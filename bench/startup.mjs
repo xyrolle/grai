@@ -6,8 +6,9 @@
 //   node startup.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { rolldown } from "rolldown";
+import { build } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
@@ -88,6 +89,22 @@ async function bundled(app, name, entry) {
 	return file;
 }
 
+/** Every key of a compiled project as grai's Vite plugin builds them for a server. */
+async function viteServerBuild(config) {
+	const { grai } = await import(join(graiSource, "vite.ts"));
+	const root = dirname(config);
+	const entry = join(root, "server-entry.js");
+	writeFileSync(entry, `export * from "./out/keys.js";\n`);
+	await build({
+		root,
+		configFile: false,
+		logLevel: "silent",
+		plugins: [grai({ config })],
+		build: { ssr: entry, outDir: join(root, "server") },
+	});
+	return join(root, "server", "server-entry.js");
+}
+
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
@@ -122,6 +139,12 @@ async function benchApp(app) {
 		[
 			"grai, every locale (the compiler's output)",
 			join(config, "..", "out", "keys.js"),
+			"options",
+			plain,
+		],
+		[
+			"grai, every locale (its Vite plugin's server build)",
+			await viteServerBuild(config),
 			"options",
 			plain,
 		],
