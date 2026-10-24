@@ -139,18 +139,28 @@ describe("a formatted placeholder's errors", () => {
 			'unsupported: messages/en.json: "a_function" (en): {amount :currency} calls :currency, which grai does not support; the formatting functions are :number, :integer, :datetime, :date, :time.',
 			'message-invalid: messages/en.json: "a_value" (en): {amount :number minimumFractionDigits=two}: "minimumFractionDigits=two" needs a whole number.',
 			`message-invalid: messages/en.json: "an_intl_value" (en): {amount :number style=currency}: Intl cannot format with these options: ${intlError(() => new Intl.NumberFormat(undefined, { style: "currency" }))}`,
-			'message-invalid: messages/en.json: "an_option" (en): {amount :number minimumFractionDigit=2}: "minimumFractionDigit=2" is not an option of :number, or is given twice. Its options are style, currency, currencyDisplay, currencySign, unit, unitDisplay, notation, compactDisplay, numberingSystem, signDisplay, useGrouping, minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, trailingZeroDisplay, roundingPriority, roundingIncrement, roundingMode.',
-			'message-invalid: messages/en.json: "twice" (en): {amount :integer signDisplay=always signDisplay=never}: "signDisplay=never" is not an option of :integer, or is given twice. Its options are signDisplay, useGrouping, minimumIntegerDigits, maximumSignificantDigits.',
+			'message-invalid: messages/en.json: "an_option" (en): {amount :number minimumFractionDigit=2}: "minimumFractionDigit=2" is not an option of :number, or is given twice. Its options are select, style, currency, currencyDisplay, currencySign, unit, unitDisplay, notation, compactDisplay, numberingSystem, signDisplay, useGrouping, minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, trailingZeroDisplay, roundingPriority, roundingIncrement, roundingMode.',
+			'message-invalid: messages/en.json: "twice" (en): {amount :integer signDisplay=always signDisplay=never}: "signDisplay=never" is not an option of :integer, or is given twice. Its options are select, signDisplay, useGrouping, minimumIntegerDigits, maximumSignificantDigits.',
 		]);
 	});
 
-	it("is an error to select on a formatted local, or to format a local", async () => {
+	it("is an error to select on a date or on a number its options round, or to format a local", async () => {
 		expect(
 			await errorsOf({
 				en: {
-					selected: [
+					a_date: [
 						{
-							declarations: ["input amount", "local price = amount: number"],
+							declarations: ["input when", "local day = when: date"],
+							selectors: ["day"],
+							match: { "day=*": "{day}" },
+						},
+					],
+					rounded: [
+						{
+							declarations: [
+								"input amount",
+								"local price = amount: number maximumFractionDigits=0 signDisplay=always",
+							],
 							selectors: ["price"],
 							match: { "price=*": "{price}" },
 						},
@@ -165,8 +175,9 @@ describe("a formatted placeholder's errors", () => {
 				},
 			}),
 		).toEqual([
+			'unsupported: messages/en.json: "a_date" (en): it selects on day, a :date value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
 			'unsupported: messages/en.json: "reformatted" (en): it formats price, a local, which grai does not support. Format the input it is made from.',
-			'unsupported: messages/en.json: "selected" (en): it selects on price, a formatted value, which grai does not support. Select on the input, or on a plural local of it.',
+			'unsupported: messages/en.json: "rounded" (en): it selects on price, a :number with maximumFractionDigits, whose category would depend on the digits shown, which grai does not support yet. Select on a local without it, and format with it in the pattern.',
 		]);
 	});
 });

@@ -59,6 +59,17 @@ it.each([
 							},
 						},
 					],
+					cart_left: [
+						{
+							declarations: ["input count", "local n = count: integer"],
+							selectors: ["n"],
+							match: {
+								"n=0": "None left",
+								"n=one": "One left",
+								"n=*": "{n} left",
+							},
+						},
+					],
 				},
 				ar: {
 					cart_title: "سلة التسوق",
@@ -95,6 +106,13 @@ it.each([
 							],
 							selectors: ["nOrdinal"],
 							match: { "nOrdinal=*": "الترتيب {n}" },
+						},
+					],
+					cart_left: [
+						{
+							declarations: ["input count", "local n = count: integer"],
+							selectors: ["n"],
+							match: { "n=0": "لم يبق شيء", "n=*": "بقي {n}" },
 						},
 					],
 				},

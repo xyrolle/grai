@@ -22,7 +22,7 @@ export type CompiledKey = Pick<
 	/** The lines the declaration takes, for the declaration maps. */
 	declarationLines: number;
 	uses: ReadonlySet<RuntimeFunction>;
-	/** The plural functions the key's code calls, by name. */
+	/** The functions of plurals.js the key's code calls, by name. */
 	plurals: ReadonlySet<string>;
 	/** The formatters the key's code calls, by name. */
 	formats: KeyModule["formats"];

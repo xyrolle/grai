@@ -5,6 +5,7 @@ import {
 	type PluralLocal,
 	parseDeclarations,
 } from "./message-declarations.ts";
+import { numberSelector } from "./number-select.ts";
 import { parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
@@ -93,12 +94,8 @@ function parseVariants(
 	);
 	const selectors = stringList(value.selectors ?? [], "selectors").map(
 		(name): Selector => {
-			if (formatted.has(name)) {
-				throw new MessageProblem(
-					"unsupported",
-					`it selects on ${name}, a formatted value, which grai does not support. Select on the input, or on a plural local of it.`,
-				);
-			}
+			const number = formatted.get(name);
+			if (number !== undefined) return numberSelector(name, number);
 			const local = plurals.get(name);
 			return local === undefined
 				? { kind: "input", name }
