@@ -28,6 +28,22 @@ describe("a recompile after an edit", () => {
 		expect([...(second.build?.compilation.changed ?? [])]).toEqual(["title"]);
 	});
 
+	it("keeps each key's message one locale at a time, for adapters that write a module per locale", async () => {
+		const { config } = project(catalogs);
+		const { build } = await recompile(config, undefined);
+		const key = (name: string) => build?.compilation.keys.get(name);
+
+		expect([key("title")?.kind, key("title")?.variants]).toEqual([
+			"text",
+			['"Title"', '"Titel"'],
+		]);
+		// "$" and "{" apart, or Biome takes the strings for template literals written by mistake.
+		expect([key("greeting")?.kind, key("greeting")?.variants]).toEqual([
+			"message",
+			["(i) => `Hello $" + "{i.name}`", "(i) => `Hallo $" + "{i.name}`"],
+		]);
+	});
+
 	it("starts again from the last good build after a compile that failed", async () => {
 		const { dir, config } = project(catalogs);
 		const good = await recompile(config, undefined);
