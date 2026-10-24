@@ -75,6 +75,10 @@
 		"./vue": {
 			"types": "./dist/vue/markup.d.ts",
 			"default": "./dist/vue/markup.js"
+		},
+		"./vue/client": {
+			"types": "./dist/vue/client.d.ts",
+			"default": "./dist/vue/client.js"
 		}
 	},
 	"bin": {
