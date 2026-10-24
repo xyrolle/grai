@@ -1,0 +1,64 @@
+import { resolve } from "node:path";
+import {
+	addPlugin,
+	addServerHandler,
+	addVitePlugin,
+	createResolver,
+	defineNuxtModule,
+} from "nuxt/kit";
+import type { NuxtModule } from "nuxt/schema";
+import { type CompileResult, compile } from "../compile.ts";
+import { readConfig } from "../config.ts";
+import { grai } from "../vite.ts";
+
+/** The module's options. `config` is the path of the project's grai.config.json, from its root. */
+export type GraiNuxtOptions = { config: string };
+
+/** The name grai/nuxt's runtime imports the project's compiled output by, in the app and the server. */
+const output = "grai/nuxt/output";
+
+/**
+ * grai's Nuxt module, with grai.config.json in the project's root:
+ *
+ *     export default defineNuxtConfig({ modules: ["grai/nuxt"] });
+ *
+ * It compiles the catalogs before Nuxt builds anything, and grai/vite compiles again on each
+ * edit in dev. A server middleware resolves each request's locale by the config's strategy, the
+ * render binds it, and the page's `<html>` takes it with its direction.
+ */
+const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
+	meta: { name: "grai", configKey: "grai" },
+	defaults: { config: "grai.config.json" },
+	async setup(options, nuxt) {
+		const configFile = resolve(nuxt.options.rootDir, options.config);
+		const config = readConfig(configFile);
+		if (!nuxt.options.ssr) {
+			throw new Error(
+				"grai: grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
+			);
+		}
+		reported(await compile(configFile), nuxt.options.dev);
+
+		const runtime = createResolver(import.meta.url).resolve;
+		nuxt.options.alias[output] = config.outdir;
+		// Only the browser's build: Nuxt runs the server's dev modules in a runner of its own,
+		// which takes an edit when the output's files change, not through grai/vite's patch.
+		addVitePlugin(() => grai({ config: configFile }), { server: false });
+		addServerHandler({
+			middleware: true,
+			handler: runtime("./runtime/locale"),
+		});
+		addPlugin(runtime("./runtime/plugin"));
+	},
+});
+export default module;
+
+/** Prints a compile's errors; a build fails on them, and dev goes on, to show the next compile's. */
+function reported(result: CompileResult, dev: boolean): void {
+	if (result.errors.length === 0) return;
+	for (const error of result.errors) console.error(error.message);
+	const count = `${result.errors.length} ${result.errors.length === 1 ? "error" : "errors"}`;
+	if (!dev)
+		throw new Error(`grai: the catalogs did not compile, with ${count}.`);
+	console.error(`grai: ${count}`);
+}
