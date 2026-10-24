@@ -152,11 +152,26 @@ describe("the Vite plugin's build", () => {
 describe("the Vite plugin's locale copies", () => {
 	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
 
+	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
+		const { dir } = project(catalogs);
+		const { sources } = await built(dir, { page });
+		const directories = new Set(
+			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
+		);
+
+		expect([...directories].sort()).toEqual([
+			"assets",
+			"assets/grai",
+			"assets/grai-de",
+			"assets/grai-en",
+		]);
+	});
+
 	it("writes each message chunk once per locale, with only that locale's words", async () => {
 		const { dir } = project(catalogs);
 		const { sources } = await built(dir, { page });
 		const messageChunks = [...sources.keys()].filter((file) =>
-			file.startsWith("grai/"),
+			file.startsWith("assets/grai/"),
 		);
 		const words = (file: string) => [
 			sources.get(file)?.includes("Title"),
@@ -174,7 +189,7 @@ describe("the Vite plugin's locale copies", () => {
 	it("serves a page its locale's words alone through an import map", async () => {
 		const { dir } = project(catalogs);
 		const { entryFiles } = await built(dir, { page }, { write: true });
-		const html = `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/grai/":"/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`;
+		const html = `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/assets/grai/":"/assets/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`;
 		const browser = await chromium.launch();
 		onTestFinished(() => browser.close());
 		const tab = await browser.newPage();
@@ -192,8 +207,12 @@ describe("the Vite plugin's locale copies", () => {
 		await tab.goto("http://grai.test/");
 		await tab.waitForFunction(`document.body.textContent === "Titel"`);
 
-		expect(requested.some((path) => path.startsWith("/grai/"))).toBe(false);
-		expect(requested.some((path) => path.startsWith("/grai-de/"))).toBe(true);
+		expect(requested.some((path) => path.startsWith("/assets/grai/"))).toBe(
+			false,
+		);
+		expect(requested.some((path) => path.startsWith("/assets/grai-de/"))).toBe(
+			true,
+		);
 	});
 
 	it("throws a GraiError naming both locales for a call in another locale than the page's", async () => {
@@ -219,7 +238,7 @@ try {
 			return path === "/"
 				? route.fulfill({
 						contentType: "text/html",
-						body: `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/grai/":"/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`,
+						body: `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/assets/grai/":"/assets/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`,
 					})
 				: route.fulfill({
 						contentType: "text/javascript",

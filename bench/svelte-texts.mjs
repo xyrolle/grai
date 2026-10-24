@@ -90,8 +90,8 @@ async function clientBuild(dir, input, plugins) {
 		};
 		visit(main.fileName);
 		return [...seen].map((fileName) =>
-			fileName.startsWith("grai/")
-				? fileName.replace("grai/", `grai-${locale}/`)
+			fileName.startsWith("assets/grai/")
+				? fileName.replace("assets/grai/", `assets/grai-${locale}/`)
 				: fileName,
 		);
 	};
@@ -104,7 +104,7 @@ function documentOf(locale, body, props, built) {
 	const bytes = (pick) =>
 		files.reduce((sum, file) => sum + pick(built.sources.get(file) ?? ""), 0);
 	return {
-		html: `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><script type="importmap">{"imports":{"/grai/":"/grai-${locale}/"}}</script></head><body><div id="app">${body}</div><script id="props" type="application/json">${json}</script><script type="module" src="/${built.entry}"></script></body></html>`,
+		html: `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><script type="importmap">{"imports":{"/assets/grai/":"/assets/grai-${locale}/"}}</script></head><body><div id="app">${body}</div><script id="props" type="application/json">${json}</script><script type="module" src="/${built.entry}"></script></body></html>`,
 		sources: built.sources,
 		raw: bytes((code) => Buffer.byteLength(code)),
 		brotli: bytes((code) => brotliCompressSync(code).length),

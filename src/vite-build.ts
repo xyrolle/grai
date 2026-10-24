@@ -3,6 +3,7 @@ import { type EnvironmentOptions, minifySync } from "vite";
 import type { Build } from "./compile.ts";
 import {
 	besideDirectory,
+	inDirectory,
 	isMessageModule,
 	keyModulePrefix,
 	keyPrefix,
@@ -75,13 +76,13 @@ export function messageChunking(outdir: string): EnvironmentOptions {
 	};
 }
 
-/** A chunk's file name: under `grai/` when it holds messages and nothing else. */
+/** A chunk's file name: in a `grai/` within its directory when it holds messages and nothing else. */
 export function chunkFileName(
 	moduleIds: readonly string[],
 	fileName: string,
 ): string {
 	return messageOnly(moduleIds)
-		? besideDirectory(fileName, messageDirectory)
+		? inDirectory(fileName, messageDirectory)
 		: fileName;
 }
 

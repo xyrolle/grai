@@ -26,8 +26,18 @@ export function messageOnly(moduleIds: readonly string[]): boolean {
 }
 
 /**
- * A file put in a sibling of its directory: `_app/immutable/chunks/a.js` with `grai` is
- * `_app/immutable/grai/a.js`. A sibling, so that a file's relative imports work alike from every
+ * A file put in a directory within its own: `_astro/a.js` with `grai` is `_astro/grai/a.js`.
+ * Within it, so that a host serving the bundler's directory as immutable (Astro's `_astro/`,
+ * Vite's `assets/`, Kit's `_app/immutable/chunks/`) serves the file so too.
+ */
+export function inDirectory(fileName: string, directory: string): string {
+	const at = fileName.lastIndexOf("/") + 1;
+	return `${fileName.slice(0, at)}${directory}/${fileName.slice(at)}`;
+}
+
+/**
+ * A file put in a sibling of its directory: `_astro/grai/a.js` with `grai-de` is
+ * `_astro/grai-de/a.js`. A sibling, so that a file's relative imports work alike from every
  * locale's copy.
  */
 export function besideDirectory(fileName: string, directory: string): string {
