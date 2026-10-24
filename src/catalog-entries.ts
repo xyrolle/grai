@@ -39,6 +39,32 @@ export function withKeyRenamed(
 	);
 }
 
+/**
+ * The text without the entries of the keys, each with the separator before it: the entries kept
+ * stay as written, each after the separator it had, so the layout and final line break stay too.
+ */
+export function withoutEntries(
+	text: string,
+	entries: readonly CatalogEntry[],
+	keys: ReadonlySet<string>,
+): string {
+	const [first] = entries;
+	const last = entries.at(-1);
+	if (first === undefined || last === undefined) return text;
+	let kept = 0;
+	let result = text.slice(0, first.keyStart);
+	entries.forEach((entry, index) => {
+		if (keys.has(entry.key)) return;
+		const previous = entries[index - 1];
+		if (kept > 0 && previous !== undefined) {
+			result += text.slice(previous.valueEnd, entry.keyStart);
+		}
+		result += text.slice(entry.keyStart, entry.valueEnd);
+		kept++;
+	});
+	return result + text.slice(last.valueEnd);
+}
+
 const whitespace = " \t\r\n";
 
 function skipSpace(text: string, at: number): number {
