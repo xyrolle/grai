@@ -1,0 +1,44 @@
+name: Bug
+description: grai does something it should not, or fails to do what its docs say.
+labels: [bug]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What grai did, with the full error or the wrong output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: A reproduction
+      description: >-
+        The smallest project that shows it: a link to a repository, or the `grai.config.json`, the
+        catalogs and the code or commands, here. A bug we can run gets fixed first.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: grai, Node (or Bun, Deno, Workers), the framework and the bundler.
+      placeholder: grai 0.1.0, Node 24.11, SvelteKit 3.2, Vite 8.3
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
