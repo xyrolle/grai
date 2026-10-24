@@ -1,7 +1,10 @@
-import { join, relative } from "node:path";
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
-import { declarationMap, type Position } from "./declaration-maps.ts";
+import {
+	type BaseCatalog,
+	type DeclarationLine,
+	shardMap,
+} from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule, pluralName } from "./plurals.ts";
@@ -16,22 +19,6 @@ export type Rendered = {
 	/** Each shard's keys, with the line of the shard's declarations each one is on. */
 	lines: readonly (readonly DeclarationLine[])[];
 };
-
-/** A key, and the line of its shard's declarations its declaration is on. */
-type DeclarationLine = readonly [key: string, line: number];
-
-/**
- * The base locale's catalog, for the declaration maps: its path, where each key is in it, and
- * whether that can differ from where the previous render had them.
- */
-export type BaseCatalog = {
-	path: string;
-	positions: ReadonlyMap<string, Position>;
-	moved: boolean;
-};
-
-/** Where a shard's declarations put each key's name: after `export declare const `. */
-const nameColumn = "export declare const ".length;
 
 /** About how many keys a shard holds, so an edit rewrites one small module and its declarations. */
 const keysPerShard = 512;
@@ -59,34 +46,26 @@ export function renderOutput(
 				);
 	const declarations: [string, string][] = [];
 	const modules: [string, string][] = [];
-	const catalog = relative(join(config.outdir, "keys"), base.path);
 	const lines: (readonly DeclarationLine[])[] = [];
 	shards.forEach((keys, index) => {
 		lines[index] = [];
 		if (keys.length === 0) return;
-		const files = shardFiles(index);
-		const kept = dirty.has(index) ? undefined : keptShard(index, files, before);
-		const shard = kept ?? renderShard(index, keys, compilation);
-		// A map is the same while the base catalog's keys and the shard's declarations keep their lines.
-		const previousMap = before?.files.get(files.map);
-		const map =
-			previousMap !== undefined &&
-			!base.moved &&
-			sameLines(shard.lines, before?.lines[index])
-				? previousMap
-				: declarationMap(
-						`${index}.d.ts`,
-						catalog,
-						shard.lines,
-						base.positions,
-						nameColumn,
-					);
+		const js = `keys/${index}.js`;
+		const dts = `keys/${index}.d.ts`;
+		const module = dirty.has(index) ? undefined : before?.files.get(js);
+		const declaration = dirty.has(index) ? undefined : before?.files.get(dts);
+		const kept = before?.lines[index];
+		const shard =
+			module !== undefined && declaration !== undefined && kept !== undefined
+				? { module, declarations: declaration, lines: kept }
+				: renderShard(index, keys, compilation);
+		const map = shardMap(index, shard.lines, base, config.outdir, {
+			map: before?.files.get(`${dts}.map`),
+			lines: kept,
+		});
 		lines[index] = shard.lines;
-		modules.push([files.module, shard.module]);
-		declarations.push(
-			[files.declarations, shard.declarations],
-			[files.map, map],
-		);
+		modules.push([js, shard.module]);
+		declarations.push([dts, shard.declarations], [`${dts}.map`, map]);
 	});
 	const keysIndex = modules
 		.map(([file]) => `export * from "./${file}";\n`)
@@ -156,45 +135,18 @@ function shardModule(keys: readonly CompiledKey[]): string {
 	return `${imports.join("")}\n${code}`;
 }
 
-/** A shard's files: its module, its declarations and their map. */
-type ShardFiles = { module: string; declarations: string; map: string };
+/** A shard's module and declarations, and the line each declaration is on. */
+type Shard = {
+	module: string;
+	declarations: string;
+	lines: readonly DeclarationLine[];
+};
 
-/** A shard's module and declarations, its declarations' map, and the line of each declaration. */
-type Shard = ShardFiles & { lines: readonly DeclarationLine[] };
-
-function shardFiles(index: number): ShardFiles {
-	const declarations = `keys/${index}.d.ts`;
-	return {
-		module: `keys/${index}.js`,
-		declarations,
-		map: `${declarations}.map`,
-	};
-}
-
-/** A shard as the previous render left it, if it has all of its files. */
-function keptShard(
-	index: number,
-	files: ShardFiles,
-	previous: Rendered | undefined,
-): Shard | undefined {
-	const module = previous?.files.get(files.module);
-	const declarations = previous?.files.get(files.declarations);
-	const map = previous?.files.get(files.map);
-	const lines = previous?.lines[index];
-	return module === undefined ||
-		declarations === undefined ||
-		map === undefined ||
-		lines === undefined
-		? undefined
-		: { module, declarations, map, lines };
-}
-
-/** A shard's module and declarations, and the line each declaration is on, for its map. */
 function renderShard(
 	index: number,
 	keys: readonly string[],
 	compilation: Compilation,
-): Omit<Shard, "map"> {
+): Shard {
 	const compiled: CompiledKey[] = [];
 	const types = keys.some((key) => compilation.keys.get(key)?.markup)
 		? "MarkupMessage, Message"
@@ -212,19 +164,6 @@ function renderShard(
 	}
 	parts.push(`//# sourceMappingURL=${index}.d.ts.map\n`);
 	return { module: shardModule(compiled), declarations: parts.join(""), lines };
-}
-
-/** Whether a shard's declarations are on the lines they were on in the previous render. */
-function sameLines(
-	lines: readonly DeclarationLine[],
-	previous: readonly DeclarationLine[] | undefined,
-): boolean {
-	if (lines === previous) return true;
-	if (previous?.length !== lines.length) return false;
-	return lines.every(
-		([key, line], index) =>
-			previous[index]?.[0] === key && previous[index]?.[1] === line,
-	);
 }
 
 /** A power of two, so a key changes shard only when the key count doubles. */

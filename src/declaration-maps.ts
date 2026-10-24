@@ -3,8 +3,70 @@
  * declaration to the key in the base locale's catalog.
  */
 
+import { join, relative } from "node:path";
+
 /** Where something starts in a text: its line and its column, both from 0. */
 export type Position = readonly [line: number, column: number];
+
+/** A key, and the line of its shard's declarations its declaration is on. */
+export type DeclarationLine = readonly [key: string, line: number];
+
+/**
+ * The base locale's catalog, for the declaration maps: its path, where each key is in it, and
+ * whether that can differ from where the previous render had them.
+ */
+export type BaseCatalog = {
+	path: string;
+	positions: ReadonlyMap<string, Position>;
+	moved: boolean;
+};
+
+/** Where a shard's declarations put each key's name: after `export declare const `. */
+const nameColumn = "export declare const ".length;
+
+/**
+ * The map of a shard's declarations, `keys/<index>.d.ts`: the previous render's while the base
+ * catalog's keys and the shard's declarations keep their lines, else a new one.
+ */
+export function shardMap(
+	index: number,
+	lines: readonly DeclarationLine[],
+	base: BaseCatalog,
+	outdir: string,
+	previous: {
+		map: string | undefined;
+		lines: readonly DeclarationLine[] | undefined;
+	},
+): string {
+	if (
+		previous.map !== undefined &&
+		!base.moved &&
+		sameLines(lines, previous.lines)
+	) {
+		return previous.map;
+	}
+	const catalog = relative(join(outdir, "keys"), base.path);
+	return declarationMap(
+		`${index}.d.ts`,
+		catalog,
+		lines,
+		base.positions,
+		nameColumn,
+	);
+}
+
+/** Whether a shard's declarations are on the lines they were on in the previous render. */
+function sameLines(
+	lines: readonly DeclarationLine[],
+	previous: readonly DeclarationLine[] | undefined,
+): boolean {
+	if (lines === previous) return true;
+	if (previous?.length !== lines.length) return false;
+	return lines.every(
+		([key, line], index) =>
+			previous[index]?.[0] === key && previous[index]?.[1] === line,
+	);
+}
 
 /**
  * Where each top-level key of a catalog starts, at the first character of its name. A catalog laid
@@ -66,7 +128,7 @@ const quote = 34;
 export function declarationMap(
 	file: string,
 	catalog: string,
-	declarations: readonly (readonly [key: string, line: number])[],
+	declarations: readonly DeclarationLine[],
 	positions: ReadonlyMap<string, Position>,
 	column: number,
 ): string {
