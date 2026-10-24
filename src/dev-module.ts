@@ -10,6 +10,8 @@ export const changeEvent = "grai:change";
  * keys.js in dev: every key, with its locales in a table, and the handler that writes an edit's
  * patch into the table. After a patch the page dispatches a cancelable `grai:change` on
  * `window`: a framework adapter that renders again cancels it, and otherwise the page reloads.
+ * Each key passes its name after its variants, for the runtime's errors to name. A build leaves
+ * names out: they would add about a third to a page's gzipped message bytes.
  */
 export function devModule(outdir: string, build: Build): string {
 	const keys = [...build.compilation.keys];
@@ -23,10 +25,10 @@ export function devModule(outdir: string, build: Build): string {
 const T = {
 ${keys.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
 };
-const live = (key, field) => T[key][field].map((_, n) => (inputs) => {
+const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
 	const variant = T[key][field][n];
 	return typeof variant === "function" ? variant(inputs) : variant;
-});
+}), key];
 ${exports.join("\n")}
 if (import.meta.hot) {
 	import.meta.hot.on(${JSON.stringify(updateEvent)}, async ({ url }) => {
