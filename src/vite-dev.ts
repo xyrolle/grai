@@ -107,11 +107,14 @@ export function serveMessages(
 		}
 		const id = `${patchPrefix}${patches.size}`;
 		patches.set(`\0${id}`, patchModule(files.outdir, next, changed));
-		const patch: HotPayload = {
+		// A runner imports the patch by its id, a page under the dev server's base, which Nuxt's is
+		// `/_nuxt/`.
+		const patchAt = (base: string): HotPayload => ({
 			type: "custom",
 			event: updateEvent,
-			data: { url: `/@id/__x00__${id}` },
-		};
+			data: { url: `${base}@id/__x00__${id}` },
+		});
+		const patch = patchAt("/");
 		for (const environment of environments) {
 			if (environment === client) continue;
 			if (!isRunnableDevEnvironment(environment)) {
@@ -131,7 +134,9 @@ export function serveMessages(
 		// it afresh, with the edit in it.
 		const module = client.moduleGraph.getModuleById(devKeysId);
 		if (module !== undefined) client.moduleGraph.invalidateModule(module);
-		client.hot.send(reloadOnEdit ? { type: "full-reload" } : patch);
+		client.hot.send(
+			reloadOnEdit ? { type: "full-reload" } : patchAt(server.config.base),
+		);
 	};
 
 	/** Shows what went wrong in the server's log and the page's overlay. */
