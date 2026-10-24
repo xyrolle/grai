@@ -143,7 +143,6 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
-  - ordinal plurals;
   - selecting on a formatted value;
   - `:percent`, `:currency` and `:unit` (`:number style=percent` and `style=currency` work);
   - markup options and attributes;
@@ -160,7 +159,7 @@ Paraglide's inlang message-format catalogs compile unchanged, and its calls stay
 - **In the browser, `{ locale }` must be the page's locale.** A built page is meant to hold only its own locale's words, so a call in another throws `locale-not-loaded`, in dev and tests as in a build.
 
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
-- **Converted:** plurals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's `number` and `datetime` formats.
+- **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's `number` and `datetime` formats.
 - **Left out:** anything else, from every locale, and named in the report.
 
 A key becomes its path joined by `_`, so `t("cart.title")` becomes `m.cart_title()`.

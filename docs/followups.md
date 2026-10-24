@@ -26,10 +26,9 @@ The Vite plugin's server build writes each message function as a function expres
 
 Done when: such a server loads function expressions while the browser keeps arrows, and `startup`'s row for the compiler's output shows the gain.
 
-## Support ordinals, number selection, more functions and markup options
+## Support number selection, more functions and markup options
 
 These are compile errors today:
-- an ordinal plural, `local p = n: plural select=ordinal`;
 - selecting on a `:number` local, which MessageFormat 2 does by plural category after an exact match;
 - `:percent`, `:currency` and `:unit`;
 - markup options and attributes.
@@ -37,6 +36,12 @@ These are compile errors today:
 Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
 
 Done when: each compiles, with a test, and the design lists it among the constructs.
+
+## The output under `noUnusedLocals`
+
+An app that checks JavaScript with `noUnusedLocals` gets errors in `plurals.js`, which takes every operand of a count where a locale's rules read only some of them.
+
+Done when: the checkJs test also sets `noUnusedLocals` and `noUnusedParameters`, and passes.
 
 ## Bind the locale in Next.js server components
 
@@ -58,7 +63,7 @@ Done when: the Vite plugin serves that module and reports the key, with a test t
 
 ## Import what `grai import` leaves out
 
-It leaves out ICU's currency and skeleton styles and i18next's formats with options or other than `number` and `datetime`, which need their options mapped one by one, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+It leaves out ICU's currency and skeleton styles and i18next's formats with options or other than `number` and `datetime`, which need their options mapped one by one. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
 
