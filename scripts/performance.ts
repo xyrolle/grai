@@ -17,7 +17,10 @@ const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 /** The median of three runs on CI's runner, rounded up. */
 const baselines = { cold: 160, noop: 4, edit: 6, process: 200 };
 const keys = 6667;
-const edits = 15;
+/** Edits made before the timed ones, while the engine still optimizes the recompile. */
+const warmupEdits = 10;
+/** Edits timed; their median is the step's time, which one slow edit on a busy runner cannot move. */
+const timedEdits = 31;
 
 function catalog(locale: string, revision = 0): Record<string, unknown> {
 	const categories =
@@ -79,14 +82,14 @@ try {
 	const noop = performance.now() - start;
 	let { build } = await recompile(config, undefined);
 	const times: number[] = [];
-	for (let revision = 1; revision <= edits; revision++) {
+	for (let revision = 1; revision <= warmupEdits + timedEdits; revision++) {
 		write(dir, "pl", revision);
 		start = performance.now();
 		const next = await recompile(config, build);
-		times.push(performance.now() - start);
+		if (revision > warmupEdits) times.push(performance.now() - start);
 		build = next.build;
 	}
-	const edit = times.toSorted((a, b) => a - b)[Math.floor(edits / 2)] ?? 0;
+	const edit = times.toSorted((a, b) => a - b)[Math.floor(timedEdits / 2)] ?? 0;
 
 	rmSync(join(dir, "out"), { recursive: true });
 	start = performance.now();
