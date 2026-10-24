@@ -1,0 +1,34 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"title": "A shop that speaks your language",
+	"greeting": "Hello, {name}!",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} item in your cart",
+				"countPlural=*": "{count} items in your cart"
+			}
+		}
+	],
+	"cart_add": "Add an item",
+	"terms": "By ordering you accept the {#link}terms{/link}.",
+	"about_link": "About us",
+	"home_link": "Back to the shop",
+	"about_title": "About the shop",
+	"about_body": "We ship everywhere, in your language.",
+	"delivery_link": "When will it arrive?",
+	"delivery_title": "When your order arrives",
+	"delivery_estimate": [
+		{
+			"declarations": ["input days", "local daysPlural = days: plural"],
+			"selectors": ["daysPlural"],
+			"match": {
+				"daysPlural=one": "It arrives in {days} day.",
+				"daysPlural=*": "It arrives in {days} days."
+			}
+		}
+	],
+	"drawn_in_browser": "Drawn in the browser"
+}
