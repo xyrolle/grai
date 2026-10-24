@@ -1,14 +1,19 @@
+import { strategy } from "grai/nuxt/output/config.js";
 import {
 	bindRequests,
+	extractLocaleFromUrl,
 	GraiError,
 	getLocale,
 	getTextDirection,
 } from "grai/nuxt/output/runtime.js";
 import {
+	addRouteMiddleware,
 	defineNuxtPlugin,
+	navigateTo,
 	type Plugin,
 	tryUseNuxtApp,
 	useHead,
+	useRequestURL,
 } from "nuxt/app";
 import "../../vue/client.ts";
 import { requestLocale } from "./request-locale.ts";
@@ -28,13 +33,29 @@ if (import.meta.server) {
 	});
 }
 
-/** Writes the page's locale and direction to its `<html>`. */
+/**
+ * Writes the page's locale and direction to its `<html>`, and, with the `url` strategy, loads
+ * the page anew for a link into another locale.
+ */
 const plugin: Plugin = defineNuxtPlugin({
 	name: "grai",
 	setup() {
 		// The request's locale on the server, and the page's <html lang> in a browser.
 		const locale = getLocale();
 		useHead({ htmlAttrs: { lang: locale, dir: getTextDirection(locale) } });
+		if (import.meta.client && strategy.includes("url")) {
+			// A page holds its own locale's words alone, so a navigation into another loads that page.
+			addRouteMiddleware(
+				"grai:locale",
+				(to) => {
+					const url = new URL(to.fullPath, useRequestURL());
+					if (extractLocaleFromUrl(url) !== locale) {
+						return navigateTo(to.fullPath, { external: true });
+					}
+				},
+				{ global: true },
+			);
+		}
 	},
 });
 export default plugin;
