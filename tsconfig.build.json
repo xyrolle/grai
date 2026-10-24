@@ -1,17 +1,15 @@
-// The package as published: the TypeScript sources compiled into dist, with their declarations,
-// and the runtime's JavaScript beside them, as the compiler copies it into every output. The
-// page's modules are among them, so it sees the DOM's types and the framework's modules too.
+// The package as published: the TypeScript sources compiled into dist, with their declarations.
+// The runtime's JavaScript ships as it is written, so scripts/build.ts copies it instead. The
+// page's modules are among the sources, so it sees the DOM's types and the framework's modules too.
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"noEmit": false,
 		"outDir": "dist",
 		"rootDir": "src",
-		"allowJs": true,
-		"isolatedDeclarations": false,
 		"lib": ["es2024", "dom"],
 		"types": ["node", "@sveltejs/kit", "vite/client"]
 	},
 	"include": ["src"],
-	"exclude": []
+	"exclude": ["src/runtime"]
 }
