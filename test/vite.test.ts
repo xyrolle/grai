@@ -449,7 +449,10 @@ describe("the Vite plugin's dev server, after a compile fails", () => {
 			JSON.stringify({ ...catalogs.de, title }, null, "\t"),
 		);
 
-	/** A dev server of the project, with the payloads it sends its pages, and a browser. */
+	/**
+	 * A dev server of the project, with the payloads it sends its pages, and a browser. The page
+	 * pings the server once connected and, when answered, sends back what it shows.
+	 */
 	async function devServer(dir: string) {
 		writeFileSync(
 			join(dir, "index.html"),
@@ -461,7 +464,13 @@ describe("the Vite plugin's dev server, after a compile fails", () => {
 const render = () => { document.getElementById("title").textContent = m.title(); };
 render();
 addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
-import.meta.hot.on("test:ping", () => { window.pinged = true; });
+import.meta.hot.on("test:pong", () => {
+	import.meta.hot.send("test:shown", [
+		document.getElementById("title").textContent,
+		document.querySelector("vite-error-overlay") === null,
+	]);
+});
+import.meta.hot.send("test:ping");
 `,
 		);
 		const sent: string[] = [];
@@ -553,21 +562,17 @@ import.meta.hot.on("test:ping", () => { window.pinged = true; });
 		fixed(dir, "Überschrift");
 		await expect.poll(() => sent.length > errors).toBe(true);
 
+		// A page gets its payloads in order, so by the time its ping is answered it has handled what
+		// the server kept for it.
+		server.ws.on("test:ping", (_data, client) => client.send("test:pong"));
+		const shown = new Promise((resolve) => server.ws.on("test:shown", resolve));
 		const page = await browser.newPage();
-		await page.goto(server.resolvedUrls?.local[0] ?? "");
-		// Pages get their payloads in order: once a ping has come, an error kept for the page has too.
-		await expect
-			.poll(async () => {
-				server.ws.send("test:ping");
-				return await page.evaluate("window.pinged === true").catch(() => false);
-			})
-			.toBe(true);
+		// Only until it commits: the reload kept for the page can come before its load event.
+		await page.goto(server.resolvedUrls?.local[0] ?? "", {
+			waitUntil: "commit",
+		});
 
-		expect(
-			await page.evaluate(
-				`[document.getElementById("title").textContent, document.querySelector("vite-error-overlay") === null]`,
-			),
-		).toEqual(["Überschrift", true]);
+		expect(await shown).toEqual(["Überschrift", true]);
 	});
 
 	it("takes the error down from an open page", async () => {
