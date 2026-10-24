@@ -121,6 +121,26 @@ describe("selecting on a :number local", () => {
 		).toEqual(["three: 3", "one: 1", "one: 1", "other: -3", "three: 3"]);
 	});
 
+	it("selects on a :percent by the percent it shows, exactly, then by its plural category", async () => {
+		const { m } = await project({
+			en: {
+				done: onNumber("percent", {
+					"n=100": "all done",
+					"n=29": "twenty-nine",
+					"n=one": "{n} done, one",
+					"n=*": "{n} done",
+				}),
+			},
+		}).load();
+
+		expect([1, 0.29, 0.01, 0.5].map((count) => m.done?.({ count }))).toEqual([
+			"all done",
+			"twenty-nine",
+			"1% done, one",
+			"50% done",
+		]);
+	});
+
 	it("is an error for a key no value can match, or for a value no variant has", async () => {
 		expect(
 			await errorsOf({
@@ -132,6 +152,7 @@ describe("selecting on a :number local", () => {
 					uncovered: onNumber("number", { "n=0": "a", "n=one": "b" }),
 					open: onNumber("number select=exact", { "n=0": "a" }),
 					mode: onNumber("number select=cardinal", { "n=*": "a" }),
+					percent_mode: onNumber("percent select=ordinal", { "n=*": "a" }),
 					price: onNumber("currency currency=EUR", { "n=*": "a" }),
 				},
 			}),
@@ -141,6 +162,7 @@ describe("selecting on a :number local", () => {
 			'message-invalid: messages/en.json: "fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
 			'message-invalid: messages/en.json: "mode" (en): "local n = count: number select=cardinal": "select=cardinal" needs plural, ordinal or exact.',
 			'selection-not-exhaustive: messages/en.json: "open" (en): no variant matches n=(any other value). Add one, or a variant with * for the selectors it does not care about.',
+			'message-invalid: messages/en.json: "percent_mode" (en): "local n = count: percent select=ordinal": "select=ordinal" is not an option of :percent, or is given twice. Its options are signDisplay, useGrouping, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, roundingPriority, roundingMode, trailingZeroDisplay.',
 			'unsupported: messages/en.json: "price" (en): it selects on n, a :currency value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
 			'selection-not-exhaustive: messages/en.json: "uncovered" (en): no variant matches n=other. Add one, or a variant with * for the selectors it does not care about.',
 			'message-invalid: messages/en.json: "written" (en): the variant n=1.0 can never be chosen: a number matches the key it is written as, 1. Write that instead.',
