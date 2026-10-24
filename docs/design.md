@@ -165,7 +165,7 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 
 ## Incremental compiles and atomic output
 
-- **A compile reads the catalogs as bytes and hashes them first.** When the manifest says the output was compiled from the same config and bytes by the same runtime, and every file it lists is there, the compile stops: nothing is parsed and no file is touched.
+- **A compile reads the catalogs as bytes and hashes them first.** When the manifest says the output was compiled from the same config and bytes by the same compiler, and every file it lists is there, the compile stops: nothing is parsed and no file is touched. "The same compiler" is a hash of grai's own modules, taken once a process (about 1–2 ms), because the version alone would miss a local build of grai.
 - **A recompile after an edit redoes only what the edit changed.** It keeps the last build in memory: each catalog's bytes and parse, each key's compiled code, each shard's text.
   - A catalog whose bytes are the same is not parsed again.
   - An edited catalog laid out one entry per line, as editors and formatters write them, has a line break and the same indent before each top-level key and nowhere else, because a JSON string holds no raw line break. The edit's changed bytes lie between two such entry starts, so only that span is parsed, in the old file and in the new. Whenever that cannot be shown exactly (another layout, a duplicated key, a span that does not parse), the whole file is parsed instead.

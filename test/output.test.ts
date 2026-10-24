@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import {
+	cpSync,
 	existsSync,
 	mkdirSync,
 	readdirSync,
@@ -9,6 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, it, vi } from "vitest";
 import { project } from "./project.ts";
 
@@ -56,6 +58,45 @@ it("touches nothing when the catalogs and config are those of the output", async
 
 	expect((await compile()).written).toEqual([]);
 	expect(modified(dir)).toEqual(before);
+});
+
+it("writes the output again when grai itself changes, as an upgrade or a local build changes it", () => {
+	const { dir, config } = project(catalogs);
+	// A copy of the compiler, in a process of its own as a new version would run.
+	const compiler = join(dir, "grai");
+	cpSync(fileURLToPath(new URL("../src", import.meta.url)), compiler, {
+		recursive: true,
+	});
+	const compile = () => {
+		const run = spawnSync(
+			process.execPath,
+			[
+				"--input-type=module",
+				"-e",
+				"const { compile } = await import(process.argv[1]); console.log(JSON.stringify((await compile(process.argv[2])).written));",
+				join(compiler, "index.ts"),
+				config,
+			],
+			{ encoding: "utf8" },
+		);
+		return JSON.parse(run.stdout);
+	};
+	expect(compile()).toContain("runtime.d.ts");
+	expect(compile()).toEqual([]);
+
+	const declarations = join(compiler, "declarations.ts");
+	writeFileSync(
+		declarations,
+		readFileSync(declarations, "utf8").replace(
+			"One of the project's locales.",
+			"A locale of the project.",
+		),
+	);
+
+	expect(compile()).toEqual(["runtime.d.ts"]);
+	expect(readFileSync(join(dir, "out", "runtime.d.ts"), "utf8")).toContain(
+		"A locale of the project.",
+	);
 });
 
 it("writes a file of the output again when it is missing", async () => {
