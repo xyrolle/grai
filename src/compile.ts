@@ -125,7 +125,10 @@ async function build(
 	);
 	const positions =
 		moved || previous === undefined
-			? keyPositions(sources[baseIndex]?.bytes.toString("utf8") ?? "")
+			? keyPositions(
+					sources[baseIndex]?.bytes.toString("utf8") ?? "",
+					catalogs[baseIndex]?.messages.keys(),
+				)
 			: previous.positions;
 	const { output, rendered } = renderOutput(
 		config,
