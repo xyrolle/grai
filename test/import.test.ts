@@ -80,7 +80,7 @@ describe("grai import --from i18next", () => {
 	});
 
 	it("turns plural suffixes into one message that chooses on count, _zero as an exact 0", async () => {
-		const m = await imported("i18next", {
+		const project = imported("i18next", {
 			"en.json": {
 				item_zero: "No items",
 				item_one: "One item",
@@ -92,8 +92,12 @@ describe("grai import --from i18next", () => {
 				item_many: "{{count}} товаров",
 				item_other: "{{count}} товара",
 			},
-		}).load();
+		});
+		const m = await project.load();
 
+		expect(readFileSync(join(project.dir, "messages", "ru.json"), "utf8")).toBe(
+			`${JSON.stringify(project.catalog("ru"), null, "\t")}\n`,
+		);
 		expect(counts((count) => m.item?.({ count }))).toEqual([
 			"No items",
 			"One item",
