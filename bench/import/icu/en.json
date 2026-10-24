@@ -11,7 +11,9 @@
 		"rank": "{n, selectordinal, one {#st} other {#th}}",
 		"offset": "{n, plural, offset:1 =0 {nobody} other {# others}}",
 		"both": "{n, plural, one {{g, select, male {his one} other {their one}}} other {{g, select, male {his #} other {their #}}}}",
-		"split": "{g, select, male {{n, plural, one {he has one} other {he has #}}} other {{n, plural, =0 {they have none} one {they have one} other {they have #}}}}"
+		"split": "{g, select, male {{n, plural, one {he has one} other {he has #}}} other {{n, plural, =0 {they have none} one {they have one} other {they have #}}}}",
+		"shipped": "Shipped {d, date, medium} at {d, time, short}",
+		"dated": "{d, date} {d, time}"
 	},
 	"app.title": "Shop"
 }

@@ -13,9 +13,10 @@ const inputName = /^[A-Za-z_$][\w$]*$/;
 const nestingLimit = 10;
 
 /**
- * An i18next string as a grai pattern: `{{name}}` and `{{- name}}` become a placeholder, and
- * `$t(key)` the text of a message of the same file without inputs. Formats (`{{value, number}}`),
- * nested values and `$t()` with options throw a MessageProblem.
+ * An i18next string as a grai pattern: `{{name}}` and `{{- name}}` become a placeholder,
+ * `{{value, number}}` and `{{value, datetime}}` one that formats alike, and `$t(key)` the text of a
+ * message of the same file without inputs. Other formats, nested values and `$t()` with options
+ * throw a MessageProblem.
  */
 export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 	const text = textOf(value);
@@ -27,8 +28,12 @@ export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 		last = match.index + match[0].length;
 		const [written, placeholder, nested] = match;
 		if (placeholder !== undefined) {
-			const name = inputOf(placeholder.trim().replace(/^-\s*/, ""), written);
-			pattern += `{${name}}`;
+			const [read = "", format] = placeholder.split(",");
+			const name = inputOf(read.trim().replace(/^-\s*/, ""), written);
+			pattern +=
+				format === undefined
+					? `{${name}}`
+					: `{${name} ${formatOf(format.trim(), written)}}`;
 			inputs.add(name);
 		} else {
 			pattern += nestedText(nested?.trim() ?? "", texts, depth);
@@ -37,13 +42,27 @@ export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 	return { pattern: pattern + escapeText(text.slice(last)), inputs };
 }
 
-function inputOf(name: string, written: string): string {
-	if (name.includes(",")) {
+/**
+ * The MessageFormat 2 call that formats as i18next's built-in formats do without options: through
+ * Intl.NumberFormat, and through Intl.DateTimeFormat with Intl's default fields.
+ */
+const formats: Readonly<Record<string, string>> = {
+	number: ":number",
+	datetime: ":date year=numeric month=numeric day=numeric",
+};
+
+function formatOf(format: string, written: string): string {
+	const call = formats[format];
+	if (call === undefined) {
 		throw new MessageProblem(
 			"unsupported",
-			`${written} formats the value, which grai does not support yet. Format it before the call and pass the text.`,
+			`${written} formats the value ${Object.hasOwn(formats, format.split("(")[0] ?? "") ? "with options" : `as ${format}`}, which grai import does not convert. Write it as {name :number} or {name :datetime} with the options it needs.`,
 		);
 	}
+	return call;
+}
+
+function inputOf(name: string, written: string): string {
 	if (!inputName.test(name)) {
 		throw new MessageProblem(
 			"unsupported",

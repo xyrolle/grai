@@ -11,7 +11,9 @@
 		"rank": "{n, selectordinal, other {#-й}}",
 		"offset": "{n, plural, offset:1 =0 {никого} other {# других}}",
 		"both": "{n, plural, one {{g, select, male {его один} other {их один}}} few {{g, select, male {его #} other {их #}}} other {{g, select, male {его # (other)} other {их # (other)}}}}",
-		"split": "{g, select, male {{n, plural, one {у него один} other {у него #}}} other {{n, plural, =0 {у них нет} one {у них один} many {у них # (many)} other {у них #}}}}"
+		"split": "{g, select, male {{n, plural, one {у него один} other {у него #}}} other {{n, plural, =0 {у них нет} one {у них один} many {у них # (many)} other {у них #}}}}",
+		"shipped": "Отправлено {d, date, medium} в {d, time, short}",
+		"dated": "{d, date} {d, time}"
 	},
 	"app.title": "Магазин"
 }

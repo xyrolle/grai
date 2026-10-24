@@ -15,14 +15,12 @@ import {
 } from "./converted.ts";
 import { type IcuNode, type IcuOption, parseIcu } from "./icu-parse.ts";
 
-const countNote =
-	"# shows the count as written (1000), where ICU formats it for the locale (1,000).";
-
 /**
  * Converts one locale's ICU MessageFormat messages, as next-intl, react-intl and intl-messageformat
  * read them, to grai's format: `plural` and `select`, nested or in sequence, become MessageFormat 2
  * selectors outermost first, `=n` an exact match on the input, `other` the catch-all `*`, `#` the
- * count and a tag markup. A message grai cannot express gets the reason as its result.
+ * count formatted with `:number`, as ICU formats it, a formatted argument its MessageFormat 2 call,
+ * and a tag markup. A message grai cannot express gets the reason as its result.
  */
 export function convertIcu(
 	entries: readonly SourceEntry[],
@@ -30,7 +28,7 @@ export function convertIcu(
 ): ImportedMessage[] {
 	return entries.map(({ path, value }) => {
 		try {
-			return { path, ...convertMessage(textOf(value), locale) };
+			return { path, result: convertMessage(textOf(value), locale), notes: [] };
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
 			return { path, result: error, notes: [] };
@@ -38,20 +36,14 @@ export function convertIcu(
 	});
 }
 
-function convertMessage(
-	source: string,
-	locale: string,
-): { result: Converted; notes: string[] } {
+function convertMessage(source: string, locale: string): Converted {
 	const nodes = parseIcu(source);
 	const converter = new IcuConverter(locale, nodes);
 	const branches = converter.expand(nodes, undefined);
 	return {
-		result: {
-			declarations: converter.declarations,
-			selectors: converter.selectors,
-			branches,
-		},
-		notes: converter.showsCount ? [countNote] : [],
+		declarations: converter.declarations,
+		selectors: converter.selectors,
+		branches,
 	};
 }
 
@@ -59,8 +51,6 @@ function convertMessage(
 class IcuConverter {
 	readonly declarations: string[] = [];
 	readonly selectors: string[] = [];
-	/** Whether a `#` shows a count, which ICU formats for the locale and grai renders as written. */
-	showsCount = false;
 	private readonly categories: readonly string[];
 	/** The message's inputs, which a plural local's name must not take. */
 	private readonly inputs: ReadonlySet<string>;
@@ -96,10 +86,15 @@ class IcuConverter {
 			case "text":
 				return [plain(escapeText(node.value))];
 			case "argument":
-				return [plain(`{${node.name}}`)];
+				return [
+					plain(
+						node.format === undefined
+							? `{${node.name}}`
+							: `{${node.name} ${node.format}}`,
+					),
+				];
 			case "pound":
-				this.showsCount = true;
-				return [plain(count === undefined ? "#" : `{${count}}`)];
+				return [plain(count === undefined ? "#" : `{${count} :number}`)];
 			case "tag":
 				return combine(
 					combine(

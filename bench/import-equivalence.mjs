@@ -1,9 +1,8 @@
 // Imports the catalogs in import/ with `grai import`, compiles them, and renders every imported
 // message with grai and with the library it came from, i18next or intl-messageformat, for each
-// locale and a range of inputs. It lists every difference, apart from the ones the import reports:
-// ICU's # formats a count for the locale (1,000 and 1,5), and i18next shows a key's name for a
-// plural form a locale lacks. i18next runs with escapeValue off, as grai leaves escaping to the
-// framework that renders the text.
+// locale and a range of inputs. It lists every difference, apart from the one the import reports:
+// i18next shows a key's name for a plural form a locale lacks. i18next runs with escapeValue off,
+// as grai leaves escaping to the framework that renders the text.
 //   node import-equivalence.mjs
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -72,8 +71,7 @@ for (const format of ["i18next", "icu"]) {
 					const ours = graiRender(m[key], inputs, locale);
 					tally.compared++;
 					if (theirs === ours) tally.equal++;
-					else if (reportedDifference(theirs, ours, sourceKey, inputs, locale))
-						tally.reported++;
+					else if (reportedDifference(theirs, sourceKey)) tally.reported++;
 					else
 						tally.different.push(
 							`${locale} ${sourceKey} ${JSON.stringify(inputs)}: ${JSON.stringify(theirs)} from ${format}, ${JSON.stringify(ours)} from grai`,
@@ -98,7 +96,7 @@ process.exitCode = failed ? 1 : 0;
 function* inputSets() {
 	for (const count of counts)
 		for (const g of genders)
-			yield { count, n: count, g, name: "Ana", value: count };
+			yield { count, n: count, g, name: "Ana", value: count, d: dateOf(count) };
 }
 
 /** Each grai key the import wrote, with the key the source library calls it by. */
@@ -162,12 +160,12 @@ function graiRender(message, inputs, locale) {
 		.join("");
 }
 
-/** A difference the import reports: # formatted for the locale, or i18next showing a key's name for a missing form. */
-function reportedDifference(theirs, ours, sourceKey, inputs, locale) {
-	if (theirs === sourceKey) return true;
-	const formatted = new Intl.NumberFormat(locale).format(inputs.n);
-	return (
-		typeof ours === "string" &&
-		ours.replaceAll(String(inputs.n), formatted) === theirs
-	);
+/** A difference the import reports: i18next showing a key's name for a missing form. */
+function reportedDifference(theirs, sourceKey) {
+	return theirs === sourceKey;
+}
+
+/** A date a count apart, in days and hours, from one moment. */
+function dateOf(count) {
+	return new Date(Date.UTC(2026, 9, 24, 15, 5, 30) + count * 90_000_000);
 }

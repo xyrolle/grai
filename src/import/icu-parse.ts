@@ -1,9 +1,13 @@
 import { MessageProblem } from "../problem.ts";
 
-/** An ICU MessageFormat message, parsed: text, `{name}`, `#`, a plural or select choice, and a tag. */
+/**
+ * An ICU MessageFormat message, parsed: text, `{name}`, `#`, a plural or select choice, and a tag.
+ * A formatted argument, such as `{price, number}`, has the MessageFormat 2 call that formats it
+ * alike, such as `:number`.
+ */
 export type IcuNode =
 	| { type: "text"; value: string }
-	| { type: "argument"; name: string }
+	| { type: "argument"; name: string; format?: string }
 	| { type: "pound" }
 	| {
 			type: "choice";
@@ -18,17 +22,37 @@ export type IcuOption = { key: string; nodes: IcuNode[] };
 
 const inputName = /^[A-Za-z_$][\w$]*$/;
 const tagName = /^[A-Za-z][\w-]*$/;
-/** The MessageFormat 2 function each ICU argument type would need. */
-const functions: Readonly<Record<string, string>> = {
-	number: ":number",
-	date: ":datetime",
-	time: ":datetime",
+/**
+ * The MessageFormat 2 call that formats an ICU argument as intl-messageformat does, by its type and
+ * style: its `number` styles, and the Intl options of its `date` and `time` styles. A date without
+ * a style takes Intl's default fields; a time without one is a medium time.
+ */
+const formats: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+	number: {
+		"": ":number",
+		integer: ":integer",
+		percent: ":number style=percent",
+	},
+	date: {
+		"": ":date year=numeric month=numeric day=numeric",
+		short: ":date year=2-digit month=numeric day=numeric",
+		medium: ":date year=numeric month=short day=numeric",
+		long: ":date year=numeric month=long day=numeric",
+		full: ":date weekday=long year=numeric month=long day=numeric",
+	},
+	time: {
+		"": ":time hour=numeric minute=numeric second=numeric",
+		short: ":time hour=numeric minute=numeric",
+		medium: ":time hour=numeric minute=numeric second=numeric",
+		long: ":time hour=numeric minute=numeric second=numeric timeZoneName=short",
+		full: ":time hour=numeric minute=numeric second=numeric timeZoneName=short",
+	},
 };
 
 /**
- * Parses an ICU message as intl-messageformat reads it. A formatted argument (`number`, `date`,
- * `time`), `selectordinal` or `offset` throws an "unsupported" MessageProblem, and a malformed
- * message a "message-invalid" one.
+ * Parses an ICU message as intl-messageformat reads it. A currency or skeleton style, an argument
+ * of another type, `selectordinal` or `offset` throws an "unsupported" MessageProblem, and a
+ * malformed message a "message-invalid" one.
  */
 export function parseIcu(source: string): IcuNode[] {
 	return new IcuParser(source).message();
@@ -125,6 +149,7 @@ class IcuParser {
 		if (this.take("}")) return { type: "argument", name: inputOf(name) };
 		if (!this.take(",")) throw invalid(`{${name} must be closed by }.`);
 		const kind = this.word();
+		if (Object.hasOwn(formats, kind)) return this.formatted(name, kind);
 		if (kind !== "plural" && kind !== "select") {
 			throw unsupportedArgument(name, kind);
 		}
@@ -138,6 +163,21 @@ class IcuParser {
 			);
 		}
 		return { type: "choice", kind, name: inputOf(name), options };
+	}
+
+	/** The rest of a formatted argument, `{name, type` read: its style, if any, and its `}`. */
+	private formatted(name: string, kind: string): IcuNode {
+		const style = this.take(",") ? this.word() : "";
+		if (!this.take("}"))
+			throw invalid(`{${name}, ${kind} must be closed by }.`);
+		const format = formats[kind]?.[style];
+		if (format === undefined) {
+			throw new MessageProblem(
+				"unsupported",
+				`{${name}, ${kind}, ${style}} formats with a style grai import does not convert. Write it as {${name} ${formats[kind]?.[""] ?? ""}} with the options it needs.`,
+			);
+		}
+		return { type: "argument", name: inputOf(name), format };
 	}
 
 	/** A choice's options up to its closing `}`, each a key and a message in braces. */
@@ -218,7 +258,7 @@ function inputOf(name: string): string {
 	return name;
 }
 
-/** Why an argument of a type other than plural or select cannot be converted. */
+/** Why an argument of a type other than plural, select, number, date or time cannot be converted. */
 function unsupportedArgument(name: string, kind: string): MessageProblem {
 	if (kind === "selectordinal") {
 		return new MessageProblem(
@@ -228,7 +268,7 @@ function unsupportedArgument(name: string, kind: string): MessageProblem {
 	}
 	return new MessageProblem(
 		"unsupported",
-		`{${name}, ${kind}} formats the value as ${functions[kind] ?? `:${kind}`}, which grai does not support yet. Format it before the call and pass the text as {${name}}.`,
+		`{${name}, ${kind}} formats the value as ${kind}, which grai does not support. Format it before the call and pass the text as {${name}}.`,
 	);
 }
 

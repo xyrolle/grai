@@ -168,11 +168,14 @@ describe("grai import", () => {
 		mkdirSync(join(dir, "i18n"));
 		writeFileSync(
 			join(dir, "i18n", "en.json"),
-			JSON.stringify({ cart: { title: "Cart" }, price: "{{p, number}}" }),
+			JSON.stringify({ cart: { title: "Cart" }, ago: "{{p, relativetime}}" }),
 		);
 		writeFileSync(
 			join(dir, "i18n", "de.json"),
-			JSON.stringify({ cart: { title: "Warenkorb" }, price: "{{p, number}}" }),
+			JSON.stringify({
+				cart: { title: "Warenkorb" },
+				ago: "{{p, relativetime}}",
+			}),
 		);
 
 		expect((await grai(dir, "import", "i18n")).code).toBe(2);
@@ -180,7 +183,7 @@ describe("grai import", () => {
 			(await grai(dir, "import", "--from", "i18next", "i18n")).stdout,
 		).toBe(
 			[
-				'left out: i18n/en.json: "price" (en, de): {{p, number}} formats the value, which grai does not support yet. Format it before the call and pass the text.',
+				'left out: i18n/en.json: "ago" (en, de): {{p, relativetime}} formats the value as relativetime, which grai import does not convert. Write it as {name :number} or {name :datetime} with the options it needs.',
 				"grai: imported 1 key into messages/en.json, messages/de.json, and left 1 out",
 				"",
 			].join("\n"),
