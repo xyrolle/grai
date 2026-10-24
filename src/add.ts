@@ -1,11 +1,10 @@
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendMessages } from "./catalog-file.ts";
 import {
 	type CompileResult,
 	compile,
 	parseCatalogs,
 	readProject,
 } from "./compile.ts";
-import { isRecord } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
 import { parseMessage } from "./message.ts";
@@ -77,21 +76,7 @@ export async function add(
 	}
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
 	for (const [locale, path] of read.config.catalogs) {
-		appendMessage(path, key, texts[locale] ?? "");
+		appendMessages(path, [[key, texts[locale] ?? ""]], path);
 	}
 	return compile(configFile);
-}
-
-/** Adds a message at the end of a catalog, keeping the catalog's indent and final line break. */
-function appendMessage(path: string, key: string, text: string) {
-	const source = readFileSync(path, "utf8");
-	const parsed: unknown = JSON.parse(source);
-	const catalog = { ...(isRecord(parsed) ? parsed : {}), [key]: text };
-	const indent = /\n([ \t]+)"/.exec(source)?.[1] ?? "";
-	const ending = source.endsWith("\n") ? "\n" : "";
-	writeFileSync(
-		`${path}.tmp`,
-		`${JSON.stringify(catalog, null, indent)}${ending}`,
-	);
-	renameSync(`${path}.tmp`, path);
 }
