@@ -32,7 +32,7 @@ Catalogs are the inlang message format, one JSON file per locale, as Paraglide r
 }
 ```
 
-`grai compile` writes the output; `grai watch` writes it again on each edit. Each message becomes a typed function:
+`grai compile` writes the output; `grai watch` writes it again on each edit. The output has a `.gitignore` of its own, so Git, Prettier and Biome skip it; ESLint needs the outdir in its `ignores`. Each message becomes a typed function:
 
 ```ts
 import { m } from "./src/lib/i18n/messages.js";

@@ -29,6 +29,7 @@ function modified(dir: string): Record<string, number> {
 it("writes the whole output once, then only the files an edit changes", async () => {
 	const { dir, compile } = project(catalogs);
 	expect((await compile()).written).toEqual([
+		".gitignore",
 		"config.js",
 		"runtime.d.ts",
 		"server.d.ts",
@@ -49,6 +50,18 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
 	);
 	expect((await compile()).written).toEqual(["keys/0.js"]);
+});
+
+it("has Git ignore the output, and nothing else", async () => {
+	const { dir, compile } = project(catalogs);
+	await compile();
+	const git = (...args: string[]) =>
+		spawnSync("git", args, { cwd: dir, encoding: "utf8" }).stdout;
+	git("init", "--quiet");
+
+	expect(git("status", "--porcelain", "--untracked-files=all")).toBe(
+		"?? grai.config.json\n?? messages/de.json\n?? messages/en.json\n",
+	);
 });
 
 it("touches nothing when the catalogs and config are those of the output", async () => {
