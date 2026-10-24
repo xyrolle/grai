@@ -1,5 +1,5 @@
-import { MessageProblem } from "./problem.ts";
-import { catchAll } from "./selection.ts";
+import { MessageProblem } from "../problem.ts";
+import { catchAll } from "../selection.ts";
 
 /** One way a converted message reads: the value each selector needs for it, and its pattern. */
 export type Branch = {
@@ -40,12 +40,35 @@ export type CatalogValue =
 			},
 	  ];
 
+/** A branch that needs no selector value. */
+export function plain(pattern: string): Branch {
+	return { keys: new Map(), pattern };
+}
+
+/** Each branch of `a` followed by each of `b`, with the selector values both need. */
+export function combine(a: readonly Branch[], b: readonly Branch[]): Branch[] {
+	return a.flatMap((first) =>
+		b.map((second) => ({
+			keys: new Map([...first.keys, ...second.keys]),
+			pattern: first.pattern + second.pattern,
+		})),
+	);
+}
+
+/** The branch, needing the selector values `keys` too. */
+export function withKeys(
+	branch: Branch,
+	keys: readonly [string, string][],
+): Branch {
+	return { keys: new Map([...branch.keys, ...keys]), pattern: branch.pattern };
+}
+
 /** A message of one pattern, without selectors. */
 export function plainMessage(pattern: string): Converted {
 	return {
 		declarations: [],
 		selectors: [],
-		branches: [{ keys: new Map(), pattern }],
+		branches: [plain(pattern)],
 	};
 }
 
@@ -75,6 +98,15 @@ export function catalogValue(message: Converted): CatalogValue {
 	];
 }
 
+/** A source value as a message's text: the libraries imported hold every message as a string. */
+export function textOf(value: unknown): string {
+	if (typeof value === "string") return value;
+	throw new MessageProblem(
+		"unsupported",
+		`its value is ${Array.isArray(value) ? "a list" : `a ${typeof value}`}, not a string; grai messages are text.`,
+	);
+}
+
 /** Text as grai's pattern syntax reads it back: `\`, `{` and `}` escaped. */
 export function escapeText(text: string): string {
 	return text.replace(/[\\{}]/g, (char) => `\\${char}`);
@@ -96,7 +128,8 @@ export function pluralLocalName(
 	taken: ReadonlySet<string>,
 ): string {
 	let name = `${input}Plural`;
-	for (let suffix = 2; taken.has(name); suffix++)
+	for (let suffix = 2; taken.has(name); suffix++) {
 		name = `${input}Plural${suffix}`;
+	}
 	return name;
 }
