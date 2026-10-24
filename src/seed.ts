@@ -113,7 +113,12 @@ export function untranslatedKeys(
 	return untranslated;
 }
 
-function isSeed(value: unknown, source: unknown, locale: string): boolean {
+/** Whether a locale's message is still the seed of the base message `source`: untranslated. */
+export function isSeed(
+	value: unknown,
+	source: unknown,
+	locale: string,
+): boolean {
 	if (value === source || sameJson(value, source)) return true;
 	// Only a plural can differ from the base text and still be its seed.
 	if (!Array.isArray(value) || !Array.isArray(source)) return false;
