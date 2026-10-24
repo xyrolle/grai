@@ -147,6 +147,33 @@ describe("a formatted placeholder", () => {
 		}
 	});
 
+	it("formats a relative time and a list as Intl.RelativeTimeFormat and Intl.ListFormat do", async () => {
+		const catalog = {
+			due: "Due {days :relativetime unit=day}",
+			due_auto: "Due {days :relativetime unit=day numeric=auto}",
+			guests: "With {names :list}",
+			either: "{names :list type=disjunction style=short}",
+		};
+		const { m } = await project({ en: catalog, de: catalog }).load();
+		const names = ["Ana", "Ion", "Maria"];
+
+		for (const locale of ["en", "de"]) {
+			const options = { locale };
+			const relative = (days: number, intl?: Intl.RelativeTimeFormatOptions) =>
+				new Intl.RelativeTimeFormat(locale, intl).format(days, "day");
+			const list = (intl?: Intl.ListFormatOptions) =>
+				new Intl.ListFormat(locale, intl).format(names);
+			expect(m.due?.({ days: -1 }, options)).toBe(`Due ${relative(-1)}`);
+			expect(m.due_auto?.({ days: 1 }, options)).toBe(
+				`Due ${relative(1, { numeric: "auto" })}`,
+			);
+			expect(m.guests?.({ names }, options)).toBe(`With ${list()}`);
+			expect(m.either?.({ names }, options)).toBe(
+				list({ type: "disjunction", style: "short" }),
+			);
+		}
+	});
+
 	it("writes one formatter for each locale and options, however many messages use it", async () => {
 		const catalog = {
 			cart_count: "{count :number} items",
@@ -178,6 +205,8 @@ describe("a formatted placeholder's errors", () => {
 					a_usage: "{distance :unit unit=meter usage=road}",
 					fraction_digits:
 						"{amount :currency currency=EUR fractionDigits=some}",
+					no_unit: "{days :relativetime numeric=auto}",
+					a_unit: "{days :relativetime unit=fortnight}",
 					an_option: "{amount :number minimumFractionDigit=2}",
 					a_value: "{amount :number minimumFractionDigits=two}",
 					an_intl_value: "{amount :number style=currency}",
@@ -185,13 +214,15 @@ describe("a formatted placeholder's errors", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "a_function" (en): {amount :string} calls :string, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "a_function" (en): {amount :string} calls :string, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'message-invalid: messages/en.json: "a_unit" (en): {days :relativetime unit=fortnight}: "unit=fortnight" needs a unit of time: year, years, quarter, quarters, month, months, week, weeks, day, days, hour, hours, minute, minutes, second, seconds.',
 			'unsupported: messages/en.json: "a_usage" (en): {distance :unit unit=meter usage=road}: usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.',
 			'message-invalid: messages/en.json: "a_value" (en): {amount :number minimumFractionDigits=two}: "minimumFractionDigits=two" needs a whole number.',
 			`message-invalid: messages/en.json: "an_intl_value" (en): {amount :number style=currency}: Intl cannot format with these options: ${intlError(() => new Intl.NumberFormat(undefined, { style: "currency" }))}`,
 			'message-invalid: messages/en.json: "an_option" (en): {amount :number minimumFractionDigit=2}: "minimumFractionDigit=2" is not an option of :number, or is given twice. Its options are select, style, currency, currencyDisplay, currencySign, unit, unitDisplay, notation, compactDisplay, numberingSystem, signDisplay, useGrouping, minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, trailingZeroDisplay, roundingPriority, roundingIncrement, roundingMode.',
 			'message-invalid: messages/en.json: "fraction_digits" (en): {amount :currency currency=EUR fractionDigits=some}: "fractionDigits=some" needs a whole number or auto.',
 			'message-invalid: messages/en.json: "no_currency" (en): {amount :currency currencyDisplay=code}: :currency needs the option currency, such as currency=EUR.',
+			'message-invalid: messages/en.json: "no_unit" (en): {days :relativetime numeric=auto}: :relativetime needs the option unit, such as unit=day.',
 			'message-invalid: messages/en.json: "twice" (en): {amount :integer signDisplay=always signDisplay=never}: "signDisplay=never" is not an option of :integer, or is given twice. Its options are select, signDisplay, useGrouping, minimumIntegerDigits, maximumSignificantDigits.',
 		]);
 	});
