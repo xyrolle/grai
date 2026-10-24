@@ -73,6 +73,14 @@ export function readConfig(file: string): Config {
 			'"locales" must be a non-empty list of distinct BCP 47 language tags, such as ["en", "de"]',
 		);
 	}
+	for (const locale of locales) {
+		const form = canonicalForm(locale);
+		if (form !== locale) {
+			throw invalid(
+				`"locales" lists "${locale}", whose canonical form is "${form}". Write it so: the page's lang, the cookie and the URL are compared with it exactly`,
+			);
+		}
+	}
 	if (typeof baseLocale !== "string" || !locales.includes(baseLocale)) {
 		throw invalid(
 			`"baseLocale" must be one of "locales": ${locales.join(", ")}`,
@@ -174,17 +182,19 @@ function isLocaleList(value: unknown): value is string[] {
 	return (
 		Array.isArray(value) &&
 		value.length > 0 &&
-		value.every(isLanguageTag) &&
+		value.every((tag) => canonicalForm(tag) !== undefined) &&
 		new Set(value).size === value.length
 	);
 }
 
-function isLanguageTag(value: unknown): value is string {
-	if (typeof value !== "string") return false;
+/** A BCP 47 language tag's canonical form, or undefined for a value that is not one tag. */
+function canonicalForm(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
 	try {
-		return Intl.getCanonicalLocales(value).length === 1;
+		const forms = Intl.getCanonicalLocales(value);
+		return forms.length === 1 ? forms[0] : undefined;
 	} catch {
-		return false;
+		return undefined;
 	}
 }
 

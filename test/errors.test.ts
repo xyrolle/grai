@@ -65,6 +65,15 @@ describe("the config", () => {
 			'config-invalid: grai.config.json: "locales" must be a non-empty list of distinct BCP 47 language tags, such as ["en", "de"].',
 		]);
 	});
+
+	it("names the canonical form of a locale written in another case", async () => {
+		expect(
+			await errorsOf({ "en-us": { title: "Title" }, de: { title: "Titel" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "locales" lists "en-us", whose canonical form is "en-US". Write it so: the page\'s lang, the cookie and the URL are compared with it exactly.',
+		]);
+	});
+
 	it("names a strategy it does not know, and a cookie strategy without its cookie", async () => {
 		const catalogs = { en: { title: "Title" } };
 
