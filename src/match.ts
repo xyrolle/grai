@@ -39,7 +39,7 @@ export function parseMatch(
 }
 
 /** Splits a variant key such as `a=one,b=*` into one key per selector, in selector order. */
-function parseVariantKey(
+export function parseVariantKey(
 	key: string,
 	selectors: readonly Selector[],
 ): string[] {

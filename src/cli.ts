@@ -3,6 +3,7 @@ import { addCommand } from "./cli/add.ts";
 import { checkCommand } from "./cli/check.ts";
 import { type Command, UsageError } from "./cli/command.ts";
 import { compileCommand } from "./cli/compile.ts";
+import { exportCommand } from "./cli/export.ts";
 import { importCommand } from "./cli/import.ts";
 import { seedCommand } from "./cli/seed.ts";
 import { watchCommand } from "./cli/watch.ts";
@@ -13,6 +14,7 @@ const commands: Record<string, Command> = {
 	watch: watchCommand,
 	check: checkCommand,
 	seed: seedCommand,
+	export: exportCommand,
 	add: addCommand,
 	import: importCommand,
 };
