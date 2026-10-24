@@ -67,9 +67,13 @@ export function renderOutput(
 		const files = shardFiles(index);
 		const kept = dirty.has(index) ? undefined : keptShard(index, files, before);
 		const shard = kept ?? renderShard(index, keys, compilation);
+		// A map is the same while the base catalog's keys and the shard's declarations keep their lines.
+		const previousMap = before?.files.get(files.map);
 		const map =
-			kept !== undefined && !base.moved
-				? kept.map
+			previousMap !== undefined &&
+			!base.moved &&
+			sameLines(shard.lines, before?.lines[index])
+				? previousMap
 				: declarationMap(
 						`${index}.d.ts`,
 						catalog,
@@ -208,6 +212,19 @@ function renderShard(
 	}
 	parts.push(`//# sourceMappingURL=${index}.d.ts.map\n`);
 	return { module: shardModule(compiled), declarations: parts.join(""), lines };
+}
+
+/** Whether a shard's declarations are on the lines they were on in the previous render. */
+function sameLines(
+	lines: readonly DeclarationLine[],
+	previous: readonly DeclarationLine[] | undefined,
+): boolean {
+	if (lines === previous) return true;
+	if (previous?.length !== lines.length) return false;
+	return lines.every(
+		([key, line], index) =>
+			previous[index]?.[0] === key && previous[index]?.[1] === line,
+	);
 }
 
 /** A power of two, so a key changes shard only when the key count doubles. */
