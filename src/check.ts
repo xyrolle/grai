@@ -5,6 +5,7 @@ import { parseCatalogs, readProject } from "./compile.ts";
 import type { Config } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
+import { missingKeyCalls } from "./missing-key-calls.ts";
 import { MessageProblem } from "./problem.ts";
 import { isSeed, untranslatedKeys } from "./seed.ts";
 import {
@@ -23,12 +24,12 @@ export type Checked = {
 
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
- * key no shipped source file names, each input one locale reads and another never does, and each
- * key `identicalToBase` lists that the catalogs no longer bear out. Source files are those under
- * the project's root, or under `sources` when given, outside the outdir, dependencies, build
- * output and dot-directories; those the config's `tests` match ship nothing. Beside them, the keys
- * each locale has not translated yet, which are not problems: a message can rightly read as the
- * base locale's.
+ * key no shipped source file names, each place a source names a key no catalog has, each input
+ * one locale reads and another never does, and each key `identicalToBase` lists that the catalogs
+ * no longer bear out. Source files are those under the project's root, or under `sources` when
+ * given, outside the outdir, dependencies, build output and dot-directories; those the config's
+ * `tests` match ship nothing. Beside them, the keys each locale has not translated yet, which are
+ * not problems: a message can rightly read as the base locale's.
  */
 export async function check(
 	configFile: string,
@@ -45,7 +46,13 @@ export async function check(
 	const files = sourceFiles(roots, config.root, config.outdir);
 	const { shipped, tests } = splitTests(files, config.tests);
 	const names = namesIn(shipped);
-	const problems = [...compilation.errors];
+	const keys = new Set(
+		catalogs.flatMap(({ messages }) => [...messages.keys()]),
+	);
+	const problems = [
+		...compilation.errors,
+		...missingKeyCalls(files, keys, config.locales),
+	];
 	for (const key of compilation.keys.keys()) {
 		if (!names.has(key)) {
 			problems.push(unused(key, config, catalogs, roots, tests));

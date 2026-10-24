@@ -113,6 +113,32 @@ describe("grai check", () => {
 		expect((await grai(counting.dir, "check")).code).toBe(0);
 	});
 
+	it("names each place a source names a key no catalog has, in Svelte, Vue and JavaScript, with the grai add that adds it", async () => {
+		const { dir } = project(catalogs);
+		const sources = {
+			"src/Cart.svelte": `<script>\n\timport { m } from "$lib/i18n";\n</script>\n<h1>{m.cart_titel()}</h1>\n`,
+			"src/Greeting.vue": `<script setup>\nimport { m } from "../out/messages.js";\n</script>\n<template><p>{{ m.cart_greeting({ name: "Ana" }) }} {{ m["cart_bye"]() }}</p></template>\n`,
+			"src/app.js": `import { cart_title } from "#i18n/messages/cart_title.js";\nimport { cart_totl } from "#i18n/messages/cart_totl.js";\n`,
+		};
+		for (const [path, text] of Object.entries(sources)) {
+			mkdirSync(join(dir, "src"), { recursive: true });
+			writeFileSync(join(dir, path), text);
+		}
+
+		const { code, stderr } = await grai(dir, "check");
+
+		const fix = (key: string) =>
+			`Add it with grai add ${key} --en "…" --de "…", or fix the name.`;
+		expect(code).toBe(1);
+		expect(stderr.split("\n")).toEqual([
+			`src/Cart.svelte:4:8: "cart_titel": m.cart_titel names a key no catalog has. ${fix("cart_titel")}`,
+			`src/Greeting.vue:4:59: "cart_bye": m["cart_bye"] names a key no catalog has. ${fix("cart_bye")}`,
+			`src/app.js:2:43: "cart_totl": #i18n/messages/cart_totl.js names a key no catalog has. ${fix("cart_totl")}`,
+			"grai: 3 errors",
+			"",
+		]);
+	});
+
 	it("counts no name that ends a longer word, such as 2xl's xl, as the key", async () => {
 		const { dir } = project({
 			en: { xl: "Extra large" },
