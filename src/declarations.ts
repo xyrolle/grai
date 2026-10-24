@@ -106,7 +106,8 @@ export declare const cookieName: ${config.cookieName === undefined ? "undefined"
 export declare function getLocale(): Locale;
 /**
  * Sets the locale: for the rest of the request on the server, for the process in a script. In a
- * browser it keeps the locale in the cookie or the URL and reloads, unless \`{ reload: false }\`.
+ * browser it sets \`<html lang>\` and \`dir\`, keeps the locale in the cookie or the URL and
+ * reloads, unless \`{ reload: false }\`.
  */
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;
 /** The direction a locale's script is written in, the bound locale's by default. */
