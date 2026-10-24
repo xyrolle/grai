@@ -242,8 +242,12 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - `grai find <key>` prints the key's line in each catalog, each call site, and each other place a source writes the name.
   - `grai rename <key> <new>` renames the key in every catalog and at every call site, then compiles. It changes nothing when any other place writes the name (an object key, a string, someone else's property), and names each, since only the author knows what it means. A new name another key has, ignoring case, or one a file that binds the key already uses, refuses it too.
   - `grai check --fix` removes each key no source names, then checks. A key that a read by a computed name may reach stays, and the report names the read: `m[expr]`, narrowed by a template's or a concatenation's literal start, `m` used whole (`Object.keys(m)`, `typeof m`), or per-key modules loaded by a built path. A key that is no key name, such as `sign-in`, stays too: the scan finds only names, so it cannot see `m["sign-in"]`, and the check reports the key as invalid, for `grai rename` to fix.
-  - **Catalogs are edited as text.** A rename changes the key's string, and a removal takes the entry with the separator before it, so every other byte of the catalog stays, layout included.
-  - **The edits are written all or none:** each file's new text goes to a temporary file first, and they are renamed into place once all are written.
+- **Every command that writes a catalog edits its text, and every other byte stays,** so a diff shows only the change:
+  - `add`, `seed` and `merge` give a key the catalog has its new value in place, and add a new key after the last entry, in the catalog's own layout: its indent, line breaks and spacing. A catalog with no entries yet, or a new one, takes another catalog's layout;
+  - a rename changes the key's string, and a removal takes the entry with the separator before it;
+  - `import` writes new catalogs, an entry per line indented by a tab.
+
+  The files are written all or none: each new text goes to a temporary file first, and they are renamed into place once all are written.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 
 ## Package
