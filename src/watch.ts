@@ -9,7 +9,8 @@ import { GraiError } from "./error.ts";
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. Changes that come during a compile are taken together by the next one. Each result
  * is reported with how long the compile took, and with its build when it succeeded. It watches
- * until the process ends or `close` is called.
+ * until the process ends or `close` is called, whose promise settles once the compile under way,
+ * if any, has finished, so the project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -18,11 +19,11 @@ export function watch(
 		milliseconds: number,
 		build: Build | undefined,
 	) => void,
-): { close: () => void } {
+): { close: () => Promise<void> } {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
 	let build: Build | undefined;
-	let compiling = false;
+	let running: Promise<void> | undefined;
 	let again = false;
 
 	/**
@@ -36,17 +37,11 @@ export function watch(
 			return;
 		}
 		const paths = [resolve(configFile), ...catalogsOf(configFile)];
-		watchers = paths.flatMap(
-			(path) => watchedFile(path, () => void run()) ?? [],
-		);
+		watchers = paths.flatMap((path) => watchedFile(path, run) ?? []);
 	};
 
-	const run = async () => {
-		if (compiling) {
-			again = true;
-			return;
-		}
-		compiling = true;
+	/** Compiles until no change came during the last compile, or until closed. */
+	const compileChanges = async () => {
 		do {
 			again = false;
 			follow();
@@ -55,14 +50,24 @@ export function watch(
 			build = next.build ?? build;
 			if (!closed) report(next.result, performance.now() - started, next.build);
 		} while (again && !closed);
-		compiling = false;
 	};
 
-	void run();
+	const run = () => {
+		if (running !== undefined) {
+			again = true;
+			return;
+		}
+		running = compileChanges().finally(() => {
+			running = undefined;
+		});
+	};
+
+	run();
 	return {
-		close: () => {
+		close: async () => {
 			closed = true;
 			for (const watcher of watchers) watcher.close();
+			await running;
 		},
 	};
 }

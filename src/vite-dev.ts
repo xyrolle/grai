@@ -19,13 +19,17 @@ export const patchPrefix = "grai:patch/";
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
  * failed, which the page shows in Vite's overlay. After an edit, the page gets a patch of the
  * changed keys; a key added or removed, or a change of locales, reloads it. The server's other
- * environments take the messages again, so the next server render has the new words.
+ * environments take the messages again, so the next server render has the new words. `close`
+ * stops following once the compile under way has finished.
  */
 export function serveMessages(
 	server: ViteDevServer,
 	files: ProjectFiles,
 	compiled: (result: Build | readonly GraiError[]) => void,
-): { patch: (id: string) => string | undefined } {
+): {
+	patch: (id: string) => string | undefined;
+	close: () => Promise<void>;
+} {
 	const client = server.environments.client;
 	const patches = new Map<string, string>();
 	let previous: Build | undefined;
@@ -74,8 +78,7 @@ export function serveMessages(
 		compiled(next);
 		if (before !== undefined) void update(before, next);
 	});
-	server.httpServer?.once("close", watcher.close);
-	return { patch: (id) => patches.get(id) };
+	return { patch: (id) => patches.get(id), close: watcher.close };
 }
 
 /** Whether a file is the plugin's to follow, so Vite's own update leaves it alone. */
