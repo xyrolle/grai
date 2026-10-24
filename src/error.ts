@@ -56,14 +56,26 @@ function location({ file, key, locale }: GraiErrorWhere): string {
 		: `${file}: "${key}" (${locale})`;
 }
 
-/** Errors in reading order: by file, then key, then locale. */
+/** Errors in reading order: by file and the place in it, then key, then locale. */
 export function sortErrors(errors: readonly GraiError[]): GraiError[] {
-	return errors.toSorted(
-		(a, b) =>
-			compare(a.file, b.file) ||
+	return errors.toSorted((a, b) => {
+		const [aFile, aLine, aColumn] = placeOf(a.file);
+		const [bFile, bLine, bColumn] = placeOf(b.file);
+		return (
+			compare(aFile, bFile) ||
+			aLine - bLine ||
+			aColumn - bColumn ||
 			compare(a.key ?? "", b.key ?? "") ||
-			compare(a.locale ?? "", b.locale ?? ""),
-	);
+			compare(a.locale ?? "", b.locale ?? "")
+		);
+	});
+}
+
+/** A file named as `file:line:column` split into its parts, so places sort by number; 0 without one. */
+function placeOf(file: string): [string, number, number] {
+	const place = /^(?<path>.*):(?<line>\d+):(?<column>\d+)$/.exec(file)?.groups;
+	if (place === undefined) return [file, 0, 0];
+	return [place.path ?? file, Number(place.line), Number(place.column)];
 }
 
 function compare(a: string, b: string): number {
