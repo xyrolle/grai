@@ -28,6 +28,11 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 - **Every key is in every locale.** A key missing from a locale is one compile error naming the locales that lack it and the `grai add` command that adds it to them. A missing translation would otherwise ship as a failed import or as another locale's words.
   - **A locale can fall back to another of its language,** with `"fallbacks": { "en-GB": "en" }`: a key its catalog lacks then compiles from the other's message, which costs nothing at run time, and its catalog can hold only the messages that differ, or none. Never to another language, as i18next allows, which would show that language's words, and never by tag alone, as Paraglide does, so a locale stays strict unless the config says otherwise. The base locale takes no fallback, as its catalog is where every key is declared.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, the server's `strategy` and `cookieName`, `switch`, `tests`, `identicalToBase` and `fallbacks`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
+- **A pseudo-locale is compiled for development, and never for a build.** `pseudoLocale` names a locale, such as `en-XA`, made from the base's messages at compile time:
+  - each letter is accented, the text grows by about 35% in whole words, and each message is in brackets, its placeholders and markup as the base writes them;
+  - a page in it shows which text bypasses the catalogs, which layout breaks with longer words, and where a text is cut, with no translator involved;
+  - it takes the base's variants, so it must have the base's plural categories;
+  - `grai watch` and the Vite dev server compile it. `grai compile` and a Vite build leave it out, so it never ships, even when a build runs over a dev server's output.
 - **Nothing is fetched and nothing is loaded from elsewhere.** grai's parser is the format's only reader, so a compile cannot depend on the network.
 
 ## Output layout
