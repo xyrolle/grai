@@ -12,8 +12,16 @@ export type OptionValue = string | number | boolean;
 /** Options by name, as Intl takes them. */
 export type IntlOptions = Readonly<Record<string, OptionValue>>;
 
-/** How an option's text is read: as a count of digits, as true or false, or as it is. */
-export type OptionKind = "digits" | "boolean" | "grouping" | "text";
+/**
+ * How an option's text is read: as a count of digits, as true or false, as a count of digits or
+ * `auto`, or as it is.
+ */
+export type OptionKind =
+	| "digits"
+	| "boolean"
+	| "grouping"
+	| "digitsOrAuto"
+	| "text";
 
 /** A formatting function: its formatter, the options it takes, and what it formats with by default. */
 export type FormatFunction = {
@@ -23,8 +31,24 @@ export type FormatFunction = {
 	fixed?: IntlOptions;
 	/** Options it formats with when it is given none that shape the text. */
 	defaults?: IntlOptions;
+	/** The option it cannot format without, such as `:currency`'s currency, with an example. */
+	required?: { option: string; example: string };
+	/** MessageFormat 2's options it does not take, each with the error that says why. */
+	refused?: Readonly<Record<string, string>>;
 	/** True when a selector can be made of it, which then takes the `select` option. */
 	selects?: true;
+};
+
+/** The options that round a number to its significant digits, shared by the number functions. */
+const roundingOptions: Readonly<Record<string, OptionKind>> = {
+	minimumSignificantDigits: "digits",
+	maximumSignificantDigits: "digits",
+	roundingPriority: "text",
+	roundingMode: "text",
+};
+const fractionDigits: Readonly<Record<string, OptionKind>> = {
+	minimumFractionDigits: "digits",
+	maximumFractionDigits: "digits",
 };
 
 /** Options that set how a date or time is written, beside its fields and styles. */
@@ -56,11 +80,12 @@ const hourSettings: Readonly<Record<string, OptionKind>> = {
 };
 
 /**
- * MessageFormat 2's formatting functions. `:number` and `:integer` take MessageFormat 2's options,
- * which are Intl.NumberFormat's by the same names, and `:number` also Intl's `style` and the options
- * that go with it. MessageFormat 2's date and time functions are a draft whose options are still
- * changing, so `:datetime`, `:date` and `:time` take Intl.DateTimeFormat's options by name, and
- * MessageFormat 2's defaults when they are given none that shape the text.
+ * MessageFormat 2's formatting functions. The number functions take MessageFormat 2's options,
+ * which are Intl.NumberFormat's by the same names but `:currency`'s fractionDigits, and `:number`
+ * also Intl's `style` and the options that go with it. MessageFormat 2's date and time functions
+ * are a draft whose options are still changing, so `:datetime`, `:date` and `:time` take
+ * Intl.DateTimeFormat's options by name, and MessageFormat 2's defaults when they are given none
+ * that shape the text.
  */
 export const functions: Readonly<Record<string, FormatFunction>> = {
 	number: {
@@ -99,6 +124,52 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 		},
 		fixed: { maximumFractionDigits: 0 },
 		selects: true,
+	},
+	percent: {
+		formatter: "number",
+		options: {
+			signDisplay: "text",
+			useGrouping: "grouping",
+			...fractionDigits,
+			...roundingOptions,
+			trailingZeroDisplay: "text",
+		},
+		fixed: { style: "percent" },
+	},
+	currency: {
+		formatter: "number",
+		options: {
+			currency: "text",
+			currencySign: "text",
+			currencyDisplay: "text",
+			useGrouping: "grouping",
+			minimumIntegerDigits: "digits",
+			fractionDigits: "digitsOrAuto",
+			...roundingOptions,
+			roundingIncrement: "digits",
+			trailingZeroDisplay: "text",
+		},
+		fixed: { style: "currency" },
+		required: { option: "currency", example: "currency=EUR" },
+	},
+	unit: {
+		formatter: "number",
+		options: {
+			unit: "text",
+			unitDisplay: "text",
+			signDisplay: "text",
+			useGrouping: "grouping",
+			minimumIntegerDigits: "digits",
+			...fractionDigits,
+			...roundingOptions,
+			roundingIncrement: "digits",
+		},
+		fixed: { style: "unit" },
+		required: { option: "unit", example: "unit=kilometer" },
+		refused: {
+			usage:
+				"usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.",
+		},
 	},
 	datetime: {
 		formatter: "datetime",
