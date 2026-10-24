@@ -7,7 +7,7 @@ import {
 	defineNuxtModule,
 } from "nuxt/kit";
 import type { NuxtModule } from "nuxt/schema";
-import { type CompileResult, compile } from "../compile.ts";
+import { type CompileResult, recompile } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import { grai } from "../vite.ts";
 import { localizedPages } from "./pages.ts";
@@ -44,13 +44,20 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 				`grai: the url strategy reads a locale from a path's first segment, and Nuxt's app.baseURL is ${nuxt.options.app.baseURL}. Serve the app from /, or use another strategy.`,
 			);
 		}
-		reported(await compile(configFile), nuxt.options.dev);
+		// As grai/vite's compile, so that the output it finds is already the one it would write.
+		const { result } = await recompile(configFile, undefined, {
+			localeCopies: true,
+		});
+		reported(result, nuxt.options.dev);
 
 		const runtime = createResolver(import.meta.url).resolve;
 		nuxt.options.alias[output] = config.outdir;
 		// Only the browser's build: Nuxt runs the server's dev modules in a runner of its own,
-		// which takes an edit when the output's files change, not through grai/vite's patch.
-		addVitePlugin(() => grai({ config: configFile }), { server: false });
+		// which takes an edit when the output's files change, not through grai/vite's patch. A
+		// build writes each message chunk's copy per locale, which a page then loads alone.
+		addVitePlugin(() => grai({ config: configFile, localeChunks: true }), {
+			server: false,
+		});
 		addServerHandler({
 			middleware: true,
 			handler: runtime("./runtime/locale"),
