@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+import { relative, resolve } from "node:path";
+import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+import { type CompileResult, compile } from "./compile.ts";
+import { readConfig } from "./config.ts";
+import type { GraiError } from "./error.ts";
+
+const usage = `Usage: grai <command> [--config <file>]
+
+  compile                      write the output, if the catalogs or config changed
+
+The config is grai.config.json in the current directory, unless --config names another file.`;
+
+/** Each command, given its arguments, does its work and returns the exit code. */
+const commands: Record<string, (args: string[]) => Promise<number>> = {
+	async compile(args) {
+		const { config } = parsed(args);
+		const started = performance.now();
+		return reported(config, await compile(config), performance.now() - started);
+	},
+};
+
+class UsageError extends Error {}
+
+/** What a command line gave: each option's value, by name. */
+type Values = Readonly<
+	Record<string, string | boolean | (string | boolean)[] | undefined>
+>;
+
+/** The config file, the command's options and its positionals. Unknown options are a usage error when strict. */
+function parsed(
+	args: string[],
+	own: ParseArgsOptionsConfig = {},
+	strict = true,
+): { config: string; values: Values; positionals: string[] } {
+	try {
+		const { values, positionals } = parseArgs({
+			args,
+			options: { config: { type: "string" }, ...own },
+			allowPositionals: true,
+			strict,
+		});
+		const config =
+			typeof values.config === "string" ? values.config : "grai.config.json";
+		return { config: resolve(config), values, positionals };
+	} catch (error) {
+		if (
+			error instanceof TypeError &&
+			"code" in error &&
+			String(error.code).startsWith("ERR_PARSE_ARGS")
+		) {
+			throw new UsageError(error.message);
+		}
+		throw error;
+	}
+}
+
+/** Prints what a compile wrote, or its errors; returns the exit code. */
+function reported(
+	config: string,
+	result: CompileResult,
+	milliseconds: number,
+): number {
+	if (result.errors.length > 0) return failed(result.errors);
+	const time = `${milliseconds.toFixed(milliseconds < 10 ? 1 : 0)} ms`;
+	const outdir = shown(readConfig(config).outdir);
+	const files =
+		result.written.length === 1
+			? result.written[0]
+			: `${result.written.length} files`;
+	console.log(
+		result.written.length === 0
+			? `grai: ${outdir} is up to date (${time})`
+			: `grai: wrote ${files} in ${outdir} (${time})`,
+	);
+	return 0;
+}
+
+/** Prints every error, in the order given, and how many; returns the exit code. */
+function failed(errors: readonly GraiError[]): number {
+	for (const error of errors) console.error(error.message);
+	console.error(
+		`grai: ${errors.length} ${errors.length === 1 ? "error" : "errors"}`,
+	);
+	return 1;
+}
+
+function shown(path: string): string {
+	return relative(process.cwd(), path) || ".";
+}
+
+const [name = "", ...args] = process.argv.slice(2);
+const command = commands[name];
+if (name === "--help" || name === "help") {
+	console.log(usage);
+} else if (command === undefined) {
+	console.error(
+		name === "" ? usage : `grai: there is no command "${name}"\n\n${usage}`,
+	);
+	process.exitCode = 2;
+} else {
+	try {
+		process.exitCode = await command(args);
+	} catch (error) {
+		if (!(error instanceof UsageError)) throw error;
+		console.error(`grai: ${error.message}\n\n${usage}`);
+		process.exitCode = 2;
+	}
+}
