@@ -64,20 +64,35 @@ export function serveMessages(
 		});
 	};
 
-	const watcher = watch(files.configFile, (result, _milliseconds, next) => {
-		if (next === undefined) {
-			compiled(result.errors);
-			client.hot.send({
-				type: "error",
-				err: { message: messagesOf(result.errors), stack: "", plugin: "grai" },
-			});
-			return;
-		}
-		const before = previous;
-		previous = next;
-		compiled(next);
-		if (before !== undefined) void update(before, next);
-	});
+	/** Shows what went wrong in the server's log and the page's overlay. */
+	const shown = (message: string, stack = "") => {
+		server.config.logger.error(`grai: ${message}`);
+		client.hot.send({
+			type: "error",
+			err: { message, stack, plugin: "grai" },
+		});
+	};
+	/** A compile or an update that threw, as when the outdir cannot be written. */
+	const failed = (error: unknown) =>
+		error instanceof Error
+			? shown(error.message, error.stack)
+			: shown(String(error));
+
+	const watcher = watch(
+		files.configFile,
+		(result, _milliseconds, next) => {
+			if (next === undefined) {
+				compiled(result.errors);
+				shown(messagesOf(result.errors));
+				return;
+			}
+			const before = previous;
+			previous = next;
+			compiled(next);
+			if (before !== undefined) update(before, next).catch(failed);
+		},
+		failed,
+	);
 	return { patch: (id) => patches.get(id), close: watcher.close };
 }
 
