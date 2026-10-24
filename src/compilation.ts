@@ -1,5 +1,6 @@
 import type { Catalog } from "./catalog.ts";
 import type { Config } from "./config.ts";
+import { lineCount } from "./declaration-maps.ts";
 import { keyDeclaration } from "./declarations.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError, sortErrors } from "./error.ts";
@@ -15,6 +16,8 @@ export type CompiledKey = Pick<KeyModule, "kind" | "variants" | "parts"> & {
 	values: readonly unknown[];
 	code: string;
 	declaration: string;
+	/** The lines the declaration takes, for the declaration maps. */
+	declarationLines: number;
 	uses: ReadonlySet<RuntimeFunction>;
 	/** The locales whose plural function the key's code calls. */
 	plurals: ReadonlySet<string>;
@@ -105,10 +108,12 @@ function compileKey(
 	const messages = parseMessages(key, catalogs, values, errors);
 	if (messages === undefined) return undefined;
 	const module = keyModule(key, messages);
+	const declaration = keyDeclaration(key, messages, base?.messages.get(key));
 	return {
 		values,
 		code: module.code,
-		declaration: keyDeclaration(key, messages, base?.messages.get(key)),
+		declaration,
+		declarationLines: lineCount(declaration),
 		uses: module.uses,
 		plurals: module.plurals,
 		kind: module.kind,

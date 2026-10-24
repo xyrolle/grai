@@ -202,7 +202,7 @@ function renderShard(
 		const key = compilation.keys.get(name);
 		if (key === undefined) continue;
 		compiled.push(key);
-		line += lineCount(key.declaration);
+		line += key.declarationLines;
 		lines.push([name, line - 1]);
 		parts.push(key.declaration);
 	}
@@ -210,12 +210,6 @@ function renderShard(
 	return { module: shardModule(compiled), declarations: parts.join(""), lines };
 }
 
-function lineCount(text: string): number {
-	let count = 0;
-	for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", at + 1))
-		count++;
-	return count;
-}
 /** A power of two, so a key changes shard only when the key count doubles. */
 function shardCount(keys: number): number {
 	let shards = 1;
