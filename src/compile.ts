@@ -107,7 +107,12 @@ export async function recompile(
 
 function sameConfig(a: Config, b: Config): boolean {
 	const shape = (config: Config) =>
-		JSON.stringify([[...config.catalogs], config.baseLocale, config.outdir]);
+		JSON.stringify([
+			[...config.catalogs],
+			config.baseLocale,
+			config.outdir,
+			[...config.fallbacks],
+		]);
 	return shape(a) === shape(b);
 }
 
@@ -242,6 +247,7 @@ function inputsOf(config: Config, hashes: readonly string[]): string {
 			config.baseLocale,
 			config.strategy,
 			config.cookieName,
+			[...config.fallbacks],
 			hashes,
 		]),
 	);

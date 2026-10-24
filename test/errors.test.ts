@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests, identicalToBase.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests, identicalToBase, fallbacks.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -72,6 +72,29 @@ describe("the config", () => {
 		).toEqual([
 			'config-invalid: grai.config.json: "locales" lists "en-us", whose canonical form is "en-US". Write it so: the page\'s lang, the cookie and the URL are compared with it exactly.',
 		]);
+	});
+
+	it("is an error when a fallback is not another locale of the same language", async () => {
+		const catalogs = {
+			en: { title: "Title" },
+			"en-GB": { title: "Title" },
+			de: { title: "Titel" },
+		};
+		const fallbackError = async (fallbacks: Record<string, string>) =>
+			(await errorsOf(catalogs, { fallbacks }))[0];
+
+		expect(await fallbackError({ "en-AU": "en" })).toBe(
+			'config-invalid: grai.config.json: "fallbacks" maps "en-AU" to "en", but each must be one of "locales": en, en-GB, de.',
+		);
+		expect(await fallbackError({ de: "en" })).toBe(
+			'config-invalid: grai.config.json: "fallbacks" maps "de" to "en", another language, whose words de would show. A fallback is a locale of the same language, such as "en-GB" to "en".',
+		);
+		expect(await fallbackError({ en: "en-GB" })).toBe(
+			'config-invalid: grai.config.json: "fallbacks" maps the base locale, en, which takes no fallback: its catalog has every key.',
+		);
+		expect(await fallbackError({ "en-GB": "en-GB" })).toBe(
+			'config-invalid: grai.config.json: "fallbacks" goes round in a circle: "en-GB" → "en-GB". Each chain of fallbacks must end at a locale that has none.',
+		);
 	});
 
 	it("names a strategy it does not know, and a cookie strategy without its cookie", async () => {
