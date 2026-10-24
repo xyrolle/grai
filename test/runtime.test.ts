@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { type Messages, project } from "./project.ts";
+import { type Messages, project, thrown } from "./project.ts";
 
 const catalogs = {
 	en: { title: "Your cart" },
@@ -173,6 +173,22 @@ describe("in a browser", () => {
 			cookie: "lang=ar; path=/; max-age=34560000; samesite=lax",
 			reloads: 1,
 			href: "https://shop.test/de/cart?step=2",
+		});
+	});
+
+	it("renders a message in the page's locale alone, as a production page holds no other", async () => {
+		page("de");
+		const { m } = await output();
+
+		expect(m.title?.({}, { locale: "de" })).toBe("Ihr Warenkorb");
+		expect(thrown(() => m.title?.({}, { locale: "en" }))).toMatchObject({
+			name: "GraiError",
+			code: "locale-not-loaded",
+			message:
+				'A message was called in "en", but this page renders in "de" alone.',
+		});
+		expect(thrown(() => m.title?.({}, { locale: "fr" }))).toMatchObject({
+			code: "locale-unknown",
 		});
 	});
 

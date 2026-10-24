@@ -10,7 +10,7 @@ import {
 
 export { baseLocale, cookieName, locales };
 
-/** A message called with an unknown locale, or with a value none of its variants accepts. */
+/** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {
 	/** @override */
 	name = "GraiError";
@@ -28,12 +28,17 @@ export class GraiError extends Error {
 }
 
 /**
+ * Whether this runs in a page. A page renders in its own locale alone: a production build loads
+ * no other locale's messages, and every build keeps that rule, so nothing fails only after deploy.
+ */
+const page = typeof document !== "undefined";
+
+/**
  * The locale outside a request, by its position in `locales`: in a browser, the page's
  * `<html lang>`, the locale the server drew it in; in a script or a test, the base locale.
  */
 let current = locales.indexOf(
-	typeof document !== "undefined" &&
-		locales.includes(document.documentElement.lang)
+	page && locales.includes(document.documentElement.lang)
 		? document.documentElement.lang
 		: baseLocale,
 );
@@ -77,7 +82,7 @@ export function setLocale(locale, options) {
 	const index = locales.indexOf(assertIsLocale(locale));
 	if (requests?.getStore() !== undefined) return requests.enterWith(index);
 	current = index;
-	if (typeof document === "undefined") return;
+	if (!page) return;
 	document.documentElement.lang = locale;
 	if (strategy.includes("cookie")) {
 		// biome-ignore lint/suspicious/noDocumentCookie: the reload that follows must see it, and the Cookie Store API is asynchronous and not in every browser.
@@ -185,7 +190,8 @@ export function localizeHref(href, options) {
 }
 
 /**
- * A message's variant for the locale a call renders in: the one it names, else the bound one.
+ * A message's variant for the locale a call renders in: the one it names, else the bound one. On
+ * a page, a call names no locale but the page's.
  *
  * @template Variant
  * @param {readonly Variant[]} variants one per locale, in `locales` order
@@ -194,10 +200,32 @@ export function localizeHref(href, options) {
  */
 function variantFor(variants, options) {
 	const locale = options?.locale;
-	const variant =
-		variants[locale === undefined ? bound() : locales.indexOf(locale)];
-	if (variant === undefined) throw unknownLocale(locale);
+	const index = locale === undefined ? bound() : locales.indexOf(locale);
+	const variant = variants[index];
+	if (variant === undefined || (page && index !== current))
+		throw noVariant(variants, locale, index);
 	return variant;
+}
+
+/**
+ * Why a call has no variant: it names a locale the project does not have, or one the page does
+ * not render in. A production page holds one locale's variants: the page's, unless its import map
+ * gave it another's.
+ *
+ * @param {readonly unknown[]} variants
+ * @param {unknown} locale
+ * @param {number} index
+ */
+function noVariant(variants, locale, index) {
+	if (index < 0) return unknownLocale(locale);
+	const held =
+		variants[current] === undefined
+			? variants.findIndex((variant) => variant !== undefined)
+			: current;
+	return new GraiError(
+		"locale-not-loaded",
+		`A message was called in "${locales[index]}", but this page renders in "${locales[held]}" alone.`,
+	);
 }
 
 /**

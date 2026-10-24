@@ -119,7 +119,7 @@ export declare function deLocalizeUrl(url: string | URL): URL;
 export declare function localizeUrl(url: string | URL, options?: { locale?: Locale }): URL;
 /** A path such as \`/cart\` with a locale's prefix; any other href as it is. */
 export declare function localizeHref(href: string, options?: { locale?: Locale }): string;
-/** A message called with an unknown locale, or with a value none of its variants accepts. */
+/** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export declare class GraiError extends Error {
 	readonly code: string;
 }

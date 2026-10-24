@@ -143,37 +143,54 @@ describe("the Vite plugin's locale copies", () => {
 		expect(requested.some((path) => path.startsWith("/grai/"))).toBe(false);
 		expect(requested.some((path) => path.startsWith("/grai-de/"))).toBe(true);
 	});
+
+	it("throws a GraiError naming both locales for a call in another locale than the page's", async () => {
+		const { dir } = project(catalogs);
+		const { entryFiles } = await built(
+			dir,
+			{
+				page: `import { m } from "./out/messages.js";
+try {
+	m.title({}, { locale: "en" });
+} catch (error) {
+	document.body.textContent = \`\${error.code}: \${error.message}\`;
+}
+`,
+			},
+			{ write: true },
+		);
+		const browser = await chromium.launch();
+		onTestFinished(() => browser.close());
+		const tab = await browser.newPage();
+		await tab.route("http://grai.test/**", (route) => {
+			const path = new URL(route.request().url()).pathname;
+			return path === "/"
+				? route.fulfill({
+						contentType: "text/html",
+						body: `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/grai/":"/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`,
+					})
+				: route.fulfill({
+						contentType: "text/javascript",
+						body: readFileSync(join(dir, "dist", path)),
+					});
+		});
+		await tab.goto("http://grai.test/");
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+
+		expect(await tab.textContent("body")).toBe(
+			'locale-not-loaded: A message was called in "en", but this page renders in "de" alone.',
+		);
+	});
 });
 
 describe("the Vite plugin's dev server", () => {
-	it("closes once the compile under way has finished, leaving the project to remove", async () => {
-		const { dir } = project(catalogs);
-		const server = await createServer({
-			root: dir,
-			configFile: false,
-			logLevel: "silent",
-			plugins: [grai()],
-		});
-		await server.close();
-
-		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
-	});
-
-	it("shows an edited message without reloading the page", async () => {
-		const { dir } = project(catalogs);
+	/** A dev server of the project, and a page in German running `main` in Chromium. */
+	async function devPage(dir: string, main: string) {
 		writeFileSync(
 			join(dir, "index.html"),
-			`<!doctype html><p id="title"></p><script type="module" src="/main.js"></script>`,
+			`<!doctype html><html lang="de"><p id="title"></p><script type="module" src="/main.js"></script>`,
 		);
-		writeFileSync(
-			join(dir, "main.js"),
-			`import { m } from "./out/messages.js";
-const render = () => { document.getElementById("title").textContent = m.title({}, { locale: "de" }); };
-render();
-addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
-window.loaded = performance.timeOrigin;
-`,
-		);
+		writeFileSync(join(dir, "main.js"), main);
 		const server = await createServer({
 			root: dir,
 			configFile: false,
@@ -192,6 +209,33 @@ window.loaded = performance.timeOrigin;
 			page.waitForFunction(
 				`document.getElementById("title").textContent === ${JSON.stringify(text)}`,
 			);
+		return { page, title };
+	}
+
+	it("closes once the compile under way has finished, leaving the project to remove", async () => {
+		const { dir } = project(catalogs);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			plugins: [grai()],
+		});
+		await server.close();
+
+		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+	});
+
+	it("shows an edited message without reloading the page", async () => {
+		const { dir } = project(catalogs);
+		const { page, title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.title(); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+window.loaded = performance.timeOrigin;
+`,
+		);
 		await title("Titel");
 		const loaded = await page.evaluate("window.loaded");
 
