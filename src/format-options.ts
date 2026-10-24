@@ -74,6 +74,10 @@ export function parseCall(
 			select = selectModeOf(text, source, token);
 			continue;
 		}
+		const refused = spec.refused?.[key];
+		if (refused !== undefined) {
+			throw new MessageProblem("unsupported", `${source}: ${refused}`);
+		}
 		const kind = spec.options[key];
 		if (kind === undefined || Object.hasOwn(given, key)) {
 			const known = Object.keys(spec.options);
@@ -84,10 +88,17 @@ export function parseCall(
 		}
 		given[key] = optionValue(kind, text, source, token);
 	}
+	const { required } = spec;
+	if (required !== undefined && !Object.hasOwn(given, required.option)) {
+		throw new MessageProblem(
+			"message-invalid",
+			`${source}: :${name} needs the option ${required.option}, such as ${required.example}.`,
+		);
+	}
 	const shaped = Object.keys(given).some(shapesText);
 	const options = {
 		...(shaped ? {} : spec.defaults),
-		...given,
+		...intlOptions(given),
 		...spec.fixed,
 	};
 	const format: Format = { formatter: spec.formatter, options };
@@ -111,6 +122,21 @@ export function parseCall(
 	};
 }
 
+/**
+ * The options given, as Intl takes them: `:currency`'s fractionDigits is both Intl's minimum and
+ * maximum fraction digits, and `auto` the currency's own.
+ */
+function intlOptions(given: IntlOptions): IntlOptions {
+	const { fractionDigits, ...options } = given;
+	return typeof fractionDigits === "number"
+		? {
+				...options,
+				minimumFractionDigits: fractionDigits,
+				maximumFractionDigits: fractionDigits,
+			}
+		: options;
+}
+
 function selectModeOf(text: string, source: string, token: string): SelectMode {
 	const mode = selectModes.find((known) => known === text);
 	if (mode === undefined) {
@@ -122,21 +148,36 @@ function selectModeOf(text: string, source: string, token: string): SelectMode {
 	return mode;
 }
 
+const digits = /^\d+$/;
+
+/** An option's value, read from its text by how the option is read. */
 function optionValue(
 	kind: OptionKind,
 	text: string,
 	source: string,
 	token: string,
 ): OptionValue {
-	if (kind === "text") return text;
-	if (kind === "digits" && /^\d+$/.test(text)) return Number(text);
-	if (kind === "boolean" && (text === "true" || text === "false")) {
-		return text === "true";
+	const invalid = (needs: string): never => {
+		throw new MessageProblem(
+			"message-invalid",
+			`${source}: "${token}" needs ${needs}.`,
+		);
+	};
+	switch (kind) {
+		case "text":
+			return text;
+		case "grouping":
+			return text === "never" || text === "false" ? false : text;
+		case "boolean":
+			return text === "true" || text === "false"
+				? text === "true"
+				: invalid("true or false");
+		case "digits":
+			return digits.test(text) ? Number(text) : invalid("a whole number");
+		case "digitsOrAuto":
+			if (text === "auto") return text;
+			return digits.test(text)
+				? Number(text)
+				: invalid("a whole number or auto");
 	}
-	if (kind === "grouping")
-		return text === "never" || text === "false" ? false : text;
-	throw new MessageProblem(
-		"message-invalid",
-		`${source}: "${token}" needs ${kind === "digits" ? "a whole number" : "true or false"}.`,
-	);
 }
