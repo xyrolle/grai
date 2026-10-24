@@ -15,7 +15,9 @@
 		"hydrate": "node hydrate.mjs",
 		"bytes": "node bytes.mjs",
 		"variants": "node variants.mjs",
-		"preload": "node preload.mjs"
+		"preload": "node preload.mjs",
+		"plurals": "node plurals.mjs",
+		"intl": "node intl.mjs"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.29.1",
