@@ -1,5 +1,7 @@
-import { hash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { createHash, hash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	type Catalog,
 	type CatalogSource,
@@ -37,7 +39,29 @@ const runtime = {
 	),
 	server: readFileSync(new URL("./runtime/server.js", import.meta.url), "utf8"),
 };
-const runtimeHash = hash("sha1", runtime.runtime + runtime.server);
+
+/**
+ * The compiler's own modules, the runtime's among them, hashed: what decides the output besides the
+ * config and the catalogs. A new version of grai changes them, and so does a local build, which
+ * keeps its version, so the output is written again after either. Taken on the first compile.
+ */
+let compilerHash: string | undefined;
+
+function hashOfCompiler(): string {
+	compilerHash ??= hashOfModules(fileURLToPath(new URL(".", import.meta.url)));
+	return compilerHash;
+}
+
+function hashOfModules(directory: string): string {
+	const modules = readdirSync(directory, { recursive: true, encoding: "utf8" })
+		.filter((file) => /\.(js|ts)$/.test(file) && !file.endsWith(".d.ts"))
+		.sort();
+	const digest = createHash("sha1");
+	for (const file of modules) {
+		digest.update(file).update(readFileSync(join(directory, file)));
+	}
+	return digest.digest("hex");
+}
 
 /**
  * Compiles a project's catalogs and writes its output, unless the output is already that of the
@@ -208,12 +232,12 @@ function basePositionsMoved(
 	);
 }
 
-/** What decides the output: the compiler's runtime, the config and every catalog's bytes. */
+/** What decides the output: the compiler, the config and every catalog's bytes. */
 function inputsOf(config: Config, hashes: readonly string[]): string {
 	return hash(
 		"sha1",
 		JSON.stringify([
-			runtimeHash,
+			hashOfCompiler(),
 			config.locales,
 			config.baseLocale,
 			config.strategy,
