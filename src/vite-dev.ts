@@ -21,10 +21,12 @@ export const patchPrefix = "grai:patch/";
 /**
  * The dev server's side: compiles when the server starts and whenever the config or a catalog
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
- * failed, which the page shows in Vite's overlay until a build succeeds. After an edit, the page gets a patch of the
- * changed keys; a key added or removed, or a change of locales, reloads it. The server's other
- * environments take the messages again, so the next server render has the new words. `close`
- * stops following once the compile under way has finished.
+ * failed, which the page shows in Vite's overlay until a build succeeds. After an edit, the page
+ * gets a patch of the changed keys; a key added or removed, or a change of locales, reloads it. A
+ * server environment that runs its modules in Vite's runner patches its table the same way, so
+ * the next server render has the new words without the runner evaluating the program again; any
+ * other environment takes the messages again. `close` stops following once the compile under way
+ * has finished.
  */
 export function serveMessages(
 	server: ViteDevServer,
