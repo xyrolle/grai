@@ -19,7 +19,8 @@
 		"plurals": "node plurals.mjs",
 		"intl": "node intl.mjs",
 		"runtime-size": "node runtime-size.mjs",
-		"hmr": "node hmr.mjs"
+		"hmr": "node hmr.mjs",
+		"call-sites": "node call-sites.mjs"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.29.1",
