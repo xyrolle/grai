@@ -6,6 +6,7 @@ import { check } from "./check.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
+import { find, foundLines } from "./find.ts";
 import { watch } from "./watch.ts";
 
 const usage = `Usage: grai <command> [--config <file>]
@@ -16,6 +17,8 @@ const usage = `Usage: grai <command> [--config <file>]
                                keys no source file names, inputs the locales do not agree on
   add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
                                then compile
+  find <key> [--source <dir>]...
+                               print the key's line in each catalog, and each call site
 
 The config is grai.config.json in the current directory, unless --config names another file.`;
 
@@ -43,9 +46,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		const { config, values } = parsed(args, {
 			source: { type: "string", multiple: true },
 		});
-		const sources = Array.isArray(values.source)
-			? values.source.map((source) => resolve(String(source)))
-			: undefined;
+		const sources = sourcesOf(values);
 		const errors = await check(config, sources);
 		if (errors.length > 0) return failed(errors);
 		console.log("grai: no problems");
@@ -80,6 +81,18 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 			await add(config, key, texts),
 			performance.now() - started,
 		);
+	},
+	async find(args) {
+		const { config, values, positionals } = parsed(args, {
+			source: { type: "string", multiple: true },
+		});
+		const [key, ...others] = positionals;
+		if (key === undefined || others.length > 0) {
+			throw new UsageError("find takes one key");
+		}
+		const found = await find(config, key, sourcesOf(values));
+		for (const line of foundLines(key, found)) console.log(line);
+		return found.errors.length > 0 ? failed(found.errors) : 0;
 	},
 };
 
@@ -116,6 +129,13 @@ function parsed(
 		}
 		throw error;
 	}
+}
+
+/** The directories `--source` names, resolved, or undefined for the project's root. */
+function sourcesOf(values: Values): string[] | undefined {
+	return Array.isArray(values.source)
+		? values.source.map((source) => resolve(String(source)))
+		: undefined;
 }
 
 /** Prints what a compile wrote, or its errors; returns the exit code. */
