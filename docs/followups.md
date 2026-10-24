@@ -31,3 +31,16 @@ Done when: the Next adapter binds the locale per request (React's request scope 
 On the client, a forced `{ locale }` other than the current one throws, and every key must be in every locale. Neither app is known to break either rule outside its tests.
 
 Done when: a local branch of each reference app on grai passes its own checks and tests, and the README cites the measured cold `dev`, one-message edit and `sync` times.
+
+## Type-check the output under `checkJs`
+
+SvelteKit's generated `tsconfig.json` sets `checkJs`, so an app with the output in `src/lib` checks its JavaScript too. svelte-check then reports errors in `plurals.js` (implicit `any`, possibly `undefined`), in `server.js` (`bindRequests` is missing from `runtime.d.ts`), and in the shards (`text` is not in `runtime.d.ts`). The SvelteKit example turns `checkJs` off.
+
+Done when: the example type-checks with `checkJs` on, the output's JavaScript included.
+
+## A `url` strategy shadows the strategies after it
+
+The `url` strategy always finds a locale: a path without a prefix is the base locale. So `["url", "cookie"]` never reads the cookie, and the config accepts it silently.
+
+Done when: the config rejects a strategy listed after `url`, or `url` finds no locale in an unprefixed path when others follow, decided in the design.
+
