@@ -27,23 +27,25 @@ const timedEdits = 31;
 const timedNoops = 11;
 const timedProcesses = 3;
 
-/**
- * The median time of `runs` runs of `step`, after `warmups` untimed ones. A step that returns a
- * number has timed itself, leaving out its own setup.
- */
+/** The median of `runs` times `step` gives, after `warmups` it is run untimed. */
 async function median(
 	runs: number,
-	step: () => Promise<number | undefined | void>,
+	step: () => Promise<number>,
 	warmups = 0,
 ): Promise<number> {
 	const times: number[] = [];
 	for (let run = 0; run < warmups + runs; run++) {
-		const started = performance.now();
-		const own = await step();
-		if (run >= warmups)
-			times.push(typeof own === "number" ? own : performance.now() - started);
+		const time = await step();
+		if (run >= warmups) times.push(time);
 	}
 	return times.toSorted((a, b) => a - b)[Math.floor(runs / 2)] ?? 0;
+}
+
+/** How long `work` takes, in milliseconds. */
+async function timed(work: () => unknown): Promise<number> {
+	const started = performance.now();
+	await work();
+	return performance.now() - started;
 }
 
 function catalog(locale: string, revision = 0): Record<string, unknown> {
@@ -101,24 +103,24 @@ try {
 	const start = performance.now();
 	await compile(config);
 	const cold = performance.now() - start;
-	const noop = await median(timedNoops, async () => {
-		await compile(config);
-	});
+	const noop = await median(timedNoops, () => timed(() => compile(config)));
 	let { build } = await recompile(config, undefined);
 	let revision = 0;
 	const edit = await median(
 		timedEdits,
-		async () => {
+		() => {
 			write(dir, "pl", ++revision);
-			const started = performance.now();
-			build = (await recompile(config, build)).build;
-			return performance.now() - started;
+			return timed(async () => {
+				build = (await recompile(config, build)).build;
+			});
 		},
 		warmupEdits,
 	);
-	const fresh = await median(timedProcesses, async () => {
+	const fresh = await median(timedProcesses, () => {
 		rmSync(join(dir, "out"), { recursive: true, force: true });
-		execFileSync(process.execPath, [cli, "compile", "--config", config]);
+		return timed(() =>
+			execFileSync(process.execPath, [cli, "compile", "--config", config]),
+		);
 	});
 
 	const steps: [string, number, number][] = [
