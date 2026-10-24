@@ -11,7 +11,9 @@
 		"rank": "{n, selectordinal, other {#}}",
 		"offset": "{n, plural, offset:1 other {#}}",
 		"both": "{n, plural, two {{g, select, male {ar his two} other {ar their two}}} other {{g, select, male {ar his #} other {ar their #}}}}",
-		"split": "{g, select, male {{n, plural, zero {ar he zero} other {ar he #}}} other {{n, plural, =0 {ar none} other {ar they #}}}}"
+		"split": "{g, select, male {{n, plural, zero {ar he zero} other {ar he #}}} other {{n, plural, =0 {ar none} other {ar they #}}}}",
+		"shipped": "شحن {d, date, medium} في {d, time, short}",
+		"dated": "{d, date} {d, time}"
 	},
 	"app.title": "ar shop"
 }

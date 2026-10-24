@@ -117,13 +117,13 @@ describe("grai import --from i18next", () => {
 				see: "See $t(title)",
 				rank_ordinal_one: "{{count}}st",
 				rank_ordinal_other: "{{count}}th",
-				price: "{{value, number}}",
+				ago: "{{value, relativetime}}",
 			},
 			"ru.json": {
 				title: "Корзина",
 				see: "См. $t(title)",
 				rank_ordinal_other: "{{count}}-й",
-				price: "{{value, number}}",
+				ago: "{{value, relativetime}}",
 			},
 		});
 		const m = await load();
@@ -140,12 +140,28 @@ describe("grai import --from i18next", () => {
 			},
 			{
 				file: "source/en.json",
-				key: "price",
+				key: "ago",
 				locales: ["en", "ru"],
 				detail:
-					"{{value, number}} formats the value, which grai does not support yet. Format it before the call and pass the text.",
+					"{{value, relativetime}} formats the value as relativetime, which grai import does not convert. Write it as {name :number} or {name :datetime} with the options it needs.",
 			},
 		]);
+	});
+
+	it("formats {{value, number}} and {{value, datetime}} as i18next does, through Intl", async () => {
+		const { load } = imported("i18next", {
+			"en.json": { price: "{{value, number}}", day: "On {{value, datetime}}" },
+			"ru.json": { price: "{{value, number}}", day: "{{value, datetime}}" },
+		});
+		const m = await load();
+		const when = new Date(Date.UTC(2026, 9, 24, 15, 5));
+
+		expect(m.price?.({ value: 1234.5 }, { locale: "ru" })).toBe(
+			new Intl.NumberFormat("ru").format(1234.5),
+		);
+		expect(m.day?.({ value: when })).toBe(
+			`On ${new Intl.DateTimeFormat("en").format(when)}`,
+		);
 	});
 
 	it("reports a plural form a locale lacks and a key that may be a context, which it imports as they are", () => {
@@ -268,16 +284,43 @@ describe("grai import --from icu", () => {
 		]);
 	});
 
-	it("leaves out formatted arguments, ordinals and offsets, and reports how # renders", () => {
+	it("formats # and number, date and time arguments as intl-messageformat does", async () => {
+		const { result, load } = imported(
+			"icu",
+			{
+				"en.json": {
+					items: "{n, plural, one {# item} other {# items}}",
+					share: "{n, number, percent} done",
+					day: "{d, date, short}",
+					at: "{d, time}",
+				},
+			},
+			["en"],
+		);
+		const m = await load();
+		const when = new Date(Date.UTC(2026, 9, 24, 15, 5, 30));
+		const format = (options: Intl.DateTimeFormatOptions) =>
+			new Intl.DateTimeFormat("en", options).format(when);
+
+		expect(m.items?.({ n: 1000 })).toBe("1,000 items");
+		expect(m.share?.({ n: 0.25 })).toBe("25% done");
+		expect(m.day?.({ d: when })).toBe(
+			format({ year: "2-digit", month: "numeric", day: "numeric" }),
+		);
+		expect(m.at?.({ d: when })).toBe(
+			format({ hour: "numeric", minute: "numeric", second: "numeric" }),
+		);
+		expect(result.changed).toEqual([]);
+	});
+
+	it("leaves out a style it does not convert, ordinals and offsets", () => {
 		const { result } = imported(
 			"icu",
 			{
 				"en.json": {
 					price: "{value, number, ::currency/EUR}",
-					day: "{d, date, short}",
 					rank: "{n, selectordinal, one {#st} other {#th}}",
 					others: "{n, plural, offset:1 other {# others}}",
-					items: "{n, plural, one {# item} other {# items}}",
 				},
 			},
 			["en"],
@@ -286,19 +329,9 @@ describe("grai import --from icu", () => {
 		expect(
 			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
 		).toEqual([
-			"price: {value, number} formats the value as :number, which grai does not support yet. Format it before the call and pass the text as {value}.",
-			"day: {d, date} formats the value as :datetime, which grai does not support yet. Format it before the call and pass the text as {d}.",
+			"price: {value, number, ::currency/EUR} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
 			"rank: {n, selectordinal} picks an ordinal form, which grai does not support yet.",
 			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
-		]);
-		expect(result.changed).toEqual([
-			{
-				file: "source/en.json",
-				key: "items",
-				locales: ["en"],
-				detail:
-					"# shows the count as written (1000), where ICU formats it for the locale (1,000).",
-			},
 		]);
 	});
 });
