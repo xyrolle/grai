@@ -65,6 +65,6 @@ function compare(a: string, b: string): number {
 }
 
 /** The errors' messages, one per line, as a tool that shows one message prints them. */
-export function messagesOf(errors: readonly GraiError[]): string {
+export function messagesOf(errors: readonly Error[]): string {
 	return errors.map((error) => error.message).join("\n");
 }

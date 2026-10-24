@@ -1,7 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { build, createServer, type HotPayload } from "vite";
+import {
+	build,
+	createServer,
+	type HotPayload,
+	isRunnableDevEnvironment,
+} from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import { project } from "./project.ts";
@@ -146,6 +151,40 @@ describe("the Vite plugin's locale copies", () => {
 });
 
 describe("the Vite plugin's dev server", () => {
+	/** A dev server of the project, and a server render of its title through Vite's SSR runner. */
+	async function serverRender(dir: string) {
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		return async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+	}
+
+	it("has an import of the output wait for the first compile, rather than fail", async () => {
+		const { dir } = project(catalogs);
+		const rendered = await serverRender(dir);
+
+		expect(await rendered()).toBe("Title");
+	});
+
+	it("fails an import of the output, rather than hold it, when the first compile throws", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "out"), "");
+		const rendered = await serverRender(dir);
+
+		await expect(rendered()).rejects.toThrow();
+	});
+
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
 		const { dir } = project(catalogs);
 		const server = await createServer({
