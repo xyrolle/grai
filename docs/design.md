@@ -23,7 +23,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input (`unit=$unit`), plural options other than `type`, selecting on a date or on a number its options round, and nested keys (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is one compile error naming the locales that lack it and the `grai add` command that adds it to them. A missing translation would otherwise ship as a failed import or as another locale's words.
-- **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
+- **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, the server's `strategy` and `cookieName`, `switch`, `tests`, and `identicalToBase`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
 - **Nothing is fetched and nothing is loaded from elsewhere.** grai's parser is the format's only reader, so a compile cannot depend on the network.
 
 ## Output layout
@@ -237,9 +237,13 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
     - **a test ships nothing, so a key that only tests name is unused,** and the report names those tests, which must change with it. Tests are the files the config's `tests` globs match, by path from the root: by default Vitest's and Jest's names (`*.test.*`, `*.spec.*`), Jest's `__tests__` folders, and the root's `test` and `tests`. A folder named `tests` deeper down may ship, as a SvelteKit route at `src/routes/tests/` does, and calling its keys unused would have `--fix` delete them. `[]` makes no file a test;
   - inputs one locale reads and another never does, which is a translation that lost or invented a placeholder.
 
-  It also lists, per locale, the keys still untranslated: those whose message equals its seed. This is a report, not an error, since a text can rightly read as the base locale's. `--json` prints the problems and the untranslated keys for scripts.
+  It also lists, per locale, the keys still untranslated: those whose message equals its seed, but the keys `identicalToBase` lists. This is a report, not an error, since a text can rightly read as the base locale's. `--json` prints the problems and the untranslated keys for scripts.
 - `grai seed <locale>` gives a locale's catalog the base text of every key it lacks, and creates the catalog if there is none.
-  - **Every key is in every locale, so an untranslated message is a seed, and equality to it is the only marker.** Nothing is kept beside the catalogs. A list of texts that are rightly identical would come only if the report proves noisy.
+  - **Every key is in every locale, so an untranslated message is a seed, and equality to it is the marker.** Nothing is kept beside the catalogs.
+  - **A message that rightly reads as the base text is listed in the config, under its locale in `identicalToBase`.** The report proved noisy without it: on app B it named 319 messages in one locale and 108 in another, each equal to the base on purpose (units, codes, words both languages share).
+    - The list is in the config, not in a file beside the catalogs or as markers in them, so the catalogs stay the inlang format and every exception is in one reviewed place.
+    - `check` and `export` take a listed key as translated, and `check` reports one that no catalog has or whose message is no longer the base text. A stale entry would otherwise hide a key that needs translating.
+    - `rename` and `check --fix` change the list with the key, through the catalogs' one writer: only the list is written again, in the config's layout, and every other byte of the config stays.
   - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` when it has no `*`. It then compiles in a locale with more categories, such as `few` in `ru`.
 - `grai export <locale>` prints a locale's messages for translators, or only the untranslated ones. `grai merge <file>` writes the translations back into the locale's catalog.
   - **The file is XLIFF 2.0**, the OASIS standard translation tools exchange, and both Weblate and Phrase read it.
