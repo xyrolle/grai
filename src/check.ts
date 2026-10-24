@@ -1,5 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { extname, join, relative } from "node:path";
+import { relative } from "node:path";
 import type { Catalog } from "./catalog.ts";
 import { compileCatalogs } from "./compilation.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
@@ -7,23 +6,7 @@ import type { Config } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
-
-/** Files that can name a message: JavaScript, TypeScript and the components of Svelte and Vue. */
-const sourceExtensions = new Set([
-	".js",
-	".mjs",
-	".cjs",
-	".jsx",
-	".ts",
-	".mts",
-	".cts",
-	".tsx",
-	".svelte",
-	".vue",
-]);
-/** Directories of dependencies and of build output, which name no message of the project's own. */
-const skippedDirectories = new Set(["node_modules", "dist", "build"]);
-const identifier = /[A-Za-z_$][\w$]*/g;
+import { namesIn, sourceFiles } from "./sources.ts";
 
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
@@ -42,35 +25,13 @@ export async function check(
 	const { config } = read;
 	const compilation = compileCatalogs(config, catalogs);
 	const roots = sources ?? [config.root];
-	const names = namesIn(roots, config.outdir);
+	const names = namesIn(sourceFiles(roots, config.root, config.outdir));
 	const problems = [...compilation.errors];
 	for (const key of compilation.keys.keys()) {
 		if (!names.has(key)) problems.push(unused(key, config, catalogs, roots));
 		problems.push(...differingInputs(key, catalogs));
 	}
 	return sortErrors(problems);
-}
-
-/** Every identifier written in the source files under the roots. */
-function namesIn(roots: readonly string[], outdir: string): Set<string> {
-	const names = new Set<string>();
-	const visit = (path: string) => {
-		for (const entry of readdirSync(path, { withFileTypes: true })) {
-			const child = join(path, entry.name);
-			if (entry.isDirectory()) {
-				const skipped =
-					entry.name.startsWith(".") ||
-					skippedDirectories.has(entry.name) ||
-					child === outdir;
-				if (!skipped) visit(child);
-			} else if (sourceExtensions.has(extname(entry.name))) {
-				for (const [name] of readFileSync(child, "utf8").matchAll(identifier))
-					names.add(name);
-			}
-		}
-	};
-	for (const root of roots) visit(root);
-	return names;
 }
 
 function unused(
