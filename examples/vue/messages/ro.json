@@ -1,0 +1,20 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"title": "Un magazin care îți vorbește limba",
+	"greeting": "Salut, {name}!",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} produs în coș",
+				"countPlural=few": "{count} produse în coș",
+				"countPlural=*": "{count} de produse în coș"
+			}
+		}
+	],
+	"cart_add": "Adaugă un produs",
+	"terms": "Comandând, accepți {#link}condițiile{/link}.",
+	"language_switch": "Read in English",
+	"drawn_in_browser": "Desenat în browser"
+}

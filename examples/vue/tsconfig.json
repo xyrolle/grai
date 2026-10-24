@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"target": "es2024",
+		"lib": ["es2024", "dom"],
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"types": ["node", "vite/client"],
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"verbatimModuleSyntax": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	"include": ["src", "server.ts", "vite.config.ts"]
+}
