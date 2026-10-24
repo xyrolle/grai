@@ -132,6 +132,29 @@ console.log(texts, parts, locale);
 	]);
 });
 
+it("types a markup message's parts by the tags every locale writes, so another tag is a type error", async () => {
+	const { dir, compile } = project({
+		en: { terms: "Read the {#link href=|/terms|}terms{/link}{#br/}" },
+		de: { terms: "Die {#b}Bedingungen{/b} lesen" },
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+type Tag = Extract<ReturnType<typeof m.terms.parts>[number], { name: string }>["name"];
+const exactly: [Tag, "b" | "br" | "link"] extends ["b" | "br" | "link", Tag] ? true : false = true;
+const options = m.terms.parts().map((part) => (part.type === "text" ? {} : part.options));
+m.terms.parts().some((part) => part.type !== "text" && part.name === "a");
+console.log(exactly, options);
+`,
+	);
+
+	// Line 5 compares a part's name with a tag no locale writes.
+	expect(errors).toEqual(["5 TS2367"]);
+});
+
 it("lets a message without inputs take none, so an input passed to it is a mistake at the call", async () => {
 	const { dir, compile } = project({
 		en: { cart_title: "Your cart" },
