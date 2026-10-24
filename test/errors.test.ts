@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests, identicalToBase.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -112,6 +112,25 @@ describe("the config", () => {
 			await errorsOf({ en: { title: "Title" } }, { tests: "**/*.test.ts" }),
 		).toEqual([
 			'config-invalid: grai.config.json: "tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test.',
+		]);
+	});
+
+	it("takes identicalToBase only as distinct keys of locales other than the base", async () => {
+		const catalogs = { en: { unit_km: "km" }, de: { unit_km: "km" } };
+		const errors = (identicalToBase: unknown) =>
+			errorsOf(catalogs, { identicalToBase });
+
+		expect(await errors(["unit_km"])).toEqual([
+			'config-invalid: grai.config.json: "identicalToBase" must map a locale to its keys whose message rightly reads as the base locale\'s, such as { "de": ["unit_km"] }.',
+		]);
+		expect(await errors({ fr: ["unit_km"] })).toEqual([
+			'config-invalid: grai.config.json: "identicalToBase" names "fr", which is not one of "locales": en, de.',
+		]);
+		expect(await errors({ en: ["unit_km"] })).toEqual([
+			'config-invalid: grai.config.json: "identicalToBase" names the base locale, en, whose messages are the base text itself.',
+		]);
+		expect(await errors({ de: ["unit_km", "unit_km"] })).toEqual([
+			'config-invalid: grai.config.json: "identicalToBase" must give de a list of distinct keys, such as ["unit_km"].',
 		]);
 	});
 });

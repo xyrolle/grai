@@ -97,6 +97,49 @@ describe("grai export", () => {
 			"cart_title",
 		);
 	});
+
+	it("takes a key identicalToBase lists for the locale as translated, with the base text its translation", async () => {
+		const { config } = project(
+			{
+				en: { unit_km: "km", cart_title: "Your cart" },
+				de: { unit_km: "km", cart_title: "Your cart" },
+			},
+			{ identicalToBase: { de: ["unit_km"] } },
+		);
+		const units = async (untranslated: boolean) => {
+			const result = await exportLocale(config, "de", {
+				json: true,
+				untranslated,
+			});
+			return "document" in result ? JSON.parse(result.document).units : [];
+		};
+
+		expect(await units(true)).toEqual([
+			{ id: "cart_title", key: "cart_title", source: "Your cart" },
+		]);
+		expect(await units(false)).toEqual([
+			{ id: "unit_km", key: "unit_km", source: "km", target: "km" },
+			{ id: "cart_title", key: "cart_title", source: "Your cart" },
+		]);
+	});
+
+	it("merges nothing from a document of a listed key merged back as it was exported", async () => {
+		const { dir, config } = project(
+			{ en: { unit_km: "km" }, de: { unit_km: "km" } },
+			{ identicalToBase: { de: ["unit_km"] } },
+		);
+		const exported = await exportLocale(config, "de", {
+			json: true,
+			untranslated: false,
+		});
+		const file = join(dir, "de-units.json");
+		writeFileSync(file, "document" in exported ? exported.document : "");
+
+		expect(await mergeDocument(config, file)).toMatchObject({
+			messages: 0,
+			units: 0,
+		});
+	});
 	it("starts each plural form from the base text for the same counts, so the count shows where the locale needs it", async () => {
 		const files = [
 			{

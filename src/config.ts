@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraiError } from "./error.ts";
 import { isGlob } from "./globs.ts";
+import {
+	type IdenticalToBase,
+	readIdenticalToBase,
+} from "./identical-to-base.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -20,6 +24,8 @@ export type Config = {
 	switch: LocaleSwitch;
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
 	tests: readonly string[];
+	/** Each locale's keys whose message is the base text on purpose, which are not untranslated. */
+	identicalToBase: IdenticalToBase;
 };
 
 /**
@@ -46,6 +52,7 @@ const fields = new Set([
 	"cookieName",
 	"switch",
 	"tests",
+	"identicalToBase",
 ]);
 const localePlaceholder = "{locale}";
 /** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
@@ -85,6 +92,7 @@ export function readConfig(file: string): Config {
 		cookieName,
 		switch: localeSwitch = "reload",
 		tests = conventionalTests,
+		identicalToBase = {},
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -140,6 +148,11 @@ export function readConfig(file: string): Config {
 			'"tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test',
 		);
 	}
+	if (!isRecord(identicalToBase)) {
+		throw invalid(
+			'"identicalToBase" must map a locale to its keys whose message rightly reads as the base locale\'s, such as { "de": ["unit_km"] }',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -156,6 +169,12 @@ export function readConfig(file: string): Config {
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 		switch: localeSwitch,
 		tests,
+		identicalToBase: readIdenticalToBase(
+			identicalToBase,
+			locales,
+			baseLocale,
+			invalid,
+		),
 	};
 }
 

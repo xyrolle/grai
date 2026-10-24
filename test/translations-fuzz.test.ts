@@ -137,18 +137,18 @@ function roundTrip(
 	target: Catalog,
 	returned: readonly ReturnedUnit[],
 ): Unit[] {
-	const merged = mergeUnits(base, target, "de", returned);
+	const merged = mergeUnits(base, target, "de", new Set(), returned);
 	expect(merged.refused).toEqual([]);
 	const messages = Object.fromEntries(target.messages);
 	for (const [key, value] of merged.messages) messages[key] = value;
-	return exportUnits(base, catalog("de", messages), "de");
+	return exportUnits(base, catalog("de", messages), "de", new Set());
 }
 
 describe("translation files, fuzzed", () => {
 	it("give back every translation as it was, through XLIFF and through JSON", () => {
 		for (let seed = 1; seed <= 150; seed++) {
 			const { base, target } = project(seed);
-			const units = exportUnits(base, target, "de");
+			const units = exportUnits(base, target, "de", new Set());
 			const xliff = readXliff(writeXliff("en", "de", units)).units;
 			const json = readUnitsJson(writeUnitsJson("en", "de", units)).units;
 
@@ -164,7 +164,11 @@ describe("translation files, fuzzed", () => {
 	it("read a damaged XLIFF file into an error or into units the merge refuses or takes, never a crash", () => {
 		for (let seed = 1; seed <= 40; seed++) {
 			const { base, target } = project(seed);
-			const document = writeXliff("en", "de", exportUnits(base, target, "de"));
+			const document = writeXliff(
+				"en",
+				"de",
+				exportUnits(base, target, "de", new Set()),
+			);
 			const next = generator(seed * 7919);
 			for (let mutation = 0; mutation < 50; mutation++) {
 				const at = Math.floor(next() * document.length);
@@ -189,7 +193,8 @@ describe("translation files, fuzzed", () => {
 					).toBe(false);
 					expect(error).toBeInstanceOf(Error);
 				}
-				if (units !== undefined) mergeUnits(base, target, "de", units);
+				if (units !== undefined)
+					mergeUnits(base, target, "de", new Set(), units);
 			}
 		}
 	});

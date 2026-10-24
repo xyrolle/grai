@@ -234,4 +234,22 @@ describe("grai check's untranslated keys", () => {
 			["ru", ["cart_items"]],
 		]);
 	});
+
+	it("leaves out the keys identicalToBase lists for the locale, as their message is the base text on purpose", async () => {
+		const { config } = project(
+			{
+				en: { unit_km: "km", cart_title: "Your cart" },
+				de: { unit_km: "km", cart_title: "Your cart" },
+				ro: { unit_km: "km", cart_title: "Your cart" },
+			},
+			{ identicalToBase: { de: ["unit_km"] } },
+		);
+
+		const { untranslated } = await check(config);
+
+		expect([...untranslated]).toEqual([
+			["de", ["cart_title"]],
+			["ro", ["unit_km", "cart_title"]],
+		]);
+	});
 });

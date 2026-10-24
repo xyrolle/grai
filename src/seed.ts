@@ -11,6 +11,7 @@ import { type CompileResult, compile } from "./compile.ts";
 import { isRecord } from "./config.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError } from "./error.ts";
+import type { IdenticalToBase } from "./identical-to-base.ts";
 import { readLocaleCatalogs } from "./locale-catalogs.ts";
 import { parseMessage } from "./message.ts";
 import { parseDeclarations } from "./message-declarations.ts";
@@ -104,22 +105,24 @@ function variantKey(keys: ReadonlyMap<string, string>): string {
 
 /**
  * The keys of each locale other than the base whose message is still its seed, the base text, in
- * the catalog's order. Only locales with any are listed.
+ * the catalog's order, but those `identical` lists for the locale. Only locales with any are listed.
  */
 export function untranslatedKeys(
 	catalogs: readonly Catalog[],
 	baseLocale: string,
+	identical: IdenticalToBase,
 ): Map<string, string[]> {
 	const base = catalogs.find((catalog) => catalog.locale === baseLocale);
 	const untranslated = new Map<string, string[]>();
 	for (const catalog of catalogs) {
 		if (base === undefined || catalog === base) continue;
+		const listed = identical.get(catalog.locale);
 		const keys: string[] = [];
 		for (const [key, value] of catalog.messages) {
 			const source = base.messages.get(key);
-			if (source !== undefined && isSeed(value, source, catalog.locale)) {
-				keys.push(key);
-			}
+			const seeded =
+				source !== undefined && isSeed(value, source, catalog.locale);
+			if (seeded && !listed?.has(key)) keys.push(key);
 		}
 		if (keys.length > 0) untranslated.set(catalog.locale, keys);
 	}

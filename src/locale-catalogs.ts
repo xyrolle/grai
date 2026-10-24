@@ -13,6 +13,8 @@ export type LocaleCatalogs = {
 	path: string;
 	base: Catalog;
 	target: Catalog | undefined;
+	/** The locale's keys whose message is the base text on purpose. */
+	identical: ReadonlySet<string>;
 };
 
 /**
@@ -56,5 +58,6 @@ export async function readLocaleCatalogs(
 	if (base === undefined)
 		throw new Error("grai read no base catalog, and no error");
 	const target = parsed.catalogs.find((catalog) => catalog.locale === locale);
-	return { config, path, base, target };
+	const identical = config.identicalToBase.get(locale) ?? new Set();
+	return { config, path, base, target, identical };
 }

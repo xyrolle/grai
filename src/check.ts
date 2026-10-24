@@ -53,7 +53,11 @@ export async function check(
 	}
 	return {
 		problems: sortErrors(problems),
-		untranslated: untranslatedKeys(catalogs, config.baseLocale),
+		untranslated: untranslatedKeys(
+			catalogs,
+			config.baseLocale,
+			config.identicalToBase,
+		),
 	};
 }
 
