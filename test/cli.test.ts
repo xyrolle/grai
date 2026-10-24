@@ -1,6 +1,9 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { project } from "./project.ts";
 
 const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
@@ -56,6 +59,26 @@ describe("grai compile", () => {
 			"",
 		]);
 	});
+});
+
+it("grai watch writes the output, then the shard a catalog's edit changes", async () => {
+	const { dir } = project(catalogs);
+	const child = spawn(process.execPath, [cli, "watch"], { cwd: dir });
+	onTestFinished(() => {
+		child.kill();
+	});
+	const lines = createInterface({ input: child.stdout })[
+		Symbol.asyncIterator
+	]();
+	const next = async () => String((await lines.next()).value);
+
+	expect(await next()).toBe("grai: watching grai.config.json and its catalogs");
+	expect(await next()).toMatch(/^grai: wrote 9 files in out/);
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, cart_title: "Warenkorb" }, null, "\t"),
+	);
+	expect(await next()).toMatch(/^grai: wrote keys\/0\.js in out \(.+ ms\)$/);
 });
 
 it("prints the usage and exits with 2 for a command it does not know", async () => {

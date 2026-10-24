@@ -4,10 +4,12 @@ import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
 import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import type { GraiError } from "./error.ts";
+import { watch } from "./watch.ts";
 
 const usage = `Usage: grai <command> [--config <file>]
 
   compile                      write the output, if the catalogs or config changed
+  watch                        write it, then again on each change of a catalog or the config
 
 The config is grai.config.json in the current directory, unless --config names another file.`;
 
@@ -17,6 +19,19 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		const { config } = parsed(args);
 		const started = performance.now();
 		return reported(config, await compile(config), performance.now() - started);
+	},
+	async watch(args) {
+		const { config } = parsed(args);
+		console.log(`grai: watching ${shown(config)} and its catalogs`);
+		let first = true;
+		watch(config, (result, milliseconds) => {
+			// A save can come as several events; the compiles after the first that change nothing say nothing.
+			const quiet =
+				!first && result.errors.length === 0 && result.written.length === 0;
+			first = false;
+			if (!quiet) reported(config, result, milliseconds);
+		});
+		return 0;
 	},
 };
 
