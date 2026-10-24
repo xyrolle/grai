@@ -36,7 +36,9 @@ export function keyModule(
  */
 export function messageChunking(outdir: string): EnvironmentOptions {
 	const runtime = new Set(
-		["runtime.js", "config.js", "plurals.js"].map((file) => join(outdir, file)),
+		["runtime.js", "config.js", "plurals.js", "formats.js"].map((file) =>
+			join(outdir, file),
+		),
 	);
 	const groups = [
 		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },

@@ -168,7 +168,7 @@ describe("a message", () => {
 		expect(
 			await errorsOf({
 				en: {
-					formatted: "Total {amount: number}",
+					formatted: "Total {amount :currency}",
 					link: "Read {#link href=|/terms|}the terms{/link}",
 					nested: { title: "Title" },
 					ordinal: [
@@ -181,7 +181,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "formatted" (en): the placeholder {amount: number} calls a function, which grai does not support yet. Write the value as {name} and format it before the call.',
+			'unsupported: messages/en.json: "formatted" (en): {amount :currency} calls :currency, which grai does not support; the formatting functions are :number, :integer, :datetime, :date, :time.',
 			'unsupported: messages/en.json: "link" (en): the markup {#link href=|/terms|} has options or attributes, which grai does not support yet. Write it as {#name}, {/name} or {#name/}.',
 			'unsupported: messages/en.json: "nested" (en): the value is an object of nested keys, which grai does not support. Flatten it into keys joined by _.',
 			'unsupported: messages/en.json: "ordinal" (en): "local p = n: plural select=ordinal" passes options to plural, which grai does not support yet.',
@@ -209,7 +209,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'message-invalid: messages/en.json: "declared" (en): "inptu count" is not a declaration. Write "input name" or "local namePlural = name: plural".',
+			'message-invalid: messages/en.json: "declared" (en): "inptu count" is not a declaration. Write "input name", "local namePlural = name: plural" or "local nameText = name: number".',
 			'message-invalid: messages/en.json: "keyed" (en): the variant key "countPlural=one,other" must be selector=value pairs joined by commas, such as "countPlural=one".',
 			'message-invalid: messages/en.json: "twice" (en): two variants have the keys one, so one of them can never be chosen. Remove one.',
 			'message-invalid: messages/en.json: "unnamed" (en): the variant key "" has no value for the selector "countPlural". Give it one, or * for any.',

@@ -1,4 +1,5 @@
 import { isRecord } from "./config.ts";
+import { type Format, parseFormat } from "./formats.ts";
 import { parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
@@ -10,6 +11,8 @@ export type LocaleMessage = {
 	inputs: ReadonlySet<string>;
 	/** Plural locals by name, each with the input it counts. */
 	plurals: ReadonlyMap<string, string>;
+	/** Formatted locals by name, each with the input it formats and how. */
+	formatted: ReadonlyMap<string, FormattedLocal>;
 	selectors: readonly Selector[];
 	/** In the order a call tries them; a message without selectors has one variant with no keys. */
 	variants: readonly Variant[];
@@ -19,11 +22,15 @@ export type LocaleMessage = {
 	markup: boolean;
 };
 
+/** A local such as `local price = amount: number style=currency currency=EUR`. */
+export type FormattedLocal = { input: string; format: Format };
+
 const messageFields = new Set(["declarations", "selectors", "match"]);
 const inputDeclaration = /^input\s+([A-Za-z_$][\w$]*)$/;
 const pluralDeclaration =
 	/^local\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*:\s*plural$/;
-const functionDeclaration = /^local\s+\S+\s*=\s*\S+?\s*:\s*(\S+)(.*)$/;
+const functionDeclaration =
+	/^local\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*:\s*(\S+)(.*)$/;
 
 /**
  * Parses a catalog value: a pattern string, or the format's one-element array of
@@ -49,6 +56,7 @@ export function parseMessage(locale: string, value: unknown): LocaleMessage {
 
 const noInputs: ReadonlySet<string> = new Set();
 const noPlurals: ReadonlyMap<string, string> = new Map();
+const noFormatted: ReadonlyMap<string, FormattedLocal> = new Map();
 
 /** A message that is one pattern: its inputs are its placeholders. */
 function patternMessage(locale: string, source: string): LocaleMessage {
@@ -63,6 +71,7 @@ function patternMessage(locale: string, source: string): LocaleMessage {
 		locale,
 		inputs,
 		plurals: noPlurals,
+		formatted: noFormatted,
 		selectors: [],
 		variants: [{ keys: [], pattern }],
 		closed: false,
@@ -84,16 +93,22 @@ function parseVariants(
 	}
 	const declared: string[] = [];
 	const plurals = new Map<string, string>();
-	for (const declaration of stringList(
-		value.declarations ?? [],
-		"declarations",
-	)) {
-		const [name, counted] = parseDeclaration(declaration);
-		if (counted === undefined) declared.push(name);
-		else plurals.set(name, counted);
+	const formatted = new Map<string, FormattedLocal>();
+	for (const text of stringList(value.declarations ?? [], "declarations")) {
+		const declaration = parseDeclaration(text);
+		if (declaration.kind === "input") declared.push(declaration.name);
+		else if (declaration.kind === "plural") {
+			plurals.set(declaration.name, declaration.input);
+		} else formatted.set(declaration.name, declaration);
 	}
 	const selectors = stringList(value.selectors ?? [], "selectors").map(
 		(name): Selector => {
+			if (formatted.has(name)) {
+				throw new MessageProblem(
+					"unsupported",
+					`it selects on ${name}, a formatted value, which grai does not support. Select on the input, or on a plural local of it.`,
+				);
+			}
 			const input = plurals.get(name);
 			return input === undefined
 				? { kind: "input", name }
@@ -101,7 +116,13 @@ function parseVariants(
 		},
 	);
 	const variants = parseMatch(value.match, selectors);
-	return withInputs(locale, { declared, plurals, selectors, variants });
+	return withInputs(locale, {
+		declared,
+		plurals,
+		formatted,
+		selectors,
+		variants,
+	});
 }
 
 /** The variants of `match`, each key split by selector; two variants with the same keys are an error. */
@@ -134,28 +155,35 @@ function parseMatch(match: unknown, selectors: readonly Selector[]): Variant[] {
 	return variants;
 }
 
-/** A name with the input it counts, for a plural local; a name alone, for an input. */
-function parseDeclaration(declaration: string): [string, string?] {
+/** A declaration: an input, a plural local of an input, or a formatted local of one. */
+type Declaration =
+	| { kind: "input"; name: string }
+	| { kind: "plural"; name: string; input: string }
+	| ({ kind: "format"; name: string } & FormattedLocal);
+
+function parseDeclaration(declaration: string): Declaration {
 	const text = declaration.trim();
 	const input = inputDeclaration.exec(text);
-	if (input?.[1] !== undefined) return [input[1]];
+	if (input?.[1] !== undefined) return { kind: "input", name: input[1] };
 	const plural = pluralDeclaration.exec(text);
 	if (plural?.[1] !== undefined && plural[2] !== undefined) {
-		return [plural[1], plural[2]];
+		return { kind: "plural", name: plural[1], input: plural[2] };
 	}
-	const call = functionDeclaration.exec(text);
-	if (call !== null) {
-		const [, name = "", options = ""] = call;
-		throw new MessageProblem(
-			"unsupported",
-			name === "plural" && options.trim() !== ""
-				? `"${declaration}" passes options to plural, which grai does not support yet.`
-				: `"${declaration}" calls :${name}, which grai does not support yet; the one function is plural.`,
-		);
+	const [, name, operand, fn, options = ""] =
+		functionDeclaration.exec(text) ?? [];
+	if (name !== undefined && operand !== undefined && fn !== undefined) {
+		if (fn === "plural") {
+			throw new MessageProblem(
+				"unsupported",
+				`"${declaration}" passes options to plural, which grai does not support yet.`,
+			);
+		}
+		const format = parseFormat(fn, options, `"${declaration}"`);
+		return { kind: "format", name, input: operand, format };
 	}
 	throw new MessageProblem(
 		"message-invalid",
-		`"${declaration}" is not a declaration. Write "input name" or "local namePlural = name: plural".`,
+		`"${declaration}" is not a declaration. Write "input name", "local namePlural = name: plural" or "local nameText = name: number".`,
 	);
 }
 
@@ -204,25 +232,35 @@ function withInputs(
 	{
 		declared,
 		plurals,
+		formatted,
 		selectors,
 		variants,
 	}: {
 		declared: readonly string[];
 		plurals: ReadonlyMap<string, string>;
+		formatted: ReadonlyMap<string, FormattedLocal>;
 		selectors: readonly Selector[];
 		variants: readonly Variant[];
 	},
 ): LocaleMessage {
 	const inputs = new Set(declared);
 	for (const counted of plurals.values()) inputs.add(counted);
+	for (const local of formatted.values()) inputs.add(local.input);
 	for (const selector of selectors) {
 		if (selector.kind === "input") inputs.add(selector.name);
 	}
+	const isLocal = (name: string) => plurals.has(name) || formatted.has(name);
 	let markup = false;
 	for (const { pattern } of variants) {
 		for (const part of pattern) {
 			if (part.type === "variable") {
-				if (!plurals.has(part.name)) inputs.add(part.name);
+				if (part.format !== undefined && isLocal(part.name)) {
+					throw new MessageProblem(
+						"unsupported",
+						`it formats ${part.name}, a local, which grai does not support. Format the input it is made from.`,
+					);
+				}
+				if (!isLocal(part.name)) inputs.add(part.name);
 			} else if (part.type !== "text") {
 				markup = true;
 			}
@@ -236,6 +274,14 @@ function withInputs(
 			);
 		}
 	}
+	for (const name of formatted.keys()) {
+		if (inputs.has(name) || plurals.has(name)) {
+			throw new MessageProblem(
+				"message-invalid",
+				`"${name}" is declared both as a formatted local and as an input or a plural local. Rename the local, such as ${name}Text.`,
+			);
+		}
+	}
 	const { variants: ordered, closed } = selectionOf(
 		locale,
 		selectors,
@@ -245,6 +291,7 @@ function withInputs(
 		locale,
 		inputs,
 		plurals,
+		formatted,
 		selectors,
 		variants: ordered,
 		closed,

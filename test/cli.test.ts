@@ -134,7 +134,7 @@ describe("grai add", () => {
 				"add",
 				"cart_total",
 				"--en",
-				"Total {sum: number}",
+				"Total {sum :currency}",
 				"--de",
 				"Summe",
 			),
@@ -153,7 +153,7 @@ describe("grai add", () => {
 			],
 			[
 				1,
-				'messages/en.json: "cart_total" (en): the placeholder {sum: number} calls a function, which grai does not support yet. Write the value as {name} and format it before the call.',
+				'messages/en.json: "cart_total" (en): {sum :currency} calls :currency, which grai does not support; the formatting functions are :number, :integer, :datetime, :date, :time.',
 			],
 		]);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(before);
