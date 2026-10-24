@@ -1,12 +1,14 @@
+import { createHash } from "node:crypto";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AstroIntegration } from "astro";
+import type { AstroConfig, AstroIntegration } from "astro";
 import type { Plugin } from "vite";
 import { disagreements } from "./astro/agreement.ts";
-import type { LocaleProject } from "./astro/middleware.ts";
+import type { ImportMap, LocaleProject } from "./astro/middleware.ts";
 import { compile } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
+import { localeDirectory, messageDirectory } from "./locale-chunks.ts";
 import { grai as graiVite } from "./vite.ts";
 
 /** The integration's options. `config` is the path of the project's grai.config.json, from Astro's root. */
@@ -27,6 +29,7 @@ const middlewareId = "grai:astro/middleware";
  */
 export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 	let configFile = "";
+	let building = false;
 	let middleware: string | undefined;
 	return {
 		name: "grai",
@@ -41,6 +44,7 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 					fileURLToPath(config.root),
 					options.config ?? "grai.config.json",
 				);
+				building = command === "build";
 				if (command === "sync") {
 					const { errors } = await compile(configFile);
 					if (errors.length > 0) throw new Error(messagesOf(errors));
@@ -68,6 +72,9 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 				middleware = middlewareCode(grai, {
 					configName: basename(configFile),
 					requestStrategies: grai.strategy.filter((name) => name !== "url"),
+					importMaps: building
+						? importMaps(grai.locales, chunksUrl(config))
+						: undefined,
 				});
 			},
 		},
@@ -96,4 +103,41 @@ function middlewareModule(code: () => string | undefined): Plugin {
 		resolveId: (id) => (id === middlewareId ? resolved : null),
 		load: (id) => (id === resolved ? code() : null),
 	};
+}
+
+/**
+ * Where the client build's chunks are served from: Astro's `build.assets` under the scripts'
+ * assets prefix, or else under the base. grai/vite puts the message chunks in `grai/` there, and
+ * each locale's copies in `grai-<locale>/`.
+ */
+function chunksUrl({ base, build }: AstroConfig): string {
+	const prefix =
+		typeof build.assetsPrefix === "string"
+			? build.assetsPrefix
+			: (build.assetsPrefix?.js ?? build.assetsPrefix?.fallback);
+	return `${(prefix ?? base).replace(/\/$/, "")}/${build.assets}/`;
+}
+
+/** Each locale's import map, from the shared message chunks to that locale's copies. */
+function importMaps(
+	locales: readonly string[],
+	chunks: string,
+): Record<string, ImportMap> {
+	return Object.fromEntries(
+		locales.map((locale) => {
+			const json = JSON.stringify({
+				imports: {
+					[`${chunks}${messageDirectory}/`]: `${chunks}${localeDirectory(locale)}/`,
+				},
+			});
+			const hash = createHash("sha256").update(json).digest("base64");
+			return [
+				locale,
+				{
+					script: `<script type="importmap">${json}</script>`,
+					hash: `sha256-${hash}`,
+				},
+			];
+		}),
+	);
 }

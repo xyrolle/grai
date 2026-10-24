@@ -258,6 +258,7 @@ function context(
 		request: new Request(`https://shop.test${path}`, { headers }),
 		isPrerendered: false,
 		routePattern: "/[...locale]",
+		csp: undefined,
 		...rest,
 	};
 }
@@ -320,6 +321,33 @@ describe("the middleware", () => {
 			`<!DOCTYPE html><html lang="ro" dir="ltr"><head></head><body>Coșul tău</body></html>`,
 			`<!DOCTYPE html><html lang="ar" dir="rtl"><head></head><body>سلتك</body></html>`,
 		]);
+	});
+
+	it("opens a built page's head with its locale's import map, and lets a CSP allow it", async () => {
+		const { m, middleware } = await compiledProject({ strategy: ["url"] });
+		const onRequest = middleware({
+			importMaps: {
+				ro: { script: "<script>ro</script>", hash: "sha256-ro" },
+				en: { script: "<script>en</script>", hash: "sha256-en" },
+			},
+		});
+		const allowed: unknown[] = [];
+
+		const response = await onRequest(
+			context(
+				"/ro/",
+				{},
+				{
+					csp: { insertScriptHash: (hash) => allowed.push(hash) },
+				},
+			),
+			page(m),
+		);
+
+		expect(await response.text()).toBe(
+			`<!DOCTYPE html><html lang="ro" dir="ltr"><head><script>ro</script></head><body>Coșul tău</body></html>`,
+		);
+		expect(allowed).toEqual(["sha256-ro"]);
 	});
 
 	it("passes on anything but a page as it is", async () => {
