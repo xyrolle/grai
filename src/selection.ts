@@ -1,4 +1,5 @@
 import type { Part } from "./pattern.ts";
+import { categoriesOf } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
 /** What a variant's key accepts for one selector: a literal value, or anything. */
@@ -22,20 +23,6 @@ export type Selection = {
 const otherValue: unique symbol = Symbol("other value");
 type Value = string | typeof otherValue;
 
-const pluralCategories = new Map<string, ReadonlySet<string>>();
-
-/** The CLDR cardinal categories of a locale, such as one and other for en. */
-export function categoriesOf(locale: string): ReadonlySet<string> {
-	let categories = pluralCategories.get(locale);
-	if (categories === undefined) {
-		categories = new Set(
-			new Intl.PluralRules(locale).resolvedOptions().pluralCategories,
-		);
-		pluralCategories.set(locale, categories);
-	}
-	return categories;
-}
-
 /**
  * Orders a message's variants by MessageFormat 2's preference (a literal key before `*`, selector
  * by selector, then the order written), after checking that every value has a variant.
@@ -56,7 +43,7 @@ export function selectionOf(
 		}
 		const categories = categoriesOf(locale);
 		for (const key of keys) {
-			if (!categories.has(key)) {
+			if (!categories.includes(key)) {
 				throw new MessageProblem(
 					"plural-category-unknown",
 					`"${key}" is not a plural category of ${locale}, so the variant ${selector.name}=${key} can never be chosen. Its categories are ${[...categories].join(", ")}.`,

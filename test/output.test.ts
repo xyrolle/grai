@@ -29,6 +29,7 @@ it("writes the whole output once, then only the files an edit changes", async ()
 	expect((await compile()).written).toEqual([
 		"config.js",
 		"runtime.d.ts",
+		"plurals.js",
 		"runtime.js",
 		"keys/0.d.ts",
 		"keys/0.js",
