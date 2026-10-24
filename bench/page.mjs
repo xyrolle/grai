@@ -21,17 +21,30 @@ const escapeText = (text) =>
 		.replace(/\{/g, "&#123;")
 		.replace(/\}/g, "&#125;");
 
-/** Message text with its inputs as Svelte expressions on `inputs`, for the inlined variant. */
+/** Whitespace as an expression, which Svelte keeps where it trims static text. */
+const keptSpaces = (spaces) =>
+	spaces === "" ? "" : `{${JSON.stringify(spaces)}}`;
+
+const markupTag = /\{[#/][^{}]*\}/g;
+/** A text's edges as Svelte trims them, and what they hold. */
+const edges = /^([ \t\r\n]*)([\s\S]*?)([ \t\r\n]*)$/;
+
+/**
+ * Message text without its markup, its inputs as Svelte expressions on `inputs`, for the inlined
+ * variant. Svelte trims the whitespace at the edges of an element's static text, so the text's own
+ * edge whitespace goes in as expressions.
+ */
 function inlineText(pattern, inputs) {
-	return pattern
-		.replace(/\{([^{}]*)\}/g, (_, inside) =>
-			inside.startsWith("#") || inside.startsWith("/")
-				? ""
-				: `\0{${inputs}.${inside}}\0`,
+	const [, leading, body, trailing] = edges.exec(
+		pattern.replace(markupTag, ""),
+	);
+	const template = body
+		.split(/(\{[^{}]*\})/)
+		.map((part, index) =>
+			index % 2 === 1 ? `{${inputs}.${part.slice(1, -1)}}` : escapeText(part),
 		)
-		.split("\0")
-		.map((part, index) => (index % 2 === 1 ? part : escapeText(part)))
 		.join("");
+	return `${keptSpaces(leading)}${template}${keptSpaces(trailing)}`;
 }
 
 /**
