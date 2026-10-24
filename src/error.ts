@@ -7,6 +7,7 @@ export type GraiErrorCode =
 	| "catalog-unreadable"
 	| "catalog-invalid"
 	| "catalog-empty"
+	| "catalog-exists"
 	| "key-invalid"
 	| "key-missing"
 	| "key-exists"
