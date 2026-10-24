@@ -7,6 +7,7 @@ import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { find, foundLines } from "./find.ts";
+import { fixLines, removeUnusedKeys } from "./fix.ts";
 import { rename } from "./rename.ts";
 import { watch } from "./watch.ts";
 
@@ -16,6 +17,8 @@ const usage = `Usage: grai <command> [--config <file>]
   watch                        write it, then again on each change of a catalog or the config
   check [--source <dir>]...    report every problem and write nothing: what compile reports,
                                keys no source file names, inputs the locales do not agree on
+  check --fix [--source <dir>]...
+                               remove the keys no source can name from every catalog, then check
   add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
                                then compile
   find <key> [--source <dir>]...
@@ -49,8 +52,14 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 	async check(args) {
 		const { config, values } = parsed(args, {
 			source: { type: "string", multiple: true },
+			fix: { type: "boolean" },
 		});
 		const sources = sourcesOf(values);
+		if (values.fix === true) {
+			const fixed = await removeUnusedKeys(config, sources);
+			for (const line of fixLines(fixed)) console.log(line);
+			if (fixed.errors.length > 0) return failed(fixed.errors);
+		}
 		const errors = await check(config, sources);
 		if (errors.length > 0) return failed(errors);
 		console.log("grai: no problems");
