@@ -1,5 +1,5 @@
-import { isKeyName } from "../compilation.ts";
 import { GraiError } from "../error.ts";
+import { isKeyName } from "../key-checks.ts";
 
 /** A grai key, folded to lower case, and the source keys that become it: the first with its file. */
 type Claim = {
