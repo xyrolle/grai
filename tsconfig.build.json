@@ -1,5 +1,6 @@
 // The package as published: the TypeScript sources compiled into dist, with their declarations,
-// and the runtime's JavaScript beside them, as the compiler copies it into every output.
+// and the runtime's JavaScript beside them, as the compiler copies it into every output. The
+// browser's modules are among them, so it sees the DOM's and Vite's client types too.
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
@@ -7,7 +8,10 @@
 		"outDir": "dist",
 		"rootDir": "src",
 		"allowJs": true,
-		"isolatedDeclarations": false
+		"isolatedDeclarations": false,
+		"lib": ["es2024", "dom"],
+		"types": ["node", "vite/client"]
 	},
-	"include": ["src"]
+	"include": ["src"],
+	"exclude": []
 }

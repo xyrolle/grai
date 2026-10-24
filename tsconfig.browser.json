@@ -1,0 +1,11 @@
+// The adapters' modules that run in the browser, which see the DOM's types and Vite's
+// `import.meta.hot`.
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["es2024", "dom"],
+		"types": ["vite/client"]
+	},
+	"include": ["src/vue/client.ts"],
+	"exclude": []
+}
