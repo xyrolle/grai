@@ -1,19 +1,28 @@
 // What a page renders: a fixed sample of message calls drawn from the app's catalog in its own
-// mix of plain text, inputs and plurals, each with inputs that reach a real variant. Every bench
-// that renders messages renders this sample.
+// mix of plain text, inputs, plurals and markup, each with inputs that reach a real variant. Every
+// bench that renders messages renders this sample.
 import { portable } from "./libraries.mjs";
 
 const placeholder = /\{([^{}#/][^{}]*)\}/g;
+const markupTag = /\{[#/]([^\s/=@{}]+)/g;
 
-/** Every input a message reads in any locale, and whether one of them selects a plural. */
+/**
+ * Every input a message reads in any locale, the markup it holds, and its kind: markup when it has
+ * any, else a plural when one of its inputs selects one, else inputs or plain text.
+ */
 function describe(app, key) {
 	const inputs = new Map();
+	const markup = new Set();
 	let plural = false;
+	const read = (pattern) => {
+		for (const [, name] of pattern.matchAll(placeholder))
+			if (!inputs.has(name)) inputs.set(name, "Ana");
+		for (const [, name] of pattern.matchAll(markupTag)) markup.add(name);
+	};
 	for (const locale of app.locales) {
 		const value = app.messages[locale][key];
 		if (typeof value === "string") {
-			for (const [, name] of value.matchAll(placeholder))
-				if (!inputs.has(name)) inputs.set(name, "Ana");
+			read(value);
 			continue;
 		}
 		for (const message of value ?? []) {
@@ -32,14 +41,23 @@ function describe(app, key) {
 				if (locals.has(selector) || inputs.has(selector)) return;
 				if (value !== undefined && value !== "*") inputs.set(selector, value);
 			});
-			for (const pattern of Object.values(message.match)) {
-				for (const [, name] of pattern.matchAll(placeholder))
-					if (!inputs.has(name)) inputs.set(name, "Ana");
-			}
+			for (const pattern of Object.values(message.match)) read(pattern);
 		}
 	}
-	const kind = plural ? "plural" : inputs.size > 0 ? "inputs" : "text";
-	return { key, kind, inputs: Object.fromEntries(inputs) };
+	const kind =
+		markup.size > 0
+			? "markup"
+			: plural
+				? "plural"
+				: inputs.size > 0
+					? "inputs"
+					: "text";
+	return {
+		key,
+		kind,
+		inputs: Object.fromEntries(inputs),
+		markup: [...markup],
+	};
 }
 
 /** A seeded shuffle, so every run and every variant renders the same calls. */
@@ -56,17 +74,18 @@ function shuffled(items) {
 
 /**
  * `count` calls in the catalog's own mix (or of one kind), repeating keys only when the catalog
- * has fewer. Plural counts cycle so every category is reached. A message the compared libraries'
- * formats cannot hold is left out, so every bench renders the same calls in every library.
+ * has fewer, and none when it has none of that kind. Plural counts cycle so every category is
+ * reached. A message the compared libraries' formats cannot hold is left out, so every bench
+ * renders the same calls in every library.
  */
 export function sampleCalls(app, count, kind) {
 	const all = Object.keys(app.messages[app.baseLocale])
 		.filter((key) => portable(app, key))
 		.map((key) => describe(app, key));
 	const pool = shuffled(kind ? all.filter((call) => call.kind === kind) : all);
+	if (pool.length === 0) return [];
 	return Array.from({ length: count }, (_, index) => {
 		const call = pool[index % pool.length];
-		if (call.kind !== "plural") return call;
 		const inputs = { ...call.inputs };
 		for (const [name, value] of Object.entries(inputs))
 			if (typeof value === "number") inputs[name] = index % 25;
@@ -74,8 +93,11 @@ export function sampleCalls(app, count, kind) {
 	});
 }
 
+/** Whether a call passes inputs: an app passes none to a message that reads none. */
+export const takesInputs = (call) => Object.keys(call.inputs).length > 0;
+
 export function kindsOf(calls) {
-	const counts = { text: 0, inputs: 0, plural: 0 };
+	const counts = { text: 0, inputs: 0, plural: 0, markup: 0 };
 	for (const call of calls) counts[call.kind]++;
 	return counts;
 }

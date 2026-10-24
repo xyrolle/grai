@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compile } from "svelte/compiler";
 import { cacheDir } from "./apps.mjs";
-import { sampleCalls } from "./calls.mjs";
+import { sampleCalls, takesInputs } from "./calls.mjs";
 
 export const SHELL_CALLS = 400;
 export const ROWS = 100;
@@ -47,7 +47,7 @@ export function pageSource(app, { from, inline, translate }) {
 		const value = inline?.[call.key];
 		if (typeof value === "string") return inlineText(value, inputs);
 		if (translate) return `{k0(${JSON.stringify(call.key)}, ${inputs})}`;
-		return `{${alias.get(call.key)}(${call.kind === "text" ? "" : inputs})}`;
+		return `{${alias.get(call.key)}(${takesInputs(call) ? inputs : ""})}`;
 	};
 	const shell = calls
 		.slice(0, SHELL_CALLS)

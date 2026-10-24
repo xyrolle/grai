@@ -1,12 +1,13 @@
 // A catalog with app A's shape, for anyone without the apps' checkouts: 6,366 keys in ro, ru and
-// en, of which 1,294 have inputs and 240 are plurals, with words of about the same length. The
-// same seed always writes the same files.
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+// en, of which 1,294 have inputs, 240 are plurals and 226 hold markup, with words of about the
+// same length. The same seed always writes the same files.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const KEYS = 6366;
 const WITH_INPUTS = 1294;
 const PLURALS = 240;
+const WITH_MARKUP = 226;
 
 const syllables = {
 	ro: [
@@ -79,6 +80,12 @@ function catalog(locale) {
 			];
 		} else if (n < PLURALS + WITH_INPUTS) {
 			entries[key] = `${sentence(random, locale, words)} {name}`;
+		} else if (n < PLURALS + WITH_INPUTS + WITH_MARKUP) {
+			// As app A holds it: mostly an element the app draws in the text's place, some a link.
+			entries[key] =
+				n % 4 === 0
+					? `${sentence(random, locale, words)} {#link}${sentence(random, locale, 2)}{/link}`
+					: `{#icon/} ${sentence(random, locale, words)}`;
 		} else {
 			entries[key] = sentence(random, locale, words);
 		}
@@ -86,13 +93,18 @@ function catalog(locale) {
 	return entries;
 }
 
-/** Writes the synthetic inlang project once and returns its root. */
+/** Writes `content` to `path` unless it holds it already, so an unchanged catalog keeps its time. */
+function keep(path, content) {
+	if (!existsSync(path) || readFileSync(path, "utf8") !== content)
+		writeFileSync(path, content);
+}
+
+/** Writes the synthetic inlang project, as this file describes it, and returns its root. */
 export function writeSyntheticProject(root) {
-	if (existsSync(join(root, "project.inlang/settings.json"))) return root;
 	mkdirSync(join(root, "messages"), { recursive: true });
 	mkdirSync(join(root, "project.inlang"), { recursive: true });
 	for (const locale of Object.keys(categories)) {
-		writeFileSync(
+		keep(
 			join(root, "messages", `${locale}.json`),
 			`${JSON.stringify(catalog(locale), null, "\t")}\n`,
 		);
@@ -102,7 +114,7 @@ export function writeSyntheticProject(root) {
 		locales: Object.keys(categories),
 		"plugin.inlang.messageFormat": { pathPattern: "./messages/{locale}.json" },
 	};
-	writeFileSync(
+	keep(
 		join(root, "project.inlang/settings.json"),
 		`${JSON.stringify(settings, null, "\t")}\n`,
 	);
