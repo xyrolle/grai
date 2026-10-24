@@ -6,7 +6,7 @@ import {
 	shardMap,
 } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
-import { formatModule } from "./formats.ts";
+import { formatModule } from "./formatters.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule, pluralName } from "./plurals.ts";
 
