@@ -24,6 +24,11 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is a compile error naming the locales that lack it. A missing translation would otherwise ship as a failed import or as another locale's words.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
+- **A pseudo-locale is compiled for development, and never for a build.** `pseudoLocale` names a locale, such as `en-XA`, made from the base's messages at compile time:
+  - each letter is accented, the text grows by about 35% in whole words, and each message is in brackets, its placeholders and markup as the base writes them;
+  - a page in it shows which text bypasses the catalogs, which layout breaks with longer words, and where a text is cut, with no translator involved;
+  - it takes the base's variants, so it must have the base's plural categories;
+  - `grai watch` and the Vite dev server compile it. `grai compile` and a Vite build leave it out, so it never ships, even when a build runs over a dev server's output.
 - **Nothing is fetched and nothing is loaded from elsewhere.** grai's parser is the format's only reader, so a compile cannot depend on the network.
 
 ## Output layout

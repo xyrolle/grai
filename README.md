@@ -49,6 +49,8 @@ m.cart_total({ amount: 12.5 }); // "Total €12.50"
 - `grai seed`, `grai export` and `grai merge` take a locale's messages to translators as XLIFF 2.0, and their translations back;
 - `grai help` lists every command.
 
+A `"pseudoLocale"` in the config, such as `"en-XA"`, is the base's messages accented, about 35% longer and in brackets, for finding text that bypasses the catalogs and layouts that break. `grai watch` and the Vite dev server compile it; `grai compile` and builds never do.
+
 ### Vite
 
 ```ts
