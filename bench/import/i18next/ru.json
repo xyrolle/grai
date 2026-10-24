@@ -21,5 +21,14 @@
 		}
 	},
 	"short_one": "{{count}} короткий",
-	"short_other": "{{count}} коротких"
+	"short_other": "{{count}} коротких",
+	"euro": "Стоит {{value, currency(EUR)}}",
+	"yen": "{{value, currency(currency: JPY; minimumFractionDigits: 2; maximumFractionDigits: 2)}}",
+	"signed": "{{value, currency(currency: EUR; signDisplay: always)}}",
+	"digits": "{{value, number(minimumFractionDigits: 2)}}",
+	"ago": "Обновлено {{value, relativetime}}",
+	"quarters": "{{value, relativetime(range: quarter; style: narrow)}}",
+	"guests": "С {{names, list}}",
+	"either": "{{names, list(type: disjunction)}}",
+	"day": "{{d, datetime(dateStyle: long; timeZone: UTC)}}"
 }

@@ -99,7 +99,15 @@ process.exitCode = failed ? 1 : 0;
 function* inputSets() {
 	for (const count of counts)
 		for (const g of genders)
-			yield { count, n: count, g, name: "Ana", value: count, d: dateOf(count) };
+			yield {
+				count,
+				n: count,
+				g,
+				name: "Ana",
+				names: ["Ana", "Ion", "Maria"].slice(0, count % 4),
+				value: count,
+				d: dateOf(count),
+			};
 }
 
 /**
