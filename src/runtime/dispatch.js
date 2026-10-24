@@ -18,7 +18,7 @@ import {
 	unlocalizedPaths,
 } from "./config.js";
 
-export { baseLocale, cookieName, locales };
+export { baseLocale, locales };
 
 // Each of the url strategy's options is a constant in config.js, which a bundler folds, so the code
 // an option needs is checked by its constant where it runs, and a page carries none of it for an
