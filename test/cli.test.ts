@@ -85,6 +85,18 @@ describe("grai check", () => {
 		expect(existsSync(join(dir, "out"))).toBe(false);
 	});
 
+	it("counts no name that ends a longer word, such as 2xl's xl, as the key", async () => {
+		const { dir } = project({
+			en: { xl: "Extra large" },
+			de: { xl: "Sehr groß" },
+		});
+		writeFileSync(join(dir, "app.ts"), 'export const size = "2xl";');
+
+		expect((await grai(dir, "check")).stderr).toContain(
+			'messages/en.json: "xl": no source file under . names the key.',
+		);
+	});
+
 	it("says so when there is no problem", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(join(dir, "app.ts"), "m.cart_title(); m.cart_greeting;");
