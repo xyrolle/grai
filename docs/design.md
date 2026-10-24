@@ -62,7 +62,7 @@ They come through an import map, which keeps the framework's single client build
 - **Each message chunk has a copy per locale,** under the sibling `grai-<locale>/`, with the same file name, imports and exports. Each key's call keeps only its locale's variant, at its locale's position, so the runtime picks it for the page's locale. A sibling, not a subdirectory, so the copies' relative imports reach the same shared chunks.
 - **The server writes the import map,** from `…/grai/` to `…/grai-<locale>/`, and points the page's `modulepreload` links at the copies, as browsers apply no import map to `modulepreload`. Without the map a page still works, with every locale's words.
 
-**Every client rule is the same in every build, dev and tests included, so nothing fails only after deploy.** On the client, a forced `{ locale }` must be the current locale. Any other throws a `GraiError` (`locale-not-loaded`) naming both locales.
+**Every client rule is the same in every build, dev and tests included, so nothing fails only after deploy.** On the client, a forced `{ locale }` must be the current locale. Any other throws a `GraiError` (`locale-not-loaded`) naming both locales, and in dev the key too. A build leaves key names out of the page: on app A they would add a third to its gzipped message bytes, and the call site in the stack names the key.
 
 ### Switching locale on the client: open
 
