@@ -161,14 +161,15 @@ describe("a catalog", () => {
 });
 
 describe("a key", () => {
-	it("is an error when a locale lacks it", async () => {
+	it("is one error when locales lack it, naming them and the command that adds it to them", async () => {
 		expect(
 			await errorsOf({
 				en: { title: "Title", extra: "Extra" },
 				de: { title: "Titel" },
+				fr: { title: "Titre" },
 			}),
 		).toEqual([
-			'key-missing: messages/de.json: "extra" (de): the key is in en but not in de. Add it to every catalog, or remove it from all.',
+			'key-missing: messages/en.json: "extra": the key is in en but not in de, fr. Add it to them with grai add extra --de "…" --fr "…", or remove it from en.',
 		]);
 	});
 
