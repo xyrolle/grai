@@ -23,5 +23,14 @@
 		}
 	},
 	"short_one": "ar one short",
-	"short_other": "ar {{count}} short"
+	"short_other": "ar {{count}} short",
+	"euro": "ar {{value, currency(EUR)}}",
+	"yen": "{{value, currency(currency: JPY; minimumFractionDigits: 2; maximumFractionDigits: 2)}}",
+	"signed": "{{value, currency(currency: EUR; signDisplay: always)}}",
+	"digits": "{{value, number(minimumFractionDigits: 2)}}",
+	"ago": "ar {{value, relativetime}}",
+	"quarters": "{{value, relativetime(range: quarter; style: narrow)}}",
+	"guests": "ar {{names, list}}",
+	"either": "{{names, list(type: disjunction)}}",
+	"day": "{{d, datetime(dateStyle: long; timeZone: UTC)}}"
 }
