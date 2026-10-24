@@ -147,8 +147,29 @@ function configModule(config: Config): string {
 	return [
 		`export const locales = ${JSON.stringify(config.locales)};`,
 		`export const baseLocale = ${JSON.stringify(config.baseLocale)};`,
+		`export const directions = ${JSON.stringify(config.locales.map(directionOf))};`,
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
 		"",
 	].join("\n");
+}
+
+/** Scripts written right to left. */
+const rightToLeft = new Set([
+	"Adlm",
+	"Arab",
+	"Hebr",
+	"Mand",
+	"Nkoo",
+	"Rohg",
+	"Samr",
+	"Syrc",
+	"Thaa",
+	"Yezi",
+]);
+
+/** The direction a locale's script is written in, from its likely script. */
+function directionOf(locale: string): "ltr" | "rtl" {
+	const script = new Intl.Locale(locale).maximize().script;
+	return script !== undefined && rightToLeft.has(script) ? "rtl" : "ltr";
 }

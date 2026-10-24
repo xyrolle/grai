@@ -1,6 +1,12 @@
 // The runtime every compiled message calls. The compiler copies this file into the output as it
 // is, beside the config.js it writes with the project's locales.
-import { baseLocale, cookieName, locales, strategy } from "./config.js";
+import {
+	baseLocale,
+	cookieName,
+	directions,
+	locales,
+	strategy,
+} from "./config.js";
 
 export { baseLocale, cookieName, locales };
 
@@ -110,29 +116,16 @@ function unknownLocale(value) {
 	);
 }
 
-/** Scripts written right to left. */
-const rightToLeft = new Set([
-	"Adlm",
-	"Arab",
-	"Hebr",
-	"Mand",
-	"Nkoo",
-	"Rohg",
-	"Samr",
-	"Syrc",
-	"Thaa",
-	"Yezi",
-]);
-
 /**
- * The direction a locale's script is written in.
+ * The direction a locale's script is written in, the bound locale's by default.
  *
  * @param {string} [locale]
  * @returns {"ltr" | "rtl"}
  */
-export function getTextDirection(locale = getLocale()) {
-	const script = new Intl.Locale(locale).maximize().script;
-	return script !== undefined && rightToLeft.has(script) ? "rtl" : "ltr";
+export function getTextDirection(locale) {
+	const index =
+		locale === undefined ? bound() : locales.indexOf(assertIsLocale(locale));
+	return directions[index] ?? "ltr";
 }
 
 /**
