@@ -145,7 +145,12 @@ export function grai(options: GraiOptions = {}): Plugin {
 			// lands in the chunks of the entries that use it.
 			const code =
 				id !== files.keysFile
-					? keyModule(files.outdir, compiled, id)
+					? keyModule(
+							files.outdir,
+							compiled,
+							id,
+							this.environment.config.consumer,
+						)
 					: serving
 						? devModule(files.outdir, compiled)
 						: keysModule(compiled);

@@ -18,6 +18,39 @@ export type Used = {
 type Value = (name: string) => string;
 
 /**
+ * One locale's function of the inputs: its parameter, the plural locals it declares, and the
+ * expression it returns.
+ */
+export type LocaleFunction = {
+	parameter: string;
+	declarations: string;
+	body: string;
+};
+
+/** A locale's function as an arrow function, the shortest to send a browser. */
+export function arrow({
+	parameter,
+	declarations,
+	body,
+}: LocaleFunction): string {
+	return declarations === ""
+		? `(${parameter}) => ${body}`
+		: `(${parameter}) => { ${declarations}return ${body}; }`;
+}
+
+/**
+ * A locale's function as a function expression, which a server loads faster: V8 pre-parses a
+ * function expression in a module until its first call, and parses an arrow function in full.
+ */
+export function functionExpression({
+	parameter,
+	declarations,
+	body,
+}: LocaleFunction): string {
+	return `function (${parameter}) { ${declarations}return ${body}; }`;
+}
+
+/**
  * One locale's function: its variants as a chain of conditions in the order they are tried. The
  * last variant needs no condition, unless a closed select can be given a value it does not list.
  */
@@ -26,7 +59,7 @@ export function localeFunction(
 	message: LocaleMessage,
 	mode: Mode,
 	used: Used,
-): string {
+): LocaleFunction {
 	const { variants, closed } = message;
 	const reads = new Set<string>();
 	const value = (name: string) => {
@@ -55,16 +88,16 @@ export function localeFunction(
 	}
 	const locals = [...message.plurals].filter(([name]) => reads.has(name));
 	if (locals.length > 0) used.plurals.add(message.locale);
-	const declarations = locals.map(
-		([name, counted]) =>
-			`const $${name} = ${pluralName(message.locale)}(${value(counted)}); `,
-	);
+	const declarations = locals
+		.map(
+			([name, counted]) =>
+				`const $${name} = ${pluralName(message.locale)}(${value(counted)}); `,
+		)
+		.join("");
 	const parameter = [...reads].some((name) => !message.plurals.has(name))
 		? "i"
 		: "";
-	return declarations.length === 0
-		? `(${parameter}) => ${body}`
-		: `(${parameter}) => { ${declarations.join("")}return ${body}; }`;
+	return { parameter, declarations, body };
 }
 
 /** The test a variant's keys put on the selectors; empty when every key is `*`. */
