@@ -16,7 +16,8 @@ const sourceExtensions = new Set([
 ]);
 /** Directories of dependencies and of build output, which name no message of the project's own. */
 const skippedDirectories = new Set(["node_modules", "dist", "build"]);
-const identifier = /[A-Za-z_$][\w$]*/g;
+/** An identifier: a name that starts with a letter, `_` or `$`, and is not the end of a longer one. */
+const identifier = /(?<![\w$])[A-Za-z_$][\w$]*/g;
 
 /** A source file: its path, the path the project shows (relative to its root), and its text. */
 export type SourceFile = { path: string; file: string; text: string };
