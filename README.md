@@ -258,6 +258,44 @@ Under `<ClientRouter />`, a link into another locale needs `data-astro-reload`, 
 
 On a static site whose page renders 400 messages and a Svelte island 100, `astro build` takes 1.7 s against Paraglide's 6.0 s. The page downloads 22.1 KB against 25.4 KB, as its island loads only its own locale's words. In `astro dev`, an edited message the server renders shows in 84 ms. With Paraglide, the open page keeps its words until a reload by hand (`bench/astro.mjs`, `docs/runtime.md`).
 
+### Vue
+
+A message is a plain function, so a template calls it as it calls anything `<script setup>` imports, with Vite and `grai/vite` as above. Import the messages as a namespace, from `keys.js`: Vue's compiler takes a namespace import as a constant, so a build keeps only the keys the template calls, where `import { m }` would ship every key. `grai/vue`'s `Markup` draws a markup message's parts, each element by the app's function:
+
+```vue
+<script setup lang="ts">
+import { Markup } from "grai/vue";
+import { h } from "vue";
+import * as m from "./i18n/keys.js";
+</script>
+
+<template>
+	<h1>{{ m.cart_title() }}</h1>
+	<Markup
+		:parts="m.terms.parts()"
+		:markup="{ link: (children) => h('a', { href: '/terms' }, children) }"
+	/>
+</template>
+```
+
+A server render binds the request's locale through the output's middleware, around Vue's render, so every setup, render and await in it reads that locale, and the page's response varies by the headers the strategy reads. `index.html` stays a page in the base locale, and the render writes the request's locale and direction into its `<html>`:
+
+```ts
+// src/entry-server.ts
+const htmlOf = (locale: Locale) =>
+	`<html lang="${locale}" dir="${getTextDirection(locale)}">`;
+
+export const render = (request: Request, template: string) =>
+	middleware(request, async ({ locale }) => {
+		const page = template
+			.replace(htmlOf(baseLocale), htmlOf(locale))
+			.replace("<!--app-html-->", await renderToString(createApp()));
+		return new Response(page, { headers: { "content-type": "text/html" } });
+	});
+```
+
+The browser takes the page's locale from its `<html lang>`, so the page hydrates in the words the server drew. With `grai({ localeChunks: true })`, the page loads only its locale's words, as a static site's does: the page's locale script keeps the `lang` the server wrote and points the page at that locale's copies. In dev, `import "grai/vue/client"` in the browser's entry renders an edited message again in place, keeping the page's state; a build leaves it out. `examples/vue` is a complete server-rendered app.
+
 ### Workers, Bun, Deno and Node
 
 The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `query`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
