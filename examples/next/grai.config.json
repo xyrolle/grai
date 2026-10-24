@@ -1,0 +1,7 @@
+{
+	"locales": ["en", "ro"],
+	"baseLocale": "en",
+	"catalogs": "messages/{locale}.json",
+	"outdir": "src/i18n",
+	"strategy": ["url"]
+}
