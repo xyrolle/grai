@@ -18,6 +18,7 @@
 		"variants": "node variants.mjs",
 		"preload": "node preload.mjs",
 		"plurals": "node plurals.mjs",
+		"ordinals": "node ordinals.mjs",
 		"intl": "node intl.mjs",
 		"runtime-size": "node runtime-size.mjs",
 		"hmr": "node hmr.mjs",
