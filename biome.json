@@ -10,5 +10,17 @@
 	},
 	"html": {
 		"experimentalFullSupportEnabled": true
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["examples/nuxt/app/pages/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useVueMultiWordComponentNames": "off"
+					}
+				}
+			}
+		}
+	]
 }

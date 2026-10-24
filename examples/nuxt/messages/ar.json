@@ -1,0 +1,39 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"title": "متجر يتحدث لغتك",
+	"greeting": "مرحبا، {name}!",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=zero": "سلتك فارغة",
+				"countPlural=one": "منتج واحد في سلتك",
+				"countPlural=two": "منتجان في سلتك",
+				"countPlural=few": "{count} منتجات في سلتك",
+				"countPlural=*": "{count} منتج في سلتك"
+			}
+		}
+	],
+	"cart_add": "أضف منتجا",
+	"terms": "بالطلب، أنت توافق على {#link}الشروط{/link}.",
+	"about_link": "من نحن",
+	"home_link": "العودة إلى المتجر",
+	"about_title": "عن المتجر",
+	"about_body": "نشحن إلى كل مكان، بلغتك.",
+	"delivery_link": "متى يصل؟",
+	"delivery_title": "متى يصل طلبك",
+	"delivery_estimate": [
+		{
+			"declarations": ["input days", "local daysPlural = days: plural"],
+			"selectors": ["daysPlural"],
+			"match": {
+				"daysPlural=one": "يصل خلال يوم واحد.",
+				"daysPlural=two": "يصل خلال يومين.",
+				"daysPlural=few": "يصل خلال {days} أيام.",
+				"daysPlural=*": "يصل خلال {days} يوما."
+			}
+		}
+	],
+	"drawn_in_browser": "رُسم في المتصفح"
+}
