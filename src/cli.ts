@@ -5,6 +5,7 @@ import { type Command, UsageError } from "./cli/command.ts";
 import { compileCommand } from "./cli/compile.ts";
 import { exportCommand } from "./cli/export.ts";
 import { importCommand } from "./cli/import.ts";
+import { mergeCommand } from "./cli/merge.ts";
 import { seedCommand } from "./cli/seed.ts";
 import { watchCommand } from "./cli/watch.ts";
 
@@ -15,6 +16,7 @@ const commands: Record<string, Command> = {
 	check: checkCommand,
 	seed: seedCommand,
 	export: exportCommand,
+	merge: mergeCommand,
 	add: addCommand,
 	import: importCommand,
 };

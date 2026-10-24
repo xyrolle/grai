@@ -17,7 +17,10 @@ export type GraiErrorCode =
 	| "unsupported"
 	| "plural-category-unknown"
 	| "selection-not-exhaustive"
-	| "output-locked";
+	| "output-locked"
+	| "translation-invalid"
+	| "translation-stale"
+	| "translation-incomplete";
 
 /** Where a problem is: a file relative to the project's root, and the message's key and locale. */
 export type GraiErrorWhere = {
