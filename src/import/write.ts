@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
+import { tabbedLayout, withMessages } from "../catalog-text.ts";
 import { GraiError } from "../error.ts";
+import { writeAll } from "../write-all.ts";
 import type { CatalogFile } from "./catalogs.ts";
 
 /** An error for each catalog that exists already: an import writes new catalogs only, so it never overwrites edits. */
@@ -20,15 +22,19 @@ export function existingCatalogs(
 		);
 }
 
-/** Writes each catalog through a temporary file renamed into place; returns the files, relative to the root. */
+/** Writes every catalog or none, an entry per line indented by a tab; returns the files, relative to the root. */
 export function writeCatalogs(
 	files: readonly CatalogFile[],
 	root: string,
 ): string[] {
-	return files.map(({ path, catalog }) => {
+	const texts = new Map<string, string>();
+	for (const { path, catalog } of files) {
 		mkdirSync(dirname(path), { recursive: true });
-		writeFileSync(`${path}.tmp`, `${JSON.stringify(catalog, null, "\t")}\n`);
-		renameSync(`${path}.tmp`, path);
-		return relative(root, path);
-	});
+		texts.set(
+			path,
+			withMessages("{}\n", Object.entries(catalog), tabbedLayout),
+		);
+	}
+	writeAll(texts);
+	return files.map(({ path }) => relative(root, path));
 }
