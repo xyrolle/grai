@@ -1,0 +1,97 @@
+# API
+
+grai 0.1's public surface. Anything this page does not list is internal, and may change in any release.
+
+## `grai`
+
+The compiler, for a build script or a bundler grai has no adapter for.
+
+- `compile(configFile: string): Promise<CompileResult>`: compiles the project and writes its output, unless the output is already that of the same config and catalogs. It never throws a `GraiError`: each one is in the result.
+- `type CompileResult = { written: string[]; errors: GraiError[] }`: the files written, relative to the outdir, or every error, sorted by file, key and locale.
+- `class GraiError extends Error`: a compile failure, with `code: GraiErrorCode`, `file: string`, and `key` and `locale` (`string | undefined`) where they apply.
+- `type GraiErrorCode`: the failure's stable name, such as `"key-missing"` or `"catalog-invalid"`.
+
+## `grai/vite`
+
+- `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin`: compiles when Vite starts, patches an edited message into the open page in dev, and in a build puts in each chunk only the keys its code uses, once per locale. `config` is the path of `grai.config.json`, from Vite's root; `reloadOnEdit` reloads the open pages after an edit rather than patch them, for a framework whose pages only the server draws, such as Astro.
+- `graiModules(options?: { config?: string }): (id: string) => GraiModuleKind | undefined`: for a tool that reads a client build's chunks, the kind of grai's module an id is, or `undefined` for any other. `config` is the path of `grai.config.json`, from the working directory.
+- `type GraiModuleKind = "runtime" | "config" | "plurals" | "formats" | "key" | "text"`: the first four go to the `grai-runtime` chunk, `key` and `text` to the message chunks under `grai/`.
+
+## `grai/svelte`
+
+- `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin[]`: `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. List it before `sveltekit()` or `svelte()`. It needs `svelte` and `magic-string`.
+
+## The `grai` command
+
+Every command takes `--config <file>`, `grai.config.json` in the current directory by default. It exits with 0, with 1 when it reports errors, and with 2 on a usage error.
+
+- `grai compile`: writes the output, if the catalogs or the config changed.
+- `grai watch`: writes it, then again on each change of a catalog or the config.
+- `grai check [--source <dir>]... [--json]`: reports every problem and writes nothing. `--json` prints `{ problems: [{ code, file, key, locale, message }], untranslated: { [locale]: string[] } }`.
+- `grai check --fix [--source <dir>]...`: removes from every catalog the keys no source can name, then checks.
+- `grai add <key> --<locale> <text>...`: adds the key to every catalog, with a text for each locale, then compiles.
+- `grai find <key> [--source <dir>]...`: prints the key's line in each catalog, and each call site.
+- `grai rename <key> <new> [--source <dir>]...`: renames the key in every catalog and at every call site, then compiles.
+- `grai seed <locale>`: gives the locale's catalog the base text of each key it lacks, then compiles.
+- `grai export <locale> [--untranslated] [--json]`: prints the locale's messages as XLIFF 2.0. `--json` prints `{ srcLang, trgLang, units: [{ id, key, variant?, note?, source, target? }] }`.
+- `grai merge <file>`: writes an exported file's translations into its locale's catalog, then compiles.
+- `grai import --from i18next|icu <file or dir>...`: converts another library's catalogs into new grai catalogs.
+- `grai help`: lists the commands.
+
+## `grai.config.json`
+
+- `locales: string[]`: the project's locales, as BCP 47 tags in their canonical form.
+- `baseLocale: string`: one of `locales`; the locale a call renders in when nothing binds another.
+- `catalogs: string`: each locale's catalog, as a path with `{locale}` in it, such as `"messages/{locale}.json"`. A catalog may nest keys in objects; a nested key is called by its names joined by `_`.
+- `outdir: string`: the directory the output goes to.
+- `strategy?: ("cookie" | "preferredLanguage" | "url")[]`: where the server looks for a request's locale, in order, before the base locale.
+- `cookieName?: string`: the cookie the `cookie` strategy reads and `setLocale` writes, a name RFC 6265 allows; required with it, refused without it.
+- `switch?: "reload" | "live"`: how a page changes locale. `"reload"`, the default, reloads or navigates; `"live"` keeps every message a call in `grai/svelte`'s build, for an app that switches in place.
+- `tests?: string[]`: globs of the source files that are tests, which `grai check` does not count as using a key; `[]` makes no file a test.
+- `fallbacks?: Record<string, string>`: each locale that takes the messages it lacks from another locale of its language, such as `{ "en-GB": "en" }`.
+- `identicalToBase?: Record<string, string[]>`: per locale, the keys whose message rightly reads as the base locale's, which `grai check` and `grai export` take as translated.
+
+Relative paths start from the config file's directory. The README's table says more about each field.
+
+## The output
+
+The compiler writes these modules, with their declarations, into `outdir`.
+
+### `messages.js`
+
+- `m`: every message, by key. `m.key(inputs?, options?)` returns the message's text.
+
+### `keys.js`
+
+- Every message as a named export, `export const key: Message<…>`. Per-key import paths map to this file, as in `"#i18n/messages/*": "./src/lib/i18n/keys.js"` in `package.json`'s `imports`.
+
+### `runtime.js`
+
+- `type Locale`: the union of the project's locales.
+- `locales`: the project's locales, in the config's order, typed as a tuple of their literals.
+- `baseLocale`: the config's base locale, typed as its literal.
+- `getLocale(): Locale`: the locale messages render in: the request's on the server, the page's in a browser.
+- `setLocale(locale: Locale, options?: { reload?: boolean }): void`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it sets `<html lang>` and `dir`, keeps the locale in the cookie or the URL, and reloads, unless `{ reload: false }`.
+- `isLocale(value: unknown): value is Locale`: whether a value is one of the project's locales.
+- `assertIsLocale(value: unknown): Locale`: the value, if it is one of the project's locales; otherwise throws a `GraiError`.
+- `getTextDirection(locale?: Locale): "ltr" | "rtl"`: the direction a locale's script is written in, the bound locale's by default.
+- `extractLocaleFromUrl(url: string | URL): Locale`: the locale a URL's first path segment names, else the base locale.
+- `deLocalizeUrl(url: string | URL): URL`: the URL without its locale prefix.
+- `localizeUrl(url: string | URL, options?: { locale?: Locale }): URL`: the URL with a locale's prefix, the current locale's by default.
+- `localizeHref(href: string, options?: { locale?: Locale }): string`: a path such as `/cart` with a locale's prefix; any other href as it is.
+
+The four URL helpers follow the `url` strategy. Without it no URL names a locale, so they leave every URL as it is, and `extractLocaleFromUrl` gives the base locale.
+- `type Message<Inputs>`: a message, `(inputs, options?: { locale?: Locale }) => string`. Without inputs, `inputs` is optional and takes none.
+- `type MarkupMessage<Inputs, Tag>`: a message with markup; its `.parts()` takes the same arguments and returns `MessagePart<Tag>[]`, `Tag` being the tags its locales write.
+- `type MessagePart<Tag>`: `{ type: "text", value }`, or `{ type: "markup-start" | "markup-end" | "markup-standalone", name: Tag, options, attributes }`, an attribute without a value being `true`.
+- `class GraiError extends Error`: what a message or a locale function throws, with `code`:
+  - `"locale-unknown"`: a value that is not one of the project's locales;
+  - `"locale-not-loaded"`: a call, in a browser, in a locale other than the page's;
+  - `"value-unmatched"`: a value a closed select does not list;
+  - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency.
+
+### `server.js`
+
+- `middleware(request: Request, handler: (resolved: { request: Request; locale: Locale }) => Response | Promise<Response>): Promise<Response>`: resolves the request's locale by the config's `strategy`, binds it for the handler and everything it calls, and gives back the handler's response, its `Vary` listing the request headers the strategy reads.
+
+Everything else in `outdir` is internal: `config.js`, `dispatch.js`, `plurals.js`, `formats.js`, the shards under `keys/`, and `.grai/`.
