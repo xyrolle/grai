@@ -4,6 +4,7 @@ import { checkCommand } from "./cli/check.ts";
 import { type Command, UsageError } from "./cli/command.ts";
 import { compileCommand } from "./cli/compile.ts";
 import { exportCommand } from "./cli/export.ts";
+import { findCommand } from "./cli/find.ts";
 import { importCommand } from "./cli/import.ts";
 import { mergeCommand } from "./cli/merge.ts";
 import { seedCommand } from "./cli/seed.ts";
@@ -19,6 +20,7 @@ const commands: Record<string, Command> = {
 	merge: mergeCommand,
 	add: addCommand,
 	import: importCommand,
+	find: findCommand,
 };
 
 const usage = `Usage: grai <command> [--config <file>]
