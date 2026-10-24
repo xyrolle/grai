@@ -9,20 +9,24 @@ import { bindRequests, extractLocaleFromUrl } from "./runtime.js";
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
+/** The request headers the strategy reads, which a shared cache must key each response by. */
+const vary = headersRead().join(", ");
+
 /**
  * Resolves the request's locale by the config's strategy and binds it for the handler and all it
- * calls, so each message called while it runs is in that locale. Returns what the handler returns.
+ * calls, so each message called while it runs is in that locale. Returns the handler's response,
+ * its `Vary` listing the request headers the strategy reads.
  *
- * @template Result
  * @param {Request} request
- * @param {(resolved: { request: Request, locale: string }) => Result} handler
- * @returns {Result}
+ * @param {(resolved: { request: Request, locale: string }) => Response | Promise<Response>} handler
+ * @returns {Promise<Response>}
  */
-export function middleware(request, handler) {
+export async function middleware(request, handler) {
 	const locale = localeOf(request);
-	return requests.run(locales.indexOf(locale), () =>
+	const response = await requests.run(locales.indexOf(locale), () =>
 		handler({ request, locale }),
 	);
+	return vary === "" ? response : withVary(response);
 }
 
 /** The first locale the strategy finds in the request, else the base locale. */
@@ -81,4 +85,35 @@ function fromAcceptLanguage(header) {
 		if (locale !== undefined) return locale;
 	}
 	return undefined;
+}
+
+/** The headers `localeOf` reads: each strategy's, up to `url`, which always finds a locale. */
+function headersRead() {
+	/** @type {string[]} */
+	const headers = [];
+	for (const source of strategy) {
+		if (source === "url") break;
+		headers.push(source === "cookie" ? "Cookie" : "Accept-Language");
+	}
+	return headers;
+}
+
+/**
+ * The response with `vary` appended to its `Vary`, unread: a header listed twice means the same to
+ * a cache, and reading `Vary` first would cost every request a header read. A response from
+ * `fetch()` has immutable headers, and the platform has no way to ask, so such a response is
+ * copied, its body unread.
+ *
+ * @param {Response} response
+ */
+function withVary(response) {
+	try {
+		response.headers.append("vary", vary);
+		return response;
+	} catch (error) {
+		if (!(error instanceof TypeError)) throw error;
+		const copy = new Response(response.body, response);
+		copy.headers.append("vary", vary);
+		return copy;
+	}
 }

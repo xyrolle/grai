@@ -21,10 +21,13 @@ async function output(config: Record<string, unknown> = {}) {
 	return {
 		m,
 		runtime,
-		middleware: server.middleware as <Result>(
+		middleware: server.middleware as (
 			request: Request,
-			handler: (resolved: { request: Request; locale: string }) => Result,
-		) => Result,
+			handler: (resolved: {
+				request: Request;
+				locale: string;
+			}) => Response | Promise<Response>,
+		) => Promise<Response>,
 	};
 }
 
@@ -49,10 +52,12 @@ describe("the middleware", () => {
 		path: string,
 		headers: Record<string, string>,
 	) =>
-		middleware(
-			new Request(`https://shop.test${path}`, { headers }),
-			({ locale }) => [locale, m.title?.()],
-		);
+		(
+			await middleware(
+				new Request(`https://shop.test${path}`, { headers }),
+				({ locale }) => Response.json([locale, m.title?.()]),
+			)
+		).json();
 
 	it("binds the locale the request names, by the strategy's order, else the base locale", async () => {
 		const { m, middleware } = await output(config);
@@ -91,16 +96,18 @@ describe("the middleware", () => {
 			release = resolve;
 		});
 		let started = 0;
-		const render = (cookie: string) =>
-			middleware(
-				new Request("https://shop.test/", { headers: { cookie } }),
-				async () => {
-					const before = m.title?.();
-					if (++started === 3) release();
-					await allStarted;
-					return [before, m.title?.()];
-				},
-			);
+		const render = async (cookie: string) =>
+			(
+				await middleware(
+					new Request("https://shop.test/", { headers: { cookie } }),
+					async () => {
+						const before = m.title?.();
+						if (++started === 3) release();
+						await allStarted;
+						return Response.json([before, m.title?.()]);
+					},
+				)
+			).json();
 
 		expect(
 			await Promise.all([
@@ -122,11 +129,68 @@ describe("the middleware", () => {
 			async () => {
 				runtime.setLocale("de");
 				await Promise.resolve();
-				return m.title?.();
+				return new Response(m.title?.());
 			},
 		);
 
-		expect([inside, m.title?.()]).toEqual(["Ihr Warenkorb", "Your cart"]);
+		expect([await inside.text(), m.title?.()]).toEqual([
+			"Ihr Warenkorb",
+			"Your cart",
+		]);
+	});
+});
+
+describe("the response's Vary", () => {
+	/** The `Vary` of the response the middleware gives for `response`, by `strategy`. */
+	const varyOf = async (
+		strategy: string[],
+		response = () => new Response("Your cart"),
+	) => {
+		const { middleware } = await output({
+			strategy,
+			...(strategy.includes("cookie") ? { cookieName: "lang" } : {}),
+		});
+		return (
+			await middleware(new Request("https://shop.test/cart"), response)
+		).headers.get("vary");
+	};
+
+	it.each([
+		[[], null],
+		[["cookie"], "Cookie"],
+		[["preferredLanguage"], "Accept-Language"],
+		[["url"], null],
+		[["cookie", "preferredLanguage"], "Cookie, Accept-Language"],
+		[["preferredLanguage", "cookie"], "Accept-Language, Cookie"],
+		[["cookie", "url"], "Cookie"],
+		[["preferredLanguage", "url"], "Accept-Language"],
+		[["cookie", "preferredLanguage", "url"], "Cookie, Accept-Language"],
+		// url always finds a locale, so the strategies after it are never read.
+		[["url", "cookie", "preferredLanguage"], null],
+	])("with the strategy %j, lists %j", async (strategy, vary) => {
+		expect(await varyOf(strategy)).toBe(vary);
+	});
+
+	it("appends to the handler's own", async () => {
+		const vary = await varyOf(
+			["cookie", "preferredLanguage"],
+			() => new Response("", { headers: { vary: "Accept-Encoding" } }),
+		);
+
+		expect(vary).toBe("Accept-Encoding, Cookie, Accept-Language");
+	});
+
+	it("varies a response whose headers are immutable, as fetch() gives, through a copy", async () => {
+		const { middleware } = await output({ strategy: ["preferredLanguage"] });
+		const response = await middleware(new Request("https://shop.test/"), () =>
+			Response.redirect("https://shop.test/cart", 307),
+		);
+
+		expect([
+			response.status,
+			response.headers.get("location"),
+			response.headers.get("vary"),
+		]).toEqual([307, "https://shop.test/cart", "Accept-Language"]);
 	});
 });
 
