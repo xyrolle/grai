@@ -1,4 +1,4 @@
-import { appendMessages } from "./catalog-file.ts";
+import { writeMessages } from "./catalog-file.ts";
 import {
 	type CompileResult,
 	compile,
@@ -76,7 +76,7 @@ export async function add(
 	}
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
 	for (const [locale, path] of read.config.catalogs) {
-		appendMessages(path, [[key, texts[locale] ?? ""]], path);
+		writeMessages(path, [[key, texts[locale] ?? ""]], path);
 	}
 	return compile(configFile);
 }

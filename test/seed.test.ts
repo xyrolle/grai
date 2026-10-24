@@ -89,7 +89,7 @@ describe("grai seed", () => {
 				errors: [
 					expect.objectContaining({
 						code: "config-invalid",
-						message: `grai.config.json: "${locale}" is not a locale to seed. Seed one of de, from the base locale en.`,
+						message: `grai.config.json: "${locale}" is not a locale to seed: name one of de; en is the base locale.`,
 					}),
 				],
 			});
