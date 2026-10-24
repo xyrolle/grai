@@ -20,7 +20,8 @@
 		"intl": "node intl.mjs",
 		"runtime-size": "node runtime-size.mjs",
 		"hmr": "node hmr.mjs",
-		"call-sites": "node call-sites.mjs"
+		"call-sites": "node call-sites.mjs",
+		"startup": "node startup.mjs"
 	},
 	"devDependencies": {
 		"@formatjs/cli": "6.16.35",
