@@ -1,0 +1,23 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"language_name": "Română",
+	"home_link": "Acasă",
+	"about_link": "Despre",
+	"greeting": "Bună ziua",
+	"about_title": "Despre acest exemplu",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} produs în coș",
+				"countPlural=few": "{count} produse în coș",
+				"countPlural=*": "{count} de produse în coș"
+			}
+		}
+	],
+	"cart_add": "Adaugă un produs",
+	"drawn_by_svelte": "Desenat de Svelte în browser",
+	"welcome": "Bine ai venit, {name}!",
+	"drawn_by_react": "Desenat de React în browser"
+}
