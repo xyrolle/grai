@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { type AstroRouting, disagreements } from "../src/astro/agreement.ts";
 import {
 	type DocumentStart,
 	rewriteDocumentStart,
@@ -10,6 +11,7 @@ import {
 	type LocaleProject,
 	localeMiddleware,
 } from "../src/astro/middleware.ts";
+import { readConfig } from "../src/config.ts";
 import { type Messages, project } from "./project.ts";
 
 const start: DocumentStart = {
@@ -101,6 +103,117 @@ describe("the document's start", () => {
 			...encoded('"><head><title>'),
 		);
 		expect(await rewrittenBody([latin1]).bytes()).toEqual(latin1);
+	});
+});
+
+/** A project's config, read as the integration reads it. */
+function graiConfig(config: Record<string, unknown>) {
+	return readConfig(
+		project({ en: { title: "Cart" }, ro: { title: "Coș" } }, config).config,
+	);
+}
+
+/** Astro's i18n routing as its config resolves it: the default locale without a prefix. */
+const unprefixed: Exclude<
+	NonNullable<AstroRouting["i18n"]>["routing"],
+	"manual"
+> = {
+	prefixDefaultLocale: false,
+	redirectToDefaultLocale: false,
+	fallbackType: "redirect",
+};
+
+const routing: AstroRouting = {
+	base: "/",
+	i18n: { locales: ["ro", "en"], defaultLocale: "en", routing: unprefixed },
+};
+
+describe("grai's config beside Astro's", () => {
+	it("agrees with Astro's i18n routing by the same locales and default, found in the URL", () => {
+		expect(disagreements(graiConfig({ strategy: ["url"] }), routing)).toEqual(
+			[],
+		);
+	});
+
+	it("agrees with any base, and no i18n routing, when the locale is not in the URL", () => {
+		expect(
+			disagreements(graiConfig({ strategy: ["cookie"], cookieName: "lang" }), {
+				base: "/shop",
+			}),
+		).toEqual([]);
+	});
+
+	it("finds the locale in the URL alone beside Astro's i18n routing", () => {
+		expect(
+			disagreements(
+				graiConfig({ strategy: ["cookie", "url"], cookieName: "lang" }),
+				routing,
+			),
+		).toEqual([
+			`Astro's i18n routing renders each page in the locale its URL names, so "strategy" must be ["url"], not ["cookie","url"].`,
+		]);
+	});
+
+	it("has Astro's i18n routing name grai's locales, by their tags", () => {
+		const config = graiConfig({ strategy: ["url"] });
+
+		expect(
+			disagreements(config, {
+				base: "/",
+				i18n: {
+					locales: ["en", "ru"],
+					defaultLocale: "en",
+					routing: unprefixed,
+				},
+			}),
+		).toEqual([
+			`Astro's i18n.locales must be grai's "locales": ["en","ro"], not ["en","ru"].`,
+		]);
+		expect(
+			disagreements(config, {
+				base: "/",
+				i18n: {
+					locales: ["en", { path: "romana", codes: ["ro"] }],
+					defaultLocale: "en",
+					routing: unprefixed,
+				},
+			}),
+		).toEqual([
+			`Astro's i18n.locales names "romana" by a path; the "url" strategy names a locale by its tag, so list the locales as their tags.`,
+		]);
+	});
+
+	it("has Astro's default locale be the base locale, without a prefix", () => {
+		expect(
+			disagreements(graiConfig({ strategy: ["url"] }), {
+				base: "/",
+				i18n: {
+					locales: ["en", "ro"],
+					defaultLocale: "ro",
+					routing: { ...unprefixed, prefixDefaultLocale: true },
+				},
+			}),
+		).toEqual([
+			`Astro's i18n.defaultLocale must be grai's "baseLocale", "en", not "ro".`,
+			`The base locale's URLs have no prefix in grai, so Astro's i18n.routing.prefixDefaultLocale must be false.`,
+		]);
+	});
+
+	it("serves every locale under its path, from no base and no domain of its own", () => {
+		expect(
+			disagreements(graiConfig({ strategy: ["url"] }), {
+				base: "/shop/",
+				i18n: {
+					locales: ["en", "ro"],
+					defaultLocale: "en",
+					domains: { ro: "https://example.ro" },
+					routing: unprefixed,
+				},
+			}),
+		).toEqual([
+			`The "url" strategy reads the locale from the path's first segment, which Astro's base "/shop/" takes. Serve the site from "/", or find the locale another way.`,
+			`Astro's i18n.domains serves ro from domains of their own, where grai's "url" strategy finds the locale in the path. Serve every locale under its path prefix instead.`,
+		]);
 	});
 });
 
