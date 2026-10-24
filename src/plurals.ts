@@ -1,3 +1,4 @@
+import type { SelectedNumber } from "./format-functions.ts";
 import {
 	categoryOrder,
 	chain,
@@ -68,13 +69,18 @@ export function pluralName(locale: string, type: PluralType): string {
 	return `${prefix}_${locale.replaceAll("-", "_")}`;
 }
 
-/** The name of plurals.js's function that rounds a count as `:integer` shows it. */
-export const integerName = "integer";
+/**
+ * The functions of plurals.js a number selector reads its input through, by the number it
+ * compares; a plain number is read through Number.
+ */
+export const numberReaders: Readonly<
+	Record<Exclude<SelectedNumber, "number">, string>
+> = { integer: "integer", percent: "percent" };
 
 /**
  * plurals.js: a function per locale and type giving a count's category, compiled from CLDR's
- * rules, and `integer`, the whole number an `:integer` selector compares. A count is taken as a
- * number, as Intl.PluralRules takes it. A whole, non-negative count, the usual one, takes a path
+ * rules, and the number readers: the whole number an `:integer` selector compares, and the
+ * percent a `:percent` one does. A count is taken as a number, as Intl.PluralRules takes it. A whole, non-negative count, the usual one, takes a path
  * with the fraction and exponent operands folded away; any other is split into its operands
  * first. That path also tests the count's type, which Number.isInteger implies, as TypeScript
  * narrows by `typeof` and not by Number.isInteger, and an app's checkJs reads this file.
@@ -110,9 +116,22 @@ const operands = (n) => {
  *
  * @param {unknown} n
  */
-export const ${integerName} = (n) => {
+export const ${numberReaders.integer} = (n) => {
 	const x = Number(n);
 	return Math.sign(x) * Math.round(Math.abs(x));
+};
+
+/**
+ * A count as the percent :percent shows: its decimal point moved two places, which is exact where
+ * multiplying by 100 is not (0.29 * 100 is 28.999999999999996).
+ *
+ * @param {unknown} n
+ */
+export const ${numberReaders.percent} = (n) => {
+	const x = Number(n);
+	if (!Number.isFinite(x)) return x * 100;
+	const [digits, exponent = "0"] = String(x).split("e");
+	return Number(\`\${digits}e\${Number(exponent) + 2}\`);
 };
 
 ${functions.join("\n")}`;

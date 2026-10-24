@@ -9,6 +9,7 @@ import {
 	type IntlOptions,
 	type OptionKind,
 	type OptionValue,
+	type SelectedNumber,
 	shapesText,
 } from "./format-functions.ts";
 import { MessageProblem } from "./problem.ts";
@@ -23,13 +24,13 @@ export type Format = { formatter: IntlFormatter; options: IntlOptions };
  */
 export type SelectMode = "plural" | "ordinal" | "exact";
 
-/** A call as a local declares it: its function, the options given, its format, and its `select`. */
+/** A call as a local declares it: its function, the options given, its format, and its selection. */
 export type Call = {
 	fn: string;
 	given: readonly string[];
 	format: Format;
-	/** For a function that selects, its mode, plural by default. */
-	select: SelectMode | undefined;
+	/** For a function that selects: the number it compares, and its mode, plural by default. */
+	selection: { number: SelectedNumber; mode: SelectMode } | undefined;
 };
 
 const option = /^([A-Za-z]\w*)=(\S+)$/;
@@ -67,11 +68,12 @@ export function parseCall(
 		);
 	}
 	const given: Record<string, OptionValue> = {};
-	let select: SelectMode | undefined;
+	const takesSelect = spec.selects?.takesSelect === true;
+	let mode: SelectMode | undefined;
 	for (const token of optionsText.trim().split(/\s+/).filter(Boolean)) {
 		const [, key = "", text = ""] = option.exec(token) ?? [];
-		if (key === "select" && spec.selects && select === undefined) {
-			select = selectModeOf(text, source, token);
+		if (key === "select" && takesSelect && mode === undefined) {
+			mode = selectModeOf(text, source, token);
 			continue;
 		}
 		const refused = spec.refused?.[key];
@@ -83,7 +85,7 @@ export function parseCall(
 			const known = Object.keys(spec.options);
 			throw new MessageProblem(
 				"message-invalid",
-				`${source}: "${token}" is not an option of :${name}, or is given twice. Its options are ${(spec.selects ? ["select", ...known] : known).join(", ")}.`,
+				`${source}: "${token}" is not an option of :${name}, or is given twice. Its options are ${(takesSelect ? ["select", ...known] : known).join(", ")}.`,
 			);
 		}
 		given[key] = optionValue(kind, text, source, token);
@@ -114,12 +116,11 @@ export function parseCall(
 			`${source}: Intl cannot format with these options: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
-	return {
-		fn: name,
-		given: Object.keys(given),
-		format,
-		select: spec.selects ? (select ?? "plural") : undefined,
-	};
+	const selection =
+		spec.selects === undefined
+			? undefined
+			: { number: spec.selects.number, mode: mode ?? "plural" };
+	return { fn: name, given: Object.keys(given), format, selection };
 }
 
 /**
