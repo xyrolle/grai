@@ -37,3 +37,9 @@ Done when: a local branch of each reference app on grai passes its own checks an
 `docs/design.md` says a per-key path to a key that does not exist resolves, in dev, to a module whose export throws a `GraiError` naming the key, with the key in the overlay. The Vite plugin does not yet: such an import fails when the page links its modules.
 
 Done when: the Vite plugin serves that module and reports the key, with a test that a page importing a missing key loads and throws the `GraiError` only when the message is called.
+
+## Rename what a module reads off a dynamic import
+
+`grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.
+
+Done when: a rename changes them, with a test of each.

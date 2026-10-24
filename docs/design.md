@@ -206,6 +206,13 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - inputs one locale reads and another never does, which is a translation that lost or invented a placeholder.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
+- **`find`, `rename` and `check --fix` read the sources through check's scan:** the same files, and the same notion of a name a source writes. None parses JavaScript, Svelte or Vue, so each takes about a second on app B's 13,000 keys and 9,000 files (68 MB), measured by `bench/refactor.mjs`.
+  - A call site is `m.key`, `m?.key`, `m["key"]`, a per-key import's path and name (static, dynamic or destructured), or a use of the name that import binds. `m` is any local name an import of `m` binds, whatever the path, so a re-export through the app's own module counts, and so does `import * as` keys.js.
+  - `grai find <key>` prints the key's line in each catalog, each call site, and each other place a source writes the name.
+  - `grai rename <key> <new>` renames the key in every catalog and at every call site, then compiles. It changes nothing when any other place writes the name (an object key, a string, someone else's property), and names each, since only the author knows what it means. A new name another key has, ignoring case, or one a file that binds the key already uses, refuses it too.
+  - `grai check --fix` removes each key no source names, then checks. A key that a read by a computed name may reach stays, and the report names the read: `m[expr]`, narrowed by a template's or a concatenation's literal start, `m` used whole (`Object.keys(m)`, `typeof m`), or per-key modules loaded by a built path.
+  - **Catalogs are edited as text.** A rename changes the key's string, and a removal takes the entry with the separator before it, so every other byte of the catalog stays, layout included.
+  - **The edits are written all or none:** each file's new text goes to a temporary file first, and they are renamed into place once all are written.
 
 ## Package
 
