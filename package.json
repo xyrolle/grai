@@ -68,7 +68,7 @@
 		"build": "tsc -p tsconfig.build.json",
 		"prepack": "pnpm build",
 		"check": "biome check .",
-		"typecheck": "tsc && tsc -p tsconfig.runtime.json && tsc -p tsconfig.browser.json",
+		"typecheck": "tsc && tsc -p tsconfig.runtime.json && tsc -p tsconfig.browser.json && pnpm --filter grai-example-vue typecheck",
 		"test": "vitest run",
 		"test:performance": "node scripts/performance.ts"
 	},

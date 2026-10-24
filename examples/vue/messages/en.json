@@ -1,0 +1,19 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"title": "A shop that speaks your language",
+	"greeting": "Hello, {name}!",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} item in your cart",
+				"countPlural=*": "{count} items in your cart"
+			}
+		}
+	],
+	"cart_add": "Add an item",
+	"terms": "By ordering you accept the {#link}terms{/link}.",
+	"language_switch": "Citește în română",
+	"drawn_in_browser": "Drawn in the browser"
+}
