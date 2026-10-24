@@ -12,6 +12,7 @@ import {
 	reportLines,
 	summaryLine,
 } from "./import.ts";
+import { seed } from "./seed.ts";
 import { watch } from "./watch.ts";
 
 const usage = `Usage: grai <command> [--config <file>]
@@ -20,6 +21,8 @@ const usage = `Usage: grai <command> [--config <file>]
   watch                        write it, then again on each change of a catalog or the config
   check [--source <dir>]...    report every problem and write nothing: what compile reports,
                                keys no source file names, inputs the locales do not agree on
+  seed <locale>                give the locale's catalog the base text of each key it lacks,
+                               creating it if need be, then compile
   add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
                                then compile
   import --from i18next|icu <file or dir>...
@@ -64,6 +67,23 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		if (errors.length > 0) return failed(errors);
 		console.log("grai: no problems");
 		return 0;
+	},
+	async seed(args) {
+		const { config, positionals } = parsed(args);
+		const [locale, ...others] = positionals;
+		if (locale === undefined || others.length > 0) {
+			throw new UsageError("seed takes one locale");
+		}
+		const started = performance.now();
+		const seeded = await seed(config, locale);
+		if ("errors" in seeded) return failed(seeded.errors);
+		const base = readConfig(config).baseLocale;
+		console.log(
+			seeded.keys === 0
+				? `grai: ${seeded.file} has every key of ${base}`
+				: `grai: seeded ${seeded.keys} ${seeded.keys === 1 ? "key" : "keys"} into ${seeded.file} with the text of ${base}`,
+		);
+		return reported(config, seeded.result, performance.now() - started);
 	},
 	async add(args) {
 		const { config } = parsed(args, {}, false);

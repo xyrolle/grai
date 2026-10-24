@@ -218,6 +218,8 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - `grai check` runs every compile check (lockstep, plural categories) without writing, and adds two of its own:
   - keys no source file names. A key counts as named when it is an identifier anywhere in a JavaScript, TypeScript, Svelte or Vue file under the project, or under `--source`, outside dependencies, build output and the outdir. That counts `m.key` and per-key imports alike, and never calls a key unused that some code names;
   - inputs one locale reads and another never does, which is a translation that lost or invented a placeholder.
+- `grai seed <locale>` gives a locale's catalog the base text of every key it lacks, and creates the catalog if there is none.
+  - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` when it has no `*`. It then compiles in a locale with more categories, such as `few` in `ru`.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
 - `grai import --from i18next|icu <file or dir>…` converts another library's catalogs into the project's catalogs, for a migration. Each source file's locale is its name (`en.json`) or its directory's (`en/common.json`).

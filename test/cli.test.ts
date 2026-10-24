@@ -103,6 +103,22 @@ describe("grai check", () => {
 	});
 });
 
+describe("grai seed", () => {
+	it("says how many keys it gave the base text, then compiles", async () => {
+		const { dir } = project({
+			en: { cart_title: "Your cart", cart_empty: "Empty" },
+			de: { cart_title: "Ihr Warenkorb" },
+		});
+
+		const { code, stdout } = await grai(dir, "seed", "de");
+
+		expect(code).toBe(0);
+		expect(stdout).toMatch(
+			/^grai: seeded 1 key into messages\/de\.json with the text of en\ngrai: wrote 13 files in out \(.+ ms\)\n$/,
+		);
+	});
+});
+
 describe("grai add", () => {
 	it("adds a key with each locale's text to every catalog, in its layout, then compiles", async () => {
 		const { dir } = project(catalogs);
