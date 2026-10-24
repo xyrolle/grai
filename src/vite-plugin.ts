@@ -26,8 +26,14 @@ import {
 	serveMessages,
 } from "./vite-dev.ts";
 
-/** The plugin's options. `config` is the path of the project's grai.config.json, from Vite's root. */
-export type GraiOptions = { config?: string };
+/**
+ * The plugin's options:
+ * - `config`: the path of the project's grai.config.json, from Vite's root.
+ * - `reloadOnEdit`: in dev, reload the open pages after an edit rather than patch them in place,
+ *   having sent the servers their patch first. For a framework whose pages the server draws and
+ *   no client code could draw again, such as Astro's.
+ */
+export type GraiOptions = { config?: string; reloadOnEdit?: boolean };
 
 /** grai's Vite plugin, and the build its last compile made, for the adapters built on it. */
 export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
@@ -132,6 +138,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			({ patch: patchOf, close: closeMessages } = serveMessages(
 				server,
 				files,
+				{ reloadOnEdit: options.reloadOnEdit === true },
 				(compiled) => {
 					if ("compilation" in compiled) build = compiled;
 					ready(compiled);
