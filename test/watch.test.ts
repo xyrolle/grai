@@ -58,3 +58,46 @@ it("gives a compile that throws to failed, and compiles again on the next change
 	expect(await outcome).toMatchObject({ errors: [] });
 	expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
 });
+
+/** A watcher of the project whose reports the test reads, closed when the test ends. */
+function watched(config: string) {
+	const reported: CompileResult[] = [];
+	const failures: unknown[] = [];
+	const watcher = watch(
+		config,
+		(result) => reported.push(result),
+		(error) => failures.push(error),
+	);
+	onTestFinished(async () => {
+		await watcher.close();
+		expect(failures).toEqual([]);
+	});
+	return reported;
+}
+
+it("reads a catalog that a save truncates and then writes once the save has settled", async () => {
+	const { dir, config } = project(catalogs);
+	const reported = watched(config);
+	await expect.poll(() => reported.length).toBe(1);
+	const catalog = join(dir, "messages", "de.json");
+
+	// As an editor saves: the file is empty for a moment before its new content is written.
+	writeFileSync(catalog, "");
+	await new Promise((resolve) => setTimeout(resolve, 5));
+	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
+
+	await expect.poll(() => reported.length).toBe(2);
+	expect(reported[1]).toMatchObject({ errors: [], written: ["keys/0.js"] });
+});
+
+it("reports a broken catalog after its save, without waiting for another", async () => {
+	const { dir, config } = project(catalogs);
+	const reported = watched(config);
+	await expect.poll(() => reported.length).toBe(1);
+
+	writeFileSync(join(dir, "messages", "de.json"), '{ "title": "Tit');
+
+	await expect
+		.poll(() => reported[1]?.errors.map((error) => error.code))
+		.toEqual(["catalog-invalid"]);
+});
