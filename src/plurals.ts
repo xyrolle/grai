@@ -53,21 +53,26 @@ export function pluralName(locale: string): string {
 
 /**
  * plurals.js: a function per locale giving a count's category, compiled from CLDR's rules. A
- * whole, non-negative count, the usual one, takes a path with the fraction and exponent operands
- * folded away; any other is split into its operands first.
+ * count is taken as a number, as Intl.PluralRules takes it. A whole, non-negative count, the usual
+ * one, takes a path with the fraction and exponent operands folded away; any other is split into
+ * its operands first. That path also tests the count's type, which Number.isInteger implies, as
+ * TypeScript narrows by `typeof` and not by Number.isInteger, and an app's checkJs reads this file.
  */
 export function pluralModule(locales: readonly string[]): string {
 	const functions = locales.map((locale) => {
 		const rules = rulesOf(locale);
 		const integer = chain(rules, integerOperands);
 		const decimal = chain(rules, decimalOperands);
-		return `export const ${pluralName(locale)} = (n) => {\n\tif (Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(n);\n\treturn ${decimal};\n};\n`;
+		return `/** @param {unknown} n */\nexport const ${pluralName(locale)} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(Number(n));\n\treturn ${decimal};\n};\n`;
 	});
 	return `// Plural rules from Unicode CLDR, © Unicode, Inc., under the Unicode License v3.
 
 /**
  * A count's operands: its absolute value, integer digits, number of fraction digits, and fraction
  * digits, once it is rounded as Intl.PluralRules rounds it, half away from zero to three digits.
+ *
+ * @param {number} n
+ * @returns {[x: number, i: number, v: number, f: number]}
  */
 const operands = (n) => {
 	const x = Math.abs(n);
@@ -75,7 +80,7 @@ const operands = (n) => {
 	if (text.includes("e")) return x < 1 ? [0, 0, 0, 0] : [x, x, 0, 0];
 	let [whole, fraction = ""] = text.split(".");
 	if (fraction.length > 3) {
-		const thousandths = Number(whole + fraction.slice(0, 3)) + (fraction[3] >= "5" ? 1 : 0);
+		const thousandths = Number(whole + fraction.slice(0, 3)) + (fraction.charAt(3) >= "5" ? 1 : 0);
 		whole = String(Math.floor(thousandths / 1000));
 		fraction = String(thousandths % 1000).padStart(3, "0").replace(/0+$/, "");
 	}
