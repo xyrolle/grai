@@ -206,6 +206,7 @@ describe("a formatted placeholder's errors", () => {
 					fraction_digits:
 						"{amount :currency currency=EUR fractionDigits=some}",
 					no_unit: "{days :relativetime numeric=auto}",
+					an_input: "{days :relativetime unit=$unit}",
 					a_unit: "{days :relativetime unit=fortnight}",
 					an_option: "{amount :number minimumFractionDigit=2}",
 					a_value: "{amount :number minimumFractionDigits=two}",
@@ -218,6 +219,7 @@ describe("a formatted placeholder's errors", () => {
 			'message-invalid: messages/en.json: "a_unit" (en): {days :relativetime unit=fortnight}: "unit=fortnight" needs a unit of time: year, years, quarter, quarters, month, months, week, weeks, day, days, hour, hours, minute, minutes, second, seconds.',
 			'unsupported: messages/en.json: "a_usage" (en): {distance :unit unit=meter usage=road}: usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.',
 			'message-invalid: messages/en.json: "a_value" (en): {amount :number minimumFractionDigits=two}: "minimumFractionDigits=two" needs a whole number.',
+			'unsupported: messages/en.json: "an_input" (en): {days :relativetime unit=$unit}: "unit=$unit" takes its value from an input, which grai does not support. Write the value itself.',
 			`message-invalid: messages/en.json: "an_intl_value" (en): {amount :number style=currency}: Intl cannot format with these options: ${intlError(() => new Intl.NumberFormat(undefined, { style: "currency" }))}`,
 			'message-invalid: messages/en.json: "an_option" (en): {amount :number minimumFractionDigit=2}: "minimumFractionDigit=2" is not an option of :number, or is given twice. Its options are select, style, currency, currencyDisplay, currencySign, unit, unitDisplay, notation, compactDisplay, numberingSystem, signDisplay, useGrouping, minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, trailingZeroDisplay, roundingPriority, roundingIncrement, roundingMode.',
 			'message-invalid: messages/en.json: "fraction_digits" (en): {amount :currency currency=EUR fractionDigits=some}: "fractionDigits=some" needs a whole number or auto.',

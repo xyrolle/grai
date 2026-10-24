@@ -78,6 +78,12 @@ export function parseCall(
 			mode = selectModeOf(text, source, token);
 			continue;
 		}
+		if (text.startsWith("$")) {
+			throw new MessageProblem(
+				"unsupported",
+				`${source}: "${token}" takes its value from an input, which grai does not support. Write the value itself.`,
+			);
+		}
 		const refused = spec.refused?.[key];
 		if (refused !== undefined) {
 			throw new MessageProblem("unsupported", `${source}: ${refused}`);
