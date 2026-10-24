@@ -1,17 +1,19 @@
-// Typed keys: what type checking a file of 500 message calls costs, against grai's generated
-// declarations and against i18next's keys, typed by declaration merging over the locale's JSON
-// (`CustomTypeOptions`). `tsc --noEmit` with TypeScript 7, median of three, and the editor's
-// completion after `m.` and inside `t("`, from TypeScript 6's language service, which tsserver
-// runs: the first request, which checks the program, and the next.
+// Typed keys: what type checking a file of 500 message calls costs with each library's typed
+// keys: grai's and Paraglide's generated declarations, i18next's keys merged into its types from
+// the locale's JSON (`CustomTypeOptions`), and use-intl's, inferred from the messages it is
+// given. `tsc --noEmit` with TypeScript 7, median of three, and the editor's completion after
+// `m.` or inside `t("`, from TypeScript 6's language service, which tsserver runs: the first
+// request, which checks the program, and the next.
 //   node types.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
 import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
+import { paraglideOutput, resolveTypeScript6 } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
 
 const CALLS = 500;
@@ -31,17 +33,21 @@ const compilerOptions = {
 	resolveJsonModule: true,
 };
 
-/** Writes the two projects: each a tsconfig, its declarations and a file of 500 calls. */
+/**
+ * Each library's project: its files (the declarations it needs and a file of 500 calls) and the
+ * text after which the editor is asked to complete a key.
+ */
 async function writeProjects(app) {
 	const config = writeGraiProject(app, "types");
 	const directory = join(config, "..");
 	const { compile } = await import(join(graiSource, "index.ts"));
 	await compile(config);
+	resolveTypeScript6();
+	const paraglide = await paraglideOutput(app, { emitTsDeclarations: true });
 	const locale = otherLocale(app);
-	writeFileSync(
-		join(directory, "translation.json"),
-		JSON.stringify(libraryCatalogs(app, locale).i18next),
-	);
+	const { i18next, icu } = libraryCatalogs(app, locale);
+	writeFileSync(join(directory, "translation.json"), JSON.stringify(i18next));
+	writeFileSync(join(directory, "messages.json"), JSON.stringify(icu));
 	writeFileSync(
 		join(directory, "i18next.d.ts"),
 		`import "i18next";
@@ -54,47 +60,53 @@ declare module "i18next" {
 `,
 	);
 	const calls = sampleCalls(app, CALLS);
-	const literal = (values) => JSON.stringify(values);
-	writeFileSync(
-		join(directory, "grai.ts"),
-		`import { m } from "./out/messages.js";\nexport const texts = [\n${calls.map((call) => `\tm.${call.key}(${call.kind === "text" ? "" : literal(call.inputs)}),`).join("\n")}\n];\n`,
-	);
-	writeFileSync(
-		join(directory, "i18next.ts"),
-		`import i18next from "i18next";\nconst t = i18next.t;\nexport const texts = [\n${calls.map((call) => `\tt(${JSON.stringify(call.key)}${call.kind === "text" ? "" : `, ${literal(i18nextValues(app, call.key, call.inputs))}`}),`).join("\n")}\n];\n`,
-	);
-	for (const name of ["grai", "i18next"]) {
-		const files =
-			name === "grai" ? ["grai.ts"] : ["i18next.d.ts", "i18next.ts"];
+	const values = (call, given = call.inputs) =>
+		call.kind === "text" ? "" : JSON.stringify(given);
+	const keyCalls = (write) =>
+		calls.map((call) => `\t${write(call)},`).join("\n");
+	const sources = {
+		grai: `import { m } from "./out/messages.js";\nexport const texts = [\n${keyCalls((call) => `m.${call.key}(${values(call)})`)}\n];\n`,
+		paraglide: `import { m } from "./${relative(directory, join(paraglide, "messages.js"))}";\nexport const texts = [\n${keyCalls((call) => `m.${call.key}(${values(call)})`)}\n];\n`,
+		i18next: `import i18next from "i18next";\nconst t = i18next.t;\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${call.kind === "text" ? "" : `, ${values(call, i18nextValues(app, call.key, call.inputs))}`})`)}\n];\n`,
+		"use-intl": `import { createTranslator } from "use-intl/core";\nimport messages from "./messages.json" with { type: "json" };\nconst t = createTranslator({ locale: ${JSON.stringify(locale)}, messages });\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${call.kind === "text" ? "" : `, ${values(call)}`})`)}\n];\n`,
+	};
+	const projects = [
+		["grai's declarations", "grai", [], "\nm."],
+		["Paraglide's declarations", "paraglide", [], "\nm."],
+		["i18next's CustomTypeOptions", "i18next", ["i18next.d.ts"], '\nt("'],
+		["use-intl, keys inferred from the messages", "use-intl", [], '\nt("'],
+	];
+	return projects.map(([title, name, declarations, marker]) => {
+		writeFileSync(join(directory, `${name}.ts`), sources[name]);
+		const files = [...declarations, `${name}.ts`];
 		writeFileSync(
 			join(directory, `tsconfig.${name}.json`),
 			JSON.stringify({ compilerOptions, files }),
 		);
-	}
-	return directory;
+		return {
+			title,
+			name,
+			files: files.map((file) => join(directory, file)),
+			marker,
+			directory,
+		};
+	});
 }
 
-/** Milliseconds to the first completion at `marker` appended to `file`, and to the next one. */
-function completion(directory, file, marker) {
-	const path = join(directory, file);
+/** Milliseconds to the first completion at the project's marker, appended to its calls, and to the next one. */
+function completion({ name, files, marker, directory }) {
+	const path = join(directory, `${name}.ts`);
 	const text = `${readFileSync(path, "utf8")}${marker}`;
-	const names = JSON.parse(
-		readFileSync(
-			join(directory, `tsconfig.${file.replace(".ts", "")}.json`),
-			"utf8",
-		),
-	).files.map((name) => join(directory, name));
 	const host = {
-		getScriptFileNames: () => names,
+		getScriptFileNames: () => files,
 		getScriptVersion: () => "1",
-		getScriptSnapshot: (name) =>
+		getScriptSnapshot: (file) =>
 			ts6.ScriptSnapshot.fromString(
-				name === path ? text : (ts6.sys.readFile(name) ?? ""),
+				file === path ? text : (ts6.sys.readFile(file) ?? ""),
 			),
 		getCurrentDirectory: () => directory,
-		getCompilationSettings: () => ({
-			...ts6.convertCompilerOptionsFromJson(compilerOptions, directory).options,
-		}),
+		getCompilationSettings: () =>
+			ts6.convertCompilerOptionsFromJson(compilerOptions, directory).options,
 		getDefaultLibFileName: ts6.getDefaultLibFilePath,
 		fileExists: ts6.sys.fileExists,
 		readFile: ts6.sys.readFile,
@@ -119,26 +131,25 @@ const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 for (const app of selectedApps()) {
-	const directory = await writeProjects(app);
+	const projects = await writeProjects(app);
 	console.log(`\n### ${app.name}: type checking ${CALLS} message calls, ms\n`);
 	console.log(
 		"| keys typed by | `tsc --noEmit`, TypeScript 7 | first completion, TypeScript 6 | next completion | completions |",
 	);
 	console.log("|---|---|---|---|---|");
-	for (const [name, marker] of [
-		["grai", "\nm."],
-		["i18next", '\nt("'],
-	]) {
+	for (const project of projects) {
 		const runs = Array.from({ length: 3 }, () => {
 			const start = performance.now();
-			execFileSync(tsc7, ["-p", join(directory, `tsconfig.${name}.json`)], {
-				stdio: "inherit",
-			});
+			execFileSync(
+				tsc7,
+				["-p", join(project.directory, `tsconfig.${project.name}.json`)],
+				{ stdio: "inherit" },
+			);
 			return performance.now() - start;
 		});
-		const done = completion(directory, `${name}.ts`, marker);
+		const done = completion(project);
 		console.log(
-			`| ${name === "grai" ? "grai's declarations" : "i18next's CustomTypeOptions"} | ${median(runs).toFixed(0)} | ${done.first.toFixed(0)} | ${done.next.toFixed(0)} | ${done.entries} |`,
+			`| ${project.title} | ${median(runs).toFixed(0)} | ${done.first.toFixed(0)} | ${done.next.toFixed(0)} | ${done.entries} |`,
 		);
 	}
 }
