@@ -23,6 +23,9 @@ export type Rendered = {
 	lines: readonly (readonly DeclarationLine[])[];
 };
 
+/** The output's .gitignore: everything in it is compiled from the catalogs, so none of it is committed. */
+const gitignore = "# grai writes this directory from the catalogs.\n*\n";
+
 /** About how many keys a shard holds, so an edit rewrites one small module and its declarations. */
 const keysPerShard = 512;
 
@@ -79,6 +82,7 @@ export function renderOutput(
 		formatters.length === 0 ? [] : [["formats.js", formatModule(formatters)]];
 	const output: Output = [
 		[
+			[".gitignore", gitignore],
 			["config.js", configModule(config)],
 			["runtime.d.ts", runtimeDeclarations(config)],
 			["server.d.ts", serverDeclarations],
