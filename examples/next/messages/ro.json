@@ -1,0 +1,36 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"title": "Un magazin care îți vorbește limba",
+	"greeting": "Salut, {name}!",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} produs în coș",
+				"countPlural=few": "{count} produse în coș",
+				"countPlural=*": "{count} de produse în coș"
+			}
+		}
+	],
+	"cart_add": "Adaugă un produs",
+	"terms": "Comandând, accepți {#link}condițiile{/link}.",
+	"about_link": "Despre noi",
+	"home_link": "Înapoi la magazin",
+	"about_title": "Despre magazin",
+	"about_body": "Livrăm oriunde, în limba ta.",
+	"language_switch": "Read in English",
+	"delivery_link": "Când sosește?",
+	"delivery_title": "Când sosește comanda",
+	"delivery_estimate": [
+		{
+			"declarations": ["input days", "local daysPlural = days: plural"],
+			"selectors": ["daysPlural"],
+			"match": {
+				"daysPlural=one": "Sosește într-o zi.",
+				"daysPlural=few": "Sosește în {days} zile.",
+				"daysPlural=*": "Sosește în {days} de zile."
+			}
+		}
+	]
+}

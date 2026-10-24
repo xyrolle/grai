@@ -1,10 +1,25 @@
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	PHASE_PRODUCTION_BUILD,
 	PHASE_PRODUCTION_SERVER,
 } from "next/constants.js";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { getRewrittenUrl } from "next/experimental/testing/server.js";
+import { NextRequest, type NextResponse } from "next/server.js";
+import { type Browser, chromium, type Page } from "playwright-core";
+import { build } from "vite";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	onTestFinished,
+	vi,
+} from "vitest";
 import { withGrai } from "../src/next/config.ts";
 import { project } from "./project.ts";
 
@@ -56,5 +71,243 @@ describe("withGrai", () => {
 		expect(await withGrai(nextConfig)(PHASE_PRODUCTION_SERVER)).toBe(
 			nextConfig,
 		);
+	});
+});
+
+/**
+ * grai/next's proxy for a project's output, bundled as Next bundles it: its imports of the
+ * output resolved to the project's outdir, and Next's own modules left to Node.
+ */
+async function proxyFor(dir: string) {
+	const outDir = join(dir, "proxy");
+	await build({
+		configFile: false,
+		logLevel: "silent",
+		resolve: {
+			alias: [
+				{
+					find: /^grai\/next\/output\/(.*)$/,
+					replacement: join(dir, "out", "$1"),
+				},
+			],
+		},
+		build: {
+			outDir,
+			minify: false,
+			lib: {
+				entry: fileURLToPath(new URL("../src/next/proxy.ts", import.meta.url)),
+				formats: ["es"],
+				fileName: "proxy",
+			},
+			rolldownOptions: { external: [/^next\//, /^node:/] },
+		},
+	});
+	const proxy: (request: NextRequest) => NextResponse = (
+		await import(pathToFileURL(join(outDir, "proxy.js")).href)
+	).proxy;
+	return (path: string, headers: Record<string, string> = {}) =>
+		getRewrittenUrl(
+			proxy(new NextRequest(`https://shop.test${path}`, { headers })),
+		)?.replace("https://shop.test", "");
+}
+
+describe("the proxy", () => {
+	const catalogs = { en: { title: "Your cart" }, ro: { title: "Coșul tău" } };
+
+	it("rewrites a request under its locale's segment, the URL's prefix stripped, the base locale's absent", async () => {
+		const { dir, load } = project(catalogs, { strategy: ["url"] });
+		await load();
+		const rewritten = await proxyFor(dir);
+
+		expect(rewritten("/")).toBe("/en");
+		expect(rewritten("/cart?step=2")).toBe("/en/cart?step=2");
+		expect(rewritten("/ro/cart")).toBe("/ro/cart");
+		expect(rewritten("/en/cart")).toBe("/en/en/cart");
+	});
+
+	it("rewrites by the cookie, then Accept-Language, and leaves the path as it is", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["cookie", "preferredLanguage"],
+			cookieName: "lang",
+		});
+		await load();
+		const rewritten = await proxyFor(dir);
+
+		expect(rewritten("/cart", { cookie: "lang=ro" })).toBe("/ro/cart");
+		expect(rewritten("/cart", { "accept-language": "ro-MD, en;q=0.5" })).toBe(
+			"/ro/cart",
+		);
+		expect(rewritten("/ro/cart", { cookie: "lang=en" })).toBe("/en/ro/cart");
+		expect(rewritten("/cart")).toBe("/en/cart");
+	});
+});
+
+// The Next example (examples/next), built by `next build` as an app builds it, served by
+// `next start`, and its pages in Chromium: under Turbopack, Next's default, and under webpack.
+const example = fileURLToPath(new URL("../examples/next/", import.meta.url));
+const next = join(example, "node_modules/.bin/next");
+const origin = "http://localhost:4771";
+/** Next's environment: no telemetry, which would phone home and outlive the test in a process of its own. */
+const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
+
+/** Builds the example with the given bundler flags and serves it until the suite ends. */
+function servedWith(flags: string[]): void {
+	let server: ChildProcess | undefined;
+	beforeAll(async () => {
+		const build = spawnSync(next, ["build", ...flags], {
+			cwd: example,
+			env,
+			encoding: "utf8",
+		});
+		if (build.status !== 0) {
+			throw new Error(`next build failed:\n${build.stdout}${build.stderr}`);
+		}
+		const started = spawn(next, ["start", "--port", "4771"], {
+			cwd: example,
+			env,
+		});
+		server = started;
+		await new Promise<void>((resolve, reject) => {
+			started.stdout.on("data", (chunk) => {
+				if (String(chunk).includes("Ready")) resolve();
+			});
+			started.on("exit", (code) =>
+				reject(new Error(`next start exited: ${code}`)),
+			);
+		});
+	}, 120_000);
+	afterAll(() => {
+		server?.kill();
+	});
+}
+
+let browser: Browser;
+let page: Page;
+/** What the page logged as an error, a hydration mismatch among them. */
+let errors: string[];
+beforeAll(async () => {
+	browser = await chromium.launch();
+});
+afterAll(() => browser?.close());
+beforeEach(async () => {
+	page = await browser.newPage();
+	errors = [];
+	page.on("console", (message) => {
+		if (message.type() === "error") errors.push(message.text());
+	});
+	page.on("pageerror", (error) => errors.push(error.message));
+});
+
+const text = (selector: string) => page.locator(selector).textContent();
+/** Marks the document, so a test tells a navigation in place from a page load. */
+const mark = () =>
+	page.evaluate(() => Object.assign(globalThis, { marked: true }));
+const marked = () => page.evaluate(() => "marked" in globalThis);
+
+describe("the Next example, built with Turbopack", () => {
+	servedWith([]);
+
+	it("renders the base locale unprefixed, in server and client components, and hydrates without an error", async () => {
+		await page.goto(`${origin}/`);
+
+		expect(await page.getAttribute("html", "lang")).toBe("en");
+		expect(await text("h1")).toBe("A shop that speaks your language");
+		expect(await text("#greeting")).toBe("Hello, Ana!");
+		expect(await text("#cart")).toBe("1 item in your cart");
+		expect(await text("#terms a")).toBe("terms");
+		await page.getByRole("button", { name: "Add an item" }).click();
+		expect(await text("#cart")).toBe("2 items in your cart");
+		expect(errors).toEqual([]);
+	});
+
+	it("renders a prefixed locale, with its own plural categories in a client component", async () => {
+		await page.goto(`${origin}/ro`);
+
+		expect(await page.getAttribute("html", "lang")).toBe("ro");
+		expect(await text("h1")).toBe("Un magazin care îți vorbește limba");
+		expect(await text("#cart")).toBe("1 produs în coș");
+		await page.getByRole("button", { name: "Adaugă un produs" }).click();
+		expect(await text("#cart")).toBe("2 produse în coș");
+		expect(await text("#terms a")).toBe("condițiile");
+		expect(errors).toEqual([]);
+	});
+
+	it("renders interleaved requests each in its own locale, in server and client components", async () => {
+		const expected = {
+			"/delivery": [
+				"When your order arrives",
+				"It arrives in 3 days.",
+				"1 item in your cart",
+			],
+			"/ro/delivery": [
+				"Când sosește comanda",
+				"Sosește în 3 zile.",
+				"1 produs în coș",
+			],
+		};
+		const paths = Array.from({ length: 24 }, (_, index) =>
+			index % 2 === 0 ? "/delivery" : "/ro/delivery",
+		);
+		const pages = await Promise.all(
+			paths.map((path) => fetch(origin + path).then((page) => page.text())),
+		);
+
+		const every = Object.values(expected).flat();
+		expect(
+			pages.map((html) => every.filter((words) => html.includes(words))),
+		).toEqual(paths.map((path) => expected[path]));
+	});
+
+	it("navigates in place within a locale, and the page and its metadata bind the locale themselves", async () => {
+		await page.goto(`${origin}/ro`);
+		await mark();
+
+		await page.click("#about");
+		await page.waitForURL(`${origin}/ro/about`);
+
+		expect(await text("h1")).toBe("Despre magazin");
+		expect(await page.title()).toBe("Despre magazin");
+		expect(await marked()).toBe(true);
+		expect(errors).toEqual([]);
+	});
+
+	it("loads the page anew when a link leads into another locale", async () => {
+		await page.goto(`${origin}/about`);
+		await mark();
+
+		const loaded = page.waitForEvent("load");
+		await page.click("#translation");
+		await loaded;
+
+		expect(page.url()).toBe(`${origin}/ro/about`);
+		expect(await text("h1")).toBe("Despre magazin");
+		expect(await marked()).toBe(false);
+	});
+
+	it("switches locale with setLocale, which goes to the page's URL in that locale", async () => {
+		await page.goto(`${origin}/ro`);
+
+		await page.click("#language");
+		await page.waitForURL(`${origin}/`);
+
+		expect(await text("h1")).toBe("A shop that speaks your language");
+		expect(await text("#cart")).toBe("1 item in your cart");
+	});
+});
+
+describe("the Next example, built with webpack", () => {
+	servedWith(["--webpack"]);
+
+	it("renders a prefixed locale in server and client components, hydrates, and navigates in place", async () => {
+		await page.goto(`${origin}/ro`);
+		await page.getByRole("button", { name: "Adaugă un produs" }).click();
+		expect(await text("#cart")).toBe("2 produse în coș");
+		await mark();
+		await page.click("#about");
+		await page.waitForURL(`${origin}/ro/about`);
+
+		expect(await text("h1")).toBe("Despre magazin");
+		expect(await marked()).toBe(true);
+		expect(errors).toEqual([]);
 	});
 });
