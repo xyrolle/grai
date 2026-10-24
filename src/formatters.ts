@@ -59,7 +59,7 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 		a.name < b.name ? -1 : 1,
 	);
 	const imports = sorted.some(({ format }) => format.input !== undefined)
-		? 'import { formatterFor } from "./runtime.js";\n\n'
+		? 'import { formatterFor } from "./dispatch.js";\n\n'
 		: "";
 	const definitions = sorted.map(({ name, locale, format }) =>
 		formatterCode(name, locale, format),

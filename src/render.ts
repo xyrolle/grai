@@ -9,6 +9,7 @@ import { formatModule } from "./formatters.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule } from "./plurals.ts";
 import {
+	dispatchDeclarations,
 	runtimeDeclarations,
 	serverDeclarations,
 } from "./runtime-declarations.ts";
@@ -33,7 +34,7 @@ const keysPerShard = 512;
  */
 export function renderOutput(
 	config: Config,
-	runtime: { runtime: string; server: string },
+	runtime: { dispatch: string; runtime: string; server: string },
 	compilation: Compilation,
 	base: BaseCatalog,
 	previous?: Rendered,
@@ -78,14 +79,15 @@ export function renderOutput(
 		[
 			["config.js", configModule(config)],
 			["runtime.d.ts", runtimeDeclarations(config)],
+			["dispatch.d.ts", dispatchDeclarations],
 			["server.d.ts", serverDeclarations],
 			["plurals.js", pluralModule(config.locales)],
 			...formatsFile(compilation),
 		],
-		[["runtime.js", runtime.runtime], ...declarations],
-		[["server.js", runtime.server]],
-		[...modules, ["keys.d.ts", keysIndex]],
+		[["dispatch.js", runtime.dispatch], ...declarations],
+		[["runtime.js", runtime.runtime], ...modules, ["keys.d.ts", keysIndex]],
 		[
+			["server.js", runtime.server],
 			["keys.js", keysIndex],
 			["messages.d.ts", `export * as m from "./keys.js";\n`],
 		],
@@ -140,7 +142,7 @@ function shardModule(keys: readonly CompiledKey[]): string {
 		for (const name of key.formats.keys()) formats.add(name);
 	}
 	const imports = [
-		`import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n`,
+		`import { ${[...uses].sort().join(", ")} } from "../dispatch.js";\n`,
 	];
 	if (plurals.size > 0) {
 		imports.push(

@@ -58,12 +58,19 @@ for (const app of selectedApps()) {
 	const { compile } = await import(join(graiSource, "index.ts"));
 	const config = writeGraiProject(app, "library-bytes");
 	await compile(config);
-	const graiOut = join(config, "..", "out", "runtime.js");
+	// The runtime as a page holds it: its API, and the dispatcher every message calls.
+	const graiOut = join(config, "..", "out");
 	const json = (file) => /\.json$/.test(file);
 	const rows = [
 		[
 			"grai",
-			await bundle(`export * from ${JSON.stringify(graiOut)};`),
+			await bundle(
+				["runtime.js", "dispatch.js"]
+					.map(
+						(file) => `export * from ${JSON.stringify(join(graiOut, file))};`,
+					)
+					.join("\n"),
+			),
 			await bundle(
 				`export * from ${JSON.stringify(join(writePrototype(app), `${locale}.js`))};`,
 			),
