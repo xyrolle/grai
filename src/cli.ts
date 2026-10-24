@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { relative, resolve } from "node:path";
 import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+import { add } from "./add.ts";
 import { check } from "./check.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
-import type { GraiError } from "./error.ts";
+import { GraiError } from "./error.ts";
 import { watch } from "./watch.ts";
 
 const usage = `Usage: grai <command> [--config <file>]
@@ -13,6 +14,8 @@ const usage = `Usage: grai <command> [--config <file>]
   watch                        write it, then again on each change of a catalog or the config
   check [--source <dir>]...    report every problem and write nothing: what compile reports,
                                keys no source file names, inputs the locales do not agree on
+  add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
+                               then compile
 
 The config is grai.config.json in the current directory, unless --config names another file.`;
 
@@ -47,6 +50,36 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		if (errors.length > 0) return failed(errors);
 		console.log("grai: no problems");
 		return 0;
+	},
+	async add(args) {
+		const { config } = parsed(args, {}, false);
+		let locales: readonly string[];
+		try {
+			locales = readConfig(config).locales;
+		} catch (error) {
+			if (error instanceof GraiError) return failed([error]);
+			throw error;
+		}
+		const flags: ParseArgsOptionsConfig = {};
+		for (const locale of locales) flags[locale] = { type: "string" };
+		const { values, positionals } = parsed(args, flags);
+		const [key, ...others] = positionals;
+		if (key === undefined || others.length > 0) {
+			throw new UsageError(
+				"add takes one key, and the key's text in each locale",
+			);
+		}
+		const texts: Record<string, string> = {};
+		for (const locale of locales) {
+			const text = values[locale];
+			if (typeof text === "string") texts[locale] = text;
+		}
+		const started = performance.now();
+		return reported(
+			config,
+			await add(config, key, texts),
+			performance.now() - started,
+		);
 	},
 };
 
