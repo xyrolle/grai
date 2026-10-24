@@ -1,6 +1,6 @@
 // Startup: what a new server process pays before and during its first render, per library. It
-// loads the messages (each library's modules and catalog bundled into one file, as a server build
-// holds them, and the instance made from them), renders the 2,000-call
+// loads every locale's messages (each library's modules and catalogs bundled into one file, as a
+// server build holds them, and the instances made from them), renders the 2,000-call
 // sample once cold, which is where use-intl parses each message it meets, and once warm, and
 // reports the heap it all holds. Each measurement is a new Node process; medians of five.
 //   node startup.mjs [app...]
@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { rolldown } from "rolldown";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
+import { graiSource, writeGraiProject } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
@@ -22,7 +23,7 @@ const CALLS = 2000;
 const callers = {
 	t: (loaded) => (key, values) => loaded.t(key, values),
 	module: (loaded) => (key, values) => loaded[key](values),
-	paraglide: (loaded, locale) => {
+	options: (loaded, locale) => {
 		const options = { locale };
 		return (key, values) => loaded[key](values, options);
 	},
@@ -60,6 +61,20 @@ async function child(module, mode, file, locale) {
 	);
 }
 
+/** A module holding every locale's instance of a library, whose `t` is `locale`'s, as a server holds them. */
+function everyLocale(app, library, locale) {
+	const imports = app.locales.map(
+		(each, index) =>
+			`import { t as t${index} } from ${JSON.stringify(join(writeLibraryModules(app, each).directory, `${each}.${library}.js`))};`,
+	);
+	const file = join(cacheDir, `startup-${app.id}-${library}-every-locale.js`);
+	writeFileSync(
+		file,
+		`${imports.join("\n")}\nexport const t = t${app.locales.indexOf(locale)};\nexport const others = [${app.locales.map((_, index) => `t${index}`).join(", ")}];\n`,
+	);
+	return file;
+}
+
 /** A module and everything it imports bundled into one file, as a server build holds them. */
 async function bundled(app, name, entry) {
 	const build = await rolldown({
@@ -78,7 +93,6 @@ const median = (values) =>
 
 async function benchApp(app) {
 	const locale = otherLocale(app);
-	const { directory: libraries } = writeLibraryModules(app, locale);
 	const sample = sampleCalls(app, CALLS);
 	const callsFile = (name, values) => {
 		const path = join(cacheDir, `startup-${app.id}-${name}.json`);
@@ -95,35 +109,37 @@ async function benchApp(app) {
 		i18nextValues(app, call.key, call.inputs),
 	);
 	const prototype = writePrototype(app);
+	const config = writeGraiProject(app, "startup");
+	const { compile } = await import(join(graiSource, "index.ts"));
+	await compile(config);
 	const rows = [
 		[
-			"grai, per-locale module",
+			"grai, one locale (the browser's per-locale module)",
 			join(prototype, `${locale}.js`),
 			"module",
 			plain,
 		],
 		[
-			"grai, server entry, shared dispatcher",
-			join(prototype, "server-shared.js"),
-			"module",
-			plain,
-		],
-		[
-			"grai, server entry, dispatcher per key",
-			join(prototype, "server.js"),
-			"module",
+			"grai, every locale (the compiler's output)",
+			join(config, "..", "out", "keys.js"),
+			"options",
 			plain,
 		],
 		[
 			"Paraglide, every locale",
 			join(await paraglideOutput(app), "messages/_index.js"),
-			"paraglide",
+			"options",
 			plain,
 		],
-		["i18next", join(libraries, `${locale}.i18next.js`), "t", forI18next],
 		[
-			"use-intl (intl-messageformat)",
-			join(libraries, `${locale}.use-intl.js`),
+			"i18next, every locale",
+			everyLocale(app, "i18next", locale),
+			"t",
+			forI18next,
+		],
+		[
+			"use-intl, every locale",
+			everyLocale(app, "use-intl", locale),
 			"t",
 			plain,
 		],
