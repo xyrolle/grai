@@ -15,11 +15,22 @@
 		"url": "git+https://github.com/xyrolle/grai.git"
 	},
 	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
 	"packageManager": "pnpm@12.15.0",
 	"engines": {
 		"node": ">=24"
 	},
 	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"prepack": "pnpm build",
 		"check": "biome check .",
 		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
 		"test": "vitest run",
