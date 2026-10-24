@@ -91,7 +91,7 @@ export function localeFunction(
 	const declarations = locals
 		.map(
 			([name, counted]) =>
-				`const $${name} = ${pluralName(message.locale)}(${value(counted)}); `,
+				`const $${name} = ${pluralName(message.locale, "cardinal")}(${value(counted)}); `,
 		)
 		.join("");
 	const parameter = [...reads].some((name) => !message.plurals.has(name))

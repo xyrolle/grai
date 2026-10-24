@@ -83,7 +83,7 @@ export function combinations(
 		const keyLists = selectors.map((_, index) => {
 			if (!plural[index]) return [first[index] ?? catchAll];
 			const counts = anything || row.some((keys) => keys[index] !== catchAll);
-			return counts ? [...categoriesOf(locale)] : [catchAll];
+			return counts ? [...categoriesOf(locale, "cardinal")] : [catchAll];
 		});
 		for (const combination of product(keyLists)) {
 			all.set(combination.join("\0"), combination);

@@ -58,7 +58,7 @@ class IcuConverter {
 	private readonly locals = new Map<string, string>();
 
 	constructor(locale: string, nodes: readonly IcuNode[]) {
-		this.categories = categoriesOf(locale);
+		this.categories = categoriesOf(locale, "cardinal");
 		this.inputs = new Set(namesIn(nodes));
 	}
 

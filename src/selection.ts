@@ -41,7 +41,7 @@ export function selectionOf(
 		if (selector.kind === "input") {
 			return listsAny ? [...keys, otherValue] : [...keys];
 		}
-		const categories = categoriesOf(locale);
+		const categories = categoriesOf(locale, "cardinal");
 		for (const key of keys) {
 			if (!categories.includes(key)) {
 				throw new MessageProblem(
