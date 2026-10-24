@@ -12,7 +12,10 @@
 		"interleave": "node interleave.mjs",
 		"workerd": "node workerd.mjs",
 		"ssr": "node ssr.mjs",
-		"hydrate": "node hydrate.mjs"
+		"hydrate": "node hydrate.mjs",
+		"bytes": "node bytes.mjs",
+		"variants": "node variants.mjs",
+		"preload": "node preload.mjs"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.29.1",
