@@ -5,10 +5,13 @@ import {
 	type DeclarationLine,
 	shardMap,
 } from "./declaration-maps.ts";
-import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import { formatModule } from "./formatters.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule } from "./plurals.ts";
+import {
+	runtimeDeclarations,
+	serverDeclarations,
+} from "./runtime-declarations.ts";
 
 /** The output's files, level by level: a file imports only files of earlier levels. */
 export type Output = readonly (readonly (readonly [string, string])[])[];
