@@ -454,6 +454,56 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		await expect.poll(rendered, devWait).toBe("Heading 2");
 	});
 
+	it("reloads the open pages after an edit with reloadOnEdit, rather than patch them, and patches the server's render", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
+		);
+		const sent: string[] = [];
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [
+				grai({ reloadOnEdit: true }),
+				{
+					name: "sent",
+					configureServer(vite) {
+						const hot = vite.environments.client.hot;
+						const send = hot.send.bind(hot);
+						hot.send = (payload: HotPayload | string, data?: unknown) => {
+							if (typeof payload === "string") send(payload, data);
+							else {
+								sent.push(
+									payload.type === "custom" ? payload.event : payload.type,
+								);
+								send(payload);
+							}
+						};
+					},
+				},
+			],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		expect(await rendered()).toBe("Title");
+
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+
+		await expect.poll(() => sent).toContain("full-reload");
+		await expect.poll(rendered).toBe("Heading");
+		expect(sent).not.toContain("grai:update");
+	});
+
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
 		const { dir } = project(catalogs);
 		const server = await createServer({
