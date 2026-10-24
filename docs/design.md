@@ -128,6 +128,7 @@ export declare const cart_items: Message<{ count: number }>;
 
   A key's inputs are the union over its locales, so a call suits every locale.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
+- **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `runtime.d.ts` declares what the shards and `server.js` import from the runtime, and `config.js` and `plurals.js` carry JSDoc types.
 - **The declarations are sharded like the modules, by measurement.** On app A and app B, a file importing `m` and using five keys, checked with TypeScript 7 and completed after `m.` with TypeScript 6's language service:
 
   | Layout | `tsc` | `m.` completion, first | after a one-message edit |
