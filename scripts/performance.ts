@@ -14,8 +14,8 @@ import { compile, recompile } from "../src/compile.ts";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
-/** The median of three runs on CI's runner, rounded up. */
-const baselines = { cold: 160, noop: 4, edit: 6, process: 200 };
+/** The median of three runs on CI's runner, rounded up: an edit took 4.8, 3.6 and 4.0 ms. */
+const baselines = { cold: 110, noop: 3, edit: 4, process: 160 };
 const keys = 6667;
 /** Edits made before the timed ones, while the engine still optimizes the recompile. */
 const warmupEdits = 10;
