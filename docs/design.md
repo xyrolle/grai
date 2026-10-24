@@ -168,7 +168,10 @@ These are MessageFormat 2's rules, restricted to the constructs above:
   - An edited catalog laid out one entry per line, as editors and formatters write them, has a line break and the same indent before each top-level key and nowhere else, because a JSON string holds no raw line break. The edit's changed bytes lie between two such entry starts, so only that span is parsed, in the old file and in the new. Whenever that cannot be shown exactly (another layout, a duplicated key, a span that does not parse), the whole file is parsed instead.
   - Only the keys whose messages changed are compiled, and only their shards are rendered and written.
   - A failed recompile leaves the last good build as it was, so the next one starts from it.
-- **Watching covers the catalogs' directory and the config, nothing else.** No other file can start a compile, so a framework's generated files never trigger one.
+- **Watching covers the config and the catalog files, nothing else.** No other file can start a compile, so a framework's generated files never trigger one.
+  - Each file is watched as a file, not through its directory: on macOS a directory's events arrive about 11 ms late, a file's in 0.2 ms.
+  - The watches are set up again before each compile, so a file an editor saves by renaming another over it is seen, and so is a change during the compile.
+  - A catalog that does not exist yet is watched for through its directory.
 - **Each file is written to a temporary file in `.grai/` and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. A file whose content is already there is not written, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
 - **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime first, then the shards, then `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
 - **One writer per outdir.** The writer takes a lock: a file holding its pid, linked into place so that it never exists empty. A lock whose process is gone is taken over, and a live one is waited for. The CLI's `watch` and the Vite plugin can then share an outdir.
@@ -196,8 +199,9 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
 - `grai check` runs every compile check (lockstep, plural categories) without writing, and adds two of its own:
-  - keys no source file uses, found by a scan for `m.key` and per-key imports;
+  - keys no source file names. A key counts as named when it is an identifier anywhere in a JavaScript, TypeScript, Svelte or Vue file under the project, or under `--source`, outside dependencies, build output and the outdir. That counts `m.key` and per-key imports alike, and never calls a key unused that some code names;
   - inputs one locale reads and another never does, which is a translation that lost or invented a placeholder.
+- Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
 
 ## Package
