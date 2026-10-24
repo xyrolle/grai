@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Browser, chromium, type Page } from "playwright";
+import { type Browser, chromium, type Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // The SvelteKit example (examples/sveltekit), compiled and built as an app builds it, served by

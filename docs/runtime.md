@@ -24,6 +24,28 @@ Not adopted:
 - **A dispatcher generated per key.** It is slower than one shared dispatcher, 25–52 ns against 13–23 ns a call: the engine keeps one hot function fast, and thousands of small copies slow.
 - **Anything more for "only the keys a page uses".** Per-key modules already do it: on app A, the keys a page loads match the keys its code names, to within two.
 
+## Compared with other libraries
+
+grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageformat 11, as next-intl runs it), on app A's catalogs. Every library renders the same calls, from i18next JSON and ICU MessageFormat converted from the same catalogs (`bench/libraries.mjs`), and its text is checked against grai's before it is timed. One key of app B that neither format can hold is left out of every sample.
+
+| | grai | Paraglide | i18next | use-intl |
+|---|---|---|---|---|
+| A text message on the server (`server`) | 16 ns | 17–33 ns | 1,170–1,859 ns | 2,396–3,058 ns |
+| A plural message on the server | 111–171 ns | 552–646 ns | 3,501–4,102 ns | 3,680–4,079 ns |
+| Server render of a page of 2,000 messages (`ssr`) | 0.15–0.16 ms | 0.18–0.21 ms | 4.16–4.17 ms | 5.70–6.18 ms |
+| Hydrating that page, at full CPU speed and at 4× slower (`hydrate`) | 7.6 / 34.7 ms | 10.7 / 50.0 ms | 16.1 / 75.6 ms | 22.3 / 104.5 ms |
+| That page's JS, brotli | 22.7 KB | 38.6 KB | 125.2 KB | 122.6 KB |
+| A new server process: loading every locale's messages, then the first render (`startup`) | 24 + 3 ms | 56 + 2 ms | 14 + 12 ms | 13 + 27 ms |
+| Heap the messages hold | 5.3 MB | 8.3 MB | 3.4 MB | 10.3 MB |
+| The runtime in the browser, brotli (`library-bytes`) | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB |
+| The messages a page downloads (`bytes`) | its own keys, in its locale: 24.5 KB on the largest page | its own keys, in every locale: 51.5 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
+| A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
+| One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
+| Type checking 500 calls with `tsc` 7 (`types`) | 82 ms | 278 ms | 609 ms | 521 ms |
+| The editor's first completion of a key, TypeScript 6 | 0.2 s | 1.0 s | 49 s | 21 s |
+
+The server rows use grai's shared dispatcher, with the locale from `AsyncLocalStorage`. In the browser a grai bundle holds one locale and a call looks nothing up, 0.5 ns; the hydration row shows what the others cost there. The startup rows bundle each library into one file, as a server build does. i18next and use-intl load faster than grai and render slower: their catalogs are 1.6 MB of strings, which V8 reads faster than grai's 1.8 MB of compiled functions, and they work out each message on its first call. Through the first render the three are close, 26–40 ms. Each is measured bundled, so none of this is the cost of an unbundled module graph. On app B, twice app A's size, the gaps widen: i18next's first completion takes 258 s against grai's 0.3 s, Paraglide's 3.4 s, and the page's JS is 208 KB against 21 KB. use-intl's completion on app B was not measured. Each bench prints app B and the synthetic catalog too.
+
 ## Server
 
 A message call inside a request, through 2,000 static call sites, 20 to a function (`server`). App A, in `ro` and `ru`:

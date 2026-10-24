@@ -55,12 +55,10 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
 
 The server picks the page's locale. The client's locale is the page's `<html lang>`, which the server writes, so the page hydrates in the words it was drawn in. A production client build loads only that locale's variants of the message modules it uses.
 
-Which mechanism delivers them is chosen by measurement in `bench/`. The candidates:
-- the same chunk names in a directory per locale, with an import map written by the server;
-- a build per locale;
-- strings inlined per locale.
-
-The compiler commits to what every candidate needs: locale-free per-key modules and per-locale variants.
+They come through an import map, which keeps the framework's single client build (`docs/runtime.md`):
+- **The Vite plugin puts the key modules in chunks of their own,** by the entries that use them, under a directory `grai` beside the one the bundler would have used (Kit's `_app/immutable/chunks/` gives `_app/immutable/grai/`). The runtime has a chunk of its own, so a message chunk holds keys and nothing else.
+- **Each message chunk has a copy per locale,** under the sibling `grai-<locale>/`, with the same file name, imports and exports. Each key's call keeps only its locale's variant, at its locale's position, so the runtime picks it for the page's locale. A sibling, not a subdirectory, so the copies' relative imports reach the same shared chunks.
+- **The server writes the import map,** from `…/grai/` to `…/grai-<locale>/`, and points the page's `modulepreload` links at the copies, as browsers apply no import map to `modulepreload`. Without the map a page still works, with every locale's words.
 
 **Every client rule is the same in every build, dev and tests included, so nothing fails only after deploy.** On the client, a forced `{ locale }` must be the current locale. Any other throws a `GraiError` naming the key and both locales.
 
@@ -128,6 +126,7 @@ export declare const cart_items: Message<{ count: number }>;
 
   A key's inputs are the union over its locales, so a call suits every locale.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
+- **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `runtime.d.ts` declares what the shards and `server.js` import from the runtime, and `config.js` and `plurals.js` carry JSDoc types.
 - **The declarations are sharded like the modules, by measurement.** On app A and app B, a file importing `m` and using five keys, checked with TypeScript 7 and completed after `m.` with TypeScript 6's language service:
 
   | Layout | `tsc` | `m.` completion, first | after a one-message edit |
@@ -177,7 +176,8 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 - **Each file is written to a temporary file in `.grai/` and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. A file whose content is already there is not written, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
 - **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime first, then the shards, then `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
 - **One writer per outdir.** The writer takes a lock: a file holding its pid, linked into place so that it never exists empty. A lock whose process is gone is taken over, and a live one is waited for. The CLI's `watch` and the Vite plugin can then share an outdir.
-- **In dev, the Vite plugin serves from memory and sends HMR itself.** Vite does not watch the output directory, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
+- **In dev, the Vite plugin serves from memory and sends HMR itself.** It watches the config and the catalogs with `fs.watch` (3–10 ms to see a save, against 48–114 ms for Vite's watcher) and ignores every other file, and the output directory's changes are its own, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
+- **An edit patches the page in place.** The dev module keeps every key's locales in a table. After an edit the plugin sends only the changed keys' functions, as a module the page imports; the page writes them into the table and dispatches a cancelable `grai:change` event on `window`. A framework adapter that renders again cancels it; otherwise the page reloads. A key added or removed, or a change of locales, reloads the page, and the server's environments take the module again. Measured: 12 ms from the save to the page on app A, against 202 ms for re-sending the whole module (`docs/runtime.md`).
 
 ## Runtime
 
@@ -221,4 +221,4 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - `grai`: the compiler's API;
   - `grai/vite`, `grai/sveltekit`, `grai/next`, `grai/server`: the adapters, each thin, each taking the project's generated modules;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform: `AsyncLocalStorage` on the server, and `Intl.Locale` for `getTextDirection`. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.

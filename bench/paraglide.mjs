@@ -10,7 +10,9 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
+import { createRequire, register } from "node:module";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { compile } from "@inlang/paraglide-js";
 import { cacheDir } from "./apps.mjs";
 
@@ -25,7 +27,7 @@ const plugins = [
 ].map((name) => installed(`${name}/dist/index.js`));
 
 /** The inlang project Paraglide reads: the app's catalogs in place, the plugins from disk. */
-function writeProject(app, directory) {
+export function writeProject(app, directory) {
 	const project = join(directory, "project.inlang");
 	mkdirSync(project, { recursive: true });
 	const settings = {
@@ -78,3 +80,15 @@ export async function paraglideOutput(app, options = {}) {
 }
 
 export const paraglideVersion = version;
+
+/**
+ * Paraglide's declaration emit needs TypeScript 6's API, which TypeScript 7 does not have. From
+ * this call on, the process resolves `typescript` to the TypeScript 6 this package installs.
+ */
+export function resolveTypeScript6() {
+	const url = pathToFileURL(
+		createRequire(import.meta.url).resolve("typescript6"),
+	).href;
+	const hook = `export async function resolve(specifier, context, next) { return next(specifier === "typescript" ? ${JSON.stringify(url)} : specifier, context); }`;
+	register(`data:text/javascript,${encodeURIComponent(hook)}`);
+}

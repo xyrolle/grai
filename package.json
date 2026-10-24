@@ -20,6 +20,10 @@
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
 		},
+		"./vite": {
+			"types": "./dist/vite.d.ts",
+			"default": "./dist/vite.js"
+		},
 		"./sveltekit": {
 			"types": "./dist/sveltekit.d.ts",
 			"default": "./dist/sveltekit.js"
@@ -44,10 +48,14 @@
 		"test:performance": "node scripts/performance.ts"
 	},
 	"peerDependencies": {
-		"@sveltejs/kit": "^3.1.0"
+		"@sveltejs/kit": "^3.1.0",
+		"vite": ">=8"
 	},
 	"peerDependenciesMeta": {
 		"@sveltejs/kit": {
+			"optional": true
+		},
+		"vite": {
 			"optional": true
 		}
 	},
@@ -56,8 +64,9 @@
 		"@sveltejs/kit": "3.1.0",
 		"@types/node": "24.19.2",
 		"cldr-core": "48.0.0",
-		"playwright": "1.64.1",
+		"playwright-core": "1.64.1",
 		"typescript": "7.0.2",
+		"vite": "8.3.5",
 		"vitest": "5.0.5"
 	}
 }

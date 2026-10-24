@@ -10,5 +10,7 @@ export declare const strategy: readonly (
 	| "preferredLanguage"
 	| "url"
 )[];
+/** The direction each locale's script is written in, in `locales` order. */
+export declare const directions: readonly ("ltr" | "rtl")[];
 /** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
 export declare const cookieName: string | undefined;

@@ -8,12 +8,18 @@ import { GraiError } from "./error.ts";
  * Compiles, then compiles again whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. Changes that come during a compile are taken together by the next one. Each result
- * is reported with how long the compile took. It watches until the process ends.
+ * is reported with how long the compile took, and with its build when it succeeded. It watches
+ * until the process ends or `close` is called.
  */
 export function watch(
 	configFile: string,
-	report: (result: CompileResult, milliseconds: number) => void,
-): void {
+	report: (
+		result: CompileResult,
+		milliseconds: number,
+		build: Build | undefined,
+	) => void,
+): { close: () => void } {
+	let closed = false;
 	let watchers: FSWatcher[] = [];
 	let build: Build | undefined;
 	let compiling = false;
@@ -25,6 +31,10 @@ export function watch(
 	 */
 	const follow = () => {
 		for (const watcher of watchers) watcher.close();
+		if (closed) {
+			watchers = [];
+			return;
+		}
 		const paths = [resolve(configFile), ...catalogsOf(configFile)];
 		watchers = paths.flatMap(
 			(path) => watchedFile(path, () => void run()) ?? [],
@@ -43,12 +53,18 @@ export function watch(
 			const started = performance.now();
 			const next = await recompile(configFile, build);
 			build = next.build ?? build;
-			report(next.result, performance.now() - started);
-		} while (again);
+			if (!closed) report(next.result, performance.now() - started, next.build);
+		} while (again && !closed);
 		compiling = false;
 	};
 
 	void run();
+	return {
+		close: () => {
+			closed = true;
+			for (const watcher of watchers) watcher.close();
+		},
+	};
 }
 
 /**
