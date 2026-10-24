@@ -101,6 +101,25 @@ describe("grai check", () => {
 			stderr: "",
 		});
 	});
+
+	it("lists each locale's untranslated keys before anything else, and they are no problem", async () => {
+		const { dir } = project({
+			en: { cart_title: "Your cart", cart_greeting: "Hello {name}" },
+			de: { cart_title: "Your cart", cart_greeting: "Hallo {name}" },
+		});
+		writeFileSync(join(dir, "app.ts"), "m.cart_title(); m.cart_greeting;");
+
+		expect(await grai(dir, "check")).toEqual({
+			code: 0,
+			stdout: "grai: 1 untranslated in de: cart_title\ngrai: no problems\n",
+			stderr: "",
+		});
+		const json = await grai(dir, "check", "--json");
+		expect([json.code, JSON.parse(json.stdout)]).toEqual([
+			0,
+			{ problems: [], untranslated: { de: ["cart_title"] } },
+		]);
+	});
 });
 
 describe("grai seed", () => {

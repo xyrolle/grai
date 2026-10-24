@@ -1,6 +1,7 @@
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { check } from "../src/check.ts";
 import { seed } from "../src/seed.ts";
 import { project } from "./project.ts";
 
@@ -93,5 +94,48 @@ describe("grai seed", () => {
 				],
 			});
 		}
+	});
+});
+
+describe("grai check's untranslated keys", () => {
+	it("lists each key whose message is still its seed, in each locale but the base, and no problem for it", async () => {
+		const { config } = project({
+			en: {
+				cart_title: "Your cart",
+				cart_total: "Total",
+				cart_items: items({
+					"countPlural=one": "{count} item",
+					"countPlural=other": "{count} items",
+				}),
+			},
+			de: {
+				cart_title: "Your cart",
+				cart_total: "Summe",
+				cart_items: items({
+					"countPlural=one": "{count} Artikel",
+					"countPlural=other": "{count} Artikel",
+				}),
+			},
+			ru: {
+				cart_title: "Корзина",
+				cart_total: "Итого",
+				cart_items: items({
+					"countPlural=one": "{count} item",
+					"countPlural=*": "{count} items",
+				}),
+			},
+		});
+
+		const { problems, untranslated } = await check(config);
+
+		expect(problems.map((problem) => problem.code)).toEqual([
+			"key-unused",
+			"key-unused",
+			"key-unused",
+		]);
+		expect([...untranslated]).toEqual([
+			["de", ["cart_title"]],
+			["ru", ["cart_items"]],
+		]);
 	});
 });

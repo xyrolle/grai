@@ -7,6 +7,7 @@ import type { Config } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
+import { untranslatedKeys } from "./seed.ts";
 
 /** Files that can name a message: JavaScript, TypeScript and the components of Svelte and Vue. */
 const sourceExtensions = new Set([
@@ -25,20 +26,28 @@ const sourceExtensions = new Set([
 const skippedDirectories = new Set(["node_modules", "dist", "build"]);
 const identifier = /[A-Za-z_$][\w$]*/g;
 
+/** What a check found: the problems, and each locale's keys that are still untranslated. */
+export type Checked = {
+	problems: GraiError[];
+	untranslated: Map<string, string[]>;
+};
+
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
  * key no source file names, and each input one locale reads and another never does. Source files
  * are those under the project's root, or under `sources` when given, outside the outdir,
- * dependencies, build output and dot-directories.
+ * dependencies, build output and dot-directories. Beside them, the keys each locale has not
+ * translated yet, which are not problems: a message can rightly read as the base locale's.
  */
 export async function check(
 	configFile: string,
 	sources?: readonly string[],
-): Promise<GraiError[]> {
+): Promise<Checked> {
 	const read = await readProject(configFile);
-	if ("errors" in read) return read.errors;
+	if ("errors" in read)
+		return { problems: read.errors, untranslated: new Map() };
 	const { catalogs, errors } = parseCatalogs(read.sources);
-	if (errors.length > 0) return errors;
+	if (errors.length > 0) return { problems: errors, untranslated: new Map() };
 	const { config } = read;
 	const compilation = compileCatalogs(config, catalogs);
 	const roots = sources ?? [config.root];
@@ -48,7 +57,10 @@ export async function check(
 		if (!names.has(key)) problems.push(unused(key, config, catalogs, roots));
 		problems.push(...differingInputs(key, catalogs));
 	}
-	return sortErrors(problems);
+	return {
+		problems: sortErrors(problems),
+		untranslated: untranslatedKeys(catalogs, config.baseLocale),
+	};
 }
 
 /** Every identifier written in the source files under the roots. */
