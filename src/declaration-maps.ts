@@ -64,6 +64,14 @@ export function declarationMap(
 	return `${JSON.stringify({ version: 3, file, sources: [catalog], names: [], mappings: lines.join(";") })}\n`;
 }
 
+/** The lines a text takes, counting the line its last line break ends. */
+export function lineCount(text: string): number {
+	let count = 0;
+	for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", at + 1))
+		count++;
+	return count;
+}
+
 const base64 =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
