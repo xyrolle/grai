@@ -215,7 +215,7 @@ The locale is resolved once per request on the server, or once per page on the c
 - **On the server, `server.js`'s middleware resolves the locale and binds it** to the request through `AsyncLocalStorage`. Its strategies:
   - `cookie`;
   - `preferredLanguage` (`Accept-Language`);
-  - `url`: a non-base locale is the first path segment, and the base locale has no prefix.
+  - `url`: a non-base locale is the first path segment, and the base locale has no prefix. A locale's home page is `/de`, not `/de/`, which SvelteKit and Next would redirect to drop the slash; every other path keeps the slash the app wrote.
 
   The base locale is always the last resort, so the config does not list it.
 - **The middleware's response lists in `Vary` the request headers its strategy reads:** `Cookie` for `cookie`, `Accept-Language` for `preferredLanguage`, and none for `url` or for the strategies after it, which it never reads. A shared cache then keeps a copy per locale, not one locale's page for every reader. They are appended to the handler's own `Vary` without reading it first, which would cost every request a header read: a header listed twice means the same to a cache. A response from `fetch()` has immutable headers, and no platform can say so in advance, so such a response is copied.
