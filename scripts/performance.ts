@@ -9,7 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compile, recompile } from "../src/compile.ts";
 
-const baselines = { cold: 180, noop: 8, edit: 6 };
+/** The median of three runs on CI's runner (153, 3.1 and 5.7 ms), rounded up. */
+const baselines = { cold: 160, noop: 4, edit: 6 };
 const keys = 6667;
 const edits = 15;
 
