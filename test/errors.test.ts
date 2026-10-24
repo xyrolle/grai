@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -104,6 +104,14 @@ describe("the config", () => {
 			await errorsOf({ en: { title: "Title" } }, { switch: "instant" }),
 		).toEqual([
 			'config-invalid: grai.config.json: "switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place.',
+		]);
+	});
+
+	it("names test globs that are not a list of globs", async () => {
+		expect(
+			await errorsOf({ en: { title: "Title" } }, { tests: "**/*.test.ts" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test.',
 		]);
 	});
 });
