@@ -211,3 +211,25 @@ console.log(texts);
 	// Lines 8 and 9: a number given as text, and a date given as text.
 	expect(errors).toEqual(["8 TS2322", "9 TS2322"]);
 });
+
+it("types a runtime GraiError's code as one of the codes the runtime throws", async () => {
+	const { dir, compile } = project({
+		en: { cart_title: "Your cart" },
+		de: { cart_title: "Ihr Warenkorb" },
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import type { GraiError } from "./out/runtime.js";
+declare const error: GraiError;
+const codes: ("locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid")[] = [error.code];
+const compiling = error.code === "key-missing";
+console.log(codes, compiling);
+`,
+	);
+
+	// Line 4: a code only the compiler reports, which the runtime never throws.
+	expect(errors).toEqual(["4 TS2367"]);
+});
