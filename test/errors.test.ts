@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { GraiError, sortErrors } from "../src/error.ts";
 import { compile } from "../src/index.ts";
 import { errorsOf, project } from "./project.ts";
 
@@ -420,6 +421,16 @@ describe("a message", () => {
 			'selection-not-exhaustive: messages/pl.json: "items" (pl): no variant matches countPlural=many. Add one, or a variant with * for the selectors it does not care about.',
 		]);
 	});
+});
+
+it("sorts the places of one file by line and column, as numbers", () => {
+	const at = (file: string) => new GraiError("key-missing", { file }, "x");
+
+	expect(
+		sortErrors([at("a.ts:10:1"), at("a.ts:9:12"), at("a.ts:9:5")]).map(
+			({ file }) => file,
+		),
+	).toEqual(["a.ts:9:5", "a.ts:9:12", "a.ts:10:1"]);
 });
 
 it("reports every error of a compile at once, by file, key and locale", async () => {
