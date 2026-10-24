@@ -49,7 +49,10 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
   messages.js   messages.d.ts    `m`, the namespace of keys.js
   .grai/manifest.json            what the output was compiled from, and its files
+  .gitignore                     `*`: the output is compiled, never committed
 ```
+
+- **The output has Git ignore it, through a `.gitignore` of its own.** Git, Prettier 3, Biome with its VCS ignore, and editors' searches then skip it with no setup. ESLint's flat config does not read `.gitignore`, so a project lists the outdir in its `ignores`. There is no option to commit the output, as neither reference app does. The outdir is grai's alone, so the config rejects one that holds the config or a catalog, which the `.gitignore` would hide.
 
 - **On disk, a few modules hold every message.** Node, scripts and tests load them as they are, and the output is a few dozen files whatever the key count. Per-key files would cost every install, editor index and file watcher, two files a key: 26.7k for app B.
 - **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then rewrites one shard of about 512 keys, and its declarations only when they change, not the whole catalog's output. TypeScript and editors re-read that shard alone.
