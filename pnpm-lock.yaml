@@ -199,6 +199,9 @@ importers:
       publint:
         specifier: 0.3.25
         version: 0.3.25
+      rolldown:
+        specifier: 1.2.15
+        version: 1.2.15
       svelte:
         specifier: 5.57.2
         version: 5.57.2

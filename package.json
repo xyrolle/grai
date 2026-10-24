@@ -46,7 +46,8 @@
 		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
 		"test": "vitest run",
 		"test:performance": "node scripts/performance.ts",
-		"check:package": "publint run --strict && attw --pack . --profile esm-only"
+		"check:package": "publint run --strict && attw --pack . --profile esm-only",
+		"size": "node scripts/size.ts"
 	},
 	"peerDependencies": {
 		"magic-string": ">=1",
@@ -76,6 +77,7 @@
 		"magic-string": "1.4.3",
 		"playwright-core": "1.64.1",
 		"publint": "0.3.25",
+		"rolldown": "1.2.15",
 		"svelte": "5.57.2",
 		"typescript": "7.0.2",
 		"vite": "8.3.5",
