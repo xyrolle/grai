@@ -43,6 +43,21 @@ describe("grai check --fix", () => {
 		expect((await check(config)).problems).toEqual([]);
 	});
 
+	it("removes a key that only a test names, and says the test names it still", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.test.ts": 'expect(m.promo_spring()).toBe("Spring sale");\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixLines(fixed)).toEqual([
+			'removed: "banner_old" from every catalog',
+			'removed: "promo_spring" from every catalog; tests still name it: src/promo.test.ts',
+		]);
+	});
+
 	it("keeps a key that is no key name, which a source may write where the scan sees no name", async () => {
 		const { dir, config } = project({
 			en: { ...catalogs.en, "sign-in": "Sign in" },

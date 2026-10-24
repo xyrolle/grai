@@ -10,6 +10,8 @@ import {
 	positionOf,
 	type SourceFile,
 	sourceFiles,
+	splitTests,
+	testsNaming,
 } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
@@ -19,6 +21,8 @@ export type KeptBy = { place: string; written: string; keys: string[] };
 export type FixResult = {
 	/** The keys removed from every catalog. */
 	removed: string[];
+	/** The removed keys that tests still name, with those tests, which need the same change. */
+	inTests: Map<string, string>;
 	/** The unused keys kept, because a read by a computed name may reach them. */
 	kept: KeptBy[];
 	/** The catalogs written, relative to the project's root. */
@@ -27,8 +31,9 @@ export type FixResult = {
 };
 
 /**
- * Removes from every catalog each key that no source file under the roots names, as `check`
- * counts a key named, and that no read by a computed name (`m[name]`, `m` used whole) may reach.
+ * Removes from every catalog each key that no shipped source file under the roots names, as
+ * `check` counts a key named, and that no read by a computed name (`m[name]`, `m` used whole) in
+ * one may reach. The tests that still name a removed key are reported, to change with it.
  * A key that is no key name stays, since the scan finds only names and so cannot tell whether a
  * source writes it (`m["sign-in"]`); check reports it as invalid. It writes every catalog or none,
  * and none when one would be left without messages.
@@ -37,16 +42,25 @@ export async function removeUnusedKeys(
 	configFile: string,
 	roots?: readonly string[],
 ): Promise<FixResult> {
-	const result: FixResult = { removed: [], kept: [], changed: [], errors: [] };
+	const result: FixResult = {
+		removed: [],
+		inTests: new Map(),
+		kept: [],
+		changed: [],
+		errors: [],
+	};
 	const read = await readProject(configFile);
 	if ("errors" in read) return { ...result, errors: read.errors };
 	const { catalogs, errors } = parseCatalogs(read.sources);
 	if (errors.length > 0) return { ...result, errors };
 	const { config } = read;
-	const files = sourceFiles(roots ?? [config.root], config.root, config.outdir);
-	const names = namesIn(files);
-	const namespaces = namespaceNames(files.map(({ text }) => text));
-	const reads = files.flatMap((source) =>
+	const { shipped, tests } = splitTests(
+		sourceFiles(roots ?? [config.root], config.root, config.outdir),
+		config.tests,
+	);
+	const names = namesIn(shipped);
+	const namespaces = namespaceNames(shipped.map(({ text }) => text));
+	const reads = shipped.flatMap((source) =>
 		dynamicReadsIn(source.text, messageBindings(source.text, namespaces)).map(
 			(read) => located(source, read),
 		),
@@ -82,6 +96,10 @@ export async function removeUnusedKeys(
 		};
 	}
 	if (removed.size === 0) return result;
+	for (const key of removed) {
+		const testing = testsNaming(tests, key);
+		if (testing !== undefined) result.inTests.set(key, testing);
+	}
 	const texts = new Map<string, string>();
 	for (const { file, bytes } of read.sources) {
 		const text = bytes.toString("utf8");
@@ -116,9 +134,15 @@ function located(
 }
 
 /** What check --fix prints before the check: each key removed, and each read that kept keys. */
-export function fixLines({ removed, kept }: FixResult): string[] {
+export function fixLines({ removed, inTests, kept }: FixResult): string[] {
+	const testing = (key: string) => {
+		const tests = inTests.get(key);
+		return tests === undefined ? "" : `; tests still name it: ${tests}`;
+	};
 	return [
-		...removed.map((key) => `removed: "${key}" from every catalog`),
+		...removed.map(
+			(key) => `removed: "${key}" from every catalog${testing(key)}`,
+		),
 		...kept.map(
 			({ place, written, keys }) =>
 				`kept: ${place}: ${written} may name ${keys.length === 1 ? `"${keys[0]}", so it stays` : `${keys.length} unused keys, so they stay`}`,
