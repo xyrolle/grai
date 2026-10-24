@@ -60,6 +60,15 @@ export default { plugins: [grai()] };
 
 The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, each chunk holds only the keys its code uses, once per locale.
 
+A tool that reads a client build's chunks can ask which of grai's modules an id is, rather than spell grai's module ids:
+
+```ts
+import { graiModules } from "grai/vite";
+
+const kindOf = graiModules(); // reads grai.config.json
+kindOf(id); // "runtime", "config", "plurals", "formats" (the grai-runtime chunk), "key" or "text" (a message chunk), or undefined
+```
+
 ### Svelte
 
 In a Svelte or SvelteKit app, take the plugin from `grai/svelte`, listed before Svelte's:
