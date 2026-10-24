@@ -742,7 +742,7 @@ export const render = () => {
 	});
 
 	/** A dev server of the project, and a page in German running `main` in Chromium. */
-	async function devPage(dir: string, main: string) {
+	async function devPage(dir: string, main: string, base = "/") {
 		writeFileSync(
 			join(dir, "index.html"),
 			`<!doctype html><html lang="de"><p id="title"></p><script type="module" src="/main.js"></script>`,
@@ -750,6 +750,7 @@ export const render = () => {
 		writeFileSync(join(dir, "main.js"), main);
 		const server = await createServer({
 			root: dir,
+			base,
 			configFile: false,
 			logLevel: "silent",
 			server: { ...loopback, watch: fixtures },
@@ -998,6 +999,31 @@ render();
 addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
 window.loaded = performance.timeOrigin;
 `,
+		);
+		await title("Titel");
+		const loaded = await page.evaluate("window.loaded");
+
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Titel"', '"Überschrift"'),
+		);
+		await title("Überschrift");
+
+		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+
+	it("shows an edited message without reloading a page served under a base, as Nuxt's is", async () => {
+		const { dir } = project(catalogs);
+		const { page, title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.title(); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+window.loaded = performance.timeOrigin;
+`,
+			"/_nuxt/",
 		);
 		await title("Titel");
 		const loaded = await page.evaluate("window.loaded");
