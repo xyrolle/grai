@@ -11,8 +11,27 @@ export function keyDeclaration(
 ): string {
 	const hasMarkup = messages.some((message) => message.markup);
 	const inputs = inputsType(messages);
-	const type = `${hasMarkup ? "MarkupMessage" : "Message"}${inputs === "" ? "" : `<${inputs}>`}`;
+	const type = hasMarkup
+		? `MarkupMessage<${inputs === "" ? "Record<string, never>" : inputs}, ${tagsType(messages)}>`
+		: `Message${inputs === "" ? "" : `<${inputs}>`}`;
 	return `${docComment(baseSource)}export declare const ${key}: ${type};\n`;
+}
+
+/** The names of a message's markup in every locale, as a union of string literals. */
+function tagsType(messages: readonly LocaleMessage[]): string {
+	const names = new Set<string>();
+	for (const { variants } of messages) {
+		for (const { pattern } of variants) {
+			for (const part of pattern) {
+				if (part.type !== "text" && part.type !== "variable")
+					names.add(part.name);
+			}
+		}
+	}
+	return [...names]
+		.sort()
+		.map((name) => JSON.stringify(name))
+		.join(" | ");
 }
 
 /**
@@ -156,14 +175,14 @@ export declare class GraiError extends Error {
 }
 export type MessageOptions = { locale?: Locale };
 /**
- * A run of a message's text, or a piece of its markup, as \`.parts()\` gives them: each option's
- * value, and each attribute's, true for one without a value.
+ * A run of a message's text, or a piece of its markup, as \`.parts()\` gives them: its name one
+ * of the message's tags, each option's value, and each attribute's, true for one without a value.
  */
-export type MessagePart =
+export type MessagePart<Tag extends string = string> =
 	| { type: "text"; value: string }
 	| {
 			type: "markup-start" | "markup-end" | "markup-standalone";
-			name: string;
+			name: Tag;
 			options: Readonly<Record<string, unknown>>;
 			attributes: Readonly<Record<string, string | true>>;
 	  };
@@ -172,9 +191,12 @@ type Call<Inputs, Result> = {} extends Inputs
 	: (inputs: Inputs, options?: MessageOptions) => Result;
 /** A message: its inputs, and the locale to render it in, else the base locale. */
 export type Message<Inputs extends object = Record<string, never>> = Call<Inputs, string>;
-/** A message with markup, which \`.parts()\` gives as text and markup parts. */
-export type MarkupMessage<Inputs extends object = Record<string, never>> = Message<Inputs> & {
-	parts: Call<Inputs, MessagePart[]>;
+/** A message with markup, which \`.parts()\` gives as text and markup parts, its tags named by \`Tag\`. */
+export type MarkupMessage<
+	Inputs extends object = Record<string, never>,
+	Tag extends string = string,
+> = Message<Inputs> & {
+	parts: Call<Inputs, MessagePart<Tag>[]>;
 };
 // What the rest of the output calls; not for apps.
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
