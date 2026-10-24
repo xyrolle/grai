@@ -18,5 +18,9 @@
 	},
 	"include": ["src", "test", "scripts", "site/pages.ts"],
 	// The page's modules see the DOM, so tsconfig.browser.json checks them.
-	"exclude": ["src/sveltekit-client.ts", "src/sveltekit-navigation.ts"]
+	"exclude": [
+		"src/sveltekit-client.ts",
+		"src/sveltekit-navigation.ts",
+		"src/vue/client.ts"
+	]
 }
