@@ -45,6 +45,7 @@ m.cart_total({ amount: 12.5 }); // "Total €12.50"
 `runtime.js` beside it has `getLocale`, `setLocale` and the URL helpers. Beyond `compile` and `watch`:
 - `grai check` reports problems, unused keys and untranslated ones, without writing anything;
 - `grai add` adds a key to every catalog at once;
+- `grai find`, `grai rename` and `grai check --fix` find a key's call sites, rename a key in every catalog and call site, and remove the keys no source names;
 - `grai seed`, `grai export` and `grai merge` take a locale's messages to translators as XLIFF 2.0, and their translations back;
 - `grai help` lists every command.
 
