@@ -2,7 +2,8 @@
 // loads every locale's messages (each library's modules and catalogs bundled into one file, as a
 // server build holds them, and the instances made from them), renders the 2,000-call
 // sample once cold, which is where use-intl parses each message it meets, and once warm, and
-// reports the heap it all holds. Each measurement is a new Node process; medians of five.
+// reports the heap it all holds. Each measurement is a new Node process, then a new workerd
+// (startup-workerd.mjs); medians of five.
 //   node startup.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -16,19 +17,11 @@ import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
+import { sampleRender } from "./startup-render.mjs";
+import { inWorkerd, workerFiles } from "./startup-workerd.mjs";
 
 const RUNS = 5;
 const CALLS = 2000;
-
-/** How each kind of module renders one call. */
-const callers = {
-	t: (loaded) => (key, values) => loaded.t(key, values),
-	module: (loaded) => (key, values) => loaded[key](values),
-	options: (loaded, locale) => {
-		const options = { locale };
-		return (key, values) => loaded[key](values, options);
-	},
-};
 
 /** Runs in the child: loads `module`, renders the sample twice, prints times and heap. */
 async function child(module, mode, file, locale) {
@@ -38,17 +31,10 @@ async function child(module, mode, file, locale) {
 	const start = performance.now();
 	const loaded = await import(module);
 	const imported = performance.now();
-	const call = callers[mode](loaded, locale);
-	const render = () => {
-		let text = "";
-		for (const { key, values } of calls) text += call(key, values);
-		return text;
-	};
-	const inLocale = (work) =>
-		loaded.withLocale ? loaded.withLocale(locale, work) : work();
-	inLocale(render);
+	const render = sampleRender(loaded, mode, calls, locale);
+	render();
 	const first = performance.now();
-	inLocale(render);
+	render();
 	const warm = performance.now();
 	globalThis.gc();
 	const heap = process.memoryUsage().heapUsed - heapBefore;
@@ -167,6 +153,14 @@ async function benchApp(app) {
 			plain,
 		],
 	];
+	const modules = [];
+	for (const [index, [name, entry, mode, file]] of rows.entries())
+		modules.push({
+			name,
+			mode,
+			file,
+			module: await bundled(app, String(index), entry),
+		});
 	console.log(
 		`\n### ${app.name}, ${locale}: a new Node ${process.versions.node} process, median of ${RUNS}\n`,
 	);
@@ -174,8 +168,7 @@ async function benchApp(app) {
 		"| library | load messages | first render, 2,000 calls | warm render | heap held |",
 	);
 	console.log("|---|---|---|---|---|");
-	for (const [index, [name, entry, mode, file]] of rows.entries()) {
-		const module = await bundled(app, String(index), entry);
+	for (const { name, mode, file, module } of modules) {
 		const runs = Array.from({ length: RUNS }, () => {
 			const args = [
 				"--expose-gc",
@@ -190,14 +183,31 @@ async function benchApp(app) {
 				execFileSync(process.execPath, args, { encoding: "utf8" }),
 			);
 		});
-		const ms = (field) =>
-			`${median(runs.map((run) => run[field])).toFixed(1)} ms`;
 		const heap = median(runs.map((run) => run.heap)) / 1024 / 1024;
 		console.log(
-			`| ${name} | ${ms("load")} | ${ms("first")} | ${ms("warm")} | ${heap.toFixed(1)} MB |`,
+			`| ${name} | ${times(runs).join(" | ")} | ${heap.toFixed(1)} MB |`,
 		);
 	}
+	console.log(
+		`\n### ${app.name}, ${locale}: a new workerd, median of ${RUNS}, to the millisecond its timer gives\n`,
+	);
+	console.log(
+		"| library | load messages | first render, 2,000 calls | warm render |",
+	);
+	console.log("|---|---|---|---|");
+	for (const { name, mode, file, module } of modules) {
+		const worker = workerFiles(module, mode, file, locale);
+		const runs = [];
+		for (let run = 0; run < RUNS; run++) runs.push(await inWorkerd(worker));
+		console.log(`| ${name} | ${times(runs, 0).join(" | ")} |`);
+	}
 }
+
+/** The median load, first render and warm render of some runs, to `digits` decimals. */
+const times = (runs, digits = 1) =>
+	["load", "first", "warm"].map(
+		(field) => `${median(runs.map((run) => run[field])).toFixed(digits)} ms`,
+	);
 
 if (process.argv[2] === "--child") await child(...process.argv.slice(3));
 else for (const app of selectedApps()) await benchApp(app);
