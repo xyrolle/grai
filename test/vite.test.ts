@@ -750,6 +750,22 @@ window.loaded = performance.timeOrigin;
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
 	});
 
+	it("tells an adapter of each call, so that it knows which renders to draw again after an edit", async () => {
+		const { dir } = project(catalogs);
+		const { title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+let reads = 0;
+globalThis[Symbol.for("grai.read")] = () => { reads += 1; };
+m.title();
+m.greeting({ name: "Ana" });
+document.getElementById("title").textContent = String(reads);
+`,
+		);
+
+		await title("2");
+	});
+
 	it("loads a page that imports a key no catalog has, shows the import in the overlay, and throws only when it is called", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(join(dir, "package.json"), perKeyImports);
