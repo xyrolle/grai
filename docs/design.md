@@ -20,25 +20,27 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
   - the escapes `\{`, `\}` and `\\`.
 
   Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:number` and `:datetime`, options, nested keys, and markup options and attributes (`docs/followups.md`).
-- **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and with per-key modules the file name. On a case-insensitive file system, two keys that differ only in case would be one file.
+- **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is a compile error naming the locales that lack it. A missing translation would otherwise ship as a failed import or as another locale's words.
-- **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, the server's `strategy` and `cookieName`, and `keyModules` (below). JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
+- **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`) and `outdir`, and later the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
 - **Nothing is fetched and nothing is loaded from elsewhere.** grai's parser is the format's only reader, so a compile cannot depend on the network.
 
 ## Output layout
 
 ```
 <outdir>/
-  runtime.js    runtime.d.ts     the runtime, with the project's locales and config
+  config.js                      the project's locales, which the runtime reads
+  runtime.js    runtime.d.ts     the runtime, the same for every project
   server.js     server.d.ts      the request middleware; client code never imports it
-  keys.js       keys.d.ts        every message: one export per key
+  keys.js       keys.d.ts        every message, as the re-exports of its shards
+  keys/<n>.js   keys/<n>.d.ts    a shard: about 512 keys
   messages.js   messages.d.ts    `m`, the namespace of keys.js
-  messages/<key>.js  <key>.d.ts  with `keyModules` only: a one-line re-export per key
-  .grai/manifest.json            each written file's content hash
+  .grai/manifest.json            what the output was compiled from, and its files
 ```
 
-- **On disk, one module holds every message.** Node, scripts and tests load one file, and the output is about ten files whatever the key count. Per-key files cost every install, editor index and file watcher: they would be 12.7k files for app A and 26.7k for app B.
-- **Per-key files exist only for per-key import paths** (`import { key } from "…/messages/key.js"`). An app that imports that way sets `keyModules`. Each file is `export { key } from "../keys.js"`, and its `.d.ts` is the same line. An app that uses `m.key` writes none.
+- **On disk, a few modules hold every message.** Node, scripts and tests load them as they are, and the output is a few dozen files whatever the key count. Per-key files would cost every install, editor index and file watcher, at 12.7k files for app A and 26.7k for app B, and writing that many takes about a second on its own (measured: 26.7k small files, 0.75 to 1.3 s).
+- **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then rewrites one shard of about 512 keys (100 kB for app B), and its declarations only when they change, not the whole catalog's output. TypeScript and editors re-read that shard alone.
+- **Per-key import paths map to keys.js with one line, never a file per key.** An app that imports `import { key } from "…/messages/key.js"` maps the pattern in its package.json `imports` (`"#i18n/messages/*": "./src/lib/i18n/keys.js"`). Node and TypeScript resolve every key's path to keys.js and its declarations, and a key that does not exist is a type error at the import. The Vite adapter resolves the same paths itself.
 - **A production build splits by key, from memory.** Measured with Vite 8.3 (Rolldown) and Rollup 4.52, on two entries that use two keys each, one key shared:
   - one module of keys: static member access on its namespace drops the unused keys, but every key used anywhere lands in one shared chunk, so each route carries the others' words;
   - one module per key: each entry's chunk carries only its own keys, and the shared key gets a chunk of its own.
@@ -46,7 +48,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
   So the Vite adapter builds one module per key from the compiler's model, and `keys.js` and the per-key paths resolve to them. They are never files, and the adapter's build test pins both results.
 - **Dev serves one module.** A dev page then requests every message as one module, whatever the key count, and every per-key path resolves to that same module. A missing key's path resolves to a module whose one export throws a `GraiError` naming the key when called, and the plugin reports the key in the overlay. The import itself succeeds, because a failed import would set off Kit's stale-deployment reload.
 - **The per-locale variants of the message modules exist only in memory too.** They have the same exports, with one locale's function each, and the bundler adapters build them from the compiler's model.
-- **The output brings its own runtime.** `runtime.js` is the package's runtime module, written after the project's constants. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies. The constants are literals that a bundler can fold.
+- **The output brings its own runtime.** `runtime.js` is the package's runtime module, as it is, beside the `config.js` it reads. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies.
 
 ### The browser's locale
 
@@ -75,12 +77,12 @@ Tests switch the locale within the page, and so do many apps, without a reload. 
 ## The generated functions
 
 ```js
-// keys.js, for locales ["en", "de"]
-import { message, plural, text } from "./runtime.js";
+// keys/3.js, a shard, for locales ["en", "de"]
+import { message, plural, text } from "../runtime.js";
 
-export const cart_title = /* @__PURE__ */ text("Your cart", "Ihr Warenkorb");
+export const cart_title = /*#__PURE__*/ text("Your cart", "Ihr Warenkorb");
 
-export const cart_items = /* @__PURE__ */ message(
+export const cart_items = /*#__PURE__*/ message(
 	(i) => (plural("en", i.count) === "one" ? `${i.count} item` : `${i.count} items`),
 	(i) => `${i.count} Artikel`,
 );
@@ -102,8 +104,8 @@ export const cart_items = /* @__PURE__ */ message(
 ## Declarations
 
 ```ts
-// keys.d.ts
-import type { Message } from "./runtime.js";
+// keys/3.d.ts
+import type { Message } from "../runtime.js";
 /** Your cart */
 export declare const cart_title: Message;
 /** {count} item (en, one) … */
@@ -124,6 +126,15 @@ export declare const cart_items: Message<{ count: number }>;
 
   A key's inputs are the union over its locales, so a call suits every locale.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
+- **The declarations are sharded like the modules, by measurement.** On app A and app B, a file importing `m` and using five keys, checked with TypeScript 7 and completed after `m.` with TypeScript 6's language service:
+
+  | Layout | `tsc` | `m.` completion, first | after a one-message edit |
+  | --- | --- | --- | --- |
+  | shards (grai) | 240 / 250 ms | 300 / 440 ms | 56 / 120 ms |
+  | one file | 215 / 250 ms | 185 / 330 ms | 89 / 190 ms |
+  | a file per key | 400 / 960 ms | 810 / 2,010 ms | 270 / 1,890 ms |
+
+  One file is a little faster to load the first time, but an edit rewrites it whole, so every edit costs more after. A file per key costs the most everywhere.
 
 ## Selection: plurals and selects
 
@@ -151,12 +162,16 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 
 ## Incremental compiles and atomic output
 
-- **The compiler keeps its model in memory:** the parsed catalogs and each key's code. When a catalog changes, it parses that file again and compares it key by key with the previous parse. It recompiles the changed keys and writes only what they change. Saving an unchanged file writes nothing.
+- **A compile reads the catalogs as bytes and hashes them first.** When the manifest says the output was compiled from the same config and bytes by the same runtime, and every file it lists is there, the compile stops: nothing is parsed and no file is touched.
+- **A recompile after an edit redoes only what the edit changed.** It keeps the last build in memory: each catalog's bytes and parse, each key's compiled code, each shard's text.
+  - A catalog whose bytes are the same is not parsed again.
+  - An edited catalog laid out one entry per line, as editors and formatters write them, has a line break and the same indent before each top-level key and nowhere else, because a JSON string holds no raw line break. The edit's changed bytes lie between two such entry starts, so only that span is parsed, in the old file and in the new. Whenever that cannot be shown exactly (another layout, a duplicated key, a span that does not parse), the whole file is parsed instead.
+  - Only the keys whose messages changed are compiled, and only their shards are rendered and written.
+  - A failed recompile leaves the last good build as it was, so the next one starts from it.
 - **Watching covers the catalogs' directory and the config, nothing else.** No other file can start a compile, so a framework's generated files never trigger one.
-- **Each file is written to a temporary file beside it and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one.
-- **The writes go in dependency order:** `keys.js` and its declarations first, then new per-key files, then `messages.js`, then the manifest, and removed per-key files last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
-- **The manifest is the persistent cache.** A cold start compiles in memory, which takes well under a second, so there is nothing to cache there. It then writes only the files whose hash differs from the manifest's or that are missing; one `readdir` finds an outdir left partial. Unchanged output is not touched, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
-- **One writer per outdir.** The writer takes a lock file, created exclusively and holding its pid, and the lock is stale once that pid is gone. The CLI's `watch` and the Vite plugin can then share an outdir.
+- **Each file is written to a temporary file in `.grai/` and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. A file whose content is already there is not written, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
+- **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime first, then the shards, then `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
+- **One writer per outdir.** The writer takes a lock: a file holding its pid, linked into place so that it never exists empty. A lock whose process is gone is taken over, and a live one is waited for. The CLI's `watch` and the Vite plugin can then share an outdir.
 - **In dev, the Vite plugin serves from memory and sends HMR itself.** Vite does not watch the output directory, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
 
 ## Runtime
