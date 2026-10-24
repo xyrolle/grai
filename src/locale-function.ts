@@ -1,5 +1,6 @@
 import { type Formatter, formatterOf } from "./formatters.ts";
 import { localeReads } from "./locale-reads.ts";
+import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { type Part, plainText } from "./pattern.ts";
@@ -133,8 +134,17 @@ function partCode(part: Part, placeholder: Placeholder): string {
 		case "variable":
 			return `{ type: "text", value: String(${placeholder(part)}) }`;
 		default:
-			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: {}, attributes: {} }`;
+			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${JSON.stringify(Object.fromEntries(part.attributes))} }`;
 	}
+}
+
+/** A markup's options as an object: each literal as text, each variable as its value. */
+function optionsCode(part: MarkupPart, placeholder: Placeholder): string {
+	const entries = [...part.options].map(
+		([name, value]) =>
+			`${JSON.stringify(name)}: ${"variable" in value ? placeholder({ type: "variable", name: value.variable }) : JSON.stringify(value.literal)}`,
+	);
+	return entries.length === 0 ? "{}" : `{ ${entries.join(", ")} }`;
 }
 
 /** Text as it reads inside a template literal: JSON's escapes, plus the backtick and `${`. */

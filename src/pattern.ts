@@ -1,4 +1,5 @@
 import { type Format, parseFormat } from "./format-options.ts";
+import { type MarkupPart, parseMarkup } from "./markup.ts";
 import { MessageProblem } from "./problem.ts";
 
 /**
@@ -8,14 +9,11 @@ import { MessageProblem } from "./problem.ts";
 export type Part =
 	| { type: "text"; value: string }
 	| { type: "variable"; name: string; format?: Format }
-	| { type: "markup-start" | "markup-end" | "markup-standalone"; name: string };
+	| MarkupPart;
 
 const identifier = /^[A-Za-z_$][\w$]*$/;
 /** A placeholder calling a function, as `{count :number}` or as a declaration writes it, `{count: number}`. */
 const call = /^([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z]\w*)(\s.*)?$/;
-const markupStart = /^#([^\s/=@]+)$/;
-const markupStandalone = /^#([^\s/=@]+)\s*\/$/;
-const markupEnd = /^\/([^\s/=@]+)$/;
 const escapable = new Set(["{", "}", "\\"]);
 
 /**
@@ -52,19 +50,8 @@ export function parsePattern(source: string): Part[] {
 
 function placeholder(body: string): Part {
 	if (identifier.test(body)) return { type: "variable", name: body };
-	const start = markupStart.exec(body)?.[1];
-	if (start !== undefined) return { type: "markup-start", name: start };
-	const standalone = markupStandalone.exec(body)?.[1];
-	if (standalone !== undefined)
-		return { type: "markup-standalone", name: standalone };
-	const end = markupEnd.exec(body)?.[1];
-	if (end !== undefined) return { type: "markup-end", name: end };
-	if (body.startsWith("#") || body.startsWith("/")) {
-		throw new MessageProblem(
-			"unsupported",
-			`the markup {${body}} has options or attributes, which grai does not support yet. Write it as {#name}, {/name} or {#name/}.`,
-		);
-	}
+	const markup = parseMarkup(body);
+	if (markup !== undefined) return markup;
 	const [, name, fn, options = ""] = call.exec(body) ?? [];
 	if (name !== undefined && fn !== undefined) {
 		return {

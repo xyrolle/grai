@@ -1,4 +1,5 @@
 import { isRecord } from "./config.ts";
+import { markupVariables } from "./markup.ts";
 import { parseMatch } from "./match.ts";
 import {
 	type FormattedLocal,
@@ -56,14 +57,17 @@ const noInputs: ReadonlySet<string> = new Set();
 const noPlurals: ReadonlyMap<string, PluralLocal> = new Map();
 const noFormatted: ReadonlyMap<string, FormattedLocal> = new Map();
 
-/** A message that is one pattern: its inputs are its placeholders. */
+/** A message that is one pattern: its inputs are its placeholders and its markup's variables. */
 function patternMessage(locale: string, source: string): LocaleMessage {
 	const pattern = parsePattern(source);
 	let inputs = noInputs;
 	let markup = false;
 	for (const part of pattern) {
 		if (part.type === "variable") inputs = new Set([...inputs, part.name]);
-		else if (part.type !== "text") markup = true;
+		else if (part.type !== "text") {
+			markup = true;
+			inputs = new Set([...inputs, ...markupVariables(part)]);
+		}
 	}
 	return {
 		locale,
@@ -149,6 +153,9 @@ function withInputs(
 				if (!isLocal(part.name)) inputs.add(part.name);
 			} else if (part.type !== "text") {
 				markup = true;
+				for (const name of markupVariables(part)) {
+					if (!isLocal(name)) inputs.add(name);
+				}
 			}
 		}
 	}
