@@ -55,3 +55,33 @@ Done when: the Vite plugin serves that module and reports the key, with a test t
 It leaves out ICU's currency and skeleton styles and i18next's formats with options or other than `number` and `datetime`, which need their options mapped one by one, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
+
+## Localized pathnames
+
+The `url` strategy prefixes a path with its locale and leaves the path as it is. A site that translates its paths (`/about` and `/de/ueber-uns`) for search engines cannot say so.
+
+Done when: the config maps a path to its path in each locale, with named segments (`/products/[id]`), compiled into a table that `config.js` holds only when the config has one; `localizeHref`, `deLocalizeUrl` and the SvelteKit adapter's `reroute` follow it, and a test covers a translated path, a segment and an untranslated path.
+
+## A domain per locale
+
+A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads.
+
+Done when: the config maps hosts to locales, the middleware reads the request's host, `localizeHref` to a locale on another host gives an absolute URL, local development has a documented way in without the production hosts, and a test covers each.
+
+## The framework's base path
+
+An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`. The framework owns the base path, so the config should not repeat it.
+
+Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
+
+## Paths the `url` strategy leaves alone
+
+With the base locale unprefixed, `url` answers every path, so a site cannot localize its public pages by URL and its app (`/dashboard`) by cookie.
+
+Done when: the config can name the paths `url` does not cover, the strategies after it then apply to those paths, and a test covers a covered and an uncovered path.
+
+## Custom locale prefixes
+
+A locale's prefix is its tag (`/en-US/…`). A site that wants `/us/…` cannot have it. Neither reference app needs it, so it waits for an adopter who does.
+
+Done when: the config maps a locale to its prefix, and the URL helpers and the middleware follow it, with a test.
