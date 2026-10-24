@@ -7,7 +7,10 @@
 		"node": ">=24"
 	},
 	"scripts": {
-		"browsers": "playwright-core install chromium webkit"
+		"browsers": "playwright-core install chromium webkit",
+		"server": "node server.mjs",
+		"interleave": "node interleave.mjs",
+		"workerd": "node workerd.mjs"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.29.1",
