@@ -97,7 +97,7 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 	expect(compile()).toContain("runtime.d.ts");
 	expect(compile()).toEqual([]);
 
-	const declarations = join(compiler, "declarations.ts");
+	const declarations = join(compiler, "runtime-declarations.ts");
 	writeFileSync(
 		declarations,
 		readFileSync(declarations, "utf8").replace(
