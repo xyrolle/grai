@@ -22,14 +22,15 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
   Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:number` and `:datetime`, options, nested keys, and markup options and attributes (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is a compile error naming the locales that lack it. A missing translation would otherwise ship as a failed import or as another locale's words.
-- **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`) and `outdir`, and later the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
+- **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
 - **Nothing is fetched and nothing is loaded from elsewhere.** grai's parser is the format's only reader, so a compile cannot depend on the network.
 
 ## Output layout
 
 ```
 <outdir>/
-  config.js                      the project's locales, which the runtime reads
+  config.js                      the project's locales and strategy, which the runtime reads
+  plurals.js                     each locale's plural rules, compiled from CLDR
   runtime.js    runtime.d.ts     the runtime, the same for every project
   server.js     server.d.ts      the request middleware; client code never imports it
   keys.js       keys.d.ts        every message, as the re-exports of its shards
@@ -78,12 +79,13 @@ Tests switch the locale within the page, and so do many apps, without a reload. 
 
 ```js
 // keys/3.js, a shard, for locales ["en", "de"]
-import { message, plural, text } from "../runtime.js";
+import { message, text } from "../runtime.js";
+import { plural_en } from "../plurals.js";
 
 export const cart_title = /*#__PURE__*/ text("Your cart", "Ihr Warenkorb");
 
 export const cart_items = /*#__PURE__*/ message(
-	(i) => (plural("en", i.count) === "one" ? `${i.count} item` : `${i.count} items`),
+	(i) => (plural_en(i.count) === "one" ? `${i.count} item` : `${i.count} items`),
 	(i) => `${i.count} Artikel`,
 );
 ```
@@ -94,7 +96,7 @@ export const cart_items = /*#__PURE__*/ message(
   - One locale may use a plain pattern where another selects: the German above needs no plural.
 - **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options: {}, attributes: {} }`. The app then decides how markup looks, and translators decide where it stands.
 - **Inputs are read as `i.name`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B).
-- **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and `plural`. A bundler transform in a per-locale build replaces a call:
+- **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and its locale's plural function. A bundler transform in a per-locale build replaces a call:
   - with the string, for a message without inputs;
   - with the body, when the argument is an object literal of side-effect-free values, each read once;
   - with a direct call of the locale's arrow, otherwise.
@@ -140,7 +142,7 @@ export declare const cart_items: Message<{ count: number }>;
 
 These are MessageFormat 2's rules, restricted to the constructs above:
 
-- **`local n = count: plural` selects the CLDR cardinal category of `count`** for the message's locale. The categories come from `Intl.PluralRules`, created once per locale and reused. `bench/` measures whether compiled CLDR rules are faster, and what they cost in bytes.
+- **`local n = count: plural` selects the CLDR cardinal category of `count`** for the message's locale, through a function compiled from CLDR's rules for that locale alone. A whole, non-negative count, the usual one, takes a path with the fraction operands folded away; any other count is rounded to three fraction digits first, as `Intl.PluralRules` rounds it. That is 4–11 ns a call against 124–249 ns for a cached `Intl.PluralRules` (`docs/runtime.md`), and every locale agrees with `Intl.PluralRules` on 0–10,000, on fractions and on negative counts. The rules are CLDR 48's, from the `cldr-core` package, so a project's categories are the same on every engine; the compile checks the variants against them.
 - **A selector on an input matches a key when `String(value)` equals it.** That is MessageFormat 2's string selection, so `1` and `"1"` both match the key `1`.
 - **The variant is chosen by MessageFormat 2's preference:** among the variants whose every key matches, a literal key comes before `*`, selector by selector, and then the order written.
 - **A selection must be exhaustive, or it is a compile error:**
@@ -187,13 +189,14 @@ The locale is resolved once per request on the server, or once per page on the c
   - `url`: a non-base locale is the first path segment, and the base locale has no prefix.
 
   The base locale is always the last resort, so the config does not list it.
+- **A call reads the bound locale once and indexes its variant with it:** the request keeps the locale's position in `locales`, so there is no search and no strategy per call. `setLocale` in a request changes the locale for the rest of that request.
 - **On the server outside a request** (scripts, crons, Node tests), one process-wide value is bound. It starts as the base locale, and `setLocale(locale, { reload: false })` changes it.
-- **On the client,** the page's `<html lang>` is the locale, else the base locale. `setLocale(locale)` writes the cookie (`cookie`) or goes to the localized URL (`url`), and reloads.
+- **On the client,** the page's `<html lang>` is the locale, else the base locale. `setLocale(locale)` writes the cookie (`cookie`) or goes to the localized URL (`url`), and reloads. With `{ reload: false }` it switches in the page, which holds every locale until an adapter builds one locale per page; what it does then is the open question above.
 
 The runtime's names are the ones existing Paraglide call sites use, so migrating changes imports, not calls. Only the middleware has a name of its own:
 - `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `cookieName`, `getTextDirection`, `MessagePart`;
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`;
-- `server.js`: `middleware(request, ({ request, locale }) => response, options?)`.
+- `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
 ## CLI
 
@@ -210,4 +213,4 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - `grai`: the compiler's API;
   - `grai/vite`, `grai/sveltekit`, `grai/next`, `grai/server`: the adapters, each thin, each taking the project's generated modules;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform: `Intl`, and `AsyncLocalStorage` on the server. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.
+- **No dependencies.** The generated output needs only the platform: `AsyncLocalStorage` on the server, and `Intl.Locale` for `getTextDirection`. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.
