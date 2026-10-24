@@ -2,6 +2,7 @@
 
 import { hash } from "node:crypto";
 import type { Format } from "./format-options.ts";
+import { formatterCode } from "./intl-formatters.ts";
 
 /** A formatter of the output: a format in a locale, under the name formats.js exports it by. */
 export type Formatter = { name: string; locale: string; format: Format };
@@ -22,8 +23,7 @@ export function formatterOf(locale: string, format: Format): Formatter {
 
 /**
  * formats.js: each formatter the messages call, as a function of the value. The Intl formatter is
- * made the first time it formats, so a locale nobody reads makes none. A value is taken as a
- * number, as Intl takes a date by its time value.
+ * made the first time it formats, so a locale nobody reads makes none.
  */
 export function formatModule(formatters: Iterable<Formatter>): string {
 	const byName = new Map<string, Formatter>();
@@ -37,25 +37,8 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 		}
 		byName.set(formatter.name, formatter);
 	}
-	const constructors = {
-		number: "Intl.NumberFormat",
-		datetime: "Intl.DateTimeFormat",
-	};
 	const definitions = [...byName.values()]
 		.sort((a, b) => (a.name < b.name ? -1 : 1))
-		.map(({ name, locale, format }) => {
-			const made = `${name}_made`;
-			const intl = constructors[format.formatter];
-			const options =
-				Object.keys(format.options).length === 0
-					? ""
-					: `, ${JSON.stringify(format.options)}`;
-			return `/** @type {${intl} | undefined} */
-let ${made};
-/** @param {unknown} value */
-export const ${name} = (value) =>
-	(${made} ??= new ${intl}(${JSON.stringify(locale)}${options})).format(Number(value));
-`;
-		});
+		.map(({ name, locale, format }) => formatterCode(name, locale, format));
 	return `// The Intl formatters the messages call, each made the first time it formats.\n\n${definitions.join("\n")}`;
 }
