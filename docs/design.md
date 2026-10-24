@@ -198,6 +198,14 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
+## SvelteKit
+
+- **`handleLocale({ middleware, getTextDirection })` is the whole server adapter.** It takes the two functions from the project's output, as every adapter takes the project's generated modules, and runs the middleware around Kit's `resolve`. The locale is resolved and bound once, for the page's render, its loads and its remote functions alike.
+- **The page's locale and direction are written into `src/app.html` through `%grai.lang%` and `%grai.dir%`,** by `transformPageChunk`. They are placeholders, as Paraglide's `%paraglide.lang%` is, so migrating renames them, and the app keeps its `<html>` as it wrote it.
+- **The browser needs nothing from the adapter.** The runtime takes `<html lang>` as the page's locale.
+- **`reroute` is one line in the app,** `deLocalizeUrl(url).pathname`, and not an export: wrapping the output's own helper would add a name and no behaviour.
+- **One locale's message chunks per page is not built yet** (`docs/followups.md`). It needs the Vite adapter's per-key modules and their per-locale variants.
+
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.

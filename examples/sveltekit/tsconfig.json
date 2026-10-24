@@ -1,0 +1,15 @@
+{
+	"extends": "$app/tsconfig",
+	"compilerOptions": {
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"verbatimModuleSyntax": true,
+		"skipLibCheck": true,
+		// The output in src/lib/i18n is checked through its declarations, not as JavaScript
+		// (docs/followups.md).
+		"checkJs": false,
+		"types": ["$app/types"]
+	},
+	"include": ["src", "vite.config.ts"]
+}

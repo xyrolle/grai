@@ -1,1 +1,3 @@
 engineStrict: true
+packages:
+  - examples/*
