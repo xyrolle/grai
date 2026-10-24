@@ -8,8 +8,9 @@ export const changeEvent = "grai:change";
 
 /**
  * keys.js in dev: every key, with its locales in a table, and the handler that writes an edit's
- * patch into the table. After a patch the page dispatches a cancelable `grai:change` on
- * `window`: a framework adapter that renders again cancels it, and otherwise the page reloads.
+ * patch into the table, in the page and in a server's module runner alike. After a patch the page
+ * dispatches a cancelable `grai:change` on `window`: a framework adapter that renders again
+ * cancels it, and otherwise the page reloads.
  */
 export function devModule(outdir: string, build: Build): string {
 	const keys = [...build.compilation.keys];

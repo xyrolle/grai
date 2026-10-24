@@ -159,6 +159,45 @@ describe("the Vite plugin's dev server", () => {
 		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
 	});
 
+	it("patches a server render's messages in place, and a later evaluation keeps the edit", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";
+globalThis.evaluated = (globalThis.evaluated ?? 0) + 1;
+export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { port: 0 },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		await server.listen();
+		await expect
+			.poll(() => existsSync(join(dir, "out", "messages.js")))
+			.toBe(true);
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		expect(await rendered()).toBe("Title 1");
+
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+
+		await expect.poll(rendered).toBe("Heading 1");
+		// The next time the runner evaluates the program, for any other reason, it keeps the edit.
+		ssr.hot.send({ type: "full-reload" });
+		await expect.poll(rendered).toBe("Heading 2");
+	});
+
 	it("shows an edited message without reloading the page", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
