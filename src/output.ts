@@ -1,13 +1,13 @@
 import {
 	link,
 	mkdir,
+	readdir,
 	readFile,
 	rename,
-	stat,
 	unlink,
 	writeFile,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { isMissing } from "./config.ts";
 import { GraiError } from "./error.ts";
@@ -21,22 +21,33 @@ const stateDirectory = ".grai";
 const lockRetry = 10;
 const lockPatience = 30_000;
 
-/** Whether the outdir holds the output of these inputs, every file of it in place. */
+/**
+ * Whether the outdir holds the output of these inputs, every file of it in place. The files are
+ * looked for by listing their few directories, not one by one, so the check costs the same however
+ * many files there are.
+ */
 export async function isUpToDate(
 	outdir: string,
 	inputs: string,
 ): Promise<boolean> {
 	const manifest = await readManifest(outdir);
 	if (manifest?.inputs !== inputs) return false;
-	const present = await Promise.all(
-		manifest.files.map((file) =>
-			stat(join(outdir, file)).then(
-				() => true,
-				() => false,
-			),
-		),
+	const directories = new Set(
+		manifest.files.map((file) => posix.dirname(file)),
 	);
-	return present.every(Boolean);
+	const listed = await Promise.all(
+		[...directories].map(async (directory) => {
+			const names = await readdir(join(outdir, directory)).catch(
+				(error: unknown) => {
+					ignoreMissing(error);
+					return [];
+				},
+			);
+			return names.map((name) => posix.join(directory, name));
+		}),
+	);
+	const present = new Set(listed.flat());
+	return manifest.files.every((file) => present.has(file));
 }
 
 /**
