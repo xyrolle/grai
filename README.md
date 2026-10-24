@@ -296,6 +296,21 @@ export const render = (request: Request, template: string) =>
 
 The browser takes the page's locale from its `<html lang>`, so the page hydrates in the words the server drew. With `grai({ localeChunks: true })`, the page loads only its locale's words, as a static site's does: the page's locale script keeps the `lang` the server wrote and points the page at that locale's copies. In dev, `import "grai/vue/client"` in the browser's entry renders an edited message again in place, keeping the page's state; a build leaves it out. `examples/vue` is a complete server-rendered app.
 
+### Nuxt
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({ modules: ["grai/nuxt"] });
+```
+
+The module compiles the catalogs before Nuxt builds anything, and again on each edit in dev, where the open page renders the edit again in place. Its server middleware resolves each request's locale by `grai.config.json`'s `strategy`, the render binds it, and the page's `<html lang>` and `dir` take it. Templates call messages, and `grai/vue`'s `Markup` draws markup, as in any Vue app.
+
+- With the `url` strategy, every page is also routed under each other locale's prefix (`/ro/about`), and links name their locale with `localizeHref("/about")`. A link into another locale loads that page anew, since a page holds its own locale's words alone.
+- A page downloads only its locale's copies of its message chunks.
+- A server route renders messages through the output's `middleware`, as any server does (below), and its `Vary` names the headers the strategy read.
+
+`examples/nuxt` is a complete app in English, Romanian and Arabic.
+
 ### Workers, Bun, Deno and Node
 
 The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `query`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
