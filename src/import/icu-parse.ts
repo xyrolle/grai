@@ -1,0 +1,240 @@
+import { MessageProblem } from "../problem.ts";
+
+/** An ICU MessageFormat message, parsed: text, `{name}`, `#`, a plural or select choice, and a tag. */
+export type IcuNode =
+	| { type: "text"; value: string }
+	| { type: "argument"; name: string }
+	| { type: "pound" }
+	| {
+			type: "choice";
+			kind: "plural" | "select";
+			name: string;
+			options: IcuOption[];
+	  }
+	| { type: "tag"; name: string; children: IcuNode[] };
+
+/** One option of a choice: its key (`one`, `=0`, `male`, `other`) and its message. */
+export type IcuOption = { key: string; nodes: IcuNode[] };
+
+const inputName = /^[A-Za-z_$][\w$]*$/;
+const tagName = /^[A-Za-z][\w-]*$/;
+/** The MessageFormat 2 function each ICU argument type would need. */
+const functions: Readonly<Record<string, string>> = {
+	number: ":number",
+	date: ":datetime",
+	time: ":datetime",
+};
+
+/**
+ * Parses an ICU message as intl-messageformat reads it. A formatted argument (`number`, `date`,
+ * `time`), `selectordinal` or `offset` throws an "unsupported" MessageProblem, and a malformed
+ * message a "message-invalid" one.
+ */
+export function parseIcu(source: string): IcuNode[] {
+	return new IcuParser(source).message();
+}
+
+class IcuParser {
+	private readonly source: string;
+	private index = 0;
+
+	constructor(source: string) {
+		this.source = source;
+	}
+
+	message(): IcuNode[] {
+		const nodes = this.nodes(false, undefined);
+		if (this.index < this.source.length) {
+			throw invalid(`the } at ${this.index} closes nothing.`);
+		}
+		return nodes;
+	}
+
+	/** Nodes up to a `}` or the closing tag, which is left unread; `#` is the count within a plural. */
+	private nodes(inPlural: boolean, closingTag: string | undefined): IcuNode[] {
+		const nodes: IcuNode[] = [];
+		let text = "";
+		const flush = () => {
+			if (text !== "") nodes.push({ type: "text", value: text });
+			text = "";
+		};
+		while (this.index < this.source.length && !this.atEnd(closingTag)) {
+			const char = this.source.charAt(this.index);
+			const tag = char === "<" ? this.tagAhead() : undefined;
+			if (char === "'") {
+				text += this.quoted(inPlural);
+			} else if (char === "{") {
+				flush();
+				nodes.push(this.argument());
+			} else if (char === "#" && inPlural) {
+				flush();
+				nodes.push({ type: "pound" });
+				this.index++;
+			} else if (tag !== undefined) {
+				flush();
+				nodes.push(this.tag(tag, inPlural));
+			} else {
+				text += char;
+				this.index++;
+			}
+		}
+		flush();
+		return nodes;
+	}
+
+	private atEnd(closingTag: string | undefined): boolean {
+		return (
+			this.source.charAt(this.index) === "}" ||
+			(closingTag !== undefined &&
+				this.source.startsWith(`</${closingTag}>`, this.index))
+		);
+	}
+
+	/** ICU's apostrophe: `''` is one, and one before a special character quotes text up to the next. */
+	private quoted(inPlural: boolean): string {
+		const next = this.source.charAt(this.index + 1);
+		if (next === "'") {
+			this.index += 2;
+			return "'";
+		}
+		if (!"{}<>|".includes(next) && !(inPlural && next === "#")) {
+			this.index++;
+			return "'";
+		}
+		let text = "";
+		this.index++;
+		while (this.index < this.source.length) {
+			const char = this.source.charAt(this.index);
+			if (char === "'") {
+				if (this.source.charAt(this.index + 1) !== "'") {
+					this.index++;
+					return text;
+				}
+				this.index++;
+			}
+			text += char;
+			this.index++;
+		}
+		return text;
+	}
+
+	/** `{name}`, or a choice: `{name, plural|select, options}`. */
+	private argument(): IcuNode {
+		this.index++;
+		const name = this.word();
+		if (this.take("}")) return { type: "argument", name: inputOf(name) };
+		if (!this.take(",")) throw invalid(`{${name} must be closed by }.`);
+		const kind = this.word();
+		if (kind !== "plural" && kind !== "select") {
+			throw unsupportedArgument(name, kind);
+		}
+		if (!this.take(",")) {
+			throw invalid(`{${name}, ${kind} must list its options.`);
+		}
+		const options = this.options(name, kind);
+		if (!options.some((option) => option.key === "other")) {
+			throw invalid(
+				`{${name}, ${kind}} has no other option, which ICU requires.`,
+			);
+		}
+		return { type: "choice", kind, name: inputOf(name), options };
+	}
+
+	/** A choice's options up to its closing `}`, each a key and a message in braces. */
+	private options(name: string, kind: "plural" | "select"): IcuOption[] {
+		const options: IcuOption[] = [];
+		while (!this.take("}")) {
+			const key = this.word();
+			if (key.startsWith("offset:")) {
+				throw new MessageProblem(
+					"unsupported",
+					`{${name}, plural, ${key}} subtracts an offset from the count, which grai does not support.`,
+				);
+			}
+			if (key === "" || !this.take("{")) {
+				throw invalid(
+					`each option of {${name}, ${kind}} must be a key and a message in braces.`,
+				);
+			}
+			options.push({ key, nodes: this.nodes(kind === "plural", undefined) });
+			if (!this.take("}")) {
+				throw invalid(`the option ${key} of {${name}} must be closed by }.`);
+			}
+		}
+		return options;
+	}
+
+	private tag(name: string, inPlural: boolean): IcuNode {
+		this.index += name.length + 2;
+		const children = this.nodes(inPlural, name);
+		if (!this.source.startsWith(`</${name}>`, this.index)) {
+			throw invalid(`the tag <${name}> must be closed by </${name}>.`);
+		}
+		this.index += name.length + 3;
+		return { type: "tag", name, children };
+	}
+
+	/** The name of an opening tag at the index, if there is one. */
+	private tagAhead(): string | undefined {
+		const end = this.source.indexOf(">", this.index);
+		const name = end === -1 ? "" : this.source.slice(this.index + 1, end);
+		return tagName.test(name) ? name : undefined;
+	}
+
+	/** Skips spaces, then reads up to a space, `,`, `{` or `}`. */
+	private word(): string {
+		this.space();
+		const start = this.index;
+		while (
+			this.index < this.source.length &&
+			!/[\s,{}]/.test(this.source.charAt(this.index))
+		) {
+			this.index++;
+		}
+		const word = this.source.slice(start, this.index);
+		this.space();
+		return word;
+	}
+
+	private take(char: string): boolean {
+		this.space();
+		if (this.source.charAt(this.index) !== char) return false;
+		this.index++;
+		return true;
+	}
+
+	private space() {
+		while (/\s/.test(this.source.charAt(this.index))) this.index++;
+	}
+}
+
+function inputOf(name: string): string {
+	if (!inputName.test(name)) {
+		throw new MessageProblem(
+			"unsupported",
+			`{${name}} is not a name grai can take as an input. Rename it, such as {count}, here and where the message is called.`,
+		);
+	}
+	return name;
+}
+
+/** Why an argument of a type other than plural or select cannot be converted. */
+function unsupportedArgument(name: string, kind: string): MessageProblem {
+	if (kind === "selectordinal") {
+		return new MessageProblem(
+			"unsupported",
+			`{${name}, selectordinal} picks an ordinal form, which grai does not support yet.`,
+		);
+	}
+	return new MessageProblem(
+		"unsupported",
+		`{${name}, ${kind}} formats the value as ${functions[kind] ?? `:${kind}`}, which grai does not support yet. Format it before the call and pass the text as {${name}}.`,
+	);
+}
+
+function invalid(detail: string): MessageProblem {
+	return new MessageProblem(
+		"message-invalid",
+		`it is not a valid ICU message: ${detail}`,
+	);
+}
