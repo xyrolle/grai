@@ -28,8 +28,18 @@ export type Message = ((
 	inputs?: object,
 	options?: { locale?: string },
 ) => string) & {
-	parts?: (inputs?: object, options?: { locale?: string }) => unknown[];
+	parts?: (inputs?: object, options?: { locale?: string }) => Part[];
 };
+
+/** A run of a markup message's text, or a piece of its markup. */
+export type Part =
+	| { type: "text"; value: string }
+	| {
+			type: "markup-start" | "markup-end" | "markup-standalone";
+			name: string;
+			options: Readonly<Record<string, unknown>>;
+			attributes: Readonly<Record<string, string | true>>;
+	  };
 export type Messages = Record<string, Message>;
 
 /** The output's runtime, as the tests call it. */

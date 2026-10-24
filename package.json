@@ -27,6 +27,10 @@
 		"./svelte": {
 			"types": "./dist/svelte.d.ts",
 			"default": "./dist/svelte.js"
+		},
+		"./vue": {
+			"types": "./dist/vue/markup.d.ts",
+			"default": "./dist/vue/markup.js"
 		}
 	},
 	"bin": {
@@ -50,7 +54,8 @@
 	"peerDependencies": {
 		"magic-string": ">=1",
 		"svelte": ">=5",
-		"vite": ">=8"
+		"vite": ">=8",
+		"vue": ">=3.5"
 	},
 	"peerDependenciesMeta": {
 		"magic-string": {
@@ -60,6 +65,9 @@
 			"optional": true
 		},
 		"vite": {
+			"optional": true
+		},
+		"vue": {
 			"optional": true
 		}
 	},
@@ -77,6 +85,7 @@
 		"typescript": "7.0.2",
 		"vite": "8.3.5",
 		"vitest": "5.0.5",
+		"vue": "3.5.44",
 		"wrangler": "4.152.0"
 	}
 }
