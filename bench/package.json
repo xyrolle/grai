@@ -25,7 +25,8 @@
 		"library-bytes": "node library-bytes.mjs",
 		"compile-time": "node compile-time.mjs",
 		"types": "node types.mjs",
-		"import-equivalence": "node import-equivalence.mjs"
+		"import-equivalence": "node import-equivalence.mjs",
+		"refactor": "node refactor.mjs"
 	},
 	"devDependencies": {
 		"@formatjs/cli": "6.16.35",
