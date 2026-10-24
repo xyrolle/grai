@@ -1,7 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { build, createServer, type HotPayload } from "vite";
+import {
+	build,
+	createServer,
+	type HotPayload,
+	isRunnableDevEnvironment,
+} from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import { project } from "./project.ts";

@@ -3,7 +3,7 @@ import type { Plugin } from "vite";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
-import { type GraiError, messagesOf } from "./error.ts";
+import { messagesOf } from "./error.ts";
 import { keyModulePrefix, keyPrefix } from "./locale-chunks.ts";
 import {
 	chunkFileName,
@@ -36,7 +36,7 @@ export function grai(options: GraiOptions = {}): Plugin {
 	let serving = false;
 	let build: Build | undefined;
 	/** The first compile: its build, or the errors that kept it from one. */
-	let first: Promise<Build | readonly GraiError[]> | undefined;
+	let first: Promise<Build | readonly Error[]> | undefined;
 	let patchOf: (id: string) => string | undefined = () => undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
@@ -108,7 +108,7 @@ export function grai(options: GraiOptions = {}): Plugin {
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
 		},
 		configureServer(server) {
-			let ready: (compiled: Build | readonly GraiError[]) => void = () => {};
+			let ready: (compiled: Build | readonly Error[]) => void = () => {};
 			first = new Promise((resolve) => {
 				ready = resolve;
 			});
@@ -126,10 +126,13 @@ export function grai(options: GraiOptions = {}): Plugin {
 		async buildEnd() {
 			await closeMessages();
 		},
-		resolveId(id) {
-			return id.startsWith(keyPrefix) || id.startsWith(patchPrefix)
-				? `\0${id}`
-				: null;
+		async resolveId(id) {
+			if (id.startsWith(keyPrefix) || id.startsWith(patchPrefix))
+				return `\0${id}`;
+			// Until the first compile has written the output, an import of it waits rather than fails:
+			// a page that failed to import it would be reloaded once the file appears.
+			if (serving) await first;
+			return null;
 		},
 		async load(id) {
 			const patch = patchOf(id);
