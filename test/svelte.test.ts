@@ -122,14 +122,14 @@ describe("grai/svelte's client build", () => {
 		expect(code(files)).toContain("message(");
 		const copy = [...files].find(
 			([file, source]) =>
-				file.startsWith("grai/") && source.includes("pageText"),
+				file.startsWith("assets/grai/") && source.includes("pageText"),
 		)?.[0];
-		expect(files.get(copy?.replace("grai/", "grai-de/") ?? "")).toContain(
-			'"Titel"',
-		);
-		expect(files.get(copy?.replace("grai/", "grai-de/") ?? "")).not.toContain(
-			'"Title"',
-		);
+		expect(
+			files.get(copy?.replace("assets/grai/", "assets/grai-de/") ?? ""),
+		).toContain('"Titel"');
+		expect(
+			files.get(copy?.replace("assets/grai/", "assets/grai-de/") ?? ""),
+		).not.toContain('"Title"');
 	});
 
 	it("names a text key's string module text in graiModules, as the message chunk it went to", async () => {
@@ -204,7 +204,7 @@ describe("grai/svelte's client build", () => {
 				return path === "/"
 					? route.fulfill({
 							contentType: "text/html",
-							body: `<!doctype html><html lang="${locale}"><script type="importmap">{"imports":{"/grai/":"/grai-${locale}/"}}</script><div id="app">${server.page(locale)}</div><script>window.drawn = document.getElementById("app").firstElementChild;</script><script type="module" src="/${entry}"></script>`,
+							body: `<!doctype html><html lang="${locale}"><script type="importmap">{"imports":{"/assets/grai/":"/assets/grai-${locale}/"}}</script><div id="app">${server.page(locale)}</div><script>window.drawn = document.getElementById("app").firstElementChild;</script><script type="module" src="/${entry}"></script>`,
 						})
 					: route.fulfill({
 							contentType: "text/javascript",
