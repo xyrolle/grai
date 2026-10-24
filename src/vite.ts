@@ -38,6 +38,7 @@ export function grai(options: GraiOptions = {}): Plugin {
 	/** The first compile: its build, or the errors that kept it from one. */
 	let first: Promise<Build | readonly GraiError[]> | undefined;
 	let patchOf: (id: string) => string | undefined = () => undefined;
+	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
 		!serving && environment?.name === "client";
@@ -111,10 +112,19 @@ export function grai(options: GraiOptions = {}): Plugin {
 			first = new Promise((resolve) => {
 				ready = resolve;
 			});
-			({ patch: patchOf } = serveMessages(server, files, (compiled) => {
-				if ("compilation" in compiled) build = compiled;
-				ready(compiled);
-			}));
+			({ patch: patchOf, close: closeMessages } = serveMessages(
+				server,
+				files,
+				(compiled) => {
+					if ("compilation" in compiled) build = compiled;
+					ready(compiled);
+				},
+			));
+		},
+		// The dev server calls it as it closes: the compile under way finishes first, so nothing is
+		// written into the project once the server has closed.
+		async buildEnd() {
+			await closeMessages();
 		},
 		resolveId(id) {
 			return id.startsWith(keyPrefix) || id.startsWith(patchPrefix)

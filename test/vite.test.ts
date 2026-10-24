@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { build, createServer } from "vite";
@@ -146,6 +146,19 @@ describe("the Vite plugin's locale copies", () => {
 });
 
 describe("the Vite plugin's dev server", () => {
+	it("closes once the compile under way has finished, leaving the project to remove", async () => {
+		const { dir } = project(catalogs);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			plugins: [grai()],
+		});
+		await server.close();
+
+		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+	});
+
 	it("shows an edited message without reloading the page", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
