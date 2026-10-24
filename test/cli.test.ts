@@ -267,12 +267,31 @@ describe("grai add", () => {
 		);
 	});
 
+	it("adds a key some catalogs have to the catalogs that lack it, with their texts", async () => {
+		const { dir } = project({
+			en: { ...catalogs.en, cart_empty: "Empty" },
+			de: catalogs.de,
+		});
+		const en = readFileSync(join(dir, "messages", "en.json"), "utf8");
+		const { code } = await grai(dir, "add", "cart_empty", "--de", "Leer");
+
+		expect(code).toBe(0);
+		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
+			JSON.stringify({ ...catalogs.de, cart_empty: "Leer" }, null, "\t"),
+		);
+		expect(readFileSync(join(dir, "messages", "en.json"), "utf8")).toBe(en);
+	});
+
 	it("writes nothing without every locale's text, for a key that exists, or for an invalid text", async () => {
-		const { dir } = project(catalogs);
+		const { dir } = project({
+			en: catalogs.en,
+			de: { ...catalogs.de, cart_note: "Notiz" },
+		});
 		const before = readFileSync(join(dir, "messages", "de.json"), "utf8");
 		const attempts = [
 			await grai(dir, "add", "cart_empty", "--en", "Empty"),
 			await grai(dir, "add", "cart_title", "--en", "Title", "--de", "Titel"),
+			await grai(dir, "add", "cart_note", "--en", "Note", "--de", "Notiz"),
 			await grai(
 				dir,
 				"add",
@@ -294,6 +313,10 @@ describe("grai add", () => {
 			[
 				1,
 				'messages/en.json: "cart_title": the key is already in the catalogs. Edit its messages there.',
+			],
+			[
+				1,
+				'messages/de.json: "cart_note" (de): the key is already in de. Edit its message there, and give a text only for the locales that lack the key.',
 			],
 			[
 				1,

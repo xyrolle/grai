@@ -11,8 +11,8 @@ import {
 } from "./command.ts";
 
 export const addCommand: Command = {
-	usage: `  add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
-                               then compile`,
+	usage: `  add <key> --<locale> <text>  with a text for each locale that lacks the key: add it to
+                               every catalog that lacks it, then compile`,
 	async run(args) {
 		const { config } = parsed(args, {}, false);
 		let locales: readonly string[];
