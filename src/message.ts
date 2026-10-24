@@ -2,6 +2,7 @@ import { isRecord } from "./config.ts";
 import { parseMatch } from "./match.ts";
 import {
 	type FormattedLocal,
+	type PluralLocal,
 	parseDeclarations,
 } from "./message-declarations.ts";
 import { parsePattern } from "./pattern.ts";
@@ -13,8 +14,8 @@ export type LocaleMessage = {
 	locale: string;
 	/** Every input the message reads or declares. */
 	inputs: ReadonlySet<string>;
-	/** Plural locals by name, each with the input it counts. */
-	plurals: ReadonlyMap<string, string>;
+	/** Plural locals by name, each with the input it counts and its type of rules. */
+	plurals: ReadonlyMap<string, PluralLocal>;
 	/** Formatted locals by name, each with the input it formats and how. */
 	formatted: ReadonlyMap<string, FormattedLocal>;
 	selectors: readonly Selector[];
@@ -51,7 +52,7 @@ export function parseMessage(locale: string, value: unknown): LocaleMessage {
 }
 
 const noInputs: ReadonlySet<string> = new Set();
-const noPlurals: ReadonlyMap<string, string> = new Map();
+const noPlurals: ReadonlyMap<string, PluralLocal> = new Map();
 const noFormatted: ReadonlyMap<string, FormattedLocal> = new Map();
 
 /** A message that is one pattern: its inputs are its placeholders. */
@@ -98,10 +99,10 @@ function parseVariants(
 					`it selects on ${name}, a formatted value, which grai does not support. Select on the input, or on a plural local of it.`,
 				);
 			}
-			const input = plurals.get(name);
-			return input === undefined
+			const local = plurals.get(name);
+			return local === undefined
 				? { kind: "input", name }
-				: { kind: "plural", name, input };
+				: { kind: "plural", name, ...local };
 		},
 	);
 	const variants = parseMatch(value.match, selectors);
@@ -125,14 +126,14 @@ function withInputs(
 		variants,
 	}: {
 		declared: readonly string[];
-		plurals: ReadonlyMap<string, string>;
+		plurals: ReadonlyMap<string, PluralLocal>;
 		formatted: ReadonlyMap<string, FormattedLocal>;
 		selectors: readonly Selector[];
 		variants: readonly Variant[];
 	},
 ): LocaleMessage {
 	const inputs = new Set(declared);
-	for (const counted of plurals.values()) inputs.add(counted);
+	for (const local of plurals.values()) inputs.add(local.input);
 	for (const local of formatted.values()) inputs.add(local.input);
 	for (const selector of selectors) {
 		if (selector.kind === "input") inputs.add(selector.name);

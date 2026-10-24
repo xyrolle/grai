@@ -171,20 +171,12 @@ describe("a message", () => {
 					formatted: "Total {amount :currency}",
 					link: "Read {#link href=|/terms|}the terms{/link}",
 					nested: { title: "Title" },
-					ordinal: [
-						{
-							declarations: ["input n", "local p = n: plural select=ordinal"],
-							selectors: ["p"],
-							match: { "p=other": "{n}th" },
-						},
-					],
 				},
 			}),
 		).toEqual([
 			'unsupported: messages/en.json: "formatted" (en): {amount :currency} calls :currency, which grai does not support; the formatting functions are :number, :integer, :datetime, :date, :time.',
 			'unsupported: messages/en.json: "link" (en): the markup {#link href=|/terms|} has options or attributes, which grai does not support yet. Write it as {#name}, {/name} or {#name/}.',
 			'unsupported: messages/en.json: "nested" (en): the value is an object of nested keys, which grai does not support. Flatten it into keys joined by _.',
-			'unsupported: messages/en.json: "ordinal" (en): "local p = n: plural select=ordinal" passes options to plural, which grai does not support yet.',
 		]);
 	});
 
@@ -200,6 +192,13 @@ describe("a message", () => {
 						},
 					],
 					keyed: counted({ "countPlural=one,other": "x" }),
+					ordinal: [
+						{
+							declarations: ["input n", "local p = n: plural select=ordinal"],
+							selectors: ["p"],
+							match: { "p=*": "{n}th" },
+						},
+					],
 					unnamed: counted({ "countPlural=one": "one", "": "any" }),
 					twice: counted({
 						"countPlural=one": "a",
@@ -211,12 +210,13 @@ describe("a message", () => {
 		).toEqual([
 			'message-invalid: messages/en.json: "declared" (en): "inptu count" is not a declaration. Write "input name", "local namePlural = name: plural" or "local nameText = name: number".',
 			'message-invalid: messages/en.json: "keyed" (en): the variant key "countPlural=one,other" must be selector=value pairs joined by commas, such as "countPlural=one".',
+			'message-invalid: messages/en.json: "ordinal" (en): "local p = n: plural select=ordinal": plural takes one option, type, which is cardinal (the default) or ordinal, as in "local nOrdinal = n: plural type=ordinal".',
 			'message-invalid: messages/en.json: "twice" (en): two variants have the keys one, so one of them can never be chosen. Remove one.',
 			'message-invalid: messages/en.json: "unnamed" (en): the variant key "" has no value for the selector "countPlural". Give it one, or * for any.',
 		]);
 	});
 
-	it("is an error when a variant names a plural category its locale does not have", async () => {
+	it("is an error when a variant names a plural or ordinal category its locale does not have", async () => {
 		expect(
 			await errorsOf({
 				en: {
@@ -226,9 +226,22 @@ describe("a message", () => {
 						"countPlural=other": "c",
 					}),
 				},
+				ru: {
+					items: [
+						{
+							declarations: [
+								"input count",
+								"local countPlural = count: plural type=ordinal",
+							],
+							selectors: ["countPlural"],
+							match: { "countPlural=one": "a", "countPlural=*": "b" },
+						},
+					],
+				},
 			}),
 		).toEqual([
 			'plural-category-unknown: messages/en.json: "items" (en): "few" is not a plural category of en, so the variant countPlural=few can never be chosen. Its categories are one, other.',
+			'plural-category-unknown: messages/ru.json: "items" (ru): "one" is not an ordinal category of ru, so the variant countPlural=one can never be chosen. Its categories are other.',
 		]);
 	});
 

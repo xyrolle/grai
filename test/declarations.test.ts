@@ -60,6 +60,13 @@ it("types each message's inputs and options from its catalogs", async () => {
 				},
 			],
 			terms: "Agree to the {#link}terms{/link}",
+			place: [
+				{
+					declarations: ["input n", "local nOrdinal = n: plural type=ordinal"],
+					selectors: ["nOrdinal"],
+					match: { "nOrdinal=one": "{n}st", "nOrdinal=*": "{n}th" },
+				},
+			],
 		},
 		de: {
 			title: "Titel",
@@ -73,6 +80,7 @@ it("types each message's inputs and options from its catalogs", async () => {
 				},
 			],
 			terms: "Den {#link}Bedingungen{/link} zustimmen",
+			place: "{n}.",
 		},
 	});
 	expect((await compile()).errors).toEqual([]);
@@ -90,12 +98,14 @@ const texts: string[] = [
 	m.month({ month: 1 }),
 	m.month({ month: "2" }),
 	m.terms(),
+	m.place({ n: 3 }),
 ];
 const parts: MessagePart[] = m.terms.parts();
 const locale: Locale = locales[1];
 m.greeting({});
 m.greeting({ name: "Ana" }, { locale: "fr" });
 m.items({ count: "2" });
+m.place({ n: "3" });
 m.month({ month: 3 });
 m.title.parts;
 m.missing();
@@ -103,15 +113,17 @@ console.log(texts, parts, locale);
 `,
 	);
 
-	// Lines 14 to 19, each a wrong call: a missing input, an unknown locale, a count as text, a month
-	// the select does not list, parts of a message without markup, and a key that does not exist.
+	// Lines 15 to 21, each a wrong call: a missing input, an unknown locale, a count and an ordinal's
+	// count as text, a month the select does not list, parts of a message without markup, and a key
+	// that does not exist.
 	expect(errors).toEqual([
-		"14 TS2741",
-		"15 TS2322",
+		"15 TS2741",
 		"16 TS2322",
 		"17 TS2322",
-		"18 TS2339",
-		"19 TS2339",
+		"18 TS2322",
+		"19 TS2322",
+		"20 TS2339",
+		"21 TS2339",
 	]);
 });
 

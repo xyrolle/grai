@@ -108,6 +108,56 @@ describe("a compiled message", () => {
 		]);
 	});
 
+	it("chooses an ordinal variant by each locale's CLDR ordinal category", async () => {
+		const ordinal = (match: Record<string, string>) => [
+			{
+				declarations: ["input n", "local nOrdinal = n: plural type=ordinal"],
+				selectors: ["nOrdinal"],
+				match,
+			},
+		];
+		const { m } = await project({
+			en: {
+				place: ordinal({
+					"nOrdinal=one": "{n}st",
+					"nOrdinal=two": "{n}nd",
+					"nOrdinal=few": "{n}rd",
+					"nOrdinal=*": "{n}th",
+				}),
+			},
+			sv: {
+				place: ordinal({ "nOrdinal=one": "{n}:a", "nOrdinal=*": "{n}:e" }),
+			},
+		}).load();
+		const render = (locale: string) =>
+			[1, 2, 3, 4, 11, 12, 21, 22, 103].map((n) =>
+				m.place?.({ n }, { locale }),
+			);
+
+		expect(render("en")).toEqual([
+			"1st",
+			"2nd",
+			"3rd",
+			"4th",
+			"11th",
+			"12th",
+			"21st",
+			"22nd",
+			"103rd",
+		]);
+		expect(render("sv")).toEqual([
+			"1:a",
+			"2:a",
+			"3:e",
+			"4:e",
+			"11:e",
+			"12:e",
+			"21:a",
+			"22:a",
+			"103:e",
+		]);
+	});
+
 	it("matches every selector of a variant, preferring a literal key to *", async () => {
 		const { m } = await project({
 			en: {
