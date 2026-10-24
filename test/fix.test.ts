@@ -43,6 +43,29 @@ describe("grai check --fix", () => {
 		expect((await check(config)).problems).toEqual([]);
 	});
 
+	it("keeps a key that is no key name, which a source may write where the scan sees no name", async () => {
+		const { dir, config } = project({
+			en: { ...catalogs.en, "sign-in": "Sign in" },
+			de: { ...catalogs.de, "sign-in": "Anmelden" },
+		});
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.tsx": "export const Promo = () => <p>{promo_spring()}</p>;\n",
+			"src/SignIn.svelte": '<button>{m["sign-in"]()}</button>\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual(["banner_old"]);
+		expect(readText(dir, "messages/de.json")).toContain(
+			'"sign-in": "Anmelden"',
+		);
+		const { problems } = await check(config);
+		expect(problems.map(({ code, key }) => `${code}: ${key}`)).toEqual([
+			"key-invalid: sign-in",
+		]);
+	});
+
 	it("keeps the unused keys a read by a computed name may reach, and says which read", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
