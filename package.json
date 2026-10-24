@@ -56,6 +56,10 @@
 			"types": "./dist/sveltekit-client.d.ts",
 			"default": "./dist/sveltekit-client.js"
 		},
+		"./astro": {
+			"types": "./dist/astro.d.ts",
+			"default": "./dist/astro.js"
+		},
 		"./astro/middleware": {
 			"types": "./dist/astro/middleware.d.ts",
 			"default": "./dist/astro/middleware.js"
