@@ -1,18 +1,17 @@
 // Compile time: what a developer waits for, per library, each run a new Node process. grai's
 // compile from this repository's source: cold, with nothing to do, and after one edited message.
 // Each time starts once the library's modules have loaded.
-// Paraglide's compile, without its TypeScript declarations and with them (TypeScript 6, whose API
-// its emit needs). formatjs compiling one locale's ICU catalog to an AST. Edits go to a copy of
+// Paraglide's compile, without its TypeScript declarations and with them (through TypeScript 6,
+// whose API its emit needs). formatjs compiling one locale's ICU catalog to an AST. Edits go to a copy of
 // the catalogs under .cache. Medians of three runs; one run for Paraglide's declarations.
 //   node compile-time.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { selectedApps } from "./apps.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
+import { resolveTypeScript6, writeProject } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
 
 const RUNS = 3;
@@ -48,6 +47,7 @@ async function child(kind, ...args) {
 		return;
 	}
 	const [project, outdir, declarations, strategy, outputStructure] = args;
+	if (declarations === "true") resolveTypeScript6();
 	const { compile } = await import("@inlang/paraglide-js");
 	rmSync(outdir, { recursive: true, force: true });
 	const start = performance.now();
@@ -64,9 +64,9 @@ async function child(kind, ...args) {
 	console.log(JSON.stringify({ cold: performance.now() - start }));
 }
 
-function run(args, nodeOptions = []) {
+function run(args) {
 	return JSON.parse(
-		execFileSync(process.execPath, [...nodeOptions, self, "--child", ...args], {
+		execFileSync(process.execPath, [self, "--child", ...args], {
 			encoding: "utf8",
 			maxBuffer: 1 << 26,
 		})
@@ -80,22 +80,9 @@ const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const times = (count, measure) => Array.from({ length: count }, measure);
 
-/** Resolves `typescript` to TypeScript 6 in a child, for Paraglide's declaration emit. */
-function typescript6() {
-	const url = pathToFileURL(
-		createRequire(import.meta.url).resolve("typescript6"),
-	).href;
-	const hook = `export async function resolve(specifier, context, next) { return next(specifier === "typescript" ? ${JSON.stringify(url)} : specifier, context); }`;
-	return [
-		"--import",
-		`data:text/javascript,import { register } from "node:module"; register(${JSON.stringify(`data:text/javascript,${hook}`)});`,
-	];
-}
-
 if (process.argv[2] === "--child") {
 	await child(...process.argv.slice(3));
 } else {
-	const { writeProject } = await import("./paraglide.mjs");
 	for (const app of selectedApps()) {
 		const config = writeGraiProject(app, "compile-time");
 		const directory = join(config, "..");
@@ -120,17 +107,14 @@ if (process.argv[2] === "--child") {
 		const paraglide = (declarations, structure, count) =>
 			median(
 				times(count, () =>
-					run(
-						[
-							"paraglide",
-							project,
-							join(directory, "paraglide"),
-							declarations,
-							strategy,
-							structure,
-						],
-						declarations === "true" ? typescript6() : [],
-					),
+					run([
+						"paraglide",
+						project,
+						join(directory, "paraglide"),
+						declarations,
+						strategy,
+						structure,
+					]),
 				).map((result) => result.cold),
 			);
 		const paraglideRows = [
