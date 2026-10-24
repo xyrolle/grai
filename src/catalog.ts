@@ -12,8 +12,11 @@ export type Catalog = {
 	locale: string;
 	file: string;
 	messages: ReadonlyMap<string, unknown>;
-	/** For a catalog parsed from an edit: the catalog edited, and the keys the edit touched. */
-	edit?: { from: Catalog; keys: ReadonlySet<string> };
+	/**
+	 * For a catalog parsed from an edit: the catalog edited, the keys the edit touched, and whether
+	 * a key now starts on another line.
+	 */
+	edit?: { from: Catalog; keys: ReadonlySet<string>; moved: boolean };
 };
 
 /** The key the format reserves for the catalog's JSON schema; it is not a message. */
@@ -102,7 +105,7 @@ export function parseEditedCatalog(
 	edited.messages.delete(schemaKey);
 	return {
 		...withMessages(source, edited.messages),
-		edit: { from: previous, keys: edited.keys },
+		edit: { from: previous, keys: edited.keys, moved: edited.moved },
 	};
 }
 

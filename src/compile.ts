@@ -9,6 +9,7 @@ import {
 } from "./catalog.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
 import { type Config, readConfig } from "./config.ts";
+import { keyPositions, type Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
 import { type Rendered, renderOutput } from "./render.ts";
@@ -23,6 +24,8 @@ export type Build = {
 	hashes: readonly string[];
 	catalogs: readonly Catalog[];
 	compilation: Compilation;
+	/** Where each key is in the base locale's catalog, for the declaration maps. */
+	positions: ReadonlyMap<string, Position>;
 	rendered: Rendered;
 };
 
@@ -115,10 +118,20 @@ async function build(
 	if (compilation.errors.length > 0) {
 		return { result: { written: [], errors: [...compilation.errors] } };
 	}
+	const baseIndex = config.locales.indexOf(config.baseLocale);
+	const moved = basePositionsMoved(
+		catalogs[baseIndex],
+		previous?.catalogs[baseIndex],
+	);
+	const positions =
+		moved || previous === undefined
+			? keyPositions(sources[baseIndex]?.bytes.toString("utf8") ?? "")
+			: previous.positions;
 	const { output, rendered } = renderOutput(
 		config,
 		runtime,
 		compilation,
+		{ path: config.catalogs.get(config.baseLocale) ?? "", positions, moved },
 		previous?.rendered,
 	);
 	let written: string[];
@@ -135,7 +148,15 @@ async function build(
 	}
 	return {
 		result: { written, errors: [] },
-		build: { config, sources, hashes, catalogs, compilation, rendered },
+		build: {
+			config,
+			sources,
+			hashes,
+			catalogs,
+			compilation,
+			positions,
+			rendered,
+		},
 	};
 }
 
@@ -171,6 +192,17 @@ function parsed(
 	if (old === undefined || catalog === undefined) return parseCatalog(source);
 	if (old.bytes.equals(source.bytes)) return catalog;
 	return parseEditedCatalog(source, catalog, old.bytes);
+}
+
+/** Whether the base catalog's keys can start on other lines than in the previous build's. */
+function basePositionsMoved(
+	base: Catalog | undefined,
+	previous: Catalog | undefined,
+): boolean {
+	if (base === previous) return false;
+	return (
+		base?.edit === undefined || base.edit.from !== previous || base.edit.moved
+	);
 }
 
 /** What decides the output: the compiler's runtime, the config and every catalog's bytes. */

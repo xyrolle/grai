@@ -5,13 +5,15 @@
  * holds no raw line break. The bytes the edit changed lie between two such entry starts, so only
  * that span is parsed, in the old file and in the new. Returns undefined whenever that cannot be
  * shown exactly, for the caller to parse the whole file. With the messages come the keys whose
- * message the edit added, changed or removed.
+ * message the edit added, changed or removed, and whether any key now starts on another line.
  */
 export function editedMessages(
 	previousBytes: Buffer,
 	previous: ReadonlyMap<string, unknown>,
 	bytes: Buffer,
-): { messages: Map<string, unknown>; keys: Set<string> } | undefined {
+):
+	| { messages: Map<string, unknown>; keys: Set<string>; moved: boolean }
+	| undefined {
 	const indent = entryIndent(bytes);
 	if (indent === undefined) return undefined;
 	const marker = Buffer.from(`\n${indent}"`);
@@ -23,8 +25,10 @@ export function editedMessages(
 	const to = spanEnd(bytes, marker, bytes.length - suffix);
 	if (to === undefined) return undefined;
 	const grown = bytes.length - previousBytes.length;
-	const removed = entries(previousBytes.subarray(from + 1, to - grown));
-	const added = entries(bytes.subarray(from + 1, to));
+	const before = previousBytes.subarray(from + 1, to - grown);
+	const after = bytes.subarray(from + 1, to);
+	const removed = entries(before);
+	const added = entries(after);
 	if (removed === undefined || added === undefined) return undefined;
 	const removedKeys = Object.keys(removed);
 	const isPreviousSpan = removedKeys.every(
@@ -49,7 +53,11 @@ export function editedMessages(
 			keys.add(key);
 		}
 	}
-	return { messages, keys };
+	// Keys keep their lines when the span keeps its keys, in order, and its number of lines.
+	const moved =
+		removedKeys.join("\0") !== Object.keys(added).join("\0") ||
+		lineBreaks(before) !== lineBreaks(after);
+	return { messages, keys, moved };
 }
 
 /** The whitespace before the first key, if the object's first key starts a line. */
@@ -81,6 +89,13 @@ function entries(span: Buffer): Record<string, unknown> | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+function lineBreaks(bytes: Buffer): number {
+	let count = 0;
+	for (let at = bytes.indexOf(10); at !== -1; at = bytes.indexOf(10, at + 1))
+		count++;
+	return count;
 }
 
 /** Bytes compared at once, natively, before the first differing chunk is searched byte by byte. */
