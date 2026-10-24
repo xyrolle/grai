@@ -3,6 +3,7 @@ import { catalogEntries, withoutEntries } from "./catalog-entries.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
+import { isKeyName } from "./key-checks.ts";
 import { messageBindings, namespaceNames } from "./message-imports.ts";
 import {
 	namesIn,
@@ -28,7 +29,9 @@ export type FixResult = {
 /**
  * Removes from every catalog each key that no source file under the roots names, as `check`
  * counts a key named, and that no read by a computed name (`m[name]`, `m` used whole) may reach.
- * It writes every catalog or none, and none when one would be left without messages.
+ * A key that is no key name stays, since the scan finds only names and so cannot tell whether a
+ * source writes it (`m["sign-in"]`); check reports it as invalid. It writes every catalog or none,
+ * and none when one would be left without messages.
  */
 export async function removeUnusedKeys(
 	configFile: string,
@@ -51,7 +54,8 @@ export async function removeUnusedKeys(
 	const keys = new Set(
 		catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);
-	for (const key of [...keys].filter((key) => !names.has(key))) {
+	const unnamed = [...keys].filter((key) => isKeyName(key) && !names.has(key));
+	for (const key of unnamed) {
 		const reach = reads.find(({ prefix }) => key.startsWith(prefix));
 		if (reach === undefined) result.removed.push(key);
 		else reach.keys.push(key);
