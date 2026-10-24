@@ -1,13 +1,12 @@
-// The package as published: the TypeScript sources compiled into dist, with their declarations,
-// and the runtime's JavaScript beside them, as the compiler copies it into every output.
+// The package as published: the TypeScript sources compiled into dist, with their declarations.
+// The runtime's JavaScript ships as it is written, so scripts/build.ts copies it instead.
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"noEmit": false,
 		"outDir": "dist",
-		"rootDir": "src",
-		"allowJs": true,
-		"isolatedDeclarations": false
+		"rootDir": "src"
 	},
-	"include": ["src"]
+	"include": ["src"],
+	"exclude": ["src/runtime"]
 }
