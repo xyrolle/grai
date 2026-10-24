@@ -20,9 +20,14 @@
 		"node": ">=24"
 	},
 	"scripts": {
-		"check": "biome check ."
+		"check": "biome check .",
+		"typecheck": "tsc",
+		"test": "vitest run"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.6.2"
+		"@biomejs/biome": "2.6.2",
+		"@types/node": "24.19.2",
+		"typescript": "7.0.2",
+		"vitest": "5.0.5"
 	}
 }
