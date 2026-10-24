@@ -1,0 +1,8 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "grai-workers-example",
+	"main": "src/worker.js",
+	// From 2026-08-04, Workers have Node.js compatibility by default, and with it the
+	// AsyncLocalStorage that grai's middleware binds each request's locale through.
+	"compatibility_date": "2026-10-01"
+}
