@@ -4,7 +4,7 @@ import {
 	type Converted,
 	type ImportedMessage,
 	plainMessage,
-	pluralLocalName,
+	pluralLocal,
 	pluralOptionKeys,
 	type SourceEntry,
 } from "./converted.ts";
@@ -155,12 +155,12 @@ function convertPlural(
 /** The patterns, by plural option, as one message choosing on `count`, an exact 0 before its category. */
 function countChoice(patterns: ReadonlyMap<string, Pattern>): Converted {
 	const inputs = [...patterns.values()].flatMap(({ inputs }) => [...inputs]);
-	const local = pluralLocalName("count", new Set(inputs));
+	const local = pluralLocal("count", "cardinal", new Set(inputs));
 	return {
-		declarations: [`local ${local} = count: plural`],
-		selectors: patterns.has("=0") ? ["count", local] : [local],
+		declarations: [local.declaration],
+		selectors: patterns.has("=0") ? ["count", local.name] : [local.name],
 		branches: [...patterns].map(([option, { pattern }]) => ({
-			keys: new Map(pluralOptionKeys("count", local, option)),
+			keys: new Map(pluralOptionKeys("count", local.name, option)),
 			pattern,
 		})),
 	};

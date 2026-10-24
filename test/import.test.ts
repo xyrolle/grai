@@ -264,6 +264,28 @@ describe("grai import --from icu", () => {
 		expect(m.nested?.({ g: "x", n: 3 }, { locale: "ru" })).toBe("их коты");
 	});
 
+	it("converts selectordinal with # and =n into an ordinal plural", async () => {
+		const m = await imported("icu", {
+			"en.json": {
+				rank: "{n, selectordinal, =1 {first} one {#st} two {#nd} few {#rd} other {#th}}",
+			},
+			"ru.json": { rank: "{n, selectordinal, other {#-й}}" },
+		}).load();
+
+		expect([1, 2, 3, 4, 11, 21, 1002].map((n) => m.rank?.({ n }))).toEqual([
+			"first",
+			"2nd",
+			"3rd",
+			"4th",
+			"11th",
+			"21st",
+			"1,002nd",
+		]);
+		expect(m.rank?.({ n: 1000 }, { locale: "ru" })).toBe(
+			`${new Intl.NumberFormat("ru").format(1000)}-й`,
+		);
+	});
+
 	it("turns tags into markup and reads ICU's apostrophes", async () => {
 		const m = await imported(
 			"icu",
@@ -313,13 +335,12 @@ describe("grai import --from icu", () => {
 		expect(result.changed).toEqual([]);
 	});
 
-	it("leaves out a style it does not convert, ordinals and offsets", () => {
+	it("leaves out a style it does not convert, and offsets", () => {
 		const { result } = imported(
 			"icu",
 			{
 				"en.json": {
 					price: "{value, number, ::currency/EUR}",
-					rank: "{n, selectordinal, one {#st} other {#th}}",
 					others: "{n, plural, offset:1 other {# others}}",
 				},
 			},
@@ -330,7 +351,6 @@ describe("grai import --from icu", () => {
 			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
 		).toEqual([
 			"price: {value, number, ::currency/EUR} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
-			"rank: {n, selectordinal} picks an ordinal form, which grai does not support yet.",
 			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
 		]);
 	});
