@@ -48,20 +48,20 @@ export function declarationMap(
 	positions: ReadonlyMap<string, Position>,
 	column: number,
 ): string {
-	const lines: string[] = [];
+	// Each segment starts at the name's column, in the one source; then come the deltas of the line
+	// and the column in the catalog. A line without a declaration has no segment.
+	const start = `${vlq(column)}A`;
+	let mappings = "";
+	let line = 0;
 	let previous: Position = [0, 0];
-	for (const [key, line] of declarations) {
+	for (const [key, declared] of declarations) {
 		const position = positions.get(key);
 		if (position === undefined) continue;
-		while (lines.length < line) lines.push("");
-		lines.push(
-			[column, 0, position[0] - previous[0], position[1] - previous[1]]
-				.map(vlq)
-				.join(""),
-		);
+		mappings += `${";".repeat(declared - line)}${start}${vlq(position[0] - previous[0])}${vlq(position[1] - previous[1])}`;
+		line = declared;
 		previous = position;
 	}
-	return `${JSON.stringify({ version: 3, file, sources: [catalog], names: [], mappings: lines.join(";") })}\n`;
+	return `${JSON.stringify({ version: 3, file, sources: [catalog], names: [], mappings })}\n`;
 }
 
 /** The lines a text takes, counting the line its last line break ends. */
