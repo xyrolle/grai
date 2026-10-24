@@ -13,6 +13,7 @@
 	"friend": "A friend",
 	"friend_male": "A boyfriend",
 	"place_ordinal_one": "{{count}}st",
+	"place_ordinal_two": "{{count}}nd",
 	"place_ordinal_other": "{{count}}th",
 	"price": "Costs {{value, number}}",
 	"nested": {
