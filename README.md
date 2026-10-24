@@ -43,7 +43,7 @@ m.cart_total({ amount: 12.5 }); // "Total €12.50"
 ```
 
 `runtime.js` beside it has `getLocale`, `setLocale` and the URL helpers. Beyond `compile` and `watch`:
-- `grai check` reports problems, unused keys and untranslated ones, without writing anything;
+- `grai check` reports problems, unused keys and untranslated ones, without writing anything. A key that only tests name is unused; the config's `tests` globs say which files are tests;
 - `grai add` adds a key to every catalog that lacks it, at once;
 - `grai find`, `grai rename` and `grai check --fix` find a key's call sites, rename a key in every catalog and call site, and remove the keys no source names;
 - `grai seed`, `grai export` and `grai merge` take a locale's messages to translators as XLIFF 2.0, and their translations back;
@@ -116,6 +116,7 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `strategy` | Optional. Where the server looks for a request's locale, in order: `cookie`, `preferredLanguage` (its `Accept-Language`), `url` (its first path segment; the base locale has no prefix). |
 | `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. |
 | `switch` | Optional. How a page changes locale: `"reload"`, the default, reloads it, and `"live"` changes it in place (`docs/design.md`). |
+| `tests` | Optional. Globs, of `*`, `**`, `?` and `{a,b}`, of the source files that are tests, which `grai check` does not count as using a key. By default `**/*.{test,spec}.*` and `**/{test,tests,__tests__}/**`; `[]` makes no file a test. |
 
 ## Measured
 
