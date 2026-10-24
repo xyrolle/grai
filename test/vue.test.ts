@@ -1,5 +1,7 @@
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createSSRApp, h } from "vue";
+import { createSSRApp, defineComponent, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 import {
 	Markup,
@@ -87,5 +89,52 @@ describe("Markup", () => {
 			message:
 				'Markup has no function for the message\'s element "icon". Add icon to its markup.',
 		});
+	});
+});
+
+describe("a Vue server render through the output's middleware", () => {
+	it("renders interleaved requests each in its own locale, before and after a component awaits", async () => {
+		const { dir, load } = project(
+			{
+				en: { greeting: "Hello", cart: "{count} in your cart" },
+				ro: { greeting: "Bună ziua", cart: "{count} în coș" },
+			},
+			{ strategy: ["cookie"], cookieName: "lang" },
+		);
+		const { m } = await load();
+		const { middleware } = await import(
+			pathToFileURL(join(dir, "out", "server.js")).href
+		);
+		/** Each render's turn to go on after its await, released once every render waits. */
+		const turns: (() => void)[] = [];
+		const Page = defineComponent({
+			async setup() {
+				const before = m.greeting?.();
+				await new Promise<void>((resolve) => turns.push(resolve));
+				return () => h("p", `${before} / ${m.cart?.({ count: 2 })}`);
+			},
+		});
+		const render = (locale: string): Promise<string> =>
+			middleware(
+				new Request("https://shop.test/", {
+					headers: { cookie: `lang=${locale}` },
+				}),
+				async () => new Response(await renderToString(createSSRApp(Page))),
+			).then((response: Response) => response.text());
+		const locales = Array.from({ length: 24 }, (_, index) =>
+			index % 2 === 0 ? "en" : "ro",
+		);
+
+		const pages = Promise.all(locales.map(render));
+		await expect.poll(() => turns.length).toBe(locales.length);
+		for (const goOn of turns.toReversed()) goOn();
+
+		expect(await pages).toEqual(
+			locales.map((locale) =>
+				locale === "en"
+					? "<p>Hello / 2 in your cart</p>"
+					: "<p>Bună ziua / 2 în coș</p>",
+			),
+		);
 	});
 });
