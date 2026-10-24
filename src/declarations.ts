@@ -1,4 +1,5 @@
 import type { Config } from "./config.ts";
+import type { Format } from "./formats.ts";
 import type { LocaleMessage } from "./message.ts";
 import { catchAll } from "./selection.ts";
 
@@ -15,8 +16,9 @@ export function keyDeclaration(
 }
 
 /**
- * The inputs every locale accepts: a count is a number, a closed select takes the values it lists,
- * and anything else becomes text.
+ * The inputs every locale accepts: a count or a value formatted as a number is a number, a value
+ * formatted as a date is a Date or its time value, a closed select takes the values it lists, and
+ * anything else becomes text.
  */
 function inputsType(messages: readonly LocaleMessage[]): string {
 	const names = new Set(messages.flatMap((message) => [...message.inputs]));
@@ -28,11 +30,16 @@ function inputsType(messages: readonly LocaleMessage[]): string {
 }
 
 function inputType(name: string, messages: readonly LocaleMessage[]): string {
+	const formatters = new Set(
+		messages.flatMap((message) => formattersOf(name, message)),
+	);
 	if (
+		formatters.has("number") ||
 		messages.some((message) => [...message.plurals.values()].includes(name))
 	) {
 		return "number";
 	}
+	if (formatters.has("datetime")) return "Date | number";
 	let accepted: Set<string> | undefined;
 	for (const message of messages) {
 		const index = message.selectors.findIndex(
@@ -51,6 +58,25 @@ function inputType(name: string, messages: readonly LocaleMessage[]): string {
 	if (accepted === undefined) return "NonNullable<unknown>";
 	if (accepted.size === 0) return "never";
 	return [...accepted].sort(byValue).flatMap(literalTypes).join(" | ");
+}
+
+/** The formatters a message shows an input through: in a placeholder, or through a local. */
+function formattersOf(
+	name: string,
+	message: LocaleMessage,
+): Format["formatter"][] {
+	const formatters: Format["formatter"][] = [];
+	for (const local of message.formatted.values()) {
+		if (local.input === name) formatters.push(local.format.formatter);
+	}
+	for (const { pattern } of message.variants) {
+		for (const part of pattern) {
+			if (part.type === "variable" && part.name === name && part.format) {
+				formatters.push(part.format.formatter);
+			}
+		}
+	}
+	return formatters;
 }
 
 /** A key matches the values whose text it is: `1` and `"1"` for the key 1, `"a"` for the key a. */

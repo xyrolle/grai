@@ -135,3 +135,39 @@ console.log(texts);
 	// Line 3: a count passed to a message that takes no inputs.
 	expect(errors).toEqual(["3 TS2322"]);
 });
+
+it("types a value formatted as a number as a number, and one formatted as a date as a Date or its time value", async () => {
+	const { dir, compile } = project({
+		en: {
+			cart_total: "Total {amount :number style=currency currency=EUR}",
+			cart_price: [
+				{
+					declarations: ["input amount", "local price = amount: integer"],
+					selectors: [],
+					match: { "": "{price}" },
+				},
+			],
+			cart_shipped: "Shipped {when :date}",
+		},
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+const texts: string[] = [
+	m.cart_total({ amount: 12.5 }),
+	m.cart_price({ amount: 3 }),
+	m.cart_shipped({ when: new Date() }),
+	m.cart_shipped({ when: Date.now() }),
+];
+m.cart_total({ amount: "12.5" });
+m.cart_shipped({ when: "today" });
+console.log(texts);
+`,
+	);
+
+	// Lines 8 and 9: a number given as text, and a date given as text.
+	expect(errors).toEqual(["8 TS2322", "9 TS2322"]);
+});
