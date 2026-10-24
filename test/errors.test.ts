@@ -109,6 +109,17 @@ describe("the config", () => {
 		);
 	});
 
+	it("is an error when the outdir holds the config or a catalog, which grai would write over or hide", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { outdir: "." })).toEqual([
+			'config-invalid: grai.config.json: "outdir" must be a directory of grai\'s own, as all in it is grai\'s output, but "." holds grai.config.json.',
+		]);
+		expect(await errorsOf(catalogs, { outdir: "messages" })).toEqual([
+			'config-invalid: grai.config.json: "outdir" must be a directory of grai\'s own, as all in it is grai\'s output, but "messages" holds messages/en.json.',
+		]);
+	});
+
 	it("names a strategy it does not know, and a cookie strategy without its cookie", async () => {
 		const catalogs = { en: { title: "Title" } };
 
