@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { relative, resolve } from "node:path";
 import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+import { check } from "./check.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import type { GraiError } from "./error.ts";
@@ -10,6 +11,8 @@ const usage = `Usage: grai <command> [--config <file>]
 
   compile                      write the output, if the catalogs or config changed
   watch                        write it, then again on each change of a catalog or the config
+  check [--source <dir>]...    report every problem and write nothing: what compile reports,
+                               keys no source file names, inputs the locales do not agree on
 
 The config is grai.config.json in the current directory, unless --config names another file.`;
 
@@ -31,6 +34,18 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 			first = false;
 			if (!quiet) reported(config, result, milliseconds);
 		});
+		return 0;
+	},
+	async check(args) {
+		const { config, values } = parsed(args, {
+			source: { type: "string", multiple: true },
+		});
+		const sources = Array.isArray(values.source)
+			? values.source.map((source) => resolve(String(source)))
+			: undefined;
+		const errors = await check(config, sources);
+		if (errors.length > 0) return failed(errors);
+		console.log("grai: no problems");
 		return 0;
 	},
 };
