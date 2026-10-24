@@ -1,0 +1,99 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { recompile } from "../src/compile.ts";
+import { editedMessages } from "../src/edit.ts";
+import { project } from "./project.ts";
+
+const catalogs = {
+	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
+	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
+};
+
+/** A catalog as editors write it: one entry per line, indented by a tab. */
+const laidOut = (messages: Record<string, unknown>) =>
+	Buffer.from(JSON.stringify(messages, null, "\t"));
+
+describe("a recompile after an edit", () => {
+	it("compiles only the keys the edit touched, and writes only their shard", async () => {
+		const { dir, config } = project(catalogs);
+		const first = await recompile(config, undefined);
+		writeFileSync(
+			join(dir, "messages", "de.json"),
+			laidOut({ ...catalogs.de, title: "Überschrift" }),
+		);
+		const second = await recompile(config, first.build);
+
+		expect(second.result.written).toEqual(["keys/0.js"]);
+		expect([...(second.build?.compilation.changed ?? [])]).toEqual(["title"]);
+	});
+
+	it("starts again from the last good build after a compile that failed", async () => {
+		const { dir, config } = project(catalogs);
+		const good = await recompile(config, undefined);
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			laidOut({ ...catalogs.de, greeting: "Hallo { name }" }),
+		);
+		const failed = await recompile(config, good.build);
+		writeFileSync(
+			catalog,
+			laidOut({ ...catalogs.de, greeting: "Servus {name}" }),
+		);
+		const fixed = await recompile(config, failed.build ?? good.build);
+
+		expect(failed.result.errors.map((error) => error.key)).toEqual([
+			"greeting",
+		]);
+		expect(fixed.result.errors).toEqual([]);
+		expect(readFileSync(join(dir, "out", "keys", "0.js"), "utf8")).toContain(
+			"Servus $" + "{i.name}",
+		);
+	});
+});
+
+describe("the messages of an edited catalog", () => {
+	const before = { first: "One", second: ["variants"], third: "Three" };
+	const parse = (messages: Record<string, unknown>) =>
+		editedMessages(
+			laidOut(before),
+			new Map(Object.entries(before)),
+			laidOut(messages),
+		);
+
+	it("are those of a whole parse, from the entries the edit touched alone", () => {
+		const edits = [
+			{ ...before, second: ["other variants"] },
+			{ ...before, fourth: "Four" },
+			{ first: "One", second: ["variants"] },
+			{ first: "Uno", second: ["variants"], third: "Tres" },
+		];
+		for (const edit of edits) {
+			expect(Object.fromEntries(parse(edit)?.messages ?? [])).toEqual(edit);
+		}
+		expect([
+			...(parse({ first: "One", second: ["variants"] })?.keys ?? []),
+		]).toEqual(["third"]);
+	});
+
+	it("are left to a whole parse when the edit cannot be shown to touch whole entries", () => {
+		const oneLine = editedMessages(
+			Buffer.from(JSON.stringify(before)),
+			new Map(Object.entries(before)),
+			Buffer.from(JSON.stringify({ ...before, first: "Uno" })),
+		);
+		const duplicated = editedMessages(
+			laidOut(before),
+			new Map(Object.entries(before)),
+			Buffer.from(
+				laidOut(before)
+					.toString()
+					.replace('\t"third"', '\t"first": "Again",\n\t"third"'),
+			),
+		);
+
+		expect(oneLine).toBeUndefined();
+		expect(duplicated).toBeUndefined();
+	});
+});

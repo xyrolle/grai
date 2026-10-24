@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { relative } from "node:path";
 import { type Config, isMissing, isRecord } from "./config.ts";
+import { editedMessages } from "./edit.ts";
 import { GraiError } from "./error.ts";
 
 /** One locale's catalog file as read: its path relative to the project's root, and its bytes. */
@@ -11,6 +12,8 @@ export type Catalog = {
 	locale: string;
 	file: string;
 	messages: ReadonlyMap<string, unknown>;
+	/** For a catalog parsed from an edit: the catalog edited, and the keys the edit touched. */
+	edit?: { from: Catalog; keys: ReadonlySet<string> };
 };
 
 /** The key the format reserves for the catalog's JSON schema; it is not a message. */
@@ -83,6 +86,24 @@ export function parseCatalog({ locale, file, bytes }: CatalogSource): Catalog {
 		if (key !== schemaKey) messages.set(key, value[key]);
 	}
 	return withMessages({ locale, file }, messages);
+}
+
+/**
+ * Parses an edited catalog, only the entries the edit changed when it can, from the catalog
+ * parsed before the edit and the bytes it was parsed from.
+ */
+export function parseEditedCatalog(
+	source: CatalogSource,
+	previous: Catalog,
+	previousBytes: Buffer,
+): Catalog {
+	const edited = editedMessages(previousBytes, previous.messages, source.bytes);
+	if (edited === undefined) return parseCatalog(source);
+	edited.messages.delete(schemaKey);
+	return {
+		...withMessages(source, edited.messages),
+		edit: { from: previous, keys: edited.keys },
+	};
 }
 
 function withMessages(
