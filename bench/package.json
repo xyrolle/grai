@@ -18,7 +18,8 @@
 		"preload": "node preload.mjs",
 		"plurals": "node plurals.mjs",
 		"intl": "node intl.mjs",
-		"runtime-size": "node runtime-size.mjs"
+		"runtime-size": "node runtime-size.mjs",
+		"hmr": "node hmr.mjs"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.29.1",
