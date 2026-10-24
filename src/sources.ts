@@ -51,6 +51,15 @@ export function sourceFiles(
 	return files;
 }
 
+/** Each offset at which a text writes a name as a whole identifier, in strings and comments too. */
+export function occurrencesOf(text: string, name: string): number[] {
+	const pattern = new RegExp(
+		`(?<![\\w$])${name.replaceAll("$", "\\$")}(?![\\w$])`,
+		"g",
+	);
+	return [...text.matchAll(pattern)].map((match) => match.index);
+}
+
 /** Every identifier the files write: a key counts as named when it is one of them. */
 export function namesIn(files: readonly SourceFile[]): Set<string> {
 	const names = new Set<string>();
@@ -58,4 +67,47 @@ export function namesIn(files: readonly SourceFile[]): Set<string> {
 		for (const name of text.match(identifier) ?? []) names.add(name);
 	}
 	return names;
+}
+
+/** The line and column, both from 1, of an offset in a text. */
+export function positionOf(
+	text: string,
+	at: number,
+): { line: number; column: number } {
+	const lineStart = text.lastIndexOf("\n", at - 1) + 1;
+	let line = 1;
+	let index = text.indexOf("\n");
+	while (index !== -1 && index < at) {
+		line++;
+		index = text.indexOf("\n", index + 1);
+	}
+	return { line, column: at - lineStart + 1 };
+}
+
+/** The line an offset is on, without its line break. */
+export function lineAt(text: string, at: number): string {
+	const start = text.lastIndexOf("\n", at - 1) + 1;
+	const end = text.indexOf("\n", at);
+	return text.slice(start, end === -1 ? text.length : end).replace(/\r$/, "");
+}
+
+/** The offset of the last character before `at` that is not whitespace, or -1. */
+export function before(text: string, at: number): number {
+	let index = at - 1;
+	while (index >= 0 && /\s/.test(text[index] ?? "")) index--;
+	return index;
+}
+
+/** The offset of the first character from `at` that is not whitespace. */
+export function after(text: string, at: number): number {
+	let index = at;
+	while (index < text.length && /\s/.test(text[index] ?? "")) index++;
+	return index;
+}
+
+/** The identifier that ends at `end`, inclusive, or "" when none does. */
+export function nameEndingAt(text: string, end: number): string {
+	let start = end;
+	while (start >= 0 && /[\w$]/.test(text[start] ?? "")) start--;
+	return text.slice(start + 1, end + 1);
 }
