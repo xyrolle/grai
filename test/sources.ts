@@ -34,6 +34,9 @@ export function Header() {
 }
 `;
 
+/** A test's line that names a key, which check does not count, since a test ships nothing. */
+export const cartTest = 'expect(m.cart_title()).toBe("Your cart");\n';
+
 /** The module that re-exports the namespace for the app. */
 export const i18nTs = `import { m } from "../../out/messages.js";
 
