@@ -1,16 +1,21 @@
 // A performance smoke check for CI: compiles a synthetic catalog of 20,001 messages (6,667 keys in
-// three locales), then compiles it again unchanged, then edits one message at a time. It fails when
-// a step takes more than twice its baseline, the median of CI's runs, so it catches a regression
-// and not the noise of a shared runner.
+// three locales), then compiles it again unchanged, then edits one message at a time, then runs the
+// built CLI's compile from a fresh process on an empty outdir. It fails when a step takes more than
+// twice its baseline, the median of CI's runs, so it catches a regression and not the noise of a
+// shared runner.
 //
-// usage: node scripts/performance.ts
+// usage: pnpm build && node scripts/performance.ts
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { compile, recompile } from "../src/compile.ts";
 
-/** The median of three runs on CI's runner (153, 3.1 and 5.7 ms), rounded up. */
-const baselines = { cold: 160, noop: 4, edit: 6 };
+const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+
+/** The median of three runs on CI's runner, rounded up. */
+const baselines = { cold: 160, noop: 4, edit: 6, process: 400 };
 const keys = 6667;
 const edits = 15;
 
@@ -83,17 +88,23 @@ try {
 	}
 	const edit = times.toSorted((a, b) => a - b)[Math.floor(edits / 2)] ?? 0;
 
+	rmSync(join(dir, "out"), { recursive: true });
+	start = performance.now();
+	execFileSync(process.execPath, [cli, "compile", "--config", config]);
+	const fresh = performance.now() - start;
+
 	const steps: [string, number, number][] = [
 		["cold", cold, baselines.cold],
 		["noop", noop, baselines.noop],
 		["edit", edit, baselines.edit],
+		["process", fresh, baselines.process],
 	];
 	let failed = false;
 	for (const [step, measured, baseline] of steps) {
 		const over = measured > 2 * baseline;
 		failed ||= over;
 		console.log(
-			`${step.padEnd(5)} ${measured.toFixed(1).padStart(7)} ms   budget ${2 * baseline} ms${over ? "   over budget" : ""}`,
+			`${step.padEnd(7)} ${measured.toFixed(1).padStart(7)} ms   budget ${2 * baseline} ms${over ? "   over budget" : ""}`,
 		);
 	}
 	if (failed) process.exitCode = 1;
