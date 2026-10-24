@@ -61,12 +61,6 @@ App A runs on grai, and the README cites its numbers. On the client, a forced `{
 
 Done when: a local branch of app B on grai passes its own checks and tests, and the README cites its cold `dev` and one-message edit times.
 
-## A missing key's import in dev
-
-`docs/design.md` says a per-key path to a key that does not exist resolves, in dev, to a module whose export throws a `GraiError` naming the key, with the key in the overlay. The Vite plugin does not yet: such an import fails when the page links its modules.
-
-Done when: the Vite plugin serves that module and reports the key, with a test that a page importing a missing key loads and throws the `GraiError` only when the message is called.
-
 ## Import what `grai import` leaves out
 
 It leaves out ICU's currency and skeleton styles, which need their options mapped one by one. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
