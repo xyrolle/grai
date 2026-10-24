@@ -138,6 +138,40 @@ describe("grai seed", () => {
 	});
 });
 
+describe("grai export and merge", () => {
+	it("prints a locale's XLIFF, and merges it back, saying what it merged", async () => {
+		const { dir } = project({
+			en: { cart_title: "Your cart", cart_empty: "Empty" },
+			de: { cart_title: "Your cart", cart_empty: "Leer" },
+		});
+
+		const exported = await grai(dir, "export", "de", "--untranslated");
+		writeFileSync(
+			join(dir, "de.xlf"),
+			exported.stdout.replace(
+				"<source>Your cart</source>",
+				"<source>Your cart</source><target>Ihr Warenkorb</target>",
+			),
+		);
+		const merged = await grai(dir, "merge", "de.xlf");
+
+		expect(exported.code).toBe(0);
+		expect(exported.stdout).toMatch(
+			/^<\?xml version="1.0" encoding="UTF-8"\?>\n<xliff /,
+		);
+		expect(merged.code).toBe(0);
+		expect(merged.stdout).toMatch(
+			/^grai: merged 1 unit into 1 message of messages\/de\.json\ngrai: wrote 13 files in out/,
+		);
+		expect(
+			JSON.parse(readFileSync(join(dir, "messages", "de.json"), "utf8")),
+		).toEqual({
+			cart_title: "Ihr Warenkorb",
+			cart_empty: "Leer",
+		});
+	});
+});
+
 describe("grai add", () => {
 	it("adds a key with each locale's text to every catalog, in its layout, then compiles", async () => {
 		const { dir } = project(catalogs);
