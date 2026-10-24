@@ -66,9 +66,10 @@ export function getLocale() {
 
 /**
  * Sets the locale. In a request, for the rest of the request; in a script or a test, for the
- * process. In a browser, for the page: it keeps the locale where the server reads it (its cookie,
- * or its URL) and reloads, unless `{ reload: false }`, after which only the messages called next
- * are in the new locale.
+ * process. In a browser, for the page: it sets the page's `<html lang>` and `dir`, so the document
+ * and its messages never disagree, keeps the locale where the server reads it (its cookie, or its
+ * URL) and reloads, unless `{ reload: false }`, after which only the messages called next are in
+ * the new locale.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
@@ -79,6 +80,7 @@ export function setLocale(locale, options) {
 	current = index;
 	if (typeof document === "undefined") return;
 	document.documentElement.lang = locale;
+	document.documentElement.dir = directions[index] ?? "ltr";
 	if (strategy.includes("cookie")) {
 		// biome-ignore lint/suspicious/noDocumentCookie: the reload that follows must see it, and the Cookie Store API is asynchronous and not in every browser.
 		document.cookie = `${cookieName}=${locale}; path=/; max-age=34560000; samesite=lax`;

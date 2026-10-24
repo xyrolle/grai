@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { chromium } from "playwright-core";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { type Messages, project } from "./project.ts";
 
@@ -174,6 +176,39 @@ describe("in a browser", () => {
 			reloads: 1,
 			href: "https://shop.test/de/cart?step=2",
 		});
+	});
+
+	it("sets <html lang> and dir with setLocale, which without a reload renders the next messages in it", async () => {
+		const { dir, load } = project(catalogs);
+		await load();
+		const browser = await chromium.launch();
+		onTestFinished(() => browser.close());
+		const tab = await browser.newPage();
+		await tab.route("http://grai.test/**", (route) => {
+			const path = new URL(route.request().url()).pathname;
+			return path === "/"
+				? route.fulfill({
+						contentType: "text/html",
+						body: `<!doctype html><html lang="de" dir="ltr"><script type="module">
+import { m } from "/out/messages.js";
+import { getLocale, setLocale } from "/out/runtime.js";
+const seen = () => [document.documentElement.lang, document.documentElement.dir, getLocale(), m.title()].join(" ");
+const before = seen();
+setLocale("ar", { reload: false });
+document.body.textContent = before + " | " + seen();
+</script>`,
+					})
+				: route.fulfill({
+						contentType: "text/javascript",
+						body: readFileSync(join(dir, path)),
+					});
+		});
+		await tab.goto("http://grai.test/");
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+
+		expect(await tab.textContent("body")).toBe(
+			"de ltr de Ihr Warenkorb | ar rtl ar سلتك",
+		);
 	});
 
 	it("goes to the new locale's URL with the url strategy", async () => {
