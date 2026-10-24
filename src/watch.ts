@@ -15,7 +15,8 @@ import { GraiError } from "./error.ts";
 const settleMilliseconds = 20;
 
 /**
- * Compiles, then compiles again whenever the config or a catalog changes, and nothing else.
+ * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
+ * whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. A change is read once the files have been quiet for `settleMilliseconds`, and changes
  * that come during a compile are taken together by the next one. Each result is reported with
@@ -67,7 +68,9 @@ export function watch(
 			const started = performance.now();
 			try {
 				follow();
-				const next = await recompile(configFile, build);
+				const next = await recompile(configFile, build, {
+					pseudoLocale: true,
+				});
 				build = next.build ?? build;
 				if (!closed)
 					report(next.result, performance.now() - started, next.build);

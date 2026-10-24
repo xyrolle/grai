@@ -15,6 +15,7 @@ import { type Config, readConfig } from "./config.ts";
 import { keyPositions, type Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
+import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
@@ -79,6 +80,9 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	return result;
 }
 
+/** How a compile is for: development and tests take the config's pseudo-locale, a build never. */
+export type CompileOptions = { pseudoLocale?: boolean };
+
 /**
  * Compiles again after an edit: reads the config and catalogs, parses only the catalogs that
  * changed (and of those, only the entries the edit touched), compiles only the keys that changed,
@@ -87,6 +91,7 @@ export async function compile(configFile: string): Promise<CompileResult> {
 export async function recompile(
 	configFile: string,
 	previous: Build | undefined,
+	options: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
 	const read = await readProject(configFile);
 	if ("errors" in read) return { result: { written: [], errors: read.errors } };
@@ -103,7 +108,7 @@ export async function recompile(
 			? oldHash
 			: hash("sha1", source.bytes);
 	});
-	return build(read.config, read.sources, hashes, before);
+	return build(read.config, read.sources, hashes, before, options);
 }
 
 function sameConfig(a: Config, b: Config): boolean {
@@ -137,13 +142,19 @@ export async function readProject(
 }
 
 async function build(
-	config: Config,
+	configured: Config,
 	sources: readonly CatalogSource[],
 	hashes: readonly string[],
 	previous?: Build,
+	{ pseudoLocale = false }: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
-	const { catalogs, errors } = parseCatalogs(sources, previous);
-	if (errors.length > 0) return { result: { written: [], errors } };
+	const parsed = parseCatalogs(sources, previous);
+	if (parsed.errors.length > 0) {
+		return { result: { written: [], errors: parsed.errors } };
+	}
+	const { config, catalogs } = pseudoLocale
+		? withPseudoLocale(configured, parsed.catalogs, previous?.catalogs)
+		: { config: configured, catalogs: parsed.catalogs };
 	const compilation = compileCatalogs(config, catalogs, previous?.compilation);
 	if (compilation.errors.length > 0) {
 		return { result: { written: [], errors: [...compilation.errors] } };

@@ -7,6 +7,7 @@ import {
 	type IdenticalToBase,
 	readIdenticalToBase,
 } from "./identical-to-base.ts";
+import { categoriesOf, type PluralType } from "./plurals.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -29,6 +30,8 @@ export type Config = {
 	identicalToBase: IdenticalToBase;
 	/** Each locale that takes the messages it lacks from another of its language, and that locale. */
 	fallbacks: ReadonlyMap<string, string>;
+	/** A locale made from the base's messages for development and tests, which no build ships. */
+	pseudoLocale: string | undefined;
 };
 
 /**
@@ -57,6 +60,7 @@ const fields = new Set([
 	"tests",
 	"identicalToBase",
 	"fallbacks",
+	"pseudoLocale",
 ]);
 const localePlaceholder = "{locale}";
 /** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
@@ -98,6 +102,7 @@ export function readConfig(file: string): Config {
 		tests = conventionalTests,
 		identicalToBase = {},
 		fallbacks = {},
+		pseudoLocale,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -170,6 +175,10 @@ export function readConfig(file: string): Config {
 			'"fallbacks" must map a locale to the locale of its language it takes the messages it lacks from, such as { "en-GB": "en" }',
 		);
 	}
+	if (pseudoLocale !== undefined) {
+		const problem = pseudoLocaleProblem(pseudoLocale, locales, baseLocale);
+		if (problem !== undefined) throw invalid(problem);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -193,6 +202,7 @@ export function readConfig(file: string): Config {
 			invalid,
 		),
 		fallbacks: readFallbacks(fallbacks, locales, baseLocale, invalid),
+		pseudoLocale: typeof pseudoLocale === "string" ? pseudoLocale : undefined,
 	};
 }
 
@@ -200,6 +210,33 @@ export function readConfig(file: string): Config {
 function afterUrl(strategy: readonly Strategy[]): readonly Strategy[] {
 	const url = strategy.indexOf("url");
 	return url === -1 ? [] : strategy.slice(url + 1);
+}
+
+/**
+ * Why a pseudo-locale cannot be one, if it cannot: it must be a language tag of its own, and
+ * choose among the base's plural categories, since its messages are the base's.
+ */
+function pseudoLocaleProblem(
+	pseudoLocale: unknown,
+	locales: readonly string[],
+	baseLocale: string,
+): string | undefined {
+	if (
+		typeof pseudoLocale !== "string" ||
+		canonicalForm(pseudoLocale) !== pseudoLocale ||
+		locales.includes(pseudoLocale)
+	) {
+		return '"pseudoLocale" must be a BCP 47 language tag in its canonical form that "locales" does not list, such as "en-XA"';
+	}
+	const types: readonly PluralType[] = ["cardinal", "ordinal"];
+	for (const type of types) {
+		const own = categoriesOf(pseudoLocale, type).join(", ");
+		const base = categoriesOf(baseLocale, type).join(", ");
+		if (own !== base) {
+			return `"pseudoLocale" takes its plurals from ${baseLocale}, so it must have its ${type} categories, ${base}, and ${pseudoLocale} has ${own}. Name it after ${baseLocale}'s language, such as "${baseLocale.split("-")[0]}-XA"`;
+		}
+	}
+	return undefined;
 }
 
 function isStrategy(value: unknown): value is Strategy[] {
