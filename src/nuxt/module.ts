@@ -10,6 +10,7 @@ import type { NuxtModule } from "nuxt/schema";
 import { type CompileResult, compile } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import { grai } from "../vite.ts";
+import { localizedPages } from "./pages.ts";
 
 /** The module's options. `config` is the path of the project's grai.config.json, from its root. */
 export type GraiNuxtOptions = { config: string };
@@ -24,7 +25,8 @@ const output = "grai/nuxt/output";
  *
  * It compiles the catalogs before Nuxt builds anything, and grai/vite compiles again on each
  * edit in dev. A server middleware resolves each request's locale by the config's strategy, the
- * render binds it, and the page's `<html>` takes it with its direction.
+ * render binds it, and the page's `<html>` takes it with its direction. With the `url` strategy,
+ * every page is routed under each locale's prefix too.
  */
 const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 	meta: { name: "grai", configKey: "grai" },
@@ -35,6 +37,11 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		if (!nuxt.options.ssr) {
 			throw new Error(
 				"grai: grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
+			);
+		}
+		if (config.strategy.includes("url") && nuxt.options.app.baseURL !== "/") {
+			throw new Error(
+				`grai: the url strategy reads a locale from a path's first segment, and Nuxt's app.baseURL is ${nuxt.options.app.baseURL}. Serve the app from /, or use another strategy.`,
 			);
 		}
 		reported(await compile(configFile), nuxt.options.dev);
@@ -49,6 +56,11 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 			handler: runtime("./runtime/locale"),
 		});
 		addPlugin(runtime("./runtime/plugin"));
+		if (config.strategy.includes("url")) {
+			nuxt.hook("pages:resolved", (pages) => {
+				pages.push(...localizedPages(pages, config.locales, config.baseLocale));
+			});
+		}
 	},
 });
 export default module;
