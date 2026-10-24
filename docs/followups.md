@@ -26,11 +26,12 @@ The Vite plugin's server build writes each message function as a function expres
 
 Done when: such a server loads function expressions while the browser keeps arrows, and `startup`'s row for the compiler's output shows the gain.
 
-## Support more functions, number selection with digit options, and markup options
+## Support the MessageFormat 2 constructs that are still compile errors
 
 These are compile errors today:
 - selecting on a `:number` local whose options change its digits (`maximumFractionDigits`, significant digits, rounding, `notation`, `style`), which MessageFormat 2 selects on by the number those digits show;
-- `:percent`, `:currency` and `:unit`;
+- `:unit`'s `usage`, which converts the value into the locale's preferred units and which Intl cannot do;
+- an option's value taken from an input, such as Paraglide's `unit=$unit`, which a cached formatter per options cannot take;
 - markup options and attributes.
 
 Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
@@ -63,7 +64,7 @@ Done when: the Vite plugin serves that module and reports the key, with a test t
 
 ## Import what `grai import` leaves out
 
-It leaves out ICU's currency and skeleton styles and i18next's formats with options or other than `number` and `datetime`, which need their options mapped one by one. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+It leaves out ICU's currency and skeleton styles, which need their options mapped one by one. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
 
