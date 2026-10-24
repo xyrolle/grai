@@ -1,5 +1,4 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
-import { isKeyName } from "./compilation.ts";
 import {
 	type CompileResult,
 	compile,
@@ -8,6 +7,7 @@ import {
 } from "./compile.ts";
 import { isRecord } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
+import { isKeyName } from "./key-checks.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
 
