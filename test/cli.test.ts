@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -94,6 +94,64 @@ describe("grai check", () => {
 			stdout: "grai: no problems\n",
 			stderr: "",
 		});
+	});
+});
+
+describe("grai add", () => {
+	it("adds a key with each locale's text to every catalog, in its layout, then compiles", async () => {
+		const { dir } = project(catalogs);
+		const { code, stdout } = await grai(
+			dir,
+			"add",
+			"cart_empty",
+			"--en",
+			"Empty",
+			"--de",
+			"Leer",
+		);
+
+		expect(code).toBe(0);
+		expect(stdout).toMatch(/^grai: wrote 9 files in out/);
+		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
+			JSON.stringify({ ...catalogs.de, cart_empty: "Leer" }, null, "\t"),
+		);
+	});
+
+	it("writes nothing without every locale's text, for a key that exists, or for an invalid text", async () => {
+		const { dir } = project(catalogs);
+		const before = readFileSync(join(dir, "messages", "de.json"), "utf8");
+		const attempts = [
+			await grai(dir, "add", "cart_empty", "--en", "Empty"),
+			await grai(dir, "add", "cart_title", "--en", "Title", "--de", "Titel"),
+			await grai(
+				dir,
+				"add",
+				"cart_total",
+				"--en",
+				"Total {sum: number}",
+				"--de",
+				"Summe",
+			),
+		];
+
+		expect(
+			attempts.map(({ code, stderr }) => [code, stderr.split("\n")[0]]),
+		).toEqual([
+			[
+				1,
+				'messages/de.json: "cart_empty" (de): give the key\'s text in de too, with --de.',
+			],
+			[
+				1,
+				'messages/en.json: "cart_title": the key is already in the catalogs. Edit its messages there.',
+			],
+			[
+				1,
+				'messages/en.json: "cart_total" (en): the placeholder {sum: number} calls a function, which grai does not support yet. Write the value as {name} and format it before the call.',
+			],
+		]);
+		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(before);
+		expect(existsSync(join(dir, "out"))).toBe(false);
 	});
 });
 

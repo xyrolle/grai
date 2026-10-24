@@ -167,18 +167,18 @@ function caseCollisions(keys: Iterable<string>): Map<string, string> {
 	return collisions;
 }
 
-/** Whether a key can be compiled at all: an identifier, colliding with no other, in every locale. */
+/** Whether a key can name a message: a JavaScript identifier that is not a reserved word. */
+export function isKeyName(key: string): boolean {
+	return keyName.test(key) && !reservedWords.has(key);
+}
+
+/** Whether a key can be compiled at all: a key name, colliding with no other, in every locale. */
 function isCompilable(
 	key: string,
 	values: readonly unknown[],
 	collisions: ReadonlyMap<string, string>,
 ): boolean {
-	return (
-		keyName.test(key) &&
-		!reservedWords.has(key) &&
-		!collisions.has(key) &&
-		!values.includes(undefined)
-	);
+	return isKeyName(key) && !collisions.has(key) && !values.includes(undefined);
 }
 
 /** Why a key cannot be compiled at all: it is no identifier, collides with another, or a locale lacks it. */
@@ -190,7 +190,7 @@ function keyProblems(
 ): GraiError[] {
 	const file =
 		catalogs.find((catalog) => catalog.messages.has(key))?.file ?? "";
-	if (!keyName.test(key) || reservedWords.has(key)) {
+	if (!isKeyName(key)) {
 		return [
 			new GraiError(
 				"key-invalid",

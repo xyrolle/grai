@@ -9,6 +9,7 @@ export type GraiErrorCode =
 	| "catalog-empty"
 	| "key-invalid"
 	| "key-missing"
+	| "key-exists"
 	| "key-unused"
 	| "inputs-differ"
 	| "message-invalid"
