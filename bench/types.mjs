@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative } from "node:path";
 import { selectedApps } from "./apps.mjs";
-import { sampleCalls } from "./calls.mjs";
+import { sampleCalls, takesInputs } from "./calls.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
 import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput, resolveTypeScript6 } from "./paraglide.mjs";
@@ -61,14 +61,14 @@ declare module "i18next" {
 	);
 	const calls = sampleCalls(app, CALLS);
 	const values = (call, given = call.inputs) =>
-		call.kind === "text" ? "" : JSON.stringify(given);
+		takesInputs(call) ? JSON.stringify(given) : "";
 	const keyCalls = (write) =>
 		calls.map((call) => `\t${write(call)},`).join("\n");
 	const sources = {
 		grai: `import { m } from "./out/messages.js";\nexport const texts = [\n${keyCalls((call) => `m.${call.key}(${values(call)})`)}\n];\n`,
 		paraglide: `import { m } from "./${relative(directory, join(paraglide, "messages.js"))}";\nexport const texts = [\n${keyCalls((call) => `m.${call.key}(${values(call)})`)}\n];\n`,
-		i18next: `import i18next from "i18next";\nconst t = i18next.t;\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${call.kind === "text" ? "" : `, ${values(call, i18nextValues(app, call.key, call.inputs))}`})`)}\n];\n`,
-		"use-intl": `import { createTranslator } from "use-intl/core";\nimport messages from "./messages.json" with { type: "json" };\nconst t = createTranslator({ locale: ${JSON.stringify(locale)}, messages });\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${call.kind === "text" ? "" : `, ${values(call)}`})`)}\n];\n`,
+		i18next: `import i18next from "i18next";\nconst t = i18next.t;\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${takesInputs(call) ? `, ${values(call, i18nextValues(app, call.key, call.inputs))}` : ""})`)}\n];\n`,
+		"use-intl": `import { createTranslator } from "use-intl/core";\nimport messages from "./messages.json" with { type: "json" };\nconst t = createTranslator({ locale: ${JSON.stringify(locale)}, messages });\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${takesInputs(call) ? `, ${values(call)}` : ""})`)}\n];\n`,
 	};
 	const projects = [
 		["grai's declarations", "grai", [], "\nm."],
