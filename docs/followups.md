@@ -32,11 +32,35 @@ Neither reference app uses them, but they are common in MessageFormat 2 catalogs
 
 Done when: each compiles, with a test, and the design lists it among the constructs.
 
-## Bind the locale in Next.js server components
+## Bind the locale in Next's server actions and route handlers
 
-Next renders server components outside the middleware's call, so an `AsyncLocalStorage` binding set there does not reach them.
+React keeps no `cache` in a server action or a route handler, so there a message names its locale (`docs/design.md`). A form's error messages are the common case.
 
-Done when: the Next adapter binds the locale per request (React's request scope or Next's own), and a test renders two interleaved requests in different locales.
+Done when: a server action and a route handler render messages in the request's locale without naming it, with a test in the Next example.
+
+## Vary Next's responses by the headers the strategy reads
+
+With the `cookie` or `preferredLanguage` strategy, grai/next's proxy answers one URL in several locales, and a page Next renders ahead of time is sent as cacheable. A shared cache keyed by the URL alone then serves the first reader's locale to everyone. The proxy could add `Vary: Cookie` or `Accept-Language`, but Next writes its own `Vary` for its RSC requests, and whether it keeps the proxy's is not measured.
+
+Done when: a page served through a shared cache renders in each reader's locale under those strategies, with a test.
+
+## Ship one locale's client messages on Next.js
+
+A client component's messages ship with every locale's variants: one Next build serves every locale, and Next gives an adapter no way to point a page at one locale's chunks. On the bench's page, grai costs 6.6 KB brotli more than the same page with its words written in, for 100 client messages in three locales and the runtime (`docs/runtime.md`).
+
+Done when: a Next page's client chunks hold only its locale's variants, with a browser test that it loads no other locale's words.
+
+## Make Next's first compile of a page cheaper
+
+On the bench's page, `next dev`'s first response for the route takes 280–890 ms more with grai than with next-intl from an empty `.next`, and 66 ms more with it kept (`docs/runtime.md`): Turbopack compiles the whole output's 1.8 MB of message functions in each layer that imports them, server, server render and client, where next-intl's catalog is JSON.
+
+Done when: a profile of that compile names where the time goes, and either a change brings it level with next-intl's or the design records why it stays.
+
+## Report markup elements the base locale does not have
+
+`Markup` throws for an element the app does not draw, and the app draws the base locale's. A translation that adds an element then throws in that locale only.
+
+Done when: the compile, or `grai check`, reports a markup element that a locale names and the base locale does not.
 
 ## Prove the design on both reference apps
 
