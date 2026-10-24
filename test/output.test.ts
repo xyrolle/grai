@@ -33,6 +33,7 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"plurals.js",
 		"runtime.js",
 		"keys/0.d.ts",
+		"keys/0.d.ts.map",
 		"server.js",
 		"keys/0.js",
 		"keys.d.ts",

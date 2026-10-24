@@ -1,5 +1,7 @@
+import { join, relative } from "node:path";
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
+import { declarationMap, type Position } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule, pluralName } from "./plurals.ts";
@@ -11,7 +13,25 @@ export type Output = readonly (readonly (readonly [string, string])[])[];
 export type Rendered = {
 	files: ReadonlyMap<string, string>;
 	shards: readonly (readonly string[])[];
+	/** Each shard's keys, with the line of the shard's declarations each one is on. */
+	lines: readonly (readonly DeclarationLine[])[];
 };
+
+/** A key, and the line of its shard's declarations its declaration is on. */
+type DeclarationLine = readonly [key: string, line: number];
+
+/**
+ * The base locale's catalog, for the declaration maps: its path, where each key is in it, and
+ * whether that can differ from where the previous render had them.
+ */
+export type BaseCatalog = {
+	path: string;
+	positions: ReadonlyMap<string, Position>;
+	moved: boolean;
+};
+
+/** Where a shard's declarations put each key's name: after `export declare const `. */
+const nameColumn = "export declare const ".length;
 
 /** About how many keys a shard holds, so an edit rewrites one small module and its declarations. */
 const keysPerShard = 512;
@@ -24,6 +44,7 @@ export function renderOutput(
 	config: Config,
 	runtime: { runtime: string; server: string },
 	compilation: Compilation,
+	base: BaseCatalog,
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
 	const count = shardCount(compilation.keys.size);
@@ -38,20 +59,30 @@ export function renderOutput(
 				);
 	const declarations: [string, string][] = [];
 	const modules: [string, string][] = [];
+	const catalog = relative(join(config.outdir, "keys"), base.path);
+	const lines: (readonly DeclarationLine[])[] = [];
 	shards.forEach((keys, index) => {
+		lines[index] = [];
 		if (keys.length === 0) return;
-		const js = `keys/${index}.js`;
-		const dts = `keys/${index}.d.ts`;
-		const module = dirty.has(index) ? undefined : before?.files.get(js);
-		const declaration = dirty.has(index) ? undefined : before?.files.get(dts);
-		if (module !== undefined && declaration !== undefined) {
-			modules.push([js, module]);
-			declarations.push([dts, declaration]);
-			return;
-		}
-		const compiled = keys.flatMap((key) => compilation.keys.get(key) ?? []);
-		modules.push([js, shardModule(compiled)]);
-		declarations.push([dts, shardDeclarations(compiled)]);
+		const files = shardFiles(index);
+		const kept = dirty.has(index) ? undefined : keptShard(index, files, before);
+		const shard = kept ?? renderShard(index, keys, compilation);
+		const map =
+			kept !== undefined && !base.moved
+				? kept.map
+				: declarationMap(
+						`${index}.d.ts`,
+						catalog,
+						shard.lines,
+						base.positions,
+						nameColumn,
+					);
+		lines[index] = shard.lines;
+		modules.push([files.module, shard.module]);
+		declarations.push(
+			[files.declarations, shard.declarations],
+			[files.map, map],
+		);
 	});
 	const keysIndex = modules
 		.map(([file]) => `export * from "./${file}";\n`)
@@ -72,7 +103,10 @@ export function renderOutput(
 		],
 		[["messages.js", `export * as m from "./keys.js";\n`]],
 	];
-	return { output, rendered: { files: new Map(output.flat()), shards } };
+	return {
+		output,
+		rendered: { files: new Map(output.flat()), shards, lines },
+	};
 }
 
 /** Every key in its shard, each shard's keys sorted. */
@@ -118,14 +152,70 @@ function shardModule(keys: readonly CompiledKey[]): string {
 	return `${imports.join("")}\n${code}`;
 }
 
-function shardDeclarations(keys: readonly CompiledKey[]): string {
-	const types = keys.some((key) => key.markup)
-		? "MarkupMessage, Message"
-		: "Message";
-	const declarations = keys.map((key) => key.declaration).join("");
-	return `import type { ${types} } from "../runtime.js";\n\n${declarations}`;
+/** A shard's files: its module, its declarations and their map. */
+type ShardFiles = { module: string; declarations: string; map: string };
+
+/** A shard's module and declarations, its declarations' map, and the line of each declaration. */
+type Shard = ShardFiles & { lines: readonly DeclarationLine[] };
+
+function shardFiles(index: number): ShardFiles {
+	const declarations = `keys/${index}.d.ts`;
+	return {
+		module: `keys/${index}.js`,
+		declarations,
+		map: `${declarations}.map`,
+	};
 }
 
+/** A shard as the previous render left it, if it has all of its files. */
+function keptShard(
+	index: number,
+	files: ShardFiles,
+	previous: Rendered | undefined,
+): Shard | undefined {
+	const module = previous?.files.get(files.module);
+	const declarations = previous?.files.get(files.declarations);
+	const map = previous?.files.get(files.map);
+	const lines = previous?.lines[index];
+	return module === undefined ||
+		declarations === undefined ||
+		map === undefined ||
+		lines === undefined
+		? undefined
+		: { module, declarations, map, lines };
+}
+
+/** A shard's module and declarations, and the line each declaration is on, for its map. */
+function renderShard(
+	index: number,
+	keys: readonly string[],
+	compilation: Compilation,
+): Omit<Shard, "map"> {
+	const compiled: CompiledKey[] = [];
+	const types = keys.some((key) => compilation.keys.get(key)?.markup)
+		? "MarkupMessage, Message"
+		: "Message";
+	const parts = [`import type { ${types} } from "../runtime.js";\n\n`];
+	const lines: DeclarationLine[] = [];
+	let line = 2;
+	for (const name of keys) {
+		const key = compilation.keys.get(name);
+		if (key === undefined) continue;
+		compiled.push(key);
+		line += lineCount(key.declaration);
+		lines.push([name, line - 1]);
+		parts.push(key.declaration);
+	}
+	parts.push(`//# sourceMappingURL=${index}.d.ts.map\n`);
+	return { module: shardModule(compiled), declarations: parts.join(""), lines };
+}
+
+function lineCount(text: string): number {
+	let count = 0;
+	for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", at + 1))
+		count++;
+	return count;
+}
 /** A power of two, so a key changes shard only when the key count doubles. */
 function shardCount(keys: number): number {
 	let shards = 1;
