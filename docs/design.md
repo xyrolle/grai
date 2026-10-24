@@ -16,11 +16,11 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 - **The constructs are a deliberate subset:**
   - text and `{name}` placeholders;
   - markup: `{#tag}…{/tag}` and `{#tag/}`;
-  - variants: `declarations` (`input x`, `local y = x: plural`, `local y = x: plural type=ordinal`), `selectors` and `match`, with `*`, several selectors, and `""` for a message without selectors;
+  - variants: `declarations` (`input x`, `local y = x: plural`, `local y = x: plural type=ordinal`, and a `:number` or `:integer` local to select on), `selectors` and `match`, with `*`, several selectors, and `""` for a message without selectors;
   - formatting: `:number`, `:integer`, `:datetime`, `:date` and `:time` with their options, in a placeholder (`{x :number}`) or as a local (`local y = x: number`);
   - the escapes `\{`, `\}` and `\\`.
 
-  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:currency`, plural options other than `type`, selecting on a formatted value, nested keys, and markup options and attributes (`docs/followups.md`).
+  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:currency`, plural options other than `type`, selecting on a date or on a number its options round, nested keys, and markup options and attributes (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is a compile error naming the locales that lack it. A missing translation would otherwise ship as a failed import or as another locale's words.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
@@ -140,10 +140,15 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 
 - **`local n = count: plural` selects the CLDR cardinal category of `count`** for the message's locale, through a function compiled from CLDR's rules for that locale alone. A whole, non-negative count, the usual one, takes a path with the fraction operands folded away; any other count is rounded to three fraction digits first, as `Intl.PluralRules` rounds it. That is 4–11 ns a call against 124–249 ns for a cached `Intl.PluralRules` (`plurals`), and every locale agrees with `Intl.PluralRules` on 0–10,000, on fractions and on negative counts. The rules are CLDR 48's, from the `cldr-core` package, so a project's categories are the same on every engine; the compile checks the variants against them.
 - **`local n = count: plural type=ordinal` selects the CLDR ordinal category of `count`** (`one` for 1st, 21st, `two` for 2nd in `en`), compiled from CLDR's ordinal rules the same way, and Paraglide's `plural` takes the same option. Every locale agrees with `Intl.PluralRules` of type ordinal on 0–1,000 and on fractions. A language whose every count is `other`, as 66 of CLDR's 108 rank (`ru`, `de`) and 34 of its 224 count (`ja`, `zh`), gets a function that returns it without reading the count, so a bundle of it carries no operands.
+- **A `:number` or `:integer` local selects as MessageFormat 2's `:number` does.** A key that is a number matches a value equal to it, and a key that is a category matches the value's category: cardinal by default, ordinal with `select=ordinal`, and none with `select=exact`. An exact match comes before a category, so `n=1` is chosen for 1 over `n=one`. `:integer` rounds the value half away from zero first, as it shows it.
+  - A key is compared with the value as JavaScript writes the number, which is MessageFormat 2's serialization for a whole number. So `1.0` and `01` can never match, and they are compile errors, as is a fraction under `:integer`.
+  - A local whose options change its digits (`maximumFractionDigits`, significant digits, rounding, `notation`, `style`) is refused as a selector: MessageFormat 2 selects on the number those digits show, which a compiled rule cannot read. `signDisplay`, `useGrouping` and `numberingSystem` only change how it is written, and are taken.
+  - A date or time does not select, in MessageFormat 2 or in grai.
 - **A selector on an input matches a key when `String(value)` equals it.** That is MessageFormat 2's string selection, so `1` and `"1"` both match the key `1`.
-- **The variant is chosen by MessageFormat 2's preference:** among the variants whose every key matches, a literal key comes before `*`, selector by selector, and then the order written.
+- **The variant is chosen by MessageFormat 2's preference:** among the variants whose every key matches, a literal key comes before `*`, and a number's exact key before its category, selector by selector, and then the order written.
 - **A selection must be exhaustive, or it is a compile error:**
-  - every plural selector covers every CLDR category of its locale, or has `*`, and every combination is covered when there are several;
+  - every plural selector, and every number selector but an exact one, covers every CLDR category of its locale, or has `*`, and every combination is covered when there are several;
+  - an exact number selector has `*`, for the numbers its keys do not list;
   - a key that is not a category of the locale (`few` in `en`) is an error, because it can never be chosen.
 
   An uncovered count would otherwise render the key's name. Both reference catalogs already meet this rule.
