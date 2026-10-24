@@ -176,13 +176,13 @@ describe("a message", () => {
 		expect(
 			await errorsOf({
 				en: {
-					formatted: "Total {amount :currency}",
+					formatted: "Total {amount :string}",
 					link: "Read {#link href=|/terms|}the terms{/link}",
 					nested: { title: "Title" },
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "formatted" (en): {amount :currency} calls :currency, which grai does not support; the formatting functions are :number, :integer, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "formatted" (en): {amount :string} calls :string, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :datetime, :date, :time.',
 			'unsupported: messages/en.json: "link" (en): the markup {#link href=|/terms|} has options or attributes, which grai does not support yet. Write it as {#name}, {/name} or {#name/}.',
 			'unsupported: messages/en.json: "nested" (en): the value is an object of nested keys, which grai does not support. Flatten it into keys joined by _.',
 		]);
