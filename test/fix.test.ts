@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { check } from "../src/check.ts";
 import { fixLines, removeUnusedKeys } from "../src/fix.ts";
 import { project } from "./project.ts";
-import { cartSvelte, readText, writeSources } from "./sources.ts";
+import {
+	cartSvelte,
+	handLaid,
+	readText,
+	schemaEntry,
+	writeSources,
+} from "./sources.ts";
 
 const catalogs = {
 	en: {
@@ -41,6 +47,27 @@ describe("grai check --fix", () => {
 			JSON.stringify(kept, null, "\t"),
 		);
 		expect((await check(config)).problems).toEqual([]);
+	});
+
+	it("takes each unused entry out with the separator before it, leaving every other byte as it is written", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.tsx": "export const Promo = () => <p>{promo_spring()}</p>;\n",
+		});
+		const entries = [
+			schemaEntry,
+			'"cart_title":"Ihr Warenkorb"',
+			'"banner_old": "Ausverkauf!"',
+			'"cart_total" :  "{count} Artikel \\u00e9"',
+			'"promo_spring": "Frühlingsangebot"',
+		];
+		writeSources(dir, { "messages/de.json": handLaid(...entries) });
+
+		await removeUnusedKeys(config);
+
+		const kept = entries.filter((entry) => !entry.startsWith('"banner_old"'));
+		expect(readText(dir, "messages/de.json")).toBe(handLaid(...kept));
 	});
 
 	it("keeps a key that is no key name, which a source may write where the scan sees no name", async () => {
