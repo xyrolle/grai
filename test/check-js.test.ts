@@ -46,6 +46,19 @@ it.each([
 					cart_terms: "Read the {#link}terms{/link}",
 					cart_total: "Total {amount :number style=currency currency=EUR}",
 					cart_shipped: "Shipped {when :date}",
+					cart_place: [
+						{
+							declarations: [
+								"input n",
+								"local nOrdinal = n: plural type=ordinal",
+							],
+							selectors: ["nOrdinal"],
+							match: {
+								"nOrdinal=one": "{n}st in line",
+								"nOrdinal=*": "{n}th in line",
+							},
+						},
+					],
 				},
 				ar: {
 					cart_title: "سلة التسوق",
@@ -74,6 +87,16 @@ it.each([
 					cart_terms: "اقرأ {#link}الشروط{/link}",
 					cart_total: "المجموع {amount :number style=currency currency=EUR}",
 					cart_shipped: "شحن {when :date}",
+					cart_place: [
+						{
+							declarations: [
+								"input n",
+								"local nOrdinal = n: plural type=ordinal",
+							],
+							selectors: ["nOrdinal"],
+							match: { "nOrdinal=*": "الترتيب {n}" },
+						},
+					],
 				},
 			},
 			{ outdir: "src/lib/i18n", ...config },

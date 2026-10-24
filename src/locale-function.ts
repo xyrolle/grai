@@ -7,7 +7,7 @@ import { catchAll, type Selector } from "./selection.ts";
 
 type Mode = "string" | "parts";
 
-/** What a key's code calls: runtime functions, the plural functions of locales, and formatters. */
+/** What a key's code calls: runtime functions, plural functions and formatters, by name. */
 export type Used = {
 	uses: Set<RuntimeFunction>;
 	plurals: Set<string>;
@@ -87,12 +87,12 @@ export function localeFunction(
 		body = `${condition} ? ${pattern} : ${body}`;
 	}
 	const locals = [...message.plurals].filter(([name]) => reads.has(name));
-	if (locals.length > 0) used.plurals.add(message.locale);
 	const declarations = locals
-		.map(
-			([name, counted]) =>
-				`const $${name} = ${pluralName(message.locale, "cardinal")}(${value(counted)}); `,
-		)
+		.map(([name, { input, type }]) => {
+			const plural = pluralName(message.locale, type);
+			used.plurals.add(plural);
+			return `const $${name} = ${plural}(${value(input)}); `;
+		})
 		.join("");
 	const parameter = [...reads].some((name) => !message.plurals.has(name))
 		? "i"

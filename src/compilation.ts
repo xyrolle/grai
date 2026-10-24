@@ -22,7 +22,7 @@ export type CompiledKey = Pick<
 	/** The lines the declaration takes, for the declaration maps. */
 	declarationLines: number;
 	uses: ReadonlySet<RuntimeFunction>;
-	/** The locales whose plural function the key's code calls. */
+	/** The plural functions the key's code calls, by name. */
 	plurals: ReadonlySet<string>;
 	/** The formatters the key's code calls, by name. */
 	formats: KeyModule["formats"];

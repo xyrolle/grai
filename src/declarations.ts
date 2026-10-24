@@ -35,7 +35,9 @@ function inputType(name: string, messages: readonly LocaleMessage[]): string {
 	);
 	if (
 		formatters.has("number") ||
-		messages.some((message) => [...message.plurals.values()].includes(name))
+		messages.some((message) =>
+			[...message.plurals.values()].some((local) => local.input === name),
+		)
 	) {
 		return "number";
 	}

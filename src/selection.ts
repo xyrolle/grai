@@ -1,13 +1,13 @@
 import type { Part } from "./pattern.ts";
-import { categoriesOf } from "./plurals.ts";
+import { categoriesOf, type PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
 /** What a variant's key accepts for one selector: a literal value, or anything. */
 export const catchAll = "*";
 
-/** A selector: the plural category of an input, or an input's value itself. */
+/** A selector: the plural category of an input, by CLDR's rules of a type, or an input's value itself. */
 export type Selector =
-	| { kind: "plural"; name: string; input: string }
+	| { kind: "plural"; name: string; input: string; type: PluralType }
 	| { kind: "input"; name: string };
 
 export type Variant = { keys: readonly string[]; pattern: readonly Part[] };
@@ -41,12 +41,12 @@ export function selectionOf(
 		if (selector.kind === "input") {
 			return listsAny ? [...keys, otherValue] : [...keys];
 		}
-		const categories = categoriesOf(locale, "cardinal");
+		const categories = categoriesOf(locale, selector.type);
 		for (const key of keys) {
 			if (!categories.includes(key)) {
 				throw new MessageProblem(
 					"plural-category-unknown",
-					`"${key}" is not a plural category of ${locale}, so the variant ${selector.name}=${key} can never be chosen. Its categories are ${[...categories].join(", ")}.`,
+					`"${key}" is not ${selector.type === "ordinal" ? "an ordinal" : "a plural"} category of ${locale}, so the variant ${selector.name}=${key} can never be chosen. Its categories are ${[...categories].join(", ")}.`,
 				);
 			}
 		}
