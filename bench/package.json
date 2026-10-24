@@ -23,7 +23,8 @@
 		"call-sites": "node call-sites.mjs",
 		"startup": "node startup.mjs",
 		"library-bytes": "node library-bytes.mjs",
-		"compile-time": "node compile-time.mjs"
+		"compile-time": "node compile-time.mjs",
+		"types": "node types.mjs"
 	},
 	"devDependencies": {
 		"@formatjs/cli": "6.16.35",
