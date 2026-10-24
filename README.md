@@ -42,7 +42,7 @@ m.cart_title({}, { locale: "de" }); // the German text
 m.cart_total({ amount: 12.5 }); // "Total €12.50"
 ```
 
-`runtime.js` beside it has `getLocale`, `setLocale` and the URL helpers. Beyond `compile` and `watch`:
+`runtime.js` beside it has `getLocale`, `setLocale` and the URL helpers; `docs/api.md` lists the whole API. Beyond `compile` and `watch`:
 - `grai check` reports problems, unused keys and untranslated ones, without writing anything. A key that only tests name is unused; the config's `tests` globs say which files are tests;
 - `grai add` adds a key to every catalog that lacks it, at once;
 - `grai find`, `grai rename` and `grai check --fix` find a key's call sites, rename a key in every catalog and call site, and remove the keys no source names;
