@@ -382,3 +382,7 @@ Next runs the proxy apart from the render, renders a request's layouts and pages
   - `grai/react`: the `Markup` component;
   - the `grai` binary: the CLI.
 - **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next and React are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
+- **The changelog is written at release, from the commits since the last tag,** not by each pull request: two open pull requests that both add a line at its top conflict, and a conflicting pull request is replaced, not merged.
+  - Changesets avoids the conflict with a file per change, at the cost of a dependency and a step in every pull request, for one package with one releaser.
+  - pnpm's own change intents, tried with pnpm 12.15, did not bump 0.0.0 on a minor change and wrote the changelog under `.changeset/changelogs/` rather than `CHANGELOG.md`.
+- **A publish runs the whole gate first** (`prepublishOnly`), so nothing reaches npm that CI would fail.
