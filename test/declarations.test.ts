@@ -114,3 +114,24 @@ console.log(texts, parts, locale);
 		"19 TS2339",
 	]);
 });
+
+it("lets a message without inputs take none, so an input passed to it is a mistake at the call", async () => {
+	const { dir, compile } = project({
+		en: { cart_title: "Your cart" },
+		de: { cart_title: "Ihr Warenkorb" },
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+const texts: string[] = [m.cart_title(), m.cart_title({}), m.cart_title({}, { locale: "de" })];
+m.cart_title({ count: 1 });
+console.log(texts);
+`,
+	);
+
+	// Line 3: a count passed to a message that takes no inputs.
+	expect(errors).toEqual(["3 TS2322"]);
+});
