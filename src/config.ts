@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	relative,
+	resolve,
+	sep,
+} from "node:path";
 import { type Cookie, cookieFields, readCookie } from "./cookie.ts";
 import { GraiError } from "./error.ts";
 import { readFallbacks } from "./fallbacks.ts";
@@ -180,17 +187,27 @@ export function readConfig(file: string): Config {
 		);
 	}
 	const root = dirname(resolve(file));
+	const catalogPaths = new Map(
+		locales.map((locale) => [
+			locale,
+			resolve(root, catalogs.replaceAll(localePlaceholder, locale)),
+		]),
+	);
+	const out = resolve(root, outdir);
+	const held = [resolve(file), ...catalogPaths.values()].find((path) =>
+		isWithin(path, out),
+	);
+	if (held !== undefined) {
+		throw invalid(
+			`"outdir" must be a directory of grai's own, as all in it is grai's output, but "${outdir}" holds ${relative(root, held)}`,
+		);
+	}
 	return {
 		root,
 		locales,
 		baseLocale,
-		catalogs: new Map(
-			locales.map((locale) => [
-				locale,
-				resolve(root, catalogs.replaceAll(localePlaceholder, locale)),
-			]),
-		),
-		outdir: resolve(root, outdir),
+		catalogs: catalogPaths,
+		outdir: out,
 		strategy,
 		cookie,
 		switch: localeSwitch,
@@ -234,6 +251,16 @@ function pseudoLocaleProblem(
 		}
 	}
 	return undefined;
+}
+
+/** Whether a path is in a directory, at any depth. */
+function isWithin(path: string, directory: string): boolean {
+	const fromDirectory = relative(directory, path);
+	return (
+		fromDirectory !== ".." &&
+		!fromDirectory.startsWith(`..${sep}`) &&
+		!isAbsolute(fromDirectory)
+	);
 }
 
 function isStrategy(value: unknown): value is Strategy[] {
