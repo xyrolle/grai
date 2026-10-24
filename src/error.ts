@@ -63,3 +63,8 @@ export function sortErrors(errors: readonly GraiError[]): GraiError[] {
 function compare(a: string, b: string): number {
 	return a < b ? -1 : a > b ? 1 : 0;
 }
+
+/** The errors' messages, one per line, as a tool that shows one message prints them. */
+export function messagesOf(errors: readonly GraiError[]): string {
+	return errors.map((error) => error.message).join("\n");
+}

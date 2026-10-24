@@ -1,10 +1,11 @@
 // Server render: the message-heavy page (page.mjs) rendered by Svelte inside a request, with its
-// messages from Paraglide, from grai's server entry, from a per-locale module, or inlined into the
-// template. What inlining saves is what messages cost the render.
+// messages from Paraglide, from grai's server entry, from a per-locale module, inlined into the
+// template, or from i18next or use-intl. What inlining saves is what messages cost the render.
 //   node ssr.mjs [app...]
 import { join } from "node:path";
 import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
+import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import {
 	PAGE_CALLS,
@@ -21,15 +22,25 @@ async function serverVariants(app, locale) {
 	const paraglide = join(await paraglideOutput(app), "messages.js");
 	const prototype = writePrototype(app);
 	const localeModule = join(prototype, `${locale}.js`);
+	const { directory: libraries } = writeLibraryModules(app, locale);
 	return {
 		Paraglide: { from: paraglide },
-		"grai, one array index, locale from ALS": {
-			from: join(prototype, "server.js"),
+		"grai, shared dispatcher, ALS": {
+			from: join(prototype, "server-shared.js"),
 		},
 		"grai, per-locale module": { from: localeModule },
 		"inlined into the template": {
 			from: localeModule,
 			inline: app.messages[locale],
+		},
+		i18next: {
+			from: join(libraries, `${locale}.i18next.js`),
+			translate: true,
+			values: (call) => i18nextValues(app, call.key, call.inputs),
+		},
+		"use-intl": {
+			from: join(libraries, `${locale}.use-intl.js`),
+			translate: true,
 		},
 	};
 }
@@ -40,7 +51,6 @@ for (const app of selectedApps()) {
 	);
 	console.log("| variant | locale | ms per render | messages' share |");
 	console.log("|---|---|---|---|");
-	const props = pageProps(app);
 	for (const locale of [app.baseLocale, otherLocale(app)]) {
 		const results = [];
 		let expected;
@@ -48,6 +58,7 @@ for (const app of selectedApps()) {
 			await serverVariants(app, locale),
 		)) {
 			const file = `ssr-${locale}-${results.length}`;
+			const props = pageProps(app, variant.values);
 			const { default: Page } = await import(
 				writePage(app, file, pageSource(app, variant), "server")
 			);
@@ -68,7 +79,9 @@ for (const app of selectedApps()) {
 				),
 			]);
 		}
-		const inlined = results.at(-1)[1];
+		const inlined = results.find(
+			([name]) => name === "inlined into the template",
+		)[1];
 		for (const [name, ns] of results) {
 			console.log(
 				`| ${name} | ${locale} | ${formatNs(ns / 1e6)} | ${((100 * (ns - inlined)) / ns).toFixed(0)}% |`,
