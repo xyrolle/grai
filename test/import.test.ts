@@ -115,12 +115,12 @@ describe("grai import --from i18next", () => {
 			"en.json": {
 				title: "Cart",
 				see: "See $t(title)",
-				ago: "{{value, relativetime}}",
+				loud: "{{value, uppercase}}",
 			},
 			"ru.json": {
 				title: "Корзина",
 				see: "См. $t(title)",
-				ago: "{{value, relativetime}}",
+				loud: "{{value, uppercase}}",
 			},
 		});
 		const m = await load();
@@ -130,10 +130,10 @@ describe("grai import --from i18next", () => {
 		expect(result.leftOut).toEqual([
 			{
 				file: "source/en.json",
-				key: "ago",
+				key: "loud",
 				locales: ["en", "ru"],
 				detail:
-					"{{value, relativetime}} formats the value as relativetime, which grai import does not convert. Write it as {name :number} or {name :datetime} with the options it needs.",
+					"{{value, uppercase}} formats the value as uppercase, which grai import does not convert. Write it with one of grai's formatting functions.",
 			},
 		]);
 	});
@@ -185,6 +185,73 @@ describe("grai import --from i18next", () => {
 		expect(m.day?.({ value: when })).toBe(
 			`On ${new Intl.DateTimeFormat("en").format(when)}`,
 		);
+	});
+
+	it("formats with i18next's currency, relativetime, list and its formats' options as i18next does, through Intl", async () => {
+		const catalog = {
+			euro: "{{value, currency(EUR)}}",
+			yen: "{{value, currency(currency: JPY; minimumFractionDigits: 2; maximumFractionDigits: 2)}}",
+			signed: "{{value, currency(currency: EUR; signDisplay: always)}}",
+			digits: "{{value, number(minimumFractionDigits: 2)}}",
+			ago: "{{value, relativetime}}",
+			quarters: "{{value, relativetime(range: quarter; style: narrow)}}",
+			names: "{{names, list}}",
+			either: "{{names, list(type: disjunction)}}",
+			long: "{{value, datetime(dateStyle: long; timeZone: UTC)}}",
+			utc: "{{value, datetime(timeZone: UTC)}}",
+		};
+		const { catalog: written, load } = imported("i18next", {
+			"en.json": catalog,
+			"ru.json": catalog,
+		});
+		const m = await load();
+		const names = ["Ana", "Ion", "Maria"];
+		const when = Date.UTC(2026, 9, 24, 23, 5);
+		const intl = (options: Intl.NumberFormatOptions) =>
+			new Intl.NumberFormat("ru", options).format(-1234.5);
+
+		expect(
+			[m.euro, m.yen, m.signed, m.digits].map((message) =>
+				message?.({ value: -1234.5 }, { locale: "ru" }),
+			),
+		).toEqual([
+			intl({ style: "currency", currency: "EUR" }),
+			intl({
+				style: "currency",
+				currency: "JPY",
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2,
+			}),
+			intl({ style: "currency", currency: "EUR", signDisplay: "always" }),
+			intl({ minimumFractionDigits: 2 }),
+		]);
+		expect(m.ago?.({ value: -2 })).toBe(
+			new Intl.RelativeTimeFormat("en").format(-2, "day"),
+		);
+		expect(m.quarters?.({ value: 1 })).toBe(
+			new Intl.RelativeTimeFormat("en", { style: "narrow" }).format(
+				1,
+				"quarter",
+			),
+		);
+		expect([m.names, m.either].map((message) => message?.({ names }))).toEqual([
+			new Intl.ListFormat("en").format(names),
+			new Intl.ListFormat("en", { type: "disjunction" }).format(names),
+		]);
+		expect(
+			[m.long, m.utc].map((message) => message?.({ value: when })),
+		).toEqual([
+			new Intl.DateTimeFormat("en", {
+				dateStyle: "long",
+				timeZone: "UTC",
+			}).format(when),
+			new Intl.DateTimeFormat("en", { timeZone: "UTC" }).format(when),
+		]);
+		expect(written("en")).toMatchObject({
+			euro: "{value :currency currency=EUR}",
+			yen: "{value :currency currency=JPY fractionDigits=2}",
+			signed: "{value :number style=currency currency=EUR signDisplay=always}",
+		});
 	});
 
 	it("reports a plural form a locale lacks and a key that may be a context, which it imports as they are", () => {

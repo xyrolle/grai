@@ -1,5 +1,6 @@
 import { MessageProblem } from "../problem.ts";
 import { escapeText, textOf } from "./converted.ts";
+import { formatCall } from "./i18next-formats.ts";
 
 /** A grai pattern, with the inputs it reads. */
 export type Pattern = { pattern: string; inputs: ReadonlySet<string> };
@@ -14,9 +15,9 @@ const nestingLimit = 10;
 
 /**
  * An i18next string as a grai pattern: `{{name}}` and `{{- name}}` become a placeholder,
- * `{{value, number}}` and `{{value, datetime}}` one that formats alike, and `$t(key)` the text of a
- * message of the same file without inputs. Other formats, nested values and `$t()` with options
- * throw a MessageProblem.
+ * `{{value, number}}` and i18next's other built-in formats one that formats alike, and `$t(key)`
+ * the text of a message of the same file without inputs. Other formats, nested values and `$t()`
+ * with options throw a MessageProblem.
  */
 export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 	const text = textOf(value);
@@ -28,38 +29,19 @@ export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 		last = match.index + match[0].length;
 		const [written, placeholder, nested] = match;
 		if (placeholder !== undefined) {
-			const [read = "", format] = placeholder.split(",");
+			const comma = placeholder.indexOf(",");
+			const read = comma === -1 ? placeholder : placeholder.slice(0, comma);
 			const name = inputOf(read.trim().replace(/^-\s*/, ""), written);
 			pattern +=
-				format === undefined
+				comma === -1
 					? `{${name}}`
-					: `{${name} ${formatOf(format.trim(), written)}}`;
+					: `{${name} ${formatCall(placeholder.slice(comma + 1).trim(), written)}}`;
 			inputs.add(name);
 		} else {
 			pattern += nestedText(nested?.trim() ?? "", texts, depth);
 		}
 	}
 	return { pattern: pattern + escapeText(text.slice(last)), inputs };
-}
-
-/**
- * The MessageFormat 2 call that formats as i18next's built-in formats do without options: through
- * Intl.NumberFormat, and through Intl.DateTimeFormat with Intl's default fields.
- */
-const formats: Readonly<Record<string, string>> = {
-	number: ":number",
-	datetime: ":date year=numeric month=numeric day=numeric",
-};
-
-function formatOf(format: string, written: string): string {
-	const call = formats[format];
-	if (call === undefined) {
-		throw new MessageProblem(
-			"unsupported",
-			`${written} formats the value ${Object.hasOwn(formats, format.split("(")[0] ?? "") ? "with options" : `as ${format}`}, which grai import does not convert. Write it as {name :number} or {name :datetime} with the options it needs.`,
-		);
-	}
-	return call;
 }
 
 function inputOf(name: string, written: string): string {
