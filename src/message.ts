@@ -1,5 +1,8 @@
 import { isRecord } from "./config.ts";
-import { type Format, parseFormat } from "./format-options.ts";
+import {
+	type FormattedLocal,
+	parseDeclarations,
+} from "./message-declarations.ts";
 import { parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
@@ -22,15 +25,7 @@ export type LocaleMessage = {
 	markup: boolean;
 };
 
-/** A local such as `local price = amount: number style=currency currency=EUR`. */
-export type FormattedLocal = { input: string; format: Format };
-
 const messageFields = new Set(["declarations", "selectors", "match"]);
-const inputDeclaration = /^input\s+([A-Za-z_$][\w$]*)$/;
-const pluralDeclaration =
-	/^local\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*:\s*plural$/;
-const functionDeclaration =
-	/^local\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*:\s*(\S+)(.*)$/;
 
 /**
  * Parses a catalog value: a pattern string, or the format's one-element array of
@@ -91,16 +86,9 @@ function parseVariants(
 			);
 		}
 	}
-	const declared: string[] = [];
-	const plurals = new Map<string, string>();
-	const formatted = new Map<string, FormattedLocal>();
-	for (const text of stringList(value.declarations ?? [], "declarations")) {
-		const declaration = parseDeclaration(text);
-		if (declaration.kind === "input") declared.push(declaration.name);
-		else if (declaration.kind === "plural") {
-			plurals.set(declaration.name, declaration.input);
-		} else formatted.set(declaration.name, declaration);
-	}
+	const { declared, plurals, formatted } = parseDeclarations(
+		stringList(value.declarations ?? [], "declarations"),
+	);
 	const selectors = stringList(value.selectors ?? [], "selectors").map(
 		(name): Selector => {
 			if (formatted.has(name)) {
@@ -153,38 +141,6 @@ function parseMatch(match: unknown, selectors: readonly Selector[]): Variant[] {
 		variants.push({ keys, pattern: parsePattern(pattern) });
 	}
 	return variants;
-}
-
-/** A declaration: an input, a plural local of an input, or a formatted local of one. */
-type Declaration =
-	| { kind: "input"; name: string }
-	| { kind: "plural"; name: string; input: string }
-	| ({ kind: "format"; name: string } & FormattedLocal);
-
-function parseDeclaration(declaration: string): Declaration {
-	const text = declaration.trim();
-	const input = inputDeclaration.exec(text);
-	if (input?.[1] !== undefined) return { kind: "input", name: input[1] };
-	const plural = pluralDeclaration.exec(text);
-	if (plural?.[1] !== undefined && plural[2] !== undefined) {
-		return { kind: "plural", name: plural[1], input: plural[2] };
-	}
-	const [, name, operand, fn, options = ""] =
-		functionDeclaration.exec(text) ?? [];
-	if (name !== undefined && operand !== undefined && fn !== undefined) {
-		if (fn === "plural") {
-			throw new MessageProblem(
-				"unsupported",
-				`"${declaration}" passes options to plural, which grai does not support yet.`,
-			);
-		}
-		const format = parseFormat(fn, options, `"${declaration}"`);
-		return { kind: "format", name, input: operand, format };
-	}
-	throw new MessageProblem(
-		"message-invalid",
-		`"${declaration}" is not a declaration. Write "input name", "local namePlural = name: plural" or "local nameText = name: number".`,
-	);
 }
 
 /** Splits a variant key such as `a=one,b=*` into one key per selector, in selector order. */
