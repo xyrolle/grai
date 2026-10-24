@@ -1,3 +1,4 @@
+import type { Catalog } from "./catalog.ts";
 import { catalogWithMessages } from "./catalog-file.ts";
 import {
 	type CompileResult,
@@ -12,8 +13,9 @@ import { MessageProblem } from "./problem.ts";
 import { writeAll } from "./write-all.ts";
 
 /**
- * Adds a key to every catalog, with its text in each locale, then compiles. It writes nothing
- * unless every locale's text is given, the key is new, and every text is a valid message.
+ * Adds a key to every catalog that lacks it, with its text in each of those locales, then compiles.
+ * It writes nothing unless some catalog lacks the key, a text is given for each that does and for
+ * no other, and every text is a valid message.
  */
 export async function add(
 	configFile: string,
@@ -27,62 +29,98 @@ export async function add(
 	const base = catalogs.find(
 		(catalog) => catalog.locale === read.config.baseLocale,
 	);
-	const file = base?.file ?? "";
-	const problems: GraiError[] = [];
-	const existing = catalogs
-		.flatMap((catalog) => [...catalog.messages.keys()])
-		.find((other) => other.toLowerCase() === key.toLowerCase());
-	if (!isKeyName(key)) {
-		problems.push(
-			new GraiError(
-				"key-invalid",
-				{ file, key },
-				"a key must be a JavaScript identifier and not a reserved word. Use letters, digits, _ and $.",
-			),
-		);
-	} else if (existing !== undefined) {
-		problems.push(
-			existing === key
-				? new GraiError(
-						"key-exists",
-						{ file, key },
-						"the key is already in the catalogs. Edit its messages there.",
-					)
-				: new GraiError(
-						"key-invalid",
-						{ file, key },
-						`the key differs from "${existing}" only in case. Choose another name.`,
-					),
-		);
-	}
-	for (const catalog of catalogs) {
-		const text = texts[catalog.locale];
-		const where = { file: catalog.file, key, locale: catalog.locale };
-		if (text === undefined) {
-			problems.push(
-				new GraiError(
-					"key-missing",
-					where,
-					`give the key's text in ${catalog.locale} too, with --${catalog.locale}.`,
-				),
-			);
-			continue;
-		}
-		try {
-			parseMessage(catalog.locale, text);
-		} catch (error) {
-			if (!(error instanceof MessageProblem)) throw error;
-			problems.push(new GraiError(error.code, where, error.message));
-		}
-	}
+	const where = { file: base?.file ?? "", key };
+	const invalid = invalidName(key, catalogs, where);
+	const problems =
+		invalid === undefined ? textProblems(catalogs, texts, where) : [invalid];
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
 	const catalogTexts = new Map<string, string>();
 	for (const [locale, path] of read.config.catalogs) {
-		catalogTexts.set(
-			path,
-			catalogWithMessages(path, [[key, texts[locale] ?? ""]], path),
-		);
+		const text = texts[locale];
+		if (text !== undefined) {
+			catalogTexts.set(path, catalogWithMessages(path, [[key, text]], path));
+		}
 	}
 	writeAll(catalogTexts);
 	return compile(configFile);
+}
+
+/** Why the key cannot name a message, if it cannot: it is no identifier, or another key's case. */
+function invalidName(
+	key: string,
+	catalogs: readonly Catalog[],
+	where: { file: string; key: string },
+): GraiError | undefined {
+	if (!isKeyName(key)) {
+		return new GraiError(
+			"key-invalid",
+			where,
+			"a key must be a JavaScript identifier and not a reserved word. Use letters, digits, _ and $.",
+		);
+	}
+	const other = catalogs
+		.flatMap((catalog) => [...catalog.messages.keys()])
+		.find((name) => name !== key && name.toLowerCase() === key.toLowerCase());
+	return other === undefined
+		? undefined
+		: new GraiError(
+				"key-invalid",
+				where,
+				`the key differs from "${other}" only in case. Choose another name.`,
+			);
+}
+
+/**
+ * What is wrong with the texts: the key is in every catalog already, a catalog that lacks it has
+ * no text or an invalid one, or one that has it is given a text.
+ */
+function textProblems(
+	catalogs: readonly Catalog[],
+	texts: Readonly<Record<string, string>>,
+	{ file, key }: { file: string; key: string },
+): GraiError[] {
+	if (catalogs.every((catalog) => catalog.messages.has(key))) {
+		return [
+			new GraiError(
+				"key-exists",
+				{ file, key },
+				"the key is already in the catalogs. Edit its messages there.",
+			),
+		];
+	}
+	return catalogs.flatMap(
+		(catalog) => textProblem(catalog, key, texts[catalog.locale]) ?? [],
+	);
+}
+
+/** What is wrong with one catalog's text, if anything. */
+function textProblem(
+	catalog: Catalog,
+	key: string,
+	text: string | undefined,
+): GraiError | undefined {
+	const where = { file: catalog.file, key, locale: catalog.locale };
+	if (catalog.messages.has(key)) {
+		return text === undefined
+			? undefined
+			: new GraiError(
+					"key-exists",
+					where,
+					`the key is already in ${catalog.locale}. Edit its message there, and give a text only for the locales that lack the key.`,
+				);
+	}
+	if (text === undefined) {
+		return new GraiError(
+			"key-missing",
+			where,
+			`give the key's text in ${catalog.locale} too, with --${catalog.locale}.`,
+		);
+	}
+	try {
+		parseMessage(catalog.locale, text);
+		return undefined;
+	} catch (error) {
+		if (!(error instanceof MessageProblem)) throw error;
+		return new GraiError(error.code, where, error.message);
+	}
 }
