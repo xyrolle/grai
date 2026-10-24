@@ -325,6 +325,17 @@ document.body.textContent = before + " | " + seen();
 	});
 });
 
+it("localizes a home page without a trailing slash, as a framework would redirect to drop it", async () => {
+	const { runtime } = await output({ strategy: ["url"] });
+
+	expect([
+		runtime.localizeHref("/", { locale: "de" }),
+		runtime.localizeHref("/?step=2#total", { locale: "de" }),
+		runtime.localizeHref("/de", { locale: "en" }),
+		runtime.localizeHref("/cart/", { locale: "de" }),
+	]).toEqual(["/de", "/de?step=2#total", "/", "/de/cart/"]);
+});
+
 it("localizes paths and URLs by their first segment under the url strategy, the base locale having none", async () => {
 	const { runtime } = await output({ strategy: ["url"] });
 	runtime.setLocale("de", { reload: false });

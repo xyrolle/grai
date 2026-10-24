@@ -192,7 +192,10 @@ export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
 	if (urlsNameLocales && locale !== baseLocale) {
-		copy.pathname = `/${locale}${copy.pathname}`;
+		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
+		// redirect to drop it.
+		const path = copy.pathname === "/" ? "" : copy.pathname;
+		copy.pathname = `/${locale}${path}`;
 	}
 	return copy;
 }
