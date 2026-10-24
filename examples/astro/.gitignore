@@ -1,0 +1,4 @@
+dist
+dist-server
+.astro
+src/lib/i18n

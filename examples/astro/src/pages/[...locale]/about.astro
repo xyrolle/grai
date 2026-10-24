@@ -1,0 +1,10 @@
+---
+import { m } from "#lib/i18n/messages.js";
+import Page from "../../layouts/Page.astro";
+
+export { getStaticPaths } from "../../locale-paths.ts";
+---
+
+<Page title={m.about_title()} path="about">
+	<h1>{m.about_title()}</h1>
+</Page>
