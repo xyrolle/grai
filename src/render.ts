@@ -1,0 +1,91 @@
+import type { Compilation, CompiledKey } from "./compilation.ts";
+import type { Config } from "./config.ts";
+import { runtimeDeclarations } from "./declarations.ts";
+import type { RuntimeFunction } from "./modules.ts";
+
+/** The output's files, level by level: a file imports only files of earlier levels. */
+export type Output = readonly (readonly (readonly [string, string])[])[];
+
+/** About how many keys a shard holds, so an edit rewrites one small module and its declarations. */
+const keysPerShard = 512;
+
+/**
+ * Renders the output. The keys are split into shards by a hash of their name, so a key stays in
+ * its shard while others come and go.
+ */
+export function renderOutput(
+	config: Config,
+	runtimeSource: string,
+	compilation: Compilation,
+): Output {
+	const shards = groupKeys(
+		compilation.keys.keys(),
+		shardCount(compilation.keys.size),
+	);
+	const declarations: [string, string][] = [];
+	const modules: [string, string][] = [];
+	shards.forEach((keys, index) => {
+		if (keys.length === 0) return;
+		const compiled = keys.flatMap((key) => compilation.keys.get(key) ?? []);
+		modules.push([`keys/${index}.js`, shardModule(compiled)]);
+		declarations.push([`keys/${index}.d.ts`, shardDeclarations(compiled)]);
+	});
+	const keysIndex = modules
+		.map(([file]) => `export * from "./${file}";\n`)
+		.join("");
+	return [
+		[
+			[
+				"config.js",
+				`export const locales = ${JSON.stringify(config.locales)};\nexport const baseLocale = ${JSON.stringify(config.baseLocale)};\n`,
+			],
+			["runtime.d.ts", runtimeDeclarations(config)],
+		],
+		[["runtime.js", runtimeSource], ...declarations],
+		[...modules, ["keys.d.ts", keysIndex]],
+		[
+			["keys.js", keysIndex],
+			["messages.d.ts", `export * as m from "./keys.js";\n`],
+		],
+		[["messages.js", `export * as m from "./keys.js";\n`]],
+	];
+}
+
+/** Every key in its shard, each shard's keys sorted. */
+function groupKeys(keys: Iterable<string>, count: number): string[][] {
+	const shards = Array.from({ length: count }, (): string[] => []);
+	for (const key of keys) shards[shardOf(key, count)]?.push(key);
+	for (const shard of shards) shard.sort();
+	return shards;
+}
+
+function shardModule(keys: readonly CompiledKey[]): string {
+	const uses = new Set<RuntimeFunction>();
+	for (const key of keys) for (const name of key.uses) uses.add(name);
+	const code = keys.map((key) => key.code).join("");
+	return `import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n\n${code}`;
+}
+
+function shardDeclarations(keys: readonly CompiledKey[]): string {
+	const types = keys.some((key) => key.markup)
+		? "MarkupMessage, Message"
+		: "Message";
+	const declarations = keys.map((key) => key.declaration).join("");
+	return `import type { ${types} } from "../runtime.js";\n\n${declarations}`;
+}
+
+/** A power of two, so a key changes shard only when the key count doubles. */
+function shardCount(keys: number): number {
+	let shards = 1;
+	while (shards * keysPerShard < keys) shards *= 2;
+	return shards;
+}
+
+/** The shard of a key: its name's FNV-1a hash, modulo the shard count. */
+function shardOf(key: string, shards: number): number {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < key.length; index++) {
+		hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193);
+	}
+	return (hash >>> 0) % shards;
+}

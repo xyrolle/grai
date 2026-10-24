@@ -21,7 +21,7 @@
 	},
 	"scripts": {
 		"check": "biome check .",
-		"typecheck": "tsc",
+		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
 		"test": "vitest run"
 	},
 	"devDependencies": {

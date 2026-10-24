@@ -1,0 +1,12 @@
+// The runtime is JavaScript the compiler copies into every project's output, so it is checked
+// as JavaScript, on its own: allowJs cannot go with tsconfig.json's isolatedDeclarations.
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"isolatedDeclarations": false,
+		"declaration": false
+	},
+	"include": ["src/runtime"]
+}
