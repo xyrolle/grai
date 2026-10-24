@@ -153,6 +153,32 @@ One message edited in a catalog until the page shows it, through Vite's dev serv
 
 Vite's watcher alone takes 48–114 ms to report a save, and `fs.watch` 3–10 ms. With a patch, the browser's part is 2–3 ms whatever the module's size.
 
+## Next.js
+
+One App Router page, on grai, on next-intl 4.14 and with its words written in (`nextjs`, from `bench/next-apps.mjs`). It renders 400 messages in a server component and 100 in a client component, chosen evenly across the synthetic catalog, so it has the catalog's share of plurals and inputs, in `ru`. Next 16.4 with Turbopack, Chromium 156. next-intl's provider sends a client component every message of the locale unless the app picks them, so it is measured both ways. The bench installs grai from the repository's build, so it runs after `pnpm build` at the root.
+
+What the page downloads, brotli:
+
+| | document | scripts | total | more than the words written in |
+|---|---|---|---|---|
+| grai | 9.2 KB | 120.6 KB | 129.8 KB | 6.7 KB |
+| next-intl, its default provider | 106.3 KB | 124.0 KB | 230.3 KB | 107.3 KB |
+| next-intl, the client's keys picked | 10.5 KB | 124.0 KB | 134.4 KB | 11.4 KB |
+| words written in | 9.2 KB | 113.8 KB | 123.1 KB | |
+
+The server component's messages cost grai nothing beyond their HTML. The 6.7 KB is the runtime and the client component's 100 messages, each with all three locales' variants: Turbopack left out every other key of the catalog.
+
+`next dev`, until ready and until the page's first response, from an empty `.next` and from the last run's; then one message edited in its catalog until the page shows it, the median of 7 edits, ms. One run, under a load of 13–20 from other work, which moves the first responses and the edits by hundreds of milliseconds for both:
+
+| | ready, empty `.next` | page | ready, `.next` kept | page | edit, server component | edit, client component |
+|---|---|---|---|---|---|---|
+| grai | 317 | 2,468 | 302 | 1,261 | 428 | 2,033 |
+| next-intl | 249 | 2,383 | 314 | 1,063 | 1,577 | 654 |
+
+- **grai's share of the start** is `withGrai`'s work when `next dev` asks for its config, its import included: 30 ms with the output current, as on every start after the first, and 138 ms from an empty outdir, which compiles and writes it. The watch's first compile, which later edits start from, runs while Next starts.
+- **An edit** reaches the shard grai rewrites in 27–28 ms, 20 of them waiting for the save to settle (`watch.ts`). The rest is Next noticing the shard and refreshing the page, as it notices and refreshes next-intl's catalog.
+- **The page's first response** from an empty `.next` is slower on grai, here by 85 ms, and by 198 ms with `.next` kept: Turbopack compiles the output's 1.8 MB of message functions in each layer that imports them, where next-intl's catalog is JSON (`docs/followups.md`).
+
 ## Runtime size
 
 The runtime the apps call (`getLocale`, `setLocale`, `locales`, `baseLocale`, `isLocale`, `localizeHref`, `deLocalizeUrl`), bundled for the browser (`runtime-size`): Paraglide's is 2,132 bytes min+gzip with a cookie strategy and 1,881 with a URL strategy, and a sketch with the locale fixed per bundle is 378.
