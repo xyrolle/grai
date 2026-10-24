@@ -45,7 +45,10 @@ export function isCompilable(
 	return isKeyName(key) && !collisions.has(key) && !values.includes(undefined);
 }
 
-/** Why a key cannot be compiled at all: it is no identifier, collides with another, or a locale lacks it. */
+/**
+ * Why a key cannot be compiled at all: it is no identifier, collides with another, or locales lack
+ * it, which is one error naming them all and the command that adds the key to them.
+ */
 export function keyProblems(
 	key: string,
 	catalogs: readonly Catalog[],
@@ -73,15 +76,19 @@ export function keyProblems(
 			),
 		];
 	}
-	const present = catalogs.filter((_, index) => values[index] !== undefined);
-	return catalogs
+	const present = catalogs
+		.filter((_, index) => values[index] !== undefined)
+		.map((catalog) => catalog.locale)
+		.join(", ");
+	const missing = catalogs
 		.filter((_, index) => values[index] === undefined)
-		.map(
-			(catalog) =>
-				new GraiError(
-					"key-missing",
-					{ file: catalog.file, key, locale: catalog.locale },
-					`the key is in ${present.map((other) => other.locale).join(", ")} but not in ${catalog.locale}. Add it to every catalog, or remove it from all.`,
-				),
-		);
+		.map((catalog) => catalog.locale);
+	const command = `grai add ${key} ${missing.map((locale) => `--${locale} "…"`).join(" ")}`;
+	return [
+		new GraiError(
+			"key-missing",
+			{ file, key },
+			`the key is in ${present} but not in ${missing.join(", ")}. Add it to them with ${command}, or remove it from ${present}.`,
+		),
+	];
 }
