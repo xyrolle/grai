@@ -44,16 +44,24 @@ let current = locales.indexOf(
 );
 
 /**
+ * A request's locale, by its position in `locales`. The middleware binds one per request, and
+ * `setLocale` in the request changes it in place: Workers have no `enterWith` to bind another,
+ * and Node marks it experimental.
+ *
+ * @typedef {{ index: number }} RequestLocale
+ */
+
+/**
  * Where the server keeps each request's locale, set by server.js.
  *
- * @type {{ getStore(): number | undefined, enterWith(index: number): void } | undefined}
+ * @type {{ getStore(): RequestLocale | undefined } | undefined}
  */
 let requests;
 
 /**
  * Lets server.js bind each request's locale. Not for apps: they bind it through the middleware.
  *
- * @param {{ getStore(): number | undefined, enterWith(index: number): void }} storage
+ * @param {{ getStore(): RequestLocale | undefined }} storage
  */
 export function bindRequests(storage) {
 	requests = storage;
@@ -61,7 +69,7 @@ export function bindRequests(storage) {
 
 /** The position in `locales` of the bound locale: the request's, else the one outside a request. */
 function bound() {
-	return requests?.getStore() ?? current;
+	return requests?.getStore()?.index ?? current;
 }
 
 /** @returns {string} */
@@ -81,7 +89,11 @@ export function getLocale() {
  */
 export function setLocale(locale, options) {
 	const index = locales.indexOf(assertIsLocale(locale));
-	if (requests?.getStore() !== undefined) return requests.enterWith(index);
+	const request = requests?.getStore();
+	if (request !== undefined) {
+		request.index = index;
+		return;
+	}
 	current = index;
 	if (!page) return;
 	document.documentElement.lang = locale;

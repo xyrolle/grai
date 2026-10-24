@@ -89,35 +89,59 @@ describe("the middleware", () => {
 		).toEqual(["en", "Your cart"]);
 	});
 
-	it("keeps each request's locale while requests interleave", async () => {
-		const { m, middleware } = await output(config);
+	/**
+	 * Each request's title before and after an await, every request started before any renders
+	 * again. A request with `switchTo` calls setLocale before it awaits.
+	 */
+	const interleaved = async (
+		{ m, runtime, middleware }: Awaited<ReturnType<typeof output>>,
+		requests: { cookie: string; switchTo?: string }[],
+	) => {
 		let release = () => {};
 		const allStarted = new Promise<void>((resolve) => {
 			release = resolve;
 		});
 		let started = 0;
-		const render = async (cookie: string) =>
-			(
-				await middleware(
-					new Request("https://shop.test/", { headers: { cookie } }),
-					async () => {
-						const before = m.title?.();
-						if (++started === 3) release();
-						await allStarted;
-						return Response.json([before, m.title?.()]);
-					},
-				)
-			).json();
+		return Promise.all(
+			requests.map(async ({ cookie, switchTo }) =>
+				(
+					await middleware(
+						new Request("https://shop.test/", { headers: { cookie } }),
+						async () => {
+							const before = m.title?.();
+							if (switchTo !== undefined) runtime.setLocale(switchTo);
+							if (++started === requests.length) release();
+							await allStarted;
+							return Response.json([before, m.title?.()]);
+						},
+					)
+				).json(),
+			),
+		);
+	};
 
-		expect(
-			await Promise.all([
-				render("lang=de"),
-				render("lang=ar"),
-				render("lang=en"),
-			]),
-		).toEqual([
+	it("keeps each request's locale while requests interleave", async () => {
+		const rendered = await interleaved(await output(config), [
+			{ cookie: "lang=de" },
+			{ cookie: "lang=ar" },
+			{ cookie: "lang=en" },
+		]);
+
+		expect(rendered).toEqual([
 			["Ihr Warenkorb", "Ihr Warenkorb"],
 			["سلتك", "سلتك"],
+			["Your cart", "Your cart"],
+		]);
+	});
+
+	it("lets setLocale switch only its own request while requests interleave", async () => {
+		const rendered = await interleaved(await output(config), [
+			{ cookie: "lang=de", switchTo: "ar" },
+			{ cookie: "lang=en" },
+		]);
+
+		expect(rendered).toEqual([
+			["Ihr Warenkorb", "سلتك"],
 			["Your cart", "Your cart"],
 		]);
 	});
