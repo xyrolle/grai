@@ -119,14 +119,11 @@ describe("grai import --from i18next", () => {
 			"en.json": {
 				title: "Cart",
 				see: "See $t(title)",
-				rank_ordinal_one: "{{count}}st",
-				rank_ordinal_other: "{{count}}th",
 				ago: "{{value, relativetime}}",
 			},
 			"ru.json": {
 				title: "Корзина",
 				see: "См. $t(title)",
-				rank_ordinal_other: "{{count}}-й",
 				ago: "{{value, relativetime}}",
 			},
 		});
@@ -137,18 +134,44 @@ describe("grai import --from i18next", () => {
 		expect(result.leftOut).toEqual([
 			{
 				file: "source/en.json",
-				key: "rank_ordinal",
-				locales: ["en", "ru"],
-				detail:
-					"its _ordinal_ forms pick an ordinal plural, which grai does not support yet.",
-			},
-			{
-				file: "source/en.json",
 				key: "ago",
 				locales: ["en", "ru"],
 				detail:
 					"{{value, relativetime}} formats the value as relativetime, which grai import does not convert. Write it as {name :number} or {name :datetime} with the options it needs.",
 			},
+		]);
+	});
+
+	it("turns _ordinal_ forms into a key of their own that chooses on count's ordinal category", async () => {
+		const { result, load } = imported("i18next", {
+			"en.json": {
+				rank_ordinal_one: "{{count}}st",
+				rank_ordinal_two: "{{count}}nd",
+				rank_ordinal_other: "{{count}}th",
+			},
+			"ru.json": {
+				rank_ordinal_one: "never chosen",
+				rank_ordinal_other: "{{count}}-й",
+			},
+		});
+		const m = await load();
+
+		expect(counts((count) => m.rank_ordinal?.({ count }))).toEqual([
+			"0th",
+			"1st",
+			"2nd",
+			"5th",
+			"21st",
+		]);
+		expect(m.rank_ordinal?.({ count: 2 }, { locale: "ru" })).toBe("2-й");
+		expect(
+			result.changed.map(
+				({ key, locales, detail }) =>
+					`${key} (${locales.join(", ")}): ${detail}`,
+			),
+		).toEqual([
+			"rank_ordinal (en, ru): its _ordinal_ forms become a key of their own, ending in _ordinal. Call it where { ordinal: true } was passed.",
+			"rank_ordinal (en): it has no _ordinal_few form: those counts show the _ordinal_other text, where i18next shows the key's name.",
 		]);
 	});
 

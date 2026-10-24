@@ -1,4 +1,4 @@
-import { categoriesOf } from "../plurals.ts";
+import { categoriesOf, type PluralType } from "../plurals.ts";
 import { MessageProblem } from "../problem.ts";
 import {
 	type Converted,
@@ -17,16 +17,20 @@ const contextSuffix = /^(.+)_([a-z]+)$/;
 /** A message of the source: a text, or the forms of a plural or an ordinal key, by suffix. */
 type Message =
 	| { kind: "text"; path: readonly string[]; value: unknown }
-	| {
-			kind: "plural" | "ordinal";
-			path: readonly string[];
-			forms: Map<string, unknown>;
-	  };
+	| PluralMessage;
+
+/** A key's plural or ordinal forms, by form. */
+type PluralMessage = {
+	kind: PluralType;
+	path: readonly string[];
+	forms: Map<string, unknown>;
+};
 
 /**
  * Converts one locale's i18next messages (the JSON v4 format) to grai's format. A key's plural
- * forms (`_one`, `_other`, …) become one message that chooses on `count`. Ordinal plurals are
- * left out with the reason, and so is what `patternOf` cannot convert.
+ * forms (`_one`, `_other`, …) become one message that chooses on `count`, and so do its ordinal
+ * forms (`_ordinal_one`, …), as a key of its own. What `patternOf` cannot convert is left out
+ * with the reason.
  */
 export function convertI18next(
 	entries: readonly SourceEntry[],
@@ -35,22 +39,11 @@ export function convertI18next(
 	const texts = new Map(
 		entries.map((entry) => [entry.path.join("."), entry.value]),
 	);
-	return messagesOf(entries).map((message) => {
-		if (message.kind === "text") {
-			return convertText(message.path, message.value, texts);
-		}
-		if (message.kind === "plural") {
-			return convertPlural(message.path, message.forms, locale, texts);
-		}
-		return {
-			path: message.path,
-			result: new MessageProblem(
-				"unsupported",
-				"its _ordinal_ forms pick an ordinal plural, which grai does not support yet.",
-			),
-			notes: [],
-		};
-	});
+	return messagesOf(entries).map((message) =>
+		message.kind === "text"
+			? convertText(message.path, message.value, texts)
+			: convertPlural(message, locale, texts),
+	);
 }
 
 /** The entries as messages, in source order: a key's plural forms together, at its first form's place. */
@@ -69,7 +62,7 @@ function messagesOf(entries: readonly SourceEntry[]): Message[] {
 			continue;
 		}
 		const [, key = "", form = ""] = plural;
-		const kind = ordinal === null ? "plural" : "ordinal";
+		const kind = ordinal === null ? "cardinal" : "ordinal";
 		const base = [
 			...path.slice(0, -1),
 			ordinal === null ? key : `${key}_ordinal`,
@@ -112,26 +105,29 @@ function convertText(
 	}
 }
 
-/** A key's plural forms as one message choosing on the plural category of `count`. */
+/** A key's plural or ordinal forms as one message choosing on the category of `count`. */
 function convertPlural(
-	path: readonly string[],
-	forms: ReadonlyMap<string, unknown>,
+	{ kind, path, forms }: PluralMessage,
 	locale: string,
 	texts: Texts,
 ): ImportedMessage {
+	const suffix = kind === "cardinal" ? "_" : "_ordinal_";
 	try {
 		if (!forms.has("other")) {
 			throw new MessageProblem(
 				"message-invalid",
-				"it has no _other form, which i18next needs for every count its other forms do not cover.",
+				`it has no ${suffix}other form, which i18next needs for every count its other forms do not cover.`,
 			);
 		}
-		const categories = categoriesOf(locale, "cardinal");
+		const categories = categoriesOf(locale, kind);
 		const patterns = new Map<string, Pattern>();
 		for (const [form, value] of forms) {
-			// i18next takes _zero for a count of 0 in every locale: an exact 0 where it is no category.
+			// i18next takes a plural's _zero for a count of 0 in every locale: an exact 0 where it is
+			// no category. An ordinal's _ordinal_zero is only ever its category.
 			const option =
-				form === "zero" && !categories.includes("zero") ? "=0" : form;
+				kind === "cardinal" && form === "zero" && !categories.includes("zero")
+					? "=0"
+					: form;
 			// A category the locale does not have is never chosen, so it is dropped.
 			if (
 				option === "=0" ||
@@ -141,10 +137,11 @@ function convertPlural(
 				patterns.set(option, patternOf(value, texts));
 			}
 		}
+		const missing = missingForms(forms, categories, suffix);
 		return {
 			path,
-			result: countChoice(patterns),
-			notes: missingForms(forms, categories),
+			result: countChoice(patterns, kind),
+			notes: kind === "cardinal" ? missing : [ordinalKey, ...missing],
 		};
 	} catch (error) {
 		if (!(error instanceof MessageProblem)) throw error;
@@ -152,10 +149,17 @@ function convertPlural(
 	}
 }
 
+/** How an ordinal is called once imported: by a key of its own, as i18next calls it by the plural's. */
+const ordinalKey =
+	"its _ordinal_ forms become a key of their own, ending in _ordinal. Call it where { ordinal: true } was passed.";
+
 /** The patterns, by plural option, as one message choosing on `count`, an exact 0 before its category. */
-function countChoice(patterns: ReadonlyMap<string, Pattern>): Converted {
+function countChoice(
+	patterns: ReadonlyMap<string, Pattern>,
+	type: PluralType,
+): Converted {
 	const inputs = [...patterns.values()].flatMap(({ inputs }) => [...inputs]);
-	const local = pluralLocal("count", "cardinal", new Set(inputs));
+	const local = pluralLocal("count", type, new Set(inputs));
 	return {
 		declarations: [local.declaration],
 		selectors: patterns.has("=0") ? ["count", local.name] : [local.name],
@@ -170,12 +174,13 @@ function countChoice(patterns: ReadonlyMap<string, Pattern>): Converted {
 function missingForms(
 	forms: ReadonlyMap<string, unknown>,
 	categories: readonly string[],
+	suffix: string,
 ): string[] {
 	const missing = categories.filter(
 		(category) => category !== "other" && !forms.has(category),
 	);
 	if (missing.length === 0) return [];
 	return [
-		`it has no _${missing.join(", _")} form: those counts show the _other text, where i18next shows the key's name.`,
+		`it has no ${suffix}${missing.join(`, ${suffix}`)} form: those counts show the ${suffix}other text, where i18next shows the key's name.`,
 	];
 }

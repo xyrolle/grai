@@ -59,7 +59,10 @@ for (const format of ["i18next", "icu"]) {
 			),
 		);
 		const tally = { compared: 0, equal: 0, reported: 0, different: [] };
-		for (const [key, sourceKey] of importedKeys(sources.en, format)) {
+		for (const [key, { sourceKey, options }] of importedKeys(
+			sources.en,
+			format,
+		)) {
 			if (!(key in m)) continue;
 			for (const locale of locales) {
 				const render =
@@ -67,7 +70,7 @@ for (const format of ["i18next", "icu"]) {
 						? i18nextRenderer(sources[locale], locale)
 						: icuRenderer(sources[locale], locale);
 				for (const inputs of inputSets()) {
-					const theirs = render(sourceKey, inputs);
+					const theirs = render(sourceKey, { ...inputs, ...options });
 					const ours = graiRender(m[key], inputs, locale);
 					tally.compared++;
 					if (theirs === ours) tally.equal++;
@@ -99,7 +102,11 @@ function* inputSets() {
 			yield { count, n: count, g, name: "Ana", value: count, d: dateOf(count) };
 }
 
-/** Each grai key the import wrote, with the key the source library calls it by. */
+/**
+ * Each grai key the import wrote, with the key the source library calls it by and the options of
+ * that call: an i18next key's ordinal forms become the grai key ending in _ordinal, which i18next
+ * calls by the plural's key with { ordinal: true }.
+ */
 function importedKeys(catalog, format, path = []) {
 	const keys = new Map();
 	for (const [name, value] of Object.entries(catalog)) {
@@ -108,12 +115,20 @@ function importedKeys(catalog, format, path = []) {
 			for (const entry of importedKeys(value, format, at)) keys.set(...entry);
 			continue;
 		}
+		const ordinal =
+			format === "i18next" &&
+			/_ordinal_(zero|one|two|few|many|other)$/.test(name);
 		const base =
 			format === "i18next"
-				? name.replace(/_(zero|one|two|few|many|other)$/, "")
+				? name.replace(/(_ordinal)?_(zero|one|two|few|many|other)$/, "")
 				: name;
-		const sourceKey = [...path, base].join(".");
-		keys.set([...path, base].join("_").replace(/[^\w$]/g, "_"), sourceKey);
+		const key = [...path, ordinal ? `${base}_ordinal` : base]
+			.join("_")
+			.replace(/[^\w$]/g, "_");
+		keys.set(key, {
+			sourceKey: [...path, base].join("."),
+			options: ordinal ? { ordinal: true } : {},
+		});
 	}
 	return keys;
 }
