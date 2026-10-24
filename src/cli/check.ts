@@ -1,7 +1,12 @@
-import { resolve } from "node:path";
 import { check } from "../check.ts";
 import type { GraiError } from "../error.ts";
-import { type Command, failed, parsed } from "./command.ts";
+import {
+	type Command,
+	failed,
+	parsed,
+	sourceOption,
+	sourcesOf,
+} from "./command.ts";
 
 export const checkCommand: Command = {
 	usage: `  check [--source <dir>]... [--json]
@@ -10,12 +15,10 @@ export const checkCommand: Command = {
                                and the keys each locale has not translated yet`,
 	async run(args) {
 		const { config, values } = parsed(args, {
-			source: { type: "string", multiple: true },
+			...sourceOption,
 			json: { type: "boolean" },
 		});
-		const sources = Array.isArray(values.source)
-			? values.source.map((source) => resolve(String(source)))
-			: undefined;
+		const sources = sourcesOf(values);
 		const { problems, untranslated } = await check(config, sources);
 		if (values.json === true) {
 			console.log(

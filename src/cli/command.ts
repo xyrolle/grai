@@ -20,6 +20,11 @@ export type Values = Readonly<
 	Record<string, string | boolean | (string | boolean)[] | undefined>
 >;
 
+/** `--source <dir>`, as often as needed: where the source files are, instead of the project's root. */
+export const sourceOption: ParseArgsOptionsConfig = {
+	source: { type: "string", multiple: true },
+};
+
 /** The config file, the command's options and its positionals. Unknown options are a usage error when strict. */
 export function parsed(
 	args: string[],
@@ -46,6 +51,13 @@ export function parsed(
 		}
 		throw error;
 	}
+}
+
+/** The directories `--source` names, resolved, or undefined for the project's root. */
+export function sourcesOf(values: Values): string[] | undefined {
+	return Array.isArray(values.source)
+		? values.source.map((source) => resolve(String(source)))
+		: undefined;
 }
 
 /** Prints what a compile wrote, or its errors; returns the exit code. */
