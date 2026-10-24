@@ -1,9 +1,9 @@
 import { type Formatter, formatterOf } from "./formatters.ts";
+import { localeReads } from "./locale-reads.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { type Part, plainText } from "./pattern.ts";
-import { pluralName } from "./plurals.ts";
-import { catchAll, type Selector } from "./selection.ts";
+import { catchAll } from "./selection.ts";
 
 type Mode = "string" | "parts";
 
@@ -61,11 +61,7 @@ export function localeFunction(
 	used: Used,
 ): LocaleFunction {
 	const { variants, closed } = message;
-	const reads = new Set<string>();
-	const value = (name: string) => {
-		reads.add(name);
-		return message.plurals.has(name) ? `$${name}` : `i.${name}`;
-	};
+	const { value, condition, prologue } = localeReads(message, used.plurals);
 	/** A placeholder's code: its value, through its formatter if it has one. */
 	const placeholder = (part: VariablePart) => {
 		const local = message.formatted.get(part.name);
@@ -77,7 +73,7 @@ export function localeFunction(
 		return `${formatter.name}(${operand})`;
 	};
 	const branches = variants.map((variant) => ({
-		condition: conditionCode(variant.keys, message.selectors, value),
+		condition: condition(variant.keys),
 		pattern: patternCode(variant.pattern, mode, placeholder),
 	}));
 	let body = closed
@@ -86,37 +82,7 @@ export function localeFunction(
 	for (const { condition, pattern } of branches.toReversed()) {
 		body = `${condition} ? ${pattern} : ${body}`;
 	}
-	const locals = [...message.plurals].filter(([name]) => reads.has(name));
-	const declarations = locals
-		.map(([name, { input, type }]) => {
-			const plural = pluralName(message.locale, type);
-			used.plurals.add(plural);
-			return `const $${name} = ${plural}(${value(input)}); `;
-		})
-		.join("");
-	const parameter = [...reads].some((name) => !message.plurals.has(name))
-		? "i"
-		: "";
-	return { parameter, declarations, body };
-}
-
-/** The test a variant's keys put on the selectors; empty when every key is `*`. */
-function conditionCode(
-	keys: readonly string[],
-	selectors: readonly Selector[],
-	value: Value,
-): string {
-	const tests: string[] = [];
-	keys.forEach((key, index) => {
-		const selector = selectors[index];
-		if (key === catchAll || selector === undefined) return;
-		tests.push(
-			selector.kind === "plural"
-				? `${value(selector.name)} === ${JSON.stringify(key)}`
-				: `String(${value(selector.name)}) === ${JSON.stringify(key)}`,
-		);
-	});
-	return tests.join(" && ");
+	return { ...prologue(), body };
 }
 
 /** The call that throws for a value the closed select lists no variant for. */
