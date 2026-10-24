@@ -132,6 +132,7 @@ describe("selecting on a :number local", () => {
 					uncovered: onNumber("number", { "n=0": "a", "n=one": "b" }),
 					open: onNumber("number select=exact", { "n=0": "a" }),
 					mode: onNumber("number select=cardinal", { "n=*": "a" }),
+					price: onNumber("currency currency=EUR", { "n=*": "a" }),
 				},
 			}),
 		).toEqual([
@@ -140,6 +141,7 @@ describe("selecting on a :number local", () => {
 			'message-invalid: messages/en.json: "fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
 			'message-invalid: messages/en.json: "mode" (en): "local n = count: number select=cardinal": "select=cardinal" needs plural, ordinal or exact.',
 			'selection-not-exhaustive: messages/en.json: "open" (en): no variant matches n=(any other value). Add one, or a variant with * for the selectors it does not care about.',
+			'unsupported: messages/en.json: "price" (en): it selects on n, a :currency value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
 			'selection-not-exhaustive: messages/en.json: "uncovered" (en): no variant matches n=other. Add one, or a variant with * for the selectors it does not care about.',
 			'message-invalid: messages/en.json: "written" (en): the variant n=1.0 can never be chosen: a number matches the key it is written as, 1. Write that instead.',
 		]);
