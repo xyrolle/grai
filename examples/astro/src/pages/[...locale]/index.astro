@@ -1,0 +1,14 @@
+---
+import { m } from "#lib/i18n/messages.js";
+import Cart from "../../components/Cart.svelte";
+import Welcome from "../../components/Welcome.tsx";
+import Page from "../../layouts/Page.astro";
+
+export { getStaticPaths } from "../../locale-paths.ts";
+---
+
+<Page title={m.greeting()} path="">
+	<h1>{m.greeting()}</h1>
+	<Cart client:load />
+	<Welcome client:load name="Ana" />
+</Page>
