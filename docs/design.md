@@ -248,6 +248,16 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - **A request's locale holds across its awaits in workerd, Bun and Deno, as in Node.** In the test, 30 requests in three locales are all in flight at once in each runtime, and each renders again after an await in its own locale, or in the one its `setLocale` chose.
 - **The tests get Bun and Deno from pnpm's runtime protocol** (`"bun": "runtime:1.4.4"` in the devDependencies), as they get workerd from Wrangler: one `pnpm install` brings every runtime they serve the example in, at a pinned version, with nothing installed globally.
 
+## Vue
+
+- **A message is a plain function, so calling one in Vue needs nothing from an adapter.** A template calls a function `<script setup>` imports. A `$t`, a global property or an injection would cost a lookup per call and hide the key from the bundler.
+- **A Vue app imports the messages as a namespace, `import * as m from "…/keys.js"`.** Vue's compiler takes a named import such as `import { m }` as a value that may be a ref, so the template reads it through `unref(m)`, the namespace escapes, and the bundler keeps every key of the catalog. A namespace import it takes as a constant, so the template calls `m.key()` itself and each chunk keeps the keys it calls (`test/vue.test.ts` pins both, so a Vue that changes either changes this advice).
+- **A server render binds the locale through the output's middleware, around `renderToString`.** Vue renders a request's app within that one call, so the binding reaches every setup, render and await of it, as Kit's `handle` does. Interleaved renders in different locales keep their own (`test/vue.test.ts`). `grai/vue` has nothing for the server, because the output's `middleware` is already the whole of it.
+- **The browser's locale is the page's `<html lang>`,** which the server writes, so the page hydrates in the words it was drawn in.
+- **`Markup` takes a map of functions, one per element, as `grai/react`'s does, rather than named slots.** Vue's type checker takes every slot as optional and any slot name as valid, so slots could not make a missing or an extra element a type error. The map is typed by the tags of its parts (`MarkupElements<NoInfer<Tag>>`), which `MarkupMessage` names, so it must name exactly the elements the message writes. Each function gets what its element encloses, and the options and attributes the message writes on it (`{#link href=|/terms|}`). It is a functional component: it keeps no state, and costs no component instance.
+- **In dev, an edit renders again in place, and the page keeps its state.** The dev module calls `globalThis[Symbol.for("grai.read")]` in every message call, and `grai/vue/client` makes that a read of a Vue `shallowRef`. On `grai:change` it changes the ref instead of reloading, so every render, computed and watcher that called a message runs again. It is behind `import.meta.hot`, which a build defines as undefined, so production ships nothing reactive under `"switch": "reload"`. A message called once in `setup` keeps its old words until the page loads again, as anything computed there would. `"live"` can make a Vue page re-render in the locale it switches to through the same read, once the runtime calls it and dispatches `grai:change` after a switch.
+- **A page still loads every locale's message chunks,** until its server writes the import map to its locale's copies (`docs/followups.md`).
+
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
@@ -341,5 +351,6 @@ Next runs the proxy apart from the render, renders a request's layouts and pages
   - `grai/svelte`: the Vite plugin for a Svelte app, whose client build also reads a call without inputs as its string;
   - `grai/next`, `grai/next/config` and `grai/next/proxy`: the Next adapter, also thin, which finds the project's generated modules through `withGrai`;
   - `grai/react`: the `Markup` component;
+  - `grai/vue`: Vue's `Markup`, and `grai/vue/client`, which renders an edit again in place in dev;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next and React are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next, React and Vue are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
