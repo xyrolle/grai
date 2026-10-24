@@ -1,5 +1,6 @@
-// The adapters' modules that run in the page, checked on their own: they see the DOM's types and
-// the frameworks' own modules ($app/env, $app/navigation, vue).
+// The adapters' modules that run in the app's own bundle, the page's among them, checked on their
+// own: they see the DOM's types and the frameworks' own modules ($app/env, $app/navigation, vue,
+// nuxt/app).
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
@@ -9,7 +10,9 @@
 	"include": [
 		"src/sveltekit-client.ts",
 		"src/sveltekit-navigation.ts",
-		"src/vue/client.ts"
+		"src/vue/client.ts",
+		"src/nuxt/runtime",
+		"src/nuxt/output.d.ts"
 	],
 	"exclude": []
 }
