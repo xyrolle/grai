@@ -1,7 +1,8 @@
 import { MessageProblem } from "../problem.ts";
 
 /**
- * An ICU MessageFormat message, parsed: text, `{name}`, `#`, a plural or select choice, and a tag.
+ * An ICU MessageFormat message, parsed: text, `{name}`, `#`, a plural, ordinal or select choice,
+ * and a tag.
  * A formatted argument, such as `{price, number}`, has the MessageFormat 2 call that formats it
  * alike, such as `:number`.
  */
@@ -11,11 +12,14 @@ export type IcuNode =
 	| { type: "pound" }
 	| {
 			type: "choice";
-			kind: "plural" | "select";
+			kind: ChoiceKind;
 			name: string;
 			options: IcuOption[];
 	  }
 	| { type: "tag"; name: string; children: IcuNode[] };
+
+/** A choice as ICU names it: by a count's plural or ordinal category, or by a value. */
+export type ChoiceKind = "plural" | "selectordinal" | "select";
 
 /** One option of a choice: its key (`one`, `=0`, `male`, `other`) and its message. */
 export type IcuOption = { key: string; nodes: IcuNode[] };
@@ -51,8 +55,8 @@ const formats: Readonly<Record<string, Readonly<Record<string, string>>>> = {
 
 /**
  * Parses an ICU message as intl-messageformat reads it. A currency or skeleton style, an argument
- * of another type, `selectordinal` or `offset` throws an "unsupported" MessageProblem, and a
- * malformed message a "message-invalid" one.
+ * of another type or `offset` throws an "unsupported" MessageProblem, and a malformed message a
+ * "message-invalid" one.
  */
 export function parseIcu(source: string): IcuNode[] {
 	return new IcuParser(source).message();
@@ -150,9 +154,7 @@ class IcuParser {
 		if (!this.take(",")) throw invalid(`{${name} must be closed by }.`);
 		const kind = this.word();
 		if (Object.hasOwn(formats, kind)) return this.formatted(name, kind);
-		if (kind !== "plural" && kind !== "select") {
-			throw unsupportedArgument(name, kind);
-		}
+		if (!isChoiceKind(kind)) throw unsupportedArgument(name, kind);
 		if (!this.take(",")) {
 			throw invalid(`{${name}, ${kind} must list its options.`);
 		}
@@ -181,14 +183,14 @@ class IcuParser {
 	}
 
 	/** A choice's options up to its closing `}`, each a key and a message in braces. */
-	private options(name: string, kind: "plural" | "select"): IcuOption[] {
+	private options(name: string, kind: ChoiceKind): IcuOption[] {
 		const options: IcuOption[] = [];
 		while (!this.take("}")) {
 			const key = this.word();
 			if (key.startsWith("offset:")) {
 				throw new MessageProblem(
 					"unsupported",
-					`{${name}, plural, ${key}} subtracts an offset from the count, which grai does not support.`,
+					`{${name}, ${kind}, ${key}} subtracts an offset from the count, which grai does not support.`,
 				);
 			}
 			if (key === "" || !this.take("{")) {
@@ -196,7 +198,7 @@ class IcuParser {
 					`each option of {${name}, ${kind}} must be a key and a message in braces.`,
 				);
 			}
-			options.push({ key, nodes: this.nodes(kind === "plural", undefined) });
+			options.push({ key, nodes: this.nodes(kind !== "select", undefined) });
 			if (!this.take("}")) {
 				throw invalid(`the option ${key} of {${name}} must be closed by }.`);
 			}
@@ -258,14 +260,12 @@ function inputOf(name: string): string {
 	return name;
 }
 
-/** Why an argument of a type other than plural, select, number, date or time cannot be converted. */
+function isChoiceKind(kind: string): kind is ChoiceKind {
+	return kind === "plural" || kind === "selectordinal" || kind === "select";
+}
+
+/** Why an argument of a type other than a choice, number, date or time cannot be converted. */
 function unsupportedArgument(name: string, kind: string): MessageProblem {
-	if (kind === "selectordinal") {
-		return new MessageProblem(
-			"unsupported",
-			`{${name}, selectordinal} picks an ordinal form, which grai does not support yet.`,
-		);
-	}
 	return new MessageProblem(
 		"unsupported",
 		`{${name}, ${kind}} formats the value as ${kind}, which grai does not support. Format it before the call and pass the text as {${name}}.`,

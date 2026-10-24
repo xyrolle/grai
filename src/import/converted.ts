@@ -1,3 +1,4 @@
+import type { PluralType } from "../plurals.ts";
 import { MessageProblem } from "../problem.ts";
 import { catchAll } from "../selection.ts";
 
@@ -122,14 +123,18 @@ export function pluralOptionKeys(
 	return option === "other" ? [] : [[local, option]];
 }
 
-/** A name for the plural local that counts an input, such as countPlural, unused by the message's inputs. */
-export function pluralLocalName(
+/**
+ * The declaration of a plural local that counts an input, such as `local countPlural = count:
+ * plural`, by a name the message's inputs do not take: countPlural, or countOrdinal for ordinals.
+ */
+export function pluralLocal(
 	input: string,
+	type: PluralType,
 	taken: ReadonlySet<string>,
-): string {
-	let name = `${input}Plural`;
-	for (let suffix = 2; taken.has(name); suffix++) {
-		name = `${input}Plural${suffix}`;
-	}
-	return name;
+): { name: string; declaration: string } {
+	const base = `${input}${type === "cardinal" ? "Plural" : "Ordinal"}`;
+	let name = base;
+	for (let suffix = 2; taken.has(name); suffix++) name = `${base}${suffix}`;
+	const options = type === "cardinal" ? "" : " type=ordinal";
+	return { name, declaration: `local ${name} = ${input}: plural${options}` };
 }

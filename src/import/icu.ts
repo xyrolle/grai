@@ -1,4 +1,4 @@
-import { categoriesOf } from "../plurals.ts";
+import { categoriesOf, type PluralType } from "../plurals.ts";
 import { MessageProblem } from "../problem.ts";
 import {
 	type Branch,
@@ -7,20 +7,26 @@ import {
 	escapeText,
 	type ImportedMessage,
 	plain,
-	pluralLocalName,
+	pluralLocal,
 	pluralOptionKeys,
 	type SourceEntry,
 	textOf,
 	withKeys,
 } from "./converted.ts";
-import { type IcuNode, type IcuOption, parseIcu } from "./icu-parse.ts";
+import {
+	type ChoiceKind,
+	type IcuNode,
+	type IcuOption,
+	parseIcu,
+} from "./icu-parse.ts";
 
 /**
  * Converts one locale's ICU MessageFormat messages, as next-intl, react-intl and intl-messageformat
- * read them, to grai's format: `plural` and `select`, nested or in sequence, become MessageFormat 2
- * selectors outermost first, `=n` an exact match on the input, `other` the catch-all `*`, `#` the
- * count formatted with `:number`, as ICU formats it, a formatted argument its MessageFormat 2 call,
- * and a tag markup. A message grai cannot express gets the reason as its result.
+ * read them, to grai's format: `plural`, `selectordinal` and `select`, nested or in sequence,
+ * become MessageFormat 2 selectors outermost first, `=n` an exact match on the input, `other` the
+ * catch-all `*`, `#` the count formatted with `:number`, as ICU formats it, a formatted argument
+ * its MessageFormat 2 call, and a tag markup. A message grai cannot express gets the reason as its
+ * result.
  */
 export function convertIcu(
 	entries: readonly SourceEntry[],
@@ -51,14 +57,14 @@ function convertMessage(source: string, locale: string): Converted {
 class IcuConverter {
 	readonly declarations: string[] = [];
 	readonly selectors: string[] = [];
-	private readonly categories: readonly string[];
+	private readonly locale: string;
 	/** The message's inputs, which a plural local's name must not take. */
 	private readonly inputs: ReadonlySet<string>;
-	/** Each counted input's plural local, declared once. */
+	/** Each counted input's plural local of each type, declared once. */
 	private readonly locals = new Map<string, string>();
 
 	constructor(locale: string, nodes: readonly IcuNode[]) {
-		this.categories = categoriesOf(locale, "cardinal");
+		this.locale = locale;
 		this.inputs = new Set(namesIn(nodes));
 	}
 
@@ -106,7 +112,7 @@ class IcuConverter {
 			case "choice":
 				return node.kind === "select"
 					? this.select(node, count)
-					: this.plural(node);
+					: this.plural(node, pluralTypes[node.kind]);
 		}
 	}
 
@@ -123,16 +129,20 @@ class IcuConverter {
 		);
 	}
 
-	private plural(node: { name: string; options: IcuOption[] }): Branch[] {
-		const local = this.pluralLocal(node.name);
+	private plural(
+		node: { name: string; options: IcuOption[] },
+		type: PluralType,
+	): Branch[] {
+		const local = this.pluralLocal(node.name, type);
 		this.claim(local);
 		if (node.options.some((option) => option.key.startsWith("="))) {
 			this.claim(node.name, local);
 		}
 		// A category the locale does not have is never chosen, so it is dropped.
+		const categories = categoriesOf(this.locale, type);
 		const chosen = node.options.filter(
 			({ key }) =>
-				key.startsWith("=") || key === "other" || this.categories.includes(key),
+				key.startsWith("=") || key === "other" || categories.includes(key),
 		);
 		for (const { key } of chosen) {
 			checkVariantKey(node.name, key.replace(/^=/, ""));
@@ -144,14 +154,14 @@ class IcuConverter {
 		);
 	}
 
-	/** The local that holds an input's plural category, declared the first time a plural counts it. */
-	private pluralLocal(input: string): string {
-		const known = this.locals.get(input);
+	/** The local that holds an input's category of a type, declared the first time a choice counts it. */
+	private pluralLocal(input: string, type: PluralType): string {
+		const known = this.locals.get(`${type} ${input}`);
 		if (known !== undefined) return known;
-		const local = pluralLocalName(input, this.inputs);
-		this.locals.set(input, local);
-		this.declarations.push(`local ${local} = ${input}: plural`);
-		return local;
+		const local = pluralLocal(input, type, this.inputs);
+		this.locals.set(`${type} ${input}`, local.name);
+		this.declarations.push(local.declaration);
+		return local.name;
 	}
 
 	/**
@@ -165,6 +175,10 @@ class IcuConverter {
 		else this.selectors.splice(at, 0, selector);
 	}
 }
+
+/** The plural rules each of ICU's counting choices takes. */
+const pluralTypes: Readonly<Record<Exclude<ChoiceKind, "select">, PluralType>> =
+	{ plural: "cardinal", selectordinal: "ordinal" };
 
 /** The inputs a node chooses on, its own choice and the ones nested in it. */
 function* choicesIn(node: IcuNode): Generator<string> {
