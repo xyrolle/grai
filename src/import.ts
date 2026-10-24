@@ -18,11 +18,12 @@ import {
 } from "./converted.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { convertI18next } from "./i18next.ts";
+import { convertIcu } from "./icu.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
 
 /** The libraries whose catalogs grai imports. */
-export const importFormats = ["i18next"] as const;
+export const importFormats = ["i18next", "icu"] as const;
 export type ImportFormat = (typeof importFormats)[number];
 
 /** A message the import left out or changed: its source file and key as the source names them, and the locales it is about. */
@@ -91,7 +92,10 @@ export function importCatalogs(
 	const named = new Map<string, Map<string, Found>>();
 	for (const source of sources) {
 		const entries = entriesOf(source, result.errors);
-		const messages = convertI18next(entries, source.locale);
+		const messages =
+			format === "i18next"
+				? convertI18next(entries, source.locale)
+				: entries.map((entry) => icuMessage(entry, source.locale));
 		const namespace =
 			namespaced && source.namespace !== "" ? [source.namespace] : [];
 		for (const message of messages) {
@@ -229,8 +233,30 @@ function flattened(
 	return Object.entries(value).flatMap(([name, item]) => {
 		if (path.length === 0 && name === "$schema") return [];
 		const at = [...path, name];
-		return isRecord(item) ? flattened(item, at) : [{ path: at, value: item }];
+		// formatjs extracts a message as { defaultMessage, description }.
+		if (isRecord(item) && typeof item.defaultMessage !== "string")
+			return flattened(item, at);
+		return [{ path: at, value: isRecord(item) ? item.defaultMessage : item }];
 	});
+}
+
+function icuMessage(
+	{ path, value }: SourceEntry,
+	locale: string,
+): ImportedMessage {
+	const notes: string[] = [];
+	try {
+		if (typeof value !== "string") {
+			throw new MessageProblem(
+				"unsupported",
+				`its value is ${Array.isArray(value) ? "a list" : `a ${typeof value}`}, not a string; grai messages are text.`,
+			);
+		}
+		return { path, result: convertIcu(value, locale, notes), notes };
+	} catch (error) {
+		if (!(error instanceof MessageProblem)) throw error;
+		return { path, result: error, notes };
+	}
 }
 
 /**
