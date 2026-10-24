@@ -4,11 +4,14 @@ import { keyDeclaration } from "./declarations.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { type LocaleMessage, parseMessage } from "./message.ts";
-import { keyModule, type RuntimeFunction } from "./modules.ts";
+import { type KeyModule, keyModule, type RuntimeFunction } from "./modules.ts";
 import { MessageProblem } from "./problem.ts";
 
-/** A key compiled from its raw messages, one per locale, kept so an unchanged key is not compiled again. */
-export type CompiledKey = {
+/**
+ * A key compiled from its raw messages, one per locale, kept so an unchanged key is not compiled
+ * again. Its kind, variants and parts are per locale, for an adapter that writes modules per locale.
+ */
+export type CompiledKey = Pick<KeyModule, "kind" | "variants" | "parts"> & {
 	values: readonly unknown[];
 	code: string;
 	declaration: string;
@@ -108,6 +111,9 @@ function compileKey(
 		declaration: keyDeclaration(key, messages, base?.messages.get(key)),
 		uses: module.uses,
 		plurals: module.plurals,
+		kind: module.kind,
+		variants: module.variants,
+		parts: module.parts,
 		markup: messages.some((message) => message.markup),
 	};
 }
