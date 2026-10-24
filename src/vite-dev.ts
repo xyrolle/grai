@@ -1,4 +1,8 @@
-import type { DevEnvironment, ViteDevServer } from "vite";
+import {
+	type DevEnvironment,
+	isRunnableDevEnvironment,
+	type ViteDevServer,
+} from "vite";
 import type { Build } from "./compile.ts";
 import { patchModule, updateEvent } from "./dev-module.ts";
 import { type GraiError, messagesOf } from "./error.ts";
@@ -18,9 +22,10 @@ export const patchPrefix = "grai:patch/";
  * The dev server's side: compiles when the server starts and whenever the config or a catalog
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
  * failed, which the page shows in Vite's overlay. After an edit, the page gets a patch of the
- * changed keys; a key added or removed, or a change of locales, reloads it. The server's other
- * environments take the messages again, so the next server render has the new words. `close`
- * stops following once the compile under way has finished.
+ * changed keys; a key added or removed, or a change of locales, reloads it. A server environment
+ * that runs its modules in Vite's runner patches its table the same way, so the next server render
+ * has the new words without the runner evaluating the program again; any other environment takes
+ * the messages again. `close` stops following once the compile under way has finished.
  */
 export function serveMessages(
 	server: ViteDevServer,
@@ -37,9 +42,7 @@ export function serveMessages(
 	const update = async (before: Build, next: Build) => {
 		const changed = [...next.compilation.changed];
 		if (changed.length === 0) return;
-		for (const environment of Object.values(server.environments)) {
-			if (environment !== client) await reload(environment, files.keysFile);
-		}
+		const environments = Object.values(server.environments);
 		const sameExports = changed.every(
 			(key) =>
 				before.compilation.keys.has(key) && next.compilation.keys.has(key),
@@ -48,20 +51,32 @@ export function serveMessages(
 			JSON.stringify(before.config.locales) ===
 			JSON.stringify(next.config.locales);
 		if (!sameExports || !sameLocales) {
-			await reload(client, files.keysFile);
+			for (const environment of environments)
+				await reload(environment, files.keysFile);
 			client.hot.send({ type: "full-reload" });
 			return;
 		}
-		// A page loaded after the edit takes the module afresh, with the edit in it.
-		const module = client.moduleGraph.getModuleById(files.keysFile);
-		if (module !== undefined) client.moduleGraph.invalidateModule(module);
 		const id = `${patchPrefix}${patches.size}`;
 		patches.set(`\0${id}`, patchModule(files.outdir, next, changed));
-		client.hot.send({
-			type: "custom",
-			event: updateEvent,
-			data: { url: `/@id/__x00__${id}` },
-		});
+		for (const environment of environments) {
+			if (environment !== client && !isRunnableDevEnvironment(environment)) {
+				await reload(environment, files.keysFile);
+				continue;
+			}
+			// A module loaded after the edit takes it afresh, with the edit in it. A runner keeps the
+			// module it evaluated, which the patch updates: dropping only the module's code has a later
+			// evaluation take the edit, where invalidating it would evaluate every importer again.
+			const module = environment.moduleGraph.getModuleById(files.keysFile);
+			if (module !== undefined && environment === client)
+				environment.moduleGraph.invalidateModule(module);
+			else if (module !== undefined)
+				environment.moduleGraph.updateModuleTransformResult(module, null);
+			environment.hot.send({
+				type: "custom",
+				event: updateEvent,
+				data: { url: `/@id/__x00__${id}` },
+			});
+		}
 	};
 
 	/** Shows what went wrong in the server's log and the page's overlay. */
