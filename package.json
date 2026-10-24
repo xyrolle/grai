@@ -31,6 +31,10 @@
 		"./vue": {
 			"types": "./dist/vue/markup.d.ts",
 			"default": "./dist/vue/markup.js"
+		},
+		"./vue/client": {
+			"types": "./dist/vue/client.d.ts",
+			"default": "./dist/vue/client.js"
 		}
 	},
 	"bin": {
@@ -47,7 +51,7 @@
 		"build": "tsc -p tsconfig.build.json",
 		"prepack": "pnpm build",
 		"check": "biome check .",
-		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
+		"typecheck": "tsc && tsc -p tsconfig.runtime.json && tsc -p tsconfig.browser.json",
 		"test": "vitest run",
 		"test:performance": "node scripts/performance.ts"
 	},
