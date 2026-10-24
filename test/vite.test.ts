@@ -248,4 +248,22 @@ window.loaded = performance.timeOrigin;
 
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
 	});
+
+	it("throws for a call in another locale than the page's, as a build does, naming the key", async () => {
+		const { dir } = project(catalogs);
+		const { title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+try {
+	m.title({}, { locale: "en" });
+} catch (error) {
+	document.getElementById("title").textContent = \`\${error.code}: \${error.message}\`;
+}
+`,
+		);
+
+		await title(
+			'locale-not-loaded: title was called in "en", but this page renders in "de" alone.',
+		);
+	});
 });

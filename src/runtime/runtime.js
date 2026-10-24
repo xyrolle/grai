@@ -194,7 +194,8 @@ export function localizeHref(href, options) {
  * a page, a call names no locale but the page's.
  *
  * @template Variant
- * @param {readonly Variant[]} variants one per locale, in `locales` order
+ * @param {readonly Variant[]} variants one per locale, in `locales` order; dev adds the key after
+ * them, for the error to name
  * @param {{ locale?: string } | undefined} options
  * @returns {Variant}
  */
@@ -224,7 +225,7 @@ function noVariant(variants, locale, index) {
 			: current;
 	return new GraiError(
 		"locale-not-loaded",
-		`A message was called in "${locales[index]}", but this page renders in "${locales[held]}" alone.`,
+		`${variants[locales.length] ?? "A message"} was called in "${locales[index]}", but this page renders in "${locales[held]}" alone.`,
 	);
 }
 
