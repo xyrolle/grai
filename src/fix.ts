@@ -1,5 +1,6 @@
 import { join, relative } from "node:path";
-import { catalogEntries, withoutEntries } from "./catalog-entries.ts";
+import { catalogEntries } from "./catalog-entries.ts";
+import { withoutEntries } from "./catalog-text.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
