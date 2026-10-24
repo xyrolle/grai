@@ -1,8 +1,11 @@
-/** Seeding a locale with the base locale's text. */
+/**
+ * Seeding a locale with the base locale's text, and what is still untranslated: a message equal to
+ * its seed. Nothing is kept beside the catalogs, since every key is in every locale anyway.
+ */
 
 import { mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
-import { readCatalogSources } from "./catalog.ts";
+import { type Catalog, readCatalogSources } from "./catalog.ts";
 import { appendMessages } from "./catalog-file.ts";
 import { type CompileResult, compile, parseCatalogs } from "./compile.ts";
 import { type Config, isRecord, readConfig } from "./config.ts";
@@ -83,6 +86,42 @@ function variantKeys(key: string): Map<string, string> {
 
 function variantKey(keys: ReadonlyMap<string, string>): string {
 	return [...keys].map(([name, key]) => `${name}=${key}`).join(",");
+}
+
+/**
+ * The keys of each locale other than the base whose message is still its seed, the base text, in
+ * the catalog's order. Only locales with any are listed.
+ */
+export function untranslatedKeys(
+	catalogs: readonly Catalog[],
+	baseLocale: string,
+): Map<string, string[]> {
+	const base = catalogs.find((catalog) => catalog.locale === baseLocale);
+	const untranslated = new Map<string, string[]>();
+	for (const catalog of catalogs) {
+		if (base === undefined || catalog === base) continue;
+		const keys: string[] = [];
+		for (const [key, value] of catalog.messages) {
+			const source = base.messages.get(key);
+			if (source !== undefined && isSeed(value, source, catalog.locale)) {
+				keys.push(key);
+			}
+		}
+		if (keys.length > 0) untranslated.set(catalog.locale, keys);
+	}
+	return untranslated;
+}
+
+function isSeed(value: unknown, source: unknown, locale: string): boolean {
+	if (value === source || sameJson(value, source)) return true;
+	// Only a plural can differ from the base text and still be its seed.
+	if (!Array.isArray(value) || !Array.isArray(source)) return false;
+	try {
+		return sameJson(value, seedValue(source, locale));
+	} catch (error) {
+		if (error instanceof MessageProblem) return false;
+		throw error;
+	}
 }
 
 /** What seeding wrote: the catalog, and how many keys it gave the base text. */

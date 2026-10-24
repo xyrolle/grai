@@ -19,8 +19,10 @@ const usage = `Usage: grai <command> [--config <file>]
 
   compile                      write the output, if the catalogs or config changed
   watch                        write it, then again on each change of a catalog or the config
-  check [--source <dir>]...    report every problem and write nothing: what compile reports,
-                               keys no source file names, inputs the locales do not agree on
+  check [--source <dir>]... [--json]
+                               report every problem and write nothing: what compile reports,
+                               keys no source file names, inputs the locales do not agree on;
+                               and the keys each locale has not translated yet
   seed <locale>                give the locale's catalog the base text of each key it lacks,
                                creating it if need be, then compile
   add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
@@ -59,12 +61,22 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 	async check(args) {
 		const { config, values } = parsed(args, {
 			source: { type: "string", multiple: true },
+			json: { type: "boolean" },
 		});
 		const sources = Array.isArray(values.source)
 			? values.source.map((source) => resolve(String(source)))
 			: undefined;
-		const errors = await check(config, sources);
-		if (errors.length > 0) return failed(errors);
+		const { problems, untranslated } = await check(config, sources);
+		if (values.json === true) {
+			console.log(
+				JSON.stringify(checkedJson(problems, untranslated), null, "\t"),
+			);
+			return problems.length > 0 ? 1 : 0;
+		}
+		for (const [locale, keys] of untranslated) {
+			console.log(untranslatedLine(locale, keys));
+		}
+		if (problems.length > 0) return failed(problems);
 		console.log("grai: no problems");
 		return 0;
 	},
@@ -191,6 +203,30 @@ function reported(
 			: `grai: wrote ${files} in ${outdir} (${time})`,
 	);
 	return 0;
+}
+
+/** How many keys of a locale are untranslated, and the first of them. */
+function untranslatedLine(locale: string, keys: readonly string[]): string {
+	const shownKeys = keys.slice(0, 10).join(", ");
+	const more = keys.length > 10 ? `, and ${keys.length - 10} more` : "";
+	return `grai: ${keys.length} untranslated in ${locale}: ${shownKeys}${more}`;
+}
+
+/** A check's findings as JSON, for scripts: every problem, and every untranslated key by locale. */
+function checkedJson(
+	problems: readonly GraiError[],
+	untranslated: ReadonlyMap<string, readonly string[]>,
+) {
+	return {
+		problems: problems.map(({ code, file, key, locale, message }) => ({
+			code,
+			file,
+			key,
+			locale,
+			message,
+		})),
+		untranslated: Object.fromEntries(untranslated),
+	};
 }
 
 /** Prints every error, in the order given, and how many; returns the exit code. */
