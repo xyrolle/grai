@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { CompiledKey } from "./compilation.ts";
 import type { Build } from "./compile.ts";
 import { outputImports } from "./output-imports.ts";
@@ -38,6 +39,22 @@ if (import.meta.hot) {
 		if (typeof window !== "undefined" && window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true }))) location.reload();
 	});
 }
+`;
+}
+
+/**
+ * What a dev import of a key no catalog has gets, by its path: an export that throws a GraiError
+ * naming the key when it is called, so the page still loads. A failed import would stop the page,
+ * and in SvelteKit look like a stale deployment, which reloads it.
+ */
+export function missingKeyModule(outdir: string, key: string): string {
+	const message = `"${key}" is imported by its path, but no catalog has it. Add it to every catalog, or fix the import.`;
+	return `import { GraiError } from ${JSON.stringify(join(outdir, "runtime.js"))};
+const missing = () => {
+	throw new GraiError("key-missing", ${JSON.stringify(message)});
+};
+missing.parts = missing;
+export { missing as ${key} };
 `;
 }
 

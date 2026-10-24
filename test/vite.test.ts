@@ -35,6 +35,27 @@ const catalogs = {
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
 };
 
+/** A package.json that maps each key's path to keys.js, as an app that imports keys by path does. */
+const perKeyImports = JSON.stringify({
+	imports: { "#i18n/messages/*": "./out/keys.js" },
+});
+
+/** A plugin that keeps the message of each error the dev server sends its pages. */
+function sentErrors(errors: string[]): Plugin {
+	return {
+		name: "sent-errors",
+		configureServer(server) {
+			const hot = server.environments.client.hot;
+			const send = hot.send.bind(hot);
+			hot.send = (payload: HotPayload | string, data?: unknown) => {
+				if (typeof payload === "string") return send(payload, data);
+				if (payload.type === "error") errors.push(payload.err.message);
+				send(payload);
+			};
+		},
+	};
+}
+
 /**
  * What a Vite build of `entries` writes, for a browser or, with `ssr`, for a server: every file,
  * its chunks, and each entry's code with its imports'.
@@ -307,18 +328,14 @@ const devTest = { timeout: 60_000 };
 const devWait = { timeout: 30_000 };
 
 describe("the Vite plugin's dev server", devTest, () => {
-	/** A dev server of the project, and a server render of its title through Vite's SSR runner. */
-	async function serverRender(dir: string) {
-		writeFileSync(
-			join(dir, "render.js"),
-			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
-		);
+	/** A dev server of the project, and a server render of its render.js through Vite's SSR runner. */
+	async function serverRenderOf(dir: string, plugins: Plugin[] = []) {
 		const server = await createServer({
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
 			server: { watch: fixtures },
-			plugins: [grai()],
+			plugins: [grai(), ...plugins],
 		});
 		onTestFinished(() => server.close());
 		const ssr = server.environments.ssr;
@@ -327,11 +344,89 @@ describe("the Vite plugin's dev server", devTest, () => {
 			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
 	}
 
+	/** A server render of the project's title. */
+	function serverRender(dir: string) {
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
+		);
+		return serverRenderOf(dir);
+	}
+
 	it("has an import of the output wait for the first compile, rather than fail", async () => {
 		const { dir } = project(catalogs);
 		const rendered = await serverRender(dir);
 
 		expect(await rendered()).toBe("Title");
+	});
+
+	it("loads a per-key import of a key no catalog has, whose call throws, and takes the key once it is added", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { title } from "#i18n/messages/title.js";
+import { subtitle } from "#i18n/messages/subtitle.js";
+export const render = () => {
+	try {
+		return \`\${title()} \${subtitle()}\`;
+	} catch (error) {
+		return \`\${error.code}: \${error.message}\`;
+	}
+};
+`,
+		);
+		const errors: string[] = [];
+		const rendered = await serverRenderOf(dir, [sentErrors(errors)]);
+
+		expect(await rendered()).toBe(
+			'key-missing: "subtitle" is imported by its path, but no catalog has it. Add it to every catalog, or fix the import.',
+		);
+		expect(errors).toEqual([
+			'render.js imports "subtitle" by its path, but no catalog has it. Add it to every catalog, or fix the import.',
+		]);
+
+		for (const [locale, text] of [
+			["en", "Subtitle"],
+			["de", "Untertitel"],
+		] as const) {
+			const catalog = join(dir, "messages", `${locale}.json`);
+			const messages = JSON.parse(readFileSync(catalog, "utf8"));
+			writeFileSync(
+				catalog,
+				JSON.stringify({ ...messages, subtitle: text }, null, "\t"),
+			);
+		}
+		await expect.poll(rendered, devWait).toBe("Title Subtitle");
+	});
+
+	it("has a per-key import of a key taken out of the catalogs throw when called, rather than fail to load", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { footer } from "#i18n/messages/footer.js";
+export const render = () => {
+	try {
+		return footer();
+	} catch (error) {
+		return error.code;
+	}
+};
+`,
+		);
+		const rendered = await serverRenderOf(dir);
+		expect(await rendered()).toBe("Footer");
+
+		for (const locale of ["en", "de"] as const) {
+			const { footer, ...rest } = catalogs[locale];
+			writeFileSync(
+				join(dir, "messages", `${locale}.json`),
+				JSON.stringify(rest, null, "\t"),
+			);
+		}
+
+		await expect.poll(rendered, devWait).toBe("key-missing");
 	});
 
 	it("fails an import of the output, rather than hold it, when the first compile throws", async () => {
@@ -540,6 +635,26 @@ window.loaded = performance.timeOrigin;
 		await title("Überschrift");
 
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+
+	it("loads a page that imports a key no catalog has, shows the import in the overlay, and throws only when it is called", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		const { page, title } = await devPage(
+			dir,
+			`import { subtitle } from "#i18n/messages/subtitle.js";
+try {
+	subtitle();
+} catch (error) {
+	document.getElementById("title").textContent = error.code;
+}
+`,
+		);
+
+		await title("key-missing");
+		await page.waitForFunction(
+			`document.querySelector("vite-error-overlay")?.shadowRoot?.textContent.includes('imports "subtitle" by its path')`,
+		);
 	});
 
 	it("throws for a call in another locale than the page's, as a build does, naming the key", async () => {

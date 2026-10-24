@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
 	type DevEnvironment,
 	type HotPayload,
@@ -6,7 +6,7 @@ import {
 	type ViteDevServer,
 } from "vite";
 import type { Build } from "./compile.ts";
-import { patchModule, updateEvent } from "./dev-module.ts";
+import { missingKeyModule, patchModule, updateEvent } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import { watch } from "./watch.ts";
 
@@ -19,6 +19,8 @@ export type ProjectFiles = {
 
 /** How the page imports an edit's patch, and that module's id. */
 export const patchPrefix = "grai:patch/";
+/** The id of the module a per-key import of a key no catalog has resolves to. */
+const missingKeyPrefix = "\0grai:missing-key/";
 
 /**
  * The dev server's side: compiles when the server starts and whenever the config or a catalog
@@ -28,7 +30,9 @@ export const patchPrefix = "grai:patch/";
  * removed, or a change of locales, reloads it. A server environment that runs its modules in
  * Vite's runner patches its table the same way, so the next server render has the new words
  * without the runner evaluating the program again; any other environment takes the messages
- * again. `close` stops following once the compile under way has finished.
+ * again. A per-key import of a key no catalog has gets a module whose export throws when called
+ * (`missingKeyImport`), so the page still loads. `close` stops following once the compile under
+ * way has finished.
  */
 export function serveMessages(
 	server: ViteDevServer,
@@ -36,11 +40,14 @@ export function serveMessages(
 	{ reloadOnEdit }: { reloadOnEdit: boolean },
 	compiled: (result: Build | readonly Error[]) => void,
 ): {
-	patch: (id: string) => string | undefined;
+	module: (id: string) => string | undefined;
+	missingKeyImport: (key: string, importer: string) => string | undefined;
 	close: () => Promise<void>;
 } {
 	const client = server.environments.client;
 	const patches = new Map<string, string>();
+	/** Each key imported by its path, with the modules that import it so. */
+	const importers = new Map<string, Set<string>>();
 	let previous: Build | undefined;
 
 	const update = async (before: Build, next: Build) => {
@@ -55,8 +62,16 @@ export function serveMessages(
 			JSON.stringify(before.config.locales) ===
 			JSON.stringify(next.config.locales);
 		if (!sameExports || !sameLocales) {
-			for (const environment of environments)
-				await reload(environment, files.keysFile);
+			const reimporting = [...importers]
+				.filter(
+					([key]) =>
+						before.compilation.keys.has(key) !== next.compilation.keys.has(key),
+				)
+				.flatMap(([, modules]) => [...modules]);
+			for (const environment of environments) {
+				for (const id of [files.keysFile, ...reimporting])
+					await reload(environment, id);
+			}
 			client.hot.send({ type: "full-reload" });
 			return;
 		}
@@ -154,7 +169,27 @@ export function serveMessages(
 		},
 		failed,
 	);
-	return { patch: (id) => patches.get(id), close: watcher.close };
+	/**
+	 * The id a per-key import resolves to when the build lacks its key: a module whose export throws
+	 * when called, with the import shown in the overlay. Undefined while the build has the key, which
+	 * keys.js exports. The importer is kept either way, so that a build adding or removing the key
+	 * has it resolve the key again.
+	 */
+	const missingKeyImport = (key: string, importer: string) => {
+		importers.set(key, (importers.get(key) ?? new Set()).add(importer));
+		if (previous === undefined || previous.compilation.keys.has(key)) {
+			return undefined;
+		}
+		shown(
+			`${relative(server.config.root, importer)} imports "${key}" by its path, but no catalog has it. Add it to every catalog, or fix the import.`,
+		);
+		return `${missingKeyPrefix}${key}`;
+	};
+	const module = (id: string) =>
+		id.startsWith(missingKeyPrefix)
+			? missingKeyModule(files.outdir, id.slice(missingKeyPrefix.length))
+			: patches.get(id);
+	return { module, missingKeyImport, close: watcher.close };
 }
 
 /** Whether a file is the plugin's to follow, so Vite's own update leaves it alone. */

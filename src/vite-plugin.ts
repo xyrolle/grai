@@ -10,6 +10,7 @@ import {
 	textModulePrefix,
 	textPrefix,
 } from "./locale-chunks.ts";
+import { moduleOf } from "./message-imports.ts";
 import {
 	chunkFileName,
 	keyModule,
@@ -44,7 +45,11 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	let build: Build | undefined;
 	/** The first compile: its build, or the errors that kept it from one. */
 	let first: Promise<Build | readonly Error[]> | undefined;
-	let patchOf: (id: string) => string | undefined = () => undefined;
+	let devModuleOf: (id: string) => string | undefined = () => undefined;
+	let missingKeyImport = (
+		_key: string,
+		_importer: string,
+	): string | undefined => undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
@@ -134,7 +139,11 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			first = new Promise((resolve) => {
 				ready = resolve;
 			});
-			({ patch: patchOf, close: closeMessages } = serveMessages(
+			({
+				module: devModuleOf,
+				missingKeyImport,
+				close: closeMessages,
+			} = serveMessages(
 				server,
 				files,
 				{ reloadOnEdit: options.reloadOnEdit === true },
@@ -154,20 +163,30 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			// the file: in dev every import waits for the first compile, so none, whatever names the
 			// output, looks for it before it exists. A page whose import failed would stay broken.
 			order: "pre",
-			async handler(id) {
+			async handler(id, importer, options) {
 				if (
 					id.startsWith(keyPrefix) ||
 					id.startsWith(textPrefix) ||
 					id.startsWith(patchPrefix)
 				)
 					return `\0${id}`;
-				if (serving) await first;
-				return null;
+				if (!serving) return null;
+				await first;
+				// Vite's resolver takes a per-key path to keys.js and to its exports alone, so a key no
+				// catalog has would fail the page; it gets a module of its own instead.
+				const module = moduleOf(id);
+				if (module.type !== "key" || importer === undefined) return null;
+				const resolved = await this.resolve(id, importer, {
+					...options,
+					skipSelf: true,
+				});
+				if (resolved?.id !== files.keysFile) return resolved;
+				return missingKeyImport(module.key, importer) ?? resolved;
 			},
 		},
 		async load(id) {
-			const patch = patchOf(id);
-			if (patch !== undefined) return patch;
+			const served = devModuleOf(id);
+			if (served !== undefined) return served;
 			if (id !== files.keysFile && !isMessageModule(id)) return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;

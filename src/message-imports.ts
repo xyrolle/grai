@@ -136,7 +136,7 @@ function listedNames(list: string | undefined, listAt: number): ListedName[] {
 }
 
 /** The module an import path names, by its last segment without the extension. */
-function moduleOf(specifier: string): MessageModule {
+export function moduleOf(specifier: string): MessageModule {
 	const segments = specifier.split("/");
 	const last = (segments.at(-1) ?? "").replace(/\.[cm]?[jt]s$/, "");
 	if (segments.at(-2) === "messages" && keyName.test(last)) {
