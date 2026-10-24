@@ -15,6 +15,9 @@
 		"url": "git+https://github.com/xyrolle/grai.git"
 	},
 	"type": "module",
+	"sideEffects": [
+		"./dist/sveltekit-client.js"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
