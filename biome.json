@@ -7,5 +7,8 @@
 	},
 	"files": {
 		"includes": ["**", "!**/pnpm-lock.yaml", "!**/*.md"]
+	},
+	"html": {
+		"experimentalFullSupportEnabled": true
 	}
 }
