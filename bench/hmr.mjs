@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { createServer } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
+import { libraryCatalogs } from "./libraries.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
 
@@ -169,11 +170,33 @@ function devPlugin(root, locales, design, timings) {
 	};
 }
 
-function writeFixture(root, app, locale) {
+/** For i18next: Vite's own JSON update, timed when it reaches the plugins. */
+function timingPlugin(catalogFile, timings) {
+	return {
+		name: "edit-timing",
+		hotUpdate({ file }) {
+			if (file !== catalogFile || this.environment.name !== "client") return;
+			const reached = performance.timeOrigin + performance.now();
+			timings.edits.push({ reached, answered: reached });
+		},
+	};
+}
+
+/**
+ * The page: 500 messages of the locale, the first one the edited target. With i18next, the
+ * catalog is the locale's i18next JSON, imported by the page, which accepts its update and
+ * hands it to i18next.
+ */
+function writeFixture(root, app, locale, design) {
 	rmSync(root, { recursive: true, force: true });
 	mkdirSync(join(root, "messages"), { recursive: true });
 	for (const each of app.locales)
 		cpSync(app.catalogs[each], join(root, "messages", `${each}.json`));
+	if (design === "i18next")
+		writeFileSync(
+			join(root, "messages", `${locale}.json`),
+			JSON.stringify(libraryCatalogs(app, locale).i18next, null, "\t"),
+		);
 	const plain = (key) =>
 		app.locales.every(
 			(each) =>
@@ -185,9 +208,28 @@ function writeFixture(root, app, locale) {
 		join(root, "index.html"),
 		`<!doctype html><meta charset="utf-8"><p id="target"></p><ul id="list"></ul><script type="module" src="/main.js"></script>`,
 	);
+	const observe = `new MutationObserver(() => { window.changed = { at: performance.timeOrigin + performance.now(), text: document.getElementById("target").textContent }; })
+	.observe(document.getElementById("target"), { childList: true, characterData: true, subtree: true });
+window.ready = true;`;
+	const i18next = `import i18next from "i18next";
+import translation from "./messages/${locale}.json";
+const shown = ${JSON.stringify(shown)};
+const instance = i18next.createInstance();
+instance.init({ lng: ${JSON.stringify(locale)}, resources: { ${JSON.stringify(locale)}: { translation } }, initAsync: false, interpolation: { escapeValue: false } });
+function render() {
+	document.getElementById("target").textContent = instance.t(shown[0]);
+	const list = document.getElementById("list");
+	list.replaceChildren(...shown.slice(1).map((key) => Object.assign(document.createElement("li"), { textContent: instance.t(key) })));
+}
+render();
+if (import.meta.hot) import.meta.hot.accept("./messages/${locale}.json", (next) => { instance.addResourceBundle(${JSON.stringify(locale)}, "translation", next.default, true, true); render(); });
+${observe}
+`;
 	writeFileSync(
 		join(root, "main.js"),
-		`import * as messages from "virtual:messages";
+		design === "i18next"
+			? i18next
+			: `import * as messages from "virtual:messages";
 const shown = ${JSON.stringify(shown)};
 function render(m) {
 	m.setLocale(${JSON.stringify(locale)});
@@ -198,9 +240,7 @@ function render(m) {
 render(messages);
 addEventListener("grai:change", () => render(messages));
 if (import.meta.hot) import.meta.hot.accept("virtual:messages", (next) => render(next));
-new MutationObserver(() => { window.changed = { at: performance.timeOrigin + performance.now(), text: document.getElementById("target").textContent }; })
-	.observe(document.getElementById("target"), { childList: true, characterData: true, subtree: true });
-window.ready = true;
+${observe}
 `,
 	);
 	return shown[0];
@@ -212,14 +252,18 @@ const median = (values) =>
 async function measure(browser, app, design) {
 	const locale = otherLocale(app);
 	const root = join(cacheDir, "hmr", app.id);
-	const key = writeFixture(root, app, locale);
+	const key = writeFixture(root, app, locale, design);
 	const timings = { edits: [] };
 	const server = await createServer({
 		root,
 		configFile: false,
 		logLevel: "silent",
 		server: { port: PORT, strictPort: true },
-		plugins: [devPlugin(root, app.locales, design, timings)],
+		plugins: [
+			design === "i18next"
+				? timingPlugin(join(root, "messages", `${locale}.json`), timings)
+				: devPlugin(root, app.locales, design, timings),
+		],
 	});
 	await server.listen();
 	const page = await browser.newPage();
@@ -230,6 +274,7 @@ async function measure(browser, app, design) {
 	const load = performance.now() - loadStart;
 
 	const catalogFile = join(root, "messages", `${locale}.json`);
+	const catalogBytes = readFileSync(catalogFile).length;
 	const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
 	const original = catalog[key];
 	const latencies = [];
@@ -258,10 +303,14 @@ async function measure(browser, app, design) {
 	await page.close();
 	await server.close();
 	rmSync(root, { recursive: true, force: true });
+	const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	const served = timings.generate
+		? `${megabytes(timings.generate.bytes)}, ${timings.generate.ms.toFixed(0)} ms`
+		: `${megabytes(catalogBytes)} of JSON`;
 	const cell = (field) =>
 		median(latencies.map((latency) => latency[field])).toFixed(1);
 	console.log(
-		`| ${design} | ${(timings.generate.bytes / 1024 / 1024).toFixed(1)} MB, ${timings.generate.ms.toFixed(0)} ms | ${load.toFixed(0)} | ${cell("total")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`,
+		`| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`,
 	);
 }
 
@@ -274,7 +323,7 @@ for (const app of selectedApps()) {
 		"| design | dev module, generated in | page load | edit to page | watcher | plugin | browser |",
 	);
 	console.log("|---|---|---|---|---|---|---|");
-	for (const design of ["whole", "patch", "patch, fs.watch"])
+	for (const design of ["whole", "patch", "patch, fs.watch", "i18next"])
 		await measure(browser, app, design);
 }
 await browser.close();
