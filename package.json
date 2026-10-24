@@ -27,6 +27,10 @@
 		"./svelte": {
 			"types": "./dist/svelte.d.ts",
 			"default": "./dist/svelte.js"
+		},
+		"./react": {
+			"types": "./dist/react/markup.d.ts",
+			"default": "./dist/react/markup.js"
 		}
 	},
 	"bin": {
@@ -49,11 +53,15 @@
 	},
 	"peerDependencies": {
 		"magic-string": ">=1",
+		"react": ">=19",
 		"svelte": ">=5",
 		"vite": ">=8"
 	},
 	"peerDependenciesMeta": {
 		"magic-string": {
+			"optional": true
+		},
+		"react": {
 			"optional": true
 		},
 		"svelte": {
@@ -67,12 +75,16 @@
 		"@biomejs/biome": "2.6.2",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
 		"@types/node": "24.19.2",
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
 		"bun": "runtime:1.4.4",
 		"cldr-core": "48.0.0",
 		"deno": "runtime:2.9.6",
 		"hono": "4.13.13",
 		"magic-string": "1.4.3",
 		"playwright-core": "1.64.1",
+		"react": "19.3.1",
+		"react-dom": "19.3.1",
 		"svelte": "5.57.2",
 		"typescript": "7.0.2",
 		"vite": "8.3.5",
