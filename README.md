@@ -133,6 +133,7 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `switch` | Optional. How a page changes locale: `"reload"`, the default, reloads it, and `"live"` changes it in place (`docs/design.md`). |
 | `tests` | Optional. Globs, of `*`, `**`, `?` and `{a,b}`, of the source files that are tests, which `grai check` does not count as using a key. By default `**/*.{test,spec}.*`, `**/__tests__/**`, and the root's `test/**` and `tests/**`, since a folder named `tests` deeper down may ship, as a route does; `[]` makes no file a test. |
 | `identicalToBase` | Optional. Per locale, the keys whose message rightly reads as the base locale's, such as a unit: `{ "de": ["unit_km"] }`. `grai check` and `grai export` take them as translated, and `grai check` reports one whose message is no longer the base text. |
+| `fallbacks` | Optional. Each locale that takes the messages it lacks from another locale of its language: `{ "en-GB": "en" }`. Its catalog may then hold only the messages that differ. |
 
 ## Measured
 
@@ -185,7 +186,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 Paraglide's inlang message-format catalogs compile unchanged, and its calls stay the same: `m.key(inputs, { locale })`. Three things differ at a call site:
 
 - **A message without inputs takes none.** `m.cart_title({ count })` is a type error, where Paraglide accepts it. An input a message never reads is a mistake at the call: a wrong key, or a placeholder a translation lost.
-- **A key missing from any locale fails the compile.** No page ships another locale's words, or a key's name, in its place.
+- **A key missing from any locale fails the compile.** No page ships another locale's words, or a key's name, in its place. A regional locale can still take the messages it lacks from another of its language, with `"fallbacks": { "en-GB": "en" }`.
 - **In the browser, `{ locale }` must be the page's locale.** A built page is meant to hold only its own locale's words, so a call in another throws `locale-not-loaded`, in dev and tests as in a build.
 
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
