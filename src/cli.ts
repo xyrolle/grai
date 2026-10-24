@@ -1,9 +1,16 @@
 #!/usr/bin/env node
-import { relative, resolve } from "node:path";
-import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+import { resolve } from "node:path";
+import type { ParseArgsOptionsConfig } from "node:util";
 import { add } from "./add.ts";
 import { check } from "./check.ts";
-import { type CompileResult, compile } from "./compile.ts";
+import {
+	parsed,
+	sourceOption,
+	sourcesOf,
+	UsageError,
+} from "./cli-arguments.ts";
+import { failed, reported, shown } from "./cli-output.ts";
+import { compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { find, foundLines } from "./find.ts";
@@ -65,7 +72,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 	},
 	async check(args) {
 		const { config, values } = parsed(args, {
-			source: { type: "string", multiple: true },
+			...sourceOption,
 			fix: { type: "boolean" },
 		});
 		const sources = sourcesOf(values);
@@ -130,9 +137,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		return 0;
 	},
 	async find(args) {
-		const { config, values, positionals } = parsed(args, {
-			source: { type: "string", multiple: true },
-		});
+		const { config, values, positionals } = parsed(args, sourceOption);
 		const [key, ...others] = positionals;
 		if (key === undefined || others.length > 0) {
 			throw new UsageError("find takes one key");
@@ -142,9 +147,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		return found.errors.length > 0 ? failed(found.errors) : 0;
 	},
 	async rename(args) {
-		const { config, values, positionals } = parsed(args, {
-			source: { type: "string", multiple: true },
-		});
+		const { config, values, positionals } = parsed(args, sourceOption);
 		const [from, to, ...others] = positionals;
 		if (from === undefined || to === undefined || others.length > 0) {
 			throw new UsageError("rename takes the key and its new name");
@@ -159,82 +162,6 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		return reported(config, result, performance.now() - started);
 	},
 };
-
-class UsageError extends Error {}
-
-/** What a command line gave: each option's value, by name. */
-type Values = Readonly<
-	Record<string, string | boolean | (string | boolean)[] | undefined>
->;
-
-/** The config file, the command's options and its positionals. Unknown options are a usage error when strict. */
-function parsed(
-	args: string[],
-	own: ParseArgsOptionsConfig = {},
-	strict = true,
-): { config: string; values: Values; positionals: string[] } {
-	try {
-		const { values, positionals } = parseArgs({
-			args,
-			options: { config: { type: "string" }, ...own },
-			allowPositionals: true,
-			strict,
-		});
-		const config =
-			typeof values.config === "string" ? values.config : "grai.config.json";
-		return { config: resolve(config), values, positionals };
-	} catch (error) {
-		if (
-			error instanceof TypeError &&
-			"code" in error &&
-			String(error.code).startsWith("ERR_PARSE_ARGS")
-		) {
-			throw new UsageError(error.message);
-		}
-		throw error;
-	}
-}
-
-/** The directories `--source` names, resolved, or undefined for the project's root. */
-function sourcesOf(values: Values): string[] | undefined {
-	return Array.isArray(values.source)
-		? values.source.map((source) => resolve(String(source)))
-		: undefined;
-}
-
-/** Prints what a compile wrote, or its errors; returns the exit code. */
-function reported(
-	config: string,
-	result: CompileResult,
-	milliseconds: number,
-): number {
-	if (result.errors.length > 0) return failed(result.errors);
-	const time = `${milliseconds.toFixed(milliseconds < 10 ? 1 : 0)} ms`;
-	const outdir = shown(readConfig(config).outdir);
-	const files =
-		result.written.length === 1
-			? result.written[0]
-			: `${result.written.length} files`;
-	console.log(
-		result.written.length === 0
-			? `grai: ${outdir} is up to date (${time})`
-			: `grai: wrote ${files} in ${outdir} (${time})`,
-	);
-	return 0;
-}
-
-/** Prints every error, in the order given, and how many; returns the exit code. */
-function failed(errors: readonly GraiError[]): number {
-	for (const error of errors) console.error(error.message);
-	console.error(
-		`grai: ${errors.length} ${errors.length === 1 ? "error" : "errors"}`,
-	);
-	return 1;
-}
-
-function shown(path: string): string {
-	return relative(process.cwd(), path) || ".";
-}
 
 const [name = "", ...args] = process.argv.slice(2);
 const command = commands[name];
