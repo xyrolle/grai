@@ -8,6 +8,12 @@ The Vite plugin writes each message chunk once per locale under `grai-<locale>/`
 
 Done when: `grai/sveltekit` does both, with a browser test that a page of the example loads no other locale's words and no shared message chunk.
 
+## One locale per page in a Vue app
+
+A server-rendered Vue page loads every locale's copy of its message chunks, since nothing writes the import map to its own locale's copies: the app's server sends Vite's `index.html`. The SvelteKit adapter's map and its rewrite of `modulepreload` links are the same for any Vite build, given where the build puts the message chunks.
+
+Done when: a Vue app's server can write the map and the preloads with one call from grai, with a browser test that a page of `examples/vue` loads no other locale's words.
+
 ## Switch locale in place: `"switch": "live"`
 
 The config accepts `"live"`, and `grai/svelte` then keeps every message a call, but no page switches in place yet. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.

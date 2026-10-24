@@ -91,6 +91,36 @@ It is `grai/vite`'s plugin, and in the client build a component's call of a mess
 
 `grai/next` is in review (#29).
 
+### Vue
+
+A message is a plain function, so a template calls it as it calls anything `<script setup>` imports, with Vite and `grai/vite` as above. Import the messages as a namespace, from `keys.js`: Vue's compiler takes a namespace import as a constant, so a build keeps only the keys the template calls, where `import { m }` would ship every key. `grai/vue`'s `Markup` draws a markup message's parts, each element by the app's function:
+
+```vue
+<script setup lang="ts">
+import { Markup } from "grai/vue";
+import { h } from "vue";
+import * as m from "./i18n/keys.js";
+</script>
+
+<template>
+	<h1>{{ m.cart_title() }}</h1>
+	<Markup
+		:parts="m.terms.parts()"
+		:markup="{ link: (children) => h('a', { href: '/terms' }, children) }"
+	/>
+</template>
+```
+
+A server render binds the request's locale through the output's middleware, around Vue's render, so every setup, render and await in it reads that locale:
+
+```ts
+// src/entry-server.ts
+export const render = (request: Request) =>
+	middleware(request, () => renderToString(createApp()));
+```
+
+The server writes the locale into the page's `<html lang>`, and the browser takes it from there. In dev, `import "grai/vue/client"` in the browser's entry renders an edited message again in place, keeping the page's state; a build leaves it out. `examples/vue` is a complete server-rendered app.
+
 ### Workers, Bun, Deno and Node
 
 The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
@@ -172,7 +202,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 
 - **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
-- **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
+- **A SvelteKit or Vue page still loads every locale's message chunks.** That lasts until the adapter, or a Vue app's server, writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
   - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:unit`'s `usage`, which converts to the locale's units;
