@@ -22,6 +22,7 @@
 		"plurals": "node plurals.mjs",
 		"ordinals": "node ordinals.mjs",
 		"intl": "node intl.mjs",
+		"option-inputs": "node option-inputs.mjs",
 		"runtime-size": "node runtime-size.mjs",
 		"hmr": "node hmr.mjs",
 		"call-sites": "node call-sites.mjs",
