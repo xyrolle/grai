@@ -32,9 +32,15 @@ export function seedValue(value: unknown, locale: string): unknown {
 		? fields.declarations.filter((item) => typeof item === "string")
 		: [];
 	const locals = parseDeclarations(declarations).plurals;
+	/** Each plural selector, with the categories of its type the locale has. */
 	const plurals = (
 		Array.isArray(fields.selectors) ? fields.selectors : []
-	).filter((name) => typeof name === "string" && locals.has(name));
+	).flatMap((name): [string, ReadonlySet<string>][] => {
+		const local = typeof name === "string" ? locals.get(name) : undefined;
+		return local === undefined
+			? []
+			: [[name, new Set(categoriesOf(locale, local.type))]];
+	});
 	if (plurals.length === 0) return value;
 	const variants = Object.entries(fields.match).map(
 		([key, pattern]): [Map<string, string>, string, unknown] => [
@@ -43,17 +49,16 @@ export function seedValue(value: unknown, locale: string): unknown {
 			pattern,
 		],
 	);
-	const categories = new Set(categoriesOf(locale, "cardinal"));
 	const open = new Set(
-		plurals.filter((name) =>
-			variants.some(([keys]) => keys.get(name) === catchAll),
+		plurals.flatMap(([name]) =>
+			variants.some(([keys]) => keys.get(name) === catchAll) ? [name] : [],
 		),
 	);
 	const match: Record<string, unknown> = {};
 	for (const [keys, written, pattern] of variants) {
 		const seeded = new Map(keys);
 		let chosen = true;
-		for (const name of plurals) {
+		for (const [name, categories] of plurals) {
 			const key = keys.get(name) ?? catchAll;
 			if (key === "other" && !open.has(name)) seeded.set(name, catchAll);
 			else if (!isPluralKey(key, categories)) chosen = false;
