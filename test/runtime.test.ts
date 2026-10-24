@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { type Messages, project } from "./project.ts";
+import { type Messages, project, thrown } from "./project.ts";
 
 const catalogs = {
 	en: { title: "Your cart" },
