@@ -1,6 +1,8 @@
 // What a page renders: a fixed sample of message calls drawn from the app's catalog in its own
 // mix of plain text, inputs and plurals, each with inputs that reach a real variant. Every bench
 // that renders messages renders this sample.
+import { portable } from "./libraries.mjs";
+
 const placeholder = /\{([^{}#/][^{}]*)\}/g;
 
 /** Every input a message reads in any locale, and whether one of them selects a plural. */
@@ -54,12 +56,13 @@ function shuffled(items) {
 
 /**
  * `count` calls in the catalog's own mix (or of one kind), repeating keys only when the catalog
- * has fewer. Plural counts cycle so every category is reached.
+ * has fewer. Plural counts cycle so every category is reached. A message the compared libraries'
+ * formats cannot hold is left out, so every bench renders the same calls in every library.
  */
 export function sampleCalls(app, count, kind) {
-	const all = Object.keys(app.messages[app.baseLocale]).map((key) =>
-		describe(app, key),
-	);
+	const all = Object.keys(app.messages[app.baseLocale])
+		.filter((key) => portable(app, key))
+		.map((key) => describe(app, key));
 	const pool = shuffled(kind ? all.filter((call) => call.kind === kind) : all);
 	return Array.from({ length: count }, (_, index) => {
 		const call = pool[index % pool.length];
