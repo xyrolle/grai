@@ -39,15 +39,17 @@ export type Merged = {
 /**
  * Merges the units a file gives back into a locale's messages. A unit without a target is skipped.
  * A message with selectors takes each variant from its unit, else from its current translation;
- * when it has neither, the message is incomplete and left as it is.
+ * when it has neither, the message is incomplete and left as it is. `identical` is the locale's
+ * keys whose message is the base text on purpose, as the export had them.
  */
 export function mergeUnits(
 	base: Catalog,
 	target: Catalog | undefined,
 	locale: string,
+	identical: ReadonlySet<string>,
 	returned: readonly ReturnedUnit[],
 ): Merged {
-	const current = exportUnits(base, target, locale);
+	const current = exportUnits(base, target, locale, identical);
 	const byId = new Map(current.map((unit) => [unit.id, unit]));
 	const keyCodes = codesByKey(current);
 	const refused: Refusal[] = [];

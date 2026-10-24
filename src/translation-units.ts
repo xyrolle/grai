@@ -32,20 +32,23 @@ export type Unit = {
 };
 
 /**
- * The units of a locale, in the base catalog's order: every key, or only the untranslated ones.
- * Throws a MessageProblem for an invalid base message.
+ * The units of a locale, in the base catalog's order: every key, or only the untranslated ones. A
+ * key in `identical`, whose message is the base text on purpose, is translated. Throws a
+ * MessageProblem for an invalid base message.
  */
 export function exportUnits(
 	base: Catalog,
 	target: Catalog | undefined,
 	locale: string,
+	identical: ReadonlySet<string>,
 	untranslatedOnly = false,
 ): Unit[] {
 	const units: Unit[] = [];
 	for (const [key, value] of base.messages) {
 		const translation = target?.messages.get(key);
 		const translated =
-			translation !== undefined && !isSeed(translation, value, locale);
+			translation !== undefined &&
+			(identical.has(key) || !isSeed(translation, value, locale));
 		if (untranslatedOnly && translated) continue;
 		units.push(
 			...messageUnits(
