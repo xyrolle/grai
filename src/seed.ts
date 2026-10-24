@@ -6,7 +6,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import type { Catalog } from "./catalog.ts";
-import { writeMessages } from "./catalog-file.ts";
+import { catalogWithMessages } from "./catalog-file.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { isRecord } from "./config.ts";
 import { sameJson } from "./edit.ts";
@@ -17,6 +17,7 @@ import { parseDeclarations } from "./message-declarations.ts";
 import { categoriesOf } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 import { catchAll } from "./selection.ts";
+import { writeAll } from "./write-all.ts";
 
 /**
  * A base message as it is seeded into a locale: the same text. A plural keeps the variants the
@@ -161,7 +162,8 @@ export async function seed(
 	if (problems.length > 0) return { errors: problems };
 	if (seeded.length > 0) {
 		mkdirSync(dirname(path), { recursive: true });
-		writeMessages(path, seeded, config.catalogs.get(config.baseLocale) ?? path);
+		const like = config.catalogs.get(config.baseLocale) ?? path;
+		writeAll(new Map([[path, catalogWithMessages(path, seeded, like)]]));
 	}
 	return {
 		file: relative(config.root, path),

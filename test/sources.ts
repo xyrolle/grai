@@ -39,3 +39,15 @@ export const i18nTs = `import { m } from "../../out/messages.js";
 
 export { m };
 `;
+
+/**
+ * A catalog's text laid out as no formatter would: two spaces, Windows line breaks, and each entry
+ * as given. A command leaves every entry it does not change exactly as it is written here.
+ */
+export function handLaid(...entries: string[]): string {
+	return `{\r\n  ${entries.join(",\r\n  ")}\r\n}\r\n`;
+}
+
+/** The `$schema` entry a catalog starts with, for `handLaid`. */
+export const schemaEntry =
+	'"$schema": "https://inlang.com/schema/inlang-message-format"';

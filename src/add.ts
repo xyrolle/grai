@@ -1,4 +1,4 @@
-import { writeMessages } from "./catalog-file.ts";
+import { catalogWithMessages } from "./catalog-file.ts";
 import {
 	type CompileResult,
 	compile,
@@ -9,6 +9,7 @@ import { GraiError, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
+import { writeAll } from "./write-all.ts";
 
 /**
  * Adds a key to every catalog, with its text in each locale, then compiles. It writes nothing
@@ -75,8 +76,13 @@ export async function add(
 		}
 	}
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
+	const catalogTexts = new Map<string, string>();
 	for (const [locale, path] of read.config.catalogs) {
-		writeMessages(path, [[key, texts[locale] ?? ""]], path);
+		catalogTexts.set(
+			path,
+			catalogWithMessages(path, [[key, texts[locale] ?? ""]], path),
+		);
 	}
+	writeAll(catalogTexts);
 	return compile(configFile);
 }

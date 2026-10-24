@@ -5,7 +5,7 @@
 
 import { readFileSync } from "node:fs";
 import { dirname, extname, relative } from "node:path";
-import { writeMessages } from "./catalog-file.ts";
+import { catalogWithMessages } from "./catalog-file.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { readLocaleCatalogs } from "./locale-catalogs.ts";
@@ -14,6 +14,7 @@ import type { ReturnedUnit } from "./returned-units.ts";
 import { readUnitsJson, writeUnitsJson } from "./translation-json.ts";
 import { mergeUnits } from "./translation-merge.ts";
 import { exportUnits } from "./translation-units.ts";
+import { writeAll } from "./write-all.ts";
 import { readXliff } from "./xliff-reader.ts";
 import { writeXliff } from "./xliff-writer.ts";
 import { XmlError } from "./xml-reader.ts";
@@ -90,10 +91,9 @@ export async function mergeDocument(
 	}
 	const merged = mergeUnits(base, target, document.trgLang, document.units);
 	if (merged.messages.length > 0) {
-		writeMessages(
-			path,
-			merged.messages,
-			config.catalogs.get(base.locale) ?? path,
+		const like = config.catalogs.get(base.locale) ?? path;
+		writeAll(
+			new Map([[path, catalogWithMessages(path, merged.messages, like)]]),
 		);
 	}
 	return {
