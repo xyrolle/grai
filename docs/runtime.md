@@ -100,6 +100,14 @@ Every variant agrees with `Intl.PluralRules` on 0–10,000 and on fractions befo
 | CLDR rules compiled | 56 ns | 63 ns | 40 ns | 184 |
 | compiled, integer path first | 6.8 ns | 11.4 ns | 3.9 ns | 255 |
 
+Ordinals are compiled the same way, from CLDR's ordinal rules, and checked against `Intl.PluralRules` of type ordinal alike (`ordinals`, four runs at a load of 10–21). A language that ranks every count alike, as `ru` does, gets a function that returns `other`, so a bundle of it is 63 bytes, not 320:
+
+| | ro | ru | en | bytes, min+gzip (ro, ru, en) |
+|---|---|---|---|---|
+| Paraglide, `type=ordinal` | 489–661 ns | 451–503 ns | 613–708 ns | 593 |
+| `Intl.PluralRules`, cached | 143–155 ns | 100–115 ns | 261–297 ns | 103 |
+| grai | 3.3–3.6 ns | 3.0–3.5 ns | 9.8–11.1 ns | 330, 63, 375 |
+
 A formatter per locale and options formats a number in 207–213 ns and a date in 462–526 ns. Paraglide's cache takes 695–770 ns and 947–1,038 ns, and a new formatter per call 8.3–9.3 µs and 21.7–23.9 µs (`intl`).
 
 ## Dev
