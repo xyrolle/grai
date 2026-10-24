@@ -146,7 +146,6 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
   - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, such as `unit=$unit`;
-  - markup options and attributes;
   - nested keys in a catalog, which `grai import` flattens.
 
   Each is a compile error that names the construct, never an approximation. `docs/followups.md` tracks them.

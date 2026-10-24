@@ -15,12 +15,12 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 - **Catalogs are the inlang message-format JSON, flat, one file per locale,** so existing Paraglide catalogs compile unchanged. `$schema` is ignored.
 - **The constructs are a deliberate subset:**
   - text and `{name}` placeholders;
-  - markup: `{#tag}…{/tag}` and `{#tag/}`;
+  - markup: `{#tag}…{/tag}` and `{#tag/}`, with options (`href=|/terms|`, `rel=$rel`) and attributes (`@translate=no`, `@hidden`);
   - variants: `declarations` (`input x`, `local y = x: plural`, `local y = x: plural type=ordinal`, and a `:number` or `:integer` local to select on), `selectors` and `match`, with `*`, several selectors, and `""` for a message without selectors;
   - formatting: `:number`, `:integer`, `:percent`, `:currency`, `:unit`, `:relativetime`, `:list`, `:datetime`, `:date` and `:time` with their options, in a placeholder (`{x :number}`) or as a local (`local y = x: number`);
   - the escapes `\{`, `\}` and `\\`.
 
-  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input (`unit=$unit`), plural options other than `type`, selecting on a date or on a number its options round, nested keys, and markup options and attributes (`docs/followups.md`).
+  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input (`unit=$unit`), plural options other than `type`, selecting on a date or on a number its options round, and nested keys (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is a compile error naming the locales that lack it. A missing translation would otherwise ship as a failed import or as another locale's words.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
@@ -105,7 +105,7 @@ export const cart_items = /*#__PURE__*/ message(
   - `message` returns `(inputs, options) => variants[index of (options?.locale ?? the bound locale)](inputs)`: one shared dispatcher, not a copy per key.
   - A message without inputs is a string per locale (`text`).
   - One locale may use a plain pattern where another selects: the German above needs no plural.
-- **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options: {}, attributes: {} }`. The app then decides how markup looks, and translators decide where it stands.
+- **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options, attributes }`. An option is a literal, or the value of an input or local (a formatted local as its text); an attribute is a literal, or `true` when it has none. The app then decides how markup looks, and translators decide where it stands.
 - **Inputs are read as `i.name`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B).
 - **A server build writes each locale's function as a function expression, `function (i) { return … }`.** V8 parses every arrow function of a module in full when it loads the module, but only pre-parses a function expression, until its first call. A server loads every locale's functions and a request calls few of them, so the Vite plugin's server build loads app A's messages about a fifth faster (`docs/runtime.md`). The browser's modules and `keys.js` keep arrows, which are shorter.
 - **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and its locale's plural and format functions. An opt-in bundler transform, later, can then replace a call in a per-locale build (`docs/runtime.md`):
@@ -131,7 +131,7 @@ export declare const cart_items: Message<{ count: number }>;
   - `Locale` is the union of the locales.
   - `Message<I>` is `(inputs: I, options?: { locale?: Locale }) => string`.
   - A message without inputs takes `inputs?: Record<string, never>`.
-  - `MarkupMessage<I>` adds `.parts(): MessagePart[]`.
+  - `MarkupMessage<I, T>` adds `.parts(): MessagePart<T>[]`, where `T` is the union of the tags every locale writes. A part named otherwise is a type error, so an app's renderer can map exactly those tags.
   - Messages return `string`.
 - **An input's type is the narrowest that every locale accepts:**
   - `number` where any locale counts it with `:plural` or formats it as a number, and `Date | number` where one formats it as a date;
