@@ -67,7 +67,8 @@
 		"check": "biome check .",
 		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
 		"test": "vitest run",
-		"test:performance": "node scripts/performance.ts"
+		"test:performance": "node scripts/performance.ts",
+		"check:package": "publint run --strict && attw --pack . --profile esm-only"
 	},
 	"peerDependencies": {
 		"@sveltejs/kit": "^3.1.0",
@@ -98,6 +99,7 @@
 		}
 	},
 	"devDependencies": {
+		"@arethetypeswrong/cli": "0.18.5",
 		"@biomejs/biome": "2.6.2",
 		"@sveltejs/kit": "3.1.0",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
@@ -111,6 +113,7 @@
 		"magic-string": "1.4.3",
 		"next": "16.4.3",
 		"playwright-core": "1.64.1",
+		"publint": "0.3.25",
 		"react": "19.3.1",
 		"react-dom": "19.3.1",
 		"svelte": "5.57.2",
