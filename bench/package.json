@@ -13,6 +13,7 @@
 		"workerd": "node workerd.mjs",
 		"ssr": "node ssr.mjs",
 		"hydrate": "node hydrate.mjs",
+		"inline-page": "node inline-page.mjs",
 		"bytes": "node bytes.mjs",
 		"variants": "node variants.mjs",
 		"preload": "node preload.mjs",

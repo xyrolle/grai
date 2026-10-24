@@ -13,6 +13,8 @@ export const ROWS = 100;
 const CALLS_PER_ROW = 16;
 const DATA_PER_ROW = 8;
 export const PAGE_CALLS = SHELL_CALLS + ROWS * CALLS_PER_ROW;
+/** The distinct calls the page draws: the shell's, then one row's. */
+export const SAMPLED_CALLS = SHELL_CALLS + CALLS_PER_ROW;
 
 const escapeText = (text) =>
 	text
@@ -53,7 +55,7 @@ function inlineText(pattern, inputs) {
  * `translate` calls a library's `t(key, values)` from `from` instead.
  */
 export function pageSource(app, { from, inline, translate }) {
-	const calls = sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW);
+	const calls = sampleCalls(app, SAMPLED_CALLS);
 	const keys = translate ? ["t"] : [...new Set(calls.map((call) => call.key))];
 	const alias = new Map(keys.map((key, index) => [key, `k${index}`]));
 	const expression = (call, inputs) => {
@@ -99,7 +101,7 @@ export const visibleText = (html) =>
 
 /** The props the page renders: each call's values, as `values` writes them, and the table's rows. */
 export function pageProps(app, values = (call) => call.inputs) {
-	const calls = sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW);
+	const calls = sampleCalls(app, SAMPLED_CALLS);
 	const rows = Array.from({ length: ROWS }, (_, id) => ({
 		id,
 		...Object.fromEntries(
