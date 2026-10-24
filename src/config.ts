@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraiError } from "./error.ts";
+import { readFallbacks } from "./fallbacks.ts";
 import { isGlob } from "./globs.ts";
 import {
 	type IdenticalToBase,
@@ -26,6 +27,8 @@ export type Config = {
 	tests: readonly string[];
 	/** Each locale's keys whose message is the base text on purpose, which are not untranslated. */
 	identicalToBase: IdenticalToBase;
+	/** Each locale that takes the messages it lacks from another of its language, and that locale. */
+	fallbacks: ReadonlyMap<string, string>;
 };
 
 /**
@@ -53,6 +56,7 @@ const fields = new Set([
 	"switch",
 	"tests",
 	"identicalToBase",
+	"fallbacks",
 ]);
 const localePlaceholder = "{locale}";
 /** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
@@ -93,6 +97,7 @@ export function readConfig(file: string): Config {
 		switch: localeSwitch = "reload",
 		tests = conventionalTests,
 		identicalToBase = {},
+		fallbacks = {},
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -153,6 +158,11 @@ export function readConfig(file: string): Config {
 			'"identicalToBase" must map a locale to its keys whose message rightly reads as the base locale\'s, such as { "de": ["unit_km"] }',
 		);
 	}
+	if (!isRecord(fallbacks)) {
+		throw invalid(
+			'"fallbacks" must map a locale to the locale of its language it takes the messages it lacks from, such as { "en-GB": "en" }',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -175,6 +185,7 @@ export function readConfig(file: string): Config {
 			baseLocale,
 			invalid,
 		),
+		fallbacks: readFallbacks(fallbacks, locales, baseLocale, invalid),
 	};
 }
 

@@ -4,6 +4,7 @@ import { lineCount } from "./declaration-maps.ts";
 import { keyDeclaration } from "./declarations.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError, sortErrors } from "./error.ts";
+import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { caseCollisions, isCompilable, keyProblems } from "./key-checks.ts";
 import { type LocaleMessage, parseMessage } from "./message.ts";
 import { type KeyModule, keyModule, type RuntimeFunction } from "./modules.ts";
@@ -67,19 +68,30 @@ export function compileCatalogs(
 			? new Map<string, string>()
 			: caseCollisions(allKeys(catalogs));
 	const base = catalogs.find((catalog) => catalog.locale === config.baseLocale);
+	const fallbackOf = fallbackPositions(config.locales, config.fallbacks);
 	for (const key of candidates) {
+		const sources = catalogs.map((_, index) =>
+			messageSource(key, index, catalogs, fallbackOf),
+		);
 		const reused = previous?.keys.get(key);
 		if (
 			reused !== undefined &&
 			!collisions.has(key) &&
-			unchanged(reused, catalogs, key)
+			unchanged(reused, sources, key)
 		) {
 			keys.set(key, reused);
 			continue;
 		}
 		changed.add(key);
 		keys.delete(key);
-		const compiled = compileKey(key, catalogs, base, collisions, errors);
+		const compiled = compileKey(
+			key,
+			catalogs,
+			sources,
+			base,
+			collisions,
+			errors,
+		);
 		if (compiled !== undefined) keys.set(key, compiled);
 	}
 	if (edited === undefined) {
@@ -97,21 +109,26 @@ export function compileCatalogs(
 	return { catalogs, keys, changed, formatted, errors: sortErrors(errors) };
 }
 
-/** Compiles one key, or adds why it cannot be to the errors. A key no catalog has any more is undefined. */
+/**
+ * Compiles one key, or adds why it cannot be to the errors. A key no catalog has any more is
+ * undefined. `sources` holds, for each locale, the catalog its message comes from: its own, or the
+ * one it falls back to.
+ */
 function compileKey(
 	key: string,
 	catalogs: readonly Catalog[],
+	sources: readonly (Catalog | undefined)[],
 	base: Catalog | undefined,
 	collisions: ReadonlyMap<string, string>,
 	errors: GraiError[],
 ): CompiledKey | undefined {
-	const values = catalogs.map((catalog) => catalog.messages.get(key));
+	const values = sources.map((source) => source?.messages.get(key));
 	if (values.every((value) => value === undefined)) return undefined;
 	if (!isCompilable(key, values, collisions)) {
 		errors.push(...keyProblems(key, catalogs, values, collisions));
 		return undefined;
 	}
-	const messages = parseMessages(key, catalogs, values, errors);
+	const messages = parseMessages(key, catalogs, sources, values, errors);
 	if (messages === undefined) return undefined;
 	const module = keyModule(key, messages);
 	const declaration = keyDeclaration(key, messages, base?.messages.get(key));
@@ -159,22 +176,24 @@ function allKeys(catalogs: readonly Catalog[]): Set<string> {
 	return keys;
 }
 
-/** Whether each catalog still holds the raw message the key was compiled from. */
+/** Whether each locale's catalog, or its fallback's, still holds the raw message the key was compiled from. */
 function unchanged(
 	compiled: CompiledKey,
-	catalogs: readonly Catalog[],
+	sources: readonly (Catalog | undefined)[],
 	key: string,
 ): boolean {
-	return catalogs.every((catalog, index) => {
-		const value = catalog.messages.get(key);
+	return sources.every((source, index) => {
+		const value = source?.messages.get(key);
 		const before = compiled.values[index];
 		return value === before || sameJson(value, before);
 	});
 }
 
+/** Each locale's message parsed, its errors named by the file the message is in. */
 function parseMessages(
 	key: string,
 	catalogs: readonly Catalog[],
+	sources: readonly (Catalog | undefined)[],
 	values: readonly unknown[],
 	errors: GraiError[],
 ): LocaleMessage[] | undefined {
@@ -184,9 +203,8 @@ function parseMessages(
 			messages.push(parseMessage(locale, values[index]));
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
-			errors.push(
-				new GraiError(error.code, { file, key, locale }, error.message),
-			);
+			const where = { file: sources[index]?.file ?? file, key, locale };
+			errors.push(new GraiError(error.code, where, error.message));
 		}
 	});
 	return messages.length === catalogs.length ? messages : undefined;

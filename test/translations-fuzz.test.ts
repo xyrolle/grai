@@ -92,6 +92,7 @@ function catalog(locale: string, messages: Record<string, unknown>): Catalog {
 		locale,
 		file: `${locale}.json`,
 		bytes: Buffer.from(JSON.stringify(messages)),
+		fallsBack: false,
 	});
 }
 

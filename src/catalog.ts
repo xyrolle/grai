@@ -4,8 +4,16 @@ import { type Config, isMissing, isRecord } from "./config.ts";
 import { editedMessages } from "./edit.ts";
 import { GraiError } from "./error.ts";
 
-/** One locale's catalog file as read: its path relative to the project's root, and its bytes. */
-export type CatalogSource = { locale: string; file: string; bytes: Buffer };
+/**
+ * One locale's catalog file as read: its path relative to the project's root, its bytes, and
+ * whether the locale falls back to another, so that its catalog can be empty.
+ */
+export type CatalogSource = {
+	locale: string;
+	file: string;
+	bytes: Buffer;
+	fallsBack: boolean;
+};
 
 /** One locale's catalog, parsed: its raw messages by key. */
 export type Catalog = {
@@ -31,7 +39,12 @@ export async function readCatalogSources(config: Config): Promise<{
 		[...config.catalogs].map(async ([locale, path]) => {
 			const file = relative(config.root, path);
 			try {
-				return { locale, file, bytes: await readFile(path) };
+				return {
+					locale,
+					file,
+					bytes: await readFile(path),
+					fallsBack: config.fallbacks.has(locale),
+				};
 			} catch (error) {
 				return unreadable(error, { file, locale }, path);
 			}
@@ -64,8 +77,12 @@ function unreadable(
 			);
 }
 
-/** Parses a catalog. One that is not a JSON object, or that holds no messages, is an error. */
-export function parseCatalog({ locale, file, bytes }: CatalogSource): Catalog {
+/**
+ * Parses a catalog. One that is not a JSON object is an error, and so is one that holds no messages,
+ * unless its locale falls back to another.
+ */
+export function parseCatalog(source: CatalogSource): Catalog {
+	const { locale, file, bytes } = source;
 	const where = { file, locale };
 	let value: unknown;
 	try {
@@ -88,7 +105,7 @@ export function parseCatalog({ locale, file, bytes }: CatalogSource): Catalog {
 	for (const key in value) {
 		if (key !== schemaKey) messages.set(key, value[key]);
 	}
-	return withMessages({ locale, file }, messages);
+	return withMessages(source, messages);
 }
 
 /**
@@ -110,10 +127,10 @@ export function parseEditedCatalog(
 }
 
 function withMessages(
-	{ locale, file }: { locale: string; file: string },
+	{ locale, file, fallsBack }: CatalogSource,
 	messages: Map<string, unknown>,
 ): Catalog {
-	if (messages.size === 0) {
+	if (messages.size === 0 && !fallsBack) {
 		throw new GraiError(
 			"catalog-empty",
 			{ file, locale },
