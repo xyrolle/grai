@@ -55,3 +55,9 @@ Done when: the Vite plugin serves that module and reports the key, with a test t
 It leaves out ICU's currency and skeleton styles and i18next's formats with options or other than `number` and `datetime`, which need their options mapped one by one, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
+
+## Rename what a module reads off a dynamic import
+
+`grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.
+
+Done when: a rename changes them, with a test of each.
