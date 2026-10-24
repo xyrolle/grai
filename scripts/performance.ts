@@ -13,19 +13,28 @@ import { fileURLToPath } from "node:url";
 import { compile, recompile } from "../src/compile.ts";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+/** A script that times a process's first compile of the config it is given. */
+const firstCompile = `
+const { compile } = await import(${JSON.stringify(new URL("../src/compile.ts", import.meta.url).href)});
+const started = performance.now();
+await compile(process.argv[1]);
+console.log(performance.now() - started);
+`;
 
 /** The median of three runs on CI's runner, rounded up: an edit took 4.8, 3.6 and 4.0 ms. */
 const baselines = { cold: 110, noop: 3, edit: 4, process: 160 };
 const keys = 6667;
-/** Edits made before the timed ones, while the engine still optimizes the recompile. */
-const warmupEdits = 10;
+/** Runs made before the timed ones of a step, while the engine still optimizes it. */
+const warmupRuns = 10;
 /**
  * How many times each step after the first compile is timed. Its median is the step's time, which
  * one slow run on a busy runner cannot move.
  */
 const timedEdits = 31;
-const timedNoops = 11;
+const timedNoops = 31;
 const timedProcesses = 3;
+/** A first compile is timed in fresh processes, each compile then the first in its process. */
+const timedColds = 3;
 
 /** The median of `runs` times `step` gives, after `warmups` it is run untimed. */
 async function median(
@@ -100,10 +109,24 @@ try {
 		}),
 	);
 
-	const start = performance.now();
+	const cold = await median(timedColds, async () => {
+		rmSync(join(dir, "out"), { recursive: true, force: true });
+		return Number(
+			execFileSync(
+				process.execPath,
+				["--input-type=module", "-e", firstCompile, config],
+				{
+					encoding: "utf8",
+				},
+			),
+		);
+	});
 	await compile(config);
-	const cold = performance.now() - start;
-	const noop = await median(timedNoops, () => timed(() => compile(config)));
+	const noop = await median(
+		timedNoops,
+		() => timed(() => compile(config)),
+		warmupRuns,
+	);
 	let { build } = await recompile(config, undefined);
 	let revision = 0;
 	const edit = await median(
@@ -114,7 +137,7 @@ try {
 				build = (await recompile(config, build)).build;
 			});
 		},
-		warmupEdits,
+		warmupRuns,
 	);
 	const fresh = await median(timedProcesses, () => {
 		rmSync(join(dir, "out"), { recursive: true, force: true });
