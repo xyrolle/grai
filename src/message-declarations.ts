@@ -3,15 +3,15 @@
  * `local y = x: plural type=ordinal` and `local y = x: number …`.
  */
 
-import { type Format, parseFormat } from "./format-options.ts";
+import { type Call, parseCall } from "./format-options.ts";
 import type { PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
 /** A local such as `local countPlural = count: plural`: the input it counts, by CLDR's rules of a type. */
 export type PluralLocal = { input: string; type: PluralType };
 
-/** A local such as `local price = amount: number style=currency currency=EUR`. */
-export type FormattedLocal = { input: string; format: Format };
+/** A local such as `local price = amount: number style=currency currency=EUR`: its input, and the call. */
+export type FormattedLocal = { input: string } & Call;
 
 /** A message's declarations: its inputs, and its plural and formatted locals by name. */
 export type Declarations = {
@@ -55,8 +55,8 @@ function parseDeclaration(declaration: string): Declaration {
 			const type = pluralTypeOf(options.trim(), declaration);
 			return { kind: "plural", name, input: operand, type };
 		}
-		const format = parseFormat(fn, options, `"${declaration}"`);
-		return { kind: "format", name, input: operand, format };
+		const call = parseCall(fn, options, `"${declaration}"`);
+		return { kind: "format", name, input: operand, ...call };
 	}
 	throw new MessageProblem(
 		"message-invalid",

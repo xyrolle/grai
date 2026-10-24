@@ -3,7 +3,7 @@ import type { CompiledKey } from "./compilation.ts";
 
 /**
  * The imports a module of keys needs from the output: the runtime functions it names, the
- * `unmatched` the keys' code throws with, the plural functions they count with, and
+ * `unmatched` the keys' code throws with, the functions of plurals.js they count with, and
  * the formatters they call.
  */
 export function outputImports(

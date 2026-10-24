@@ -7,7 +7,7 @@ import { catchAll } from "./selection.ts";
 
 type Mode = "string" | "parts";
 
-/** What a key's code calls: runtime functions, plural functions and formatters, by name. */
+/** What a key's code calls: runtime functions, plurals.js's functions and formatters, by name. */
 export type Used = {
 	uses: Set<RuntimeFunction>;
 	plurals: Set<string>;

@@ -1,4 +1,7 @@
-/** A formatting function's call, as a message writes it: its options checked and made Intl's when compiling. */
+/**
+ * A formatting function's call, as a message writes it: its options checked and made Intl's when
+ * compiling, and its `select` mode.
+ */
 
 import {
 	functions,
@@ -13,18 +16,45 @@ import { MessageProblem } from "./problem.ts";
 /** How a value is shown: through an Intl formatter, with the options Intl takes. */
 export type Format = { formatter: IntlFormatter; options: IntlOptions };
 
+/**
+ * MessageFormat 2's `select` option of `:number` and `:integer`: how a selector on the call
+ * matches, by the exact value and then by its plural or ordinal category, or by the exact value
+ * alone. It does not change how the value is formatted.
+ */
+export type SelectMode = "plural" | "ordinal" | "exact";
+
+/** A call as a local declares it: its function, the options given, its format, and its `select`. */
+export type Call = {
+	fn: string;
+	given: readonly string[];
+	format: Format;
+	/** For a function that selects, its mode, plural by default. */
+	select: SelectMode | undefined;
+};
+
 const option = /^([A-Za-z]\w*)=(\S+)$/;
 
-/**
- * The format a function call asks for, such as `:number` with `minimumFractionDigits=2`, checked
- * by making its formatter once: whether Intl takes the options does not depend on the locale.
- * `source` is the call as written, for the errors.
- */
+const selectModes: readonly SelectMode[] = ["plural", "ordinal", "exact"];
+
+/** The format a placeholder's call asks for, such as `{n :number minimumFractionDigits=2}`. */
 export function parseFormat(
 	name: string,
 	optionsText: string,
 	source: string,
 ): Format {
+	return parseCall(name, optionsText, source).format;
+}
+
+/**
+ * A function call, such as `:number` with `minimumFractionDigits=2`: its format, checked by making
+ * its formatter once, as whether Intl takes the options does not depend on the locale, and its
+ * `select` mode. `source` is the call as written, for the errors.
+ */
+export function parseCall(
+	name: string,
+	optionsText: string,
+	source: string,
+): Call {
 	const spec = functions[name];
 	if (spec === undefined) {
 		throw new MessageProblem(
@@ -37,13 +67,19 @@ export function parseFormat(
 		);
 	}
 	const given: Record<string, OptionValue> = {};
+	let select: SelectMode | undefined;
 	for (const token of optionsText.trim().split(/\s+/).filter(Boolean)) {
 		const [, key = "", text = ""] = option.exec(token) ?? [];
+		if (key === "select" && spec.selects && select === undefined) {
+			select = selectModeOf(text, source, token);
+			continue;
+		}
 		const kind = spec.options[key];
 		if (kind === undefined || Object.hasOwn(given, key)) {
+			const known = Object.keys(spec.options);
 			throw new MessageProblem(
 				"message-invalid",
-				`${source}: "${token}" is not an option of :${name}, or is given twice. Its options are ${Object.keys(spec.options).join(", ")}.`,
+				`${source}: "${token}" is not an option of :${name}, or is given twice. Its options are ${(spec.selects ? ["select", ...known] : known).join(", ")}.`,
 			);
 		}
 		given[key] = optionValue(kind, text, source, token);
@@ -67,7 +103,23 @@ export function parseFormat(
 			`${source}: Intl cannot format with these options: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
-	return format;
+	return {
+		fn: name,
+		given: Object.keys(given),
+		format,
+		select: spec.selects ? (select ?? "plural") : undefined,
+	};
+}
+
+function selectModeOf(text: string, source: string, token: string): SelectMode {
+	const mode = selectModes.find((known) => known === text);
+	if (mode === undefined) {
+		throw new MessageProblem(
+			"message-invalid",
+			`${source}: "${token}" needs plural, ordinal or exact.`,
+		);
+	}
+	return mode;
 }
 
 function optionValue(
