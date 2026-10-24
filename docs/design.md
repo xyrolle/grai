@@ -35,6 +35,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
   server.js     server.d.ts      the request middleware; client code never imports it
   keys.js       keys.d.ts        every message, as the re-exports of its shards
   keys/<n>.js   keys/<n>.d.ts    a shard: about 512 keys
+  keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
   messages.js   messages.d.ts    `m`, the namespace of keys.js
   .grai/manifest.json            what the output was compiled from, and its files
 ```
@@ -126,6 +127,7 @@ export declare const cart_items: Message<{ count: number }>;
 
   A key's inputs are the union over its locales, so a call suits every locale.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
+- **Go to definition lands on the key in the base locale's catalog.** Each shard's declarations have a declaration map, from each key's name to the line its key is on in the base catalog, and TypeScript 6's tsserver and TypeScript 7's language server both follow it. An edit regenerates the maps only when it moves a key to another line, so a message's new words cost no map.
 - **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `runtime.d.ts` declares what the shards and `server.js` import from the runtime, and `config.js` and `plurals.js` carry JSDoc types.
 - **The declarations are sharded like the modules, by measurement.** On app A and app B, a file importing `m` and using five keys, checked with TypeScript 7 and completed after `m.` with TypeScript 6's language service:
 

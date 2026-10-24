@@ -14,6 +14,12 @@ A production page holds only its locale's words, and `setLocale(locale, { reload
 
 Done when: the design records one option as a decision, and a browser test shows that a production build and dev switch the same way.
 
+## Show a server text call at 20 ns or less
+
+A text message called in a request reads the request's locale from `AsyncLocalStorage`. On a loaded machine that measured 24–27 ns, against 28–32 ns for the runtime lane's prototype run alongside, which measured 14–23 ns on a quiet one.
+
+Done when: `bench/` runs grai's own output on a quiet machine and shows a text call in a request at 20 ns or less, or the design records why the floor is higher.
+
 ## Support MessageFormat 2's formatting functions
 
 `:number`, `:integer`, `:datetime`, `:date` and `:time` are compile errors today, and so are function options (such as `select=ordinal`) and markup options and attributes. Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
