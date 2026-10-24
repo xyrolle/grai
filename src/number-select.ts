@@ -1,23 +1,24 @@
 /**
- * Selecting on a `:number` or `:integer` local, as MessageFormat 2 selects on it: a key that is a
- * number matches the value exactly, a key that is a category matches the value's CLDR category of
- * the rules `select` names, and an exact match comes before a category.
+ * Selecting on a `:number`, `:integer` or `:percent` local, as MessageFormat 2 selects on it: a
+ * key that is a number matches the value exactly, a key that is a category matches the value's
+ * CLDR category of the rules `select` names, and an exact match comes before a category.
  */
 
+import type { SelectedNumber } from "./format-functions.ts";
 import type { SelectMode } from "./format-options.ts";
 import type { FormattedLocal } from "./message-declarations.ts";
 import { categoriesOf, type PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
 /**
- * A selector on a number local: the input it reads, whether it rounds it to a whole number first,
- * as `:integer` does, and the rules its categories come from, none for `select=exact`.
+ * A selector on a number local: the input it reads, the number it compares, and the rules its
+ * categories come from, none for `select=exact`.
  */
 export type NumberSelector = {
 	kind: "number";
 	name: string;
 	input: string;
-	integer: boolean;
+	number: SelectedNumber;
 	rules: PluralType | undefined;
 };
 
@@ -37,7 +38,9 @@ const writingOptions: ReadonlySet<string> = new Set([
 
 /** The rules a number local's categories come from, none for select=exact or a date. */
 export function selectRules(local: FormattedLocal): PluralType | undefined {
-	return local.select === undefined ? undefined : rulesByMode[local.select];
+	return local.selection === undefined
+		? undefined
+		: rulesByMode[local.selection.mode];
 }
 
 /** A selector on a formatted local; throws a MessageProblem for one grai cannot select on. */
@@ -45,7 +48,7 @@ export function numberSelector(
 	name: string,
 	local: FormattedLocal,
 ): NumberSelector {
-	if (local.select === undefined) {
+	if (local.selection === undefined) {
 		throw new MessageProblem(
 			"unsupported",
 			`it selects on ${name}, a :${local.fn} value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.`,
@@ -62,7 +65,7 @@ export function numberSelector(
 		kind: "number",
 		name,
 		input: local.input,
-		integer: local.fn === "integer",
+		number: local.selection.number,
 		rules: selectRules(local),
 	};
 }
@@ -93,7 +96,7 @@ export function checkNumberKey(
 				`the variant ${selector.name}=${key} can never be chosen: a number matches the key it is written as, ${shortest}. Write that instead.`,
 			);
 		}
-		if (selector.integer && !Number.isInteger(Number(key))) {
+		if (selector.number === "integer" && !Number.isInteger(Number(key))) {
 			throw new MessageProblem(
 				"message-invalid",
 				`the variant ${selector.name}=${key} can never be chosen: ${selector.name} is a whole number. Remove it.`,

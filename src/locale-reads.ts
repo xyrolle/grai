@@ -6,7 +6,7 @@
 
 import type { LocaleMessage } from "./message.ts";
 import { isExactKey } from "./number-select.ts";
-import { integerName, pluralName } from "./plurals.ts";
+import { numberReaders, pluralName } from "./plurals.ts";
 import { catchAll } from "./selection.ts";
 
 export type LocaleReads = {
@@ -74,9 +74,12 @@ export function localeReads(
 	const numberConsts = () =>
 		selectors.flatMap((selector, index) => {
 			if (selector.kind !== "number" || !reads.has(selector.name)) return [];
-			const number = selector.integer ? called(integerName) : "Number";
+			const reader =
+				selector.number === "number"
+					? "Number"
+					: called(numberReaders[selector.number]);
 			const consts = [
-				`const $${selector.name} = ${number}(${value(selector.input)}); `,
+				`const $${selector.name} = ${reader}(${value(selector.input)}); `,
 			];
 			if (selector.rules !== undefined && categorized.has(index)) {
 				const plural = called(pluralName(locale, selector.rules));

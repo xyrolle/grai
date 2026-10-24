@@ -23,6 +23,12 @@ export type OptionKind =
 	| "digitsOrAuto"
 	| "text";
 
+/**
+ * The number a selector on a function compares, from its input: the input as a number, rounded to
+ * a whole one as `:integer` shows it, or the percent `:percent` shows.
+ */
+export type SelectedNumber = "number" | "integer" | "percent";
+
 /** A formatting function: its formatter, the options it takes, and what it formats with by default. */
 export type FormatFunction = {
 	formatter: IntlFormatter;
@@ -35,8 +41,11 @@ export type FormatFunction = {
 	required?: { option: string; example: string };
 	/** MessageFormat 2's options it does not take, each with the error that says why. */
 	refused?: Readonly<Record<string, string>>;
-	/** True when a selector can be made of it, which then takes the `select` option. */
-	selects?: true;
+	/**
+	 * How a selector on it chooses: by the number it compares, and by the `select` option it then
+	 * takes, or else always by the plural rules.
+	 */
+	selects?: { number: SelectedNumber; takesSelect: boolean };
 };
 
 /** The options that round a number to its significant digits, shared by the number functions. */
@@ -112,7 +121,7 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 			roundingIncrement: "digits",
 			roundingMode: "text",
 		},
-		selects: true,
+		selects: { number: "number", takesSelect: true },
 	},
 	integer: {
 		formatter: "number",
@@ -123,7 +132,7 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 			maximumSignificantDigits: "digits",
 		},
 		fixed: { maximumFractionDigits: 0 },
-		selects: true,
+		selects: { number: "integer", takesSelect: true },
 	},
 	percent: {
 		formatter: "number",
@@ -135,6 +144,7 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 			trailingZeroDisplay: "text",
 		},
 		fixed: { style: "percent" },
+		selects: { number: "percent", takesSelect: false },
 	},
 	currency: {
 		formatter: "number",
