@@ -45,6 +45,10 @@
 			"types": "./dist/react/markup.d.ts",
 			"default": "./dist/react/markup.js"
 		},
+		"./astro": {
+			"types": "./dist/astro.d.ts",
+			"default": "./dist/astro.js"
+		},
 		"./astro/middleware": {
 			"types": "./dist/astro/middleware.d.ts",
 			"default": "./dist/astro/middleware.js"
