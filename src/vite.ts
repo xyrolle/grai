@@ -1,16 +1,24 @@
 import { join, resolve } from "node:path";
-import type { DevEnvironment, Plugin } from "vite";
+import { type DevEnvironment, minifySync, type Plugin } from "vite";
 import type { CompiledKey } from "./compilation.ts";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import type { GraiError } from "./error.ts";
+import {
+	besideDirectory,
+	keyModulePrefix,
+	keyPrefix,
+	localeCopies,
+	localeDirectory,
+	messageDirectory,
+	messageOnly,
+} from "./locale-chunks.ts";
 import { pluralName } from "./plurals.ts";
 import { watch } from "./watch.ts";
 
 /** The plugin's options. `config` is the path of the project's grai.config.json, from Vite's root. */
 export type GraiOptions = { config?: string };
 
-const keyPrefix = "grai:key/";
 const patchPrefix = "grai:patch/";
 
 /**
@@ -18,12 +26,16 @@ const patchPrefix = "grai:patch/";
  * of them or the config changes, and nothing else; it serves every message as one module from
  * memory, and an edit sends only the changed keys' functions, which the page writes in place.
  * In a build, every key is a module of its own, so each chunk holds only the keys its code uses.
+ * In the client build those modules go to chunks of their own, under `grai/`, and each locale
+ * gets a copy of each under `grai-<locale>/`, with the same names and only its own words.
  */
 export function grai(options: GraiOptions = {}): Plugin {
 	let configFile = "";
 	let keysFile = "";
 	let outdir = "";
 	let serving = false;
+	/** Each message-only chunk's code per locale, by the chunk's file name before hashing. */
+	const copies = new Map<string, Map<string, string>>();
 	let build: Build | undefined;
 	/** The first compile, or the errors that kept it from a build. */
 	let first: Promise<Build | readonly GraiError[]> | undefined;
@@ -51,11 +63,97 @@ export function grai(options: GraiOptions = {}): Plugin {
 
 	return {
 		name: "grai",
-		configResolved(config) {
-			configFile = resolve(config.root, options.config ?? "grai.config.json");
+		config(config, environment) {
+			configFile = resolve(
+				config.root ?? "",
+				options.config ?? "grai.config.json",
+			);
 			outdir = readConfig(configFile).outdir;
 			keysFile = join(outdir, "keys.js");
-			serving = config.command === "serve";
+			serving = environment.command === "serve";
+		},
+		configEnvironment(name) {
+			if (serving || name !== "client") return;
+			const runtime = new Set(
+				["runtime.js", "config.js", "plurals.js"].map((file) =>
+					join(outdir, file),
+				),
+			);
+			// The runtime in a chunk of its own, and the keys in chunks by the entries that use them,
+			// so a message chunk holds keys and nothing else.
+			const groups = [
+				{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
+				{
+					name: messageDirectory,
+					test: (id: string) => id.startsWith(keyModulePrefix),
+					entriesAware: true,
+				},
+			];
+			return {
+				build: { rolldownOptions: { output: { codeSplitting: { groups } } } },
+			};
+		},
+		outputOptions(output) {
+			if (serving || this.environment?.name !== "client") return null;
+			const named = output.chunkFileNames;
+			return {
+				...output,
+				chunkFileNames: (chunk) => {
+					const fileName =
+						typeof named === "function"
+							? named(chunk)
+							: (named ?? "[name]-[hash].js");
+					return messageOnly(chunk.moduleIds)
+						? besideDirectory(fileName, messageDirectory)
+						: fileName;
+				},
+			};
+		},
+		renderChunk(code, chunk) {
+			if (
+				serving ||
+				this.environment.name !== "client" ||
+				!messageOnly(chunk.moduleIds)
+			)
+				return null;
+			copies.set(
+				chunk.fileName,
+				localeCopies(chunk.fileName, code, build?.config.locales ?? []),
+			);
+			return null;
+		},
+		generateBundle(_, bundle) {
+			if (serving || this.environment.name !== "client") return;
+			// A chunk's file name has a placeholder for its hash until the bundle is written.
+			const hashes = new Map<string, string>();
+			const chunks = Object.values(bundle).filter(
+				(file) => file.type === "chunk",
+			);
+			for (const chunk of chunks) {
+				const token = chunk.preliminaryFileName.match(/!~\{\d+\}~/)?.[0];
+				if (token === undefined) continue;
+				const at = chunk.preliminaryFileName.indexOf(token);
+				const after = chunk.preliminaryFileName.length - at - token.length;
+				hashes.set(
+					token,
+					chunk.fileName.slice(at, chunk.fileName.length - after),
+				);
+			}
+			const minify = this.environment.config.build.minify !== false;
+			for (const chunk of chunks) {
+				for (const [locale, code] of copies.get(chunk.preliminaryFileName) ??
+					[]) {
+					const linked = code.replaceAll(
+						/!~\{\d+\}~/g,
+						(token) => hashes.get(token) ?? token,
+					);
+					this.emitFile({
+						type: "asset",
+						fileName: besideDirectory(chunk.fileName, localeDirectory(locale)),
+						source: minify ? minifySync(chunk.fileName, linked).code : linked,
+					});
+				}
+			}
 		},
 		async buildStart() {
 			if (serving) return;
@@ -139,7 +237,7 @@ export function grai(options: GraiOptions = {}): Plugin {
 		async load(id) {
 			const patch = patches.get(id);
 			if (patch !== undefined) return patch;
-			if (id !== keysFile && !id.startsWith(`\0${keyPrefix}`)) return null;
+			if (id !== keysFile && !id.startsWith(keyModulePrefix)) return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;
 			if (!("compilation" in compiled)) return this.error(describe(compiled));
@@ -151,7 +249,7 @@ export function grai(options: GraiOptions = {}): Plugin {
 					code: serving ? devModule(current) : keysModule(current),
 					moduleSideEffects: false,
 				};
-			const key = id.slice(keyPrefix.length + 1);
+			const key = id.slice(keyModulePrefix.length);
 			const module = current.compilation.keys.get(key);
 			if (module === undefined) return null;
 			return {

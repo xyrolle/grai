@@ -11,8 +11,12 @@ const catalogs = {
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
 };
 
-/** The chunks a Vite build of `entries` writes, by entry name: each one's code with its imports'. */
-async function builtEntries(dir: string, entries: Record<string, string>) {
+/** What a Vite build of `entries` writes: every file, and each entry's code with its imports'. */
+async function built(
+	dir: string,
+	entries: Record<string, string>,
+	{ write = false } = {},
+) {
 	for (const [name, code] of Object.entries(entries))
 		writeFileSync(join(dir, `${name}.js`), code);
 	const output = await build({
@@ -21,8 +25,8 @@ async function builtEntries(dir: string, entries: Record<string, string>) {
 		logLevel: "silent",
 		plugins: [grai()],
 		build: {
-			write: false,
-			minify: false,
+			write,
+			outDir: join(dir, "dist"),
 			rolldownOptions: {
 				input: Object.fromEntries(
 					Object.keys(entries).map((name) => [name, join(dir, `${name}.js`)]),
@@ -30,9 +34,10 @@ async function builtEntries(dir: string, entries: Record<string, string>) {
 			},
 		},
 	});
-	const chunks = (Array.isArray(output) ? output : [output])
-		.flatMap((result) => ("output" in result ? result.output : []))
-		.filter((file) => file.type === "chunk");
+	const files = (Array.isArray(output) ? output : [output]).flatMap((result) =>
+		"output" in result ? result.output : [],
+	);
+	const chunks = files.filter((file) => file.type === "chunk");
 	const byFile = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
 	const loaded = (file: string, seen = new Set<string>()): string => {
 		if (seen.has(file)) return "";
@@ -43,17 +48,29 @@ async function builtEntries(dir: string, entries: Record<string, string>) {
 			: chunk.code +
 					chunk.imports.map((imported) => loaded(imported, seen)).join("");
 	};
-	return Object.fromEntries(
+	const entryCode = Object.fromEntries(
 		chunks
 			.filter((chunk) => chunk.isEntry)
 			.map((chunk) => [chunk.name, loaded(chunk.fileName)]),
 	);
+	const sources = new Map(
+		files.map((file) => [
+			file.fileName,
+			file.type === "chunk" ? file.code : String(file.source),
+		]),
+	);
+	const entryFiles = Object.fromEntries(
+		chunks
+			.filter((chunk) => chunk.isEntry)
+			.map((chunk) => [chunk.name, chunk.fileName]),
+	);
+	return { entries: entryCode, sources, entryFiles };
 }
 
 describe("the Vite plugin's build", () => {
 	it("gives each entry only the keys its code uses", async () => {
 		const { dir } = project(catalogs);
-		const entries = await builtEntries(dir, {
+		const { entries } = await built(dir, {
 			a: `import { m } from "./out/messages.js";\nconsole.log(m.title(), m.greeting({ name: "Ana" }));\n`,
 			b: `import { m } from "./out/messages.js";\nconsole.log(m.footer(), m.greeting({ name: "Ana" }));\n`,
 		});
@@ -73,10 +90,58 @@ describe("the Vite plugin's build", () => {
 	it("fails the build with the compiler's errors", async () => {
 		const { dir } = project({ en: { title: "Title" }, de: {} });
 		await expect(
-			builtEntries(dir, {
+			built(dir, {
 				a: `import { m } from "./out/messages.js";\nconsole.log(m.title());\n`,
 			}),
 		).rejects.toThrow(/catalog/);
+	});
+});
+
+describe("the Vite plugin's locale copies", () => {
+	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
+
+	it("writes each message chunk once per locale, with only that locale's words", async () => {
+		const { dir } = project(catalogs);
+		const { sources } = await built(dir, { page });
+		const messageChunks = [...sources.keys()].filter((file) =>
+			file.startsWith("grai/"),
+		);
+		const words = (file: string) => [
+			sources.get(file)?.includes("Title"),
+			sources.get(file)?.includes("Titel"),
+		];
+
+		expect(messageChunks.length).toBeGreaterThan(0);
+		for (const file of messageChunks) {
+			expect(words(file)).toEqual([true, true]);
+			expect(words(file.replace("grai/", "grai-en/"))).toEqual([true, false]);
+			expect(words(file.replace("grai/", "grai-de/"))).toEqual([false, true]);
+		}
+	});
+
+	it("serves a page its locale's words alone through an import map", async () => {
+		const { dir } = project(catalogs);
+		const { entryFiles } = await built(dir, { page }, { write: true });
+		const html = `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/grai/":"/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`;
+		const browser = await chromium.launch();
+		onTestFinished(() => browser.close());
+		const tab = await browser.newPage();
+		const requested: string[] = [];
+		await tab.route("http://grai.test/**", (route) => {
+			const path = new URL(route.request().url()).pathname;
+			requested.push(path);
+			return path === "/"
+				? route.fulfill({ contentType: "text/html", body: html })
+				: route.fulfill({
+						contentType: "text/javascript",
+						body: readFileSync(join(dir, "dist", path)),
+					});
+		});
+		await tab.goto("http://grai.test/");
+		await tab.waitForFunction(`document.body.textContent === "Titel"`);
+
+		expect(requested.some((path) => path.startsWith("/grai/"))).toBe(false);
+		expect(requested.some((path) => path.startsWith("/grai-de/"))).toBe(true);
 	});
 });
 
