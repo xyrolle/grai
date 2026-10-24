@@ -7,6 +7,7 @@ import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { find, foundLines } from "./find.ts";
+import { rename } from "./rename.ts";
 import { watch } from "./watch.ts";
 
 const usage = `Usage: grai <command> [--config <file>]
@@ -19,6 +20,9 @@ const usage = `Usage: grai <command> [--config <file>]
                                then compile
   find <key> [--source <dir>]...
                                print the key's line in each catalog, and each call site
+  rename <key> <new> [--source <dir>]...
+                               rename the key in every catalog and at every call site, then
+                               compile; nothing changes if a call site is unclear
 
 The config is grai.config.json in the current directory, unless --config names another file.`;
 
@@ -93,6 +97,23 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		const found = await find(config, key, sourcesOf(values));
 		for (const line of foundLines(key, found)) console.log(line);
 		return found.errors.length > 0 ? failed(found.errors) : 0;
+	},
+	async rename(args) {
+		const { config, values, positionals } = parsed(args, {
+			source: { type: "string", multiple: true },
+		});
+		const [from, to, ...others] = positionals;
+		if (from === undefined || to === undefined || others.length > 0) {
+			throw new UsageError("rename takes the key and its new name");
+		}
+		const started = performance.now();
+		const result = await rename(config, from, to, sourcesOf(values));
+		if (result.changed.length > 0) {
+			console.log(
+				`grai: renamed ${from} to ${to} in ${result.changed.join(", ")}`,
+			);
+		}
+		return reported(config, result, performance.now() - started);
 	},
 };
 
