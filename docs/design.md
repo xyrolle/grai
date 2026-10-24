@@ -90,7 +90,7 @@ They come through an import map, which keeps the framework's single client build
 - **Key modules import the output by `grai:output/`, a prefix of grai's, not by its path.** The bundler weighs a module by its code, and with the output's path in each key module the same project would chunk differently in another directory.
 - **The formatters stay in the runtime's chunk.** A chunk of their own would spare a page without formatted messages their bytes, for one more request on every page with one. App A has no formatted message, and app B's formatters take 223 bytes brotli.
 - **Each message chunk has a copy per locale,** under the sibling `grai-<locale>/`, with the same file name, imports and exports. Each key's call keeps only its locale's variant, at its locale's position, so the runtime picks it for the page's locale. A sibling, not a subdirectory, so the copies' relative imports reach the same shared chunks.
-- **The server writes the import map,** from `…/grai/` to `…/grai-<locale>/`, and points the page's `modulepreload` links at the copies, as browsers apply no import map to `modulepreload`. Without the map a page still works, with every locale's words. This is the SvelteKit adapter's part, still open (`docs/followups.md`).
+- **The server writes the import map,** from `…/grai/` to `…/grai-<locale>/`, and points the page's `modulepreload` links at the copies, as browsers apply no import map to `modulepreload`. Without the map a page still works, with every locale's words. `grai/nuxt` writes them for Nuxt; the SvelteKit adapter's part is still open (`docs/followups.md`).
 
 **Every client rule is the same in every build, dev and tests included, so nothing fails only after deploy.** On the client, a forced `{ locale }` must be the current locale. Any other throws a `GraiError` (`locale-not-loaded`) naming both locales, and in dev the key too. A build leaves key names out of the page: on app A they would add a third to its gzipped message bytes, and the call site in the stack names the key.
 
@@ -291,6 +291,22 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - **In dev, an edit renders again in place, and the page keeps its state.** The dev module names each message call's key to `globalThis[Symbol.for("grai.read")]`, as for `grai/sveltekit/client`, and `grai/vue/client` makes that a read of the key's own `shallowRef`. On `grai:change` it changes the edited keys' refs instead of reloading, so the renders, computeds and watchers that called an edited message run again, and no other. It is behind `import.meta.hot`, which a build defines as undefined, so production ships nothing reactive under `"switch": "reload"`. A message called once in `setup` keeps its old words until the page loads again, as anything computed there would. `"live"` can make a Vue page re-render in the locale it switches to through the same read, once the runtime calls it and dispatches `grai:change` after a switch.
 - **A page still loads every locale's message chunks,** until its server writes the import map to its locale's copies (`docs/followups.md`).
 
+## Nuxt
+
+- **A module, as Nuxt takes its integrations: `modules: ["grai/nuxt"]`.** It compiles in its setup, before Nuxt builds anything, so the server's modules, `nuxt prepare` and `nuxt typecheck` find the output. A build fails on a compile error; dev goes on, and shows the next compile's errors in the overlay.
+- **A server middleware resolves the locale once per request, and the app's plugin binds it for the render.** Nuxt bundles its server and its app apart, each with a copy of the output, so the binding in the server's copy cannot reach the app's. Both are given the request's event, so the middleware keeps the locale's place in `locales` on it. The plugin has the app's runtime read it from the Nuxt app of the render (`tryUseNuxtApp`): every setup, template, plugin and route middleware of a render finds that app, and `<script setup>` finds it again after an await.
+  - Interleaved requests keep their own locales, before and after a page's await (`test/nuxt-example.test.ts`).
+  - A message rendered where no render can be found, at a module's top level or after an await outside a setup, throws a `GraiError` (`locale-unbound`) rather than render the base locale's words.
+  - `setLocale` cannot change a render's locale, since the request names it, so the page's `<html lang>` and its words always agree.
+- **`<html lang>` and `dir` are written through `useHead`,** so the page hydrates in the locale it was drawn in.
+- **The url strategy routes each page under each locale's prefix but the base locale's, through copies of the pages in Nuxt's `pages:resolved` hook,** as @nuxtjs/i18n does. A copy is named `<name>___<locale>`, as @nuxtjs/i18n names its own. A route's locale is its prefix, so the middleware's strategy and the router always agree.
+  - Only paths are localized: a name leads to the base locale's page, and a link names its locale with `localizeHref`.
+  - A link into another locale loads the page anew, through a global route middleware, since a page holds its own locale's words alone and a navigation in place would show the other locale's page with them.
+  - `app.baseURL` must be `/`, since the strategy reads a path's first segment (`docs/followups.md`).
+- **A page downloads only its locale's message chunks.** grai/vite keeps them in Nuxt's `_nuxt/grai/`, and each locale's copies in `_nuxt/grai-<locale>/`, where Nitro serves them. The plugin adds one entry to the import map Nuxt already writes for its entry, and points the page's preload and prefetch links at the copies. It does so in unhead's `ssr:render` hook, on the head's tags, so no HTML is parsed. A page without Nuxt's import map is left as it is, with every locale's words.
+- **grai/vite runs in the browser's build only.** Nuxt runs its server's dev modules in vite-node, outside Vite's module runner, so grai/vite's patch of a runner would not reach them. Nuxt invalidates those modules when grai writes the output's files, so the next server render has the edit, and the open page renders it again in place through `grai/vue/client`, which the plugin imports.
+- **`ssr: false` is refused,** since the server picks each page's locale.
+
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
@@ -391,5 +407,6 @@ Next runs the proxy apart from the render, renders a request's layouts and pages
   - `grai/next`, `grai/next/config` and `grai/next/proxy`: the Next adapter, also thin, which finds the project's generated modules through `withGrai`;
   - `grai/react`: the `Markup` component;
   - `grai/vue`: Vue's `Markup`, and `grai/vue/client`, which renders an edit again in place in dev;
+  - `grai/nuxt`: the Nuxt module;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next, React and Vue are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next, React, Vue and Nuxt are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.

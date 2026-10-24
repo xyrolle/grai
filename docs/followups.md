@@ -20,6 +20,24 @@ A server-rendered Vue page loads every locale's copy of its message chunks, sinc
 
 Done when: a Vue app's server can write the map and the preloads with one call from grai, with a browser test that a page of `examples/vue` loads no other locale's words.
 
+## Nuxt dev under the Vite Environment API
+
+With `experimental.viteEnvironmentApi`, Nuxt's one Vite server holds the browser's environment and the server's, and grai/vite, scoped to the browser's, still patches the server's environment in place after an edit, as if Vite's module runner ran it. Nuxt runs the server's modules in vite-node instead, so its next render keeps the old words.
+
+Done when: grai/vite takes the messages again in an environment whose runner did not evaluate them, and a test of the Nuxt example under `experimental.viteEnvironmentApi` shows an edit in the server's next render.
+
+## A Nuxt navigation's preloads
+
+On a client navigation to a page Nuxt loads lazily, Vite's preload helper adds `modulepreload` links for the page's chunks as it imports them, and they name the shared message chunks, which no import map reaches. The browser then fetches both a shared chunk and the locale's copy.
+
+Done when: a navigation preloads the locale's copies alone, with a test that it fetches no shared message chunk.
+
+## Localized redirects in Nuxt
+
+The url strategy's copy of a page keeps the page's `redirect`, so a redirect from a localized path leads to the base locale's path.
+
+Done when: a copy's redirect to a path names its locale, with a test.
+
 ## Switch locale in place: `"switch": "live"`
 
 The config accepts `"live"`, and `grai/svelte` then keeps every message a call, but no page switches in place yet. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
