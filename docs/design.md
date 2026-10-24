@@ -4,7 +4,7 @@ grai compiles translation catalogs into plain functions and their type declarati
 
 ## Goals
 
-The reference workloads are two production SvelteKit apps: app A with 6,366 keys × 3 locales (about 19k messages), and app B with 13,326 keys × 3 locales (about 40k messages).
+The reference workloads are two production SvelteKit apps: app A with 6,379 keys × 3 locales (about 19k messages), and app B with 13,326 keys × 3 locales (about 40k messages).
 - A full compile takes well under a second on either.
 - An edit to one message reaches the output in milliseconds.
 - No network, no plugins, and no TypeScript run.
@@ -32,6 +32,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
 <outdir>/
   config.js                      the project's locales and strategy, which the runtime reads
   plurals.js                     each locale's plural rules, compiled from CLDR
+  formats.js                     the Intl formatters messages call, when any does
   runtime.js    runtime.d.ts     the runtime, the same for every project
   server.js     server.d.ts      the request middleware; client code never imports it
   keys.js       keys.d.ts        every message, as the re-exports of its shards
@@ -41,15 +42,15 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
   .grai/manifest.json            what the output was compiled from, and its files
 ```
 
-- **On disk, a few modules hold every message.** Node, scripts and tests load them as they are, and the output is a few dozen files whatever the key count. Per-key files would cost every install, editor index and file watcher, at 12.7k files for app A and 26.7k for app B, and writing that many takes about a second on its own (measured: 26.7k small files, 0.75 to 1.3 s).
-- **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then rewrites one shard of about 512 keys (100 kB for app B), and its declarations only when they change, not the whole catalog's output. TypeScript and editors re-read that shard alone.
+- **On disk, a few modules hold every message.** Node, scripts and tests load them as they are, and the output is a few dozen files whatever the key count. Per-key files would cost every install, editor index and file watcher, two files a key: 26.7k for app B.
+- **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then rewrites one shard of about 512 keys, and its declarations only when they change, not the whole catalog's output. TypeScript and editors re-read that shard alone.
 - **Per-key import paths map to keys.js with one line, never a file per key.** An app that imports `import { key } from "…/messages/key.js"` maps the pattern in its package.json `imports` (`"#i18n/messages/*": "./src/lib/i18n/keys.js"`). Node and TypeScript resolve every key's path to keys.js and its declarations, and a key that does not exist is a type error at the import. The Vite adapter resolves the same paths itself.
 - **A production build splits by key, from memory.** Measured with Vite 8.3 (Rolldown) and Rollup 4.52, on two entries that use two keys each, one key shared:
   - one module of keys: static member access on its namespace drops the unused keys, but every key used anywhere lands in one shared chunk, so each route carries the others' words;
   - one module per key: each entry's chunk carries only its own keys, and the shared key gets a chunk of its own.
 
   So the Vite adapter builds one module per key from the compiler's model, and `keys.js` and the per-key paths resolve to them. They are never files, and the adapter's build test pins both results.
-- **Dev serves one module.** A dev page then requests every message as one module, whatever the key count, and every per-key path resolves to that same module. A missing key's path resolves to a module whose one export throws a `GraiError` naming the key when called, and the plugin reports the key in the overlay. The import itself succeeds, because a failed import would set off Kit's stale-deployment reload.
+- **Dev serves one module.** A dev page then requests every message as one module, whatever the key count, and every per-key path resolves to that same module. A missing key's path resolves to a module whose one export throws a `GraiError` naming the key when called, and the plugin reports the key in the overlay. The import itself succeeds, because a failed import would set off Kit's stale-deployment reload. This module is not built yet (`docs/followups.md`).
 - **The per-locale variants of the message modules exist only in memory too.** They have the same exports, with one locale's function each, and the bundler adapters build them from the compiler's model.
 - **The output brings its own runtime.** `runtime.js` is the package's runtime module, as it is, beside the `config.js` it reads. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies.
 
@@ -60,7 +61,7 @@ The server picks the page's locale. The client's locale is the page's `<html lan
 They come through an import map, which keeps the framework's single client build (`docs/runtime.md`):
 - **The Vite plugin puts the key modules in chunks of their own,** by the entries that use them, under a directory `grai` beside the one the bundler would have used (Kit's `_app/immutable/chunks/` gives `_app/immutable/grai/`). The runtime has a chunk of its own, so a message chunk holds keys and nothing else.
 - **Each message chunk has a copy per locale,** under the sibling `grai-<locale>/`, with the same file name, imports and exports. Each key's call keeps only its locale's variant, at its locale's position, so the runtime picks it for the page's locale. A sibling, not a subdirectory, so the copies' relative imports reach the same shared chunks.
-- **The server writes the import map,** from `…/grai/` to `…/grai-<locale>/`, and points the page's `modulepreload` links at the copies, as browsers apply no import map to `modulepreload`. Without the map a page still works, with every locale's words.
+- **The server writes the import map,** from `…/grai/` to `…/grai-<locale>/`, and points the page's `modulepreload` links at the copies, as browsers apply no import map to `modulepreload`. Without the map a page still works, with every locale's words. This is the SvelteKit adapter's part, still open (`docs/followups.md`).
 
 **Every client rule is the same in every build, dev and tests included, so nothing fails only after deploy.** On the client, a forced `{ locale }` must be the current locale. Any other throws a `GraiError` (`locale-not-loaded`) naming both locales, and in dev the key too. A build leaves key names out of the page: on app A they would add a third to its gzipped message bytes, and the call site in the stack names the key.
 
@@ -96,7 +97,7 @@ export const cart_items = /*#__PURE__*/ message(
   - One locale may use a plain pattern where another selects: the German above needs no plural.
 - **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options: {}, attributes: {} }`. The app then decides how markup looks, and translators decide where it stands.
 - **Inputs are read as `i.name`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B).
-- **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and its locale's plural function. A bundler transform in a per-locale build replaces a call:
+- **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and its locale's plural and format functions. An opt-in bundler transform, later, can then replace a call in a per-locale build (`docs/runtime.md`):
   - with the string, for a message without inputs;
   - with the body, when the argument is an object literal of side-effect-free values, each read once;
   - with a direct call of the locale's arrow, otherwise.
@@ -114,7 +115,7 @@ export declare const cart_title: Message;
 export declare const cart_items: Message<{ count: number }>;
 ```
 
-- **The compiler writes the `.d.ts` files itself, as text, from the same model as the JavaScript.** It never runs TypeScript. Declaration emit through TypeScript takes most of a compile at this catalog size (27 s of 32 s on app A), and writing the declarations directly takes milliseconds.
+- **The compiler writes the `.d.ts` files itself, as text, from the same model as the JavaScript.** It never runs TypeScript. Declaration emit through TypeScript takes most of a compile at this catalog size: Paraglide's compile of app A takes 3.8 s, and 32.1 s with TypeScript's declarations (`compile-time`).
 - **The types are named in the generated `runtime.d.ts`:**
   - `Locale` is the union of the locales.
   - `Message<I>` is `(inputs: I, options?: { locale?: Locale }) => string`.
@@ -122,7 +123,7 @@ export declare const cart_items: Message<{ count: number }>;
   - `MarkupMessage<I>` adds `.parts(): MessagePart[]`.
   - Messages return `string`.
 - **An input's type is the narrowest that every locale accepts:**
-  - `number` where any locale counts it with `:plural`;
+  - `number` where any locale counts it with `:plural` or formats it as a number, and `Date | number` where one formats it as a date;
   - the union of the keys, as numbers and strings (`1 | "1" | …`), where every locale that selects on it lists its values without `*`;
   - `NonNullable<unknown>` where it is only interpolated or selected with `*`, because interpolation turns any value into text.
 
@@ -130,21 +131,13 @@ export declare const cart_items: Message<{ count: number }>;
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
 - **Go to definition lands on the key in the base locale's catalog.** Each shard's declarations have a declaration map, from each key's name to the line its key is on in the base catalog, and TypeScript 6's tsserver and TypeScript 7's language server both follow it. An edit regenerates the maps only when it moves a key to another line, so a message's new words cost no map.
 - **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `runtime.d.ts` declares what the shards and `server.js` import from the runtime, and `config.js` and `plurals.js` carry JSDoc types.
-- **The declarations are sharded like the modules, by measurement.** On app A and app B, a file importing `m` and using five keys, checked with TypeScript 7 and completed after `m.` with TypeScript 6's language service:
-
-  | Layout | `tsc` | `m.` completion, first | after a one-message edit |
-  | --- | --- | --- | --- |
-  | shards (grai) | 240 / 250 ms | 300 / 440 ms | 56 / 120 ms |
-  | one file | 215 / 250 ms | 185 / 330 ms | 89 / 190 ms |
-  | a file per key | 400 / 960 ms | 810 / 2,010 ms | 270 / 1,890 ms |
-
-  One file is a little faster to load the first time, but an edit rewrites it whole, so every edit costs more after. A file per key costs the most everywhere.
+- **The declarations are sharded like the modules.** One file loads a little faster in an editor the first time, but an edit rewrites it whole, so every edit after costs more. A file per key costs the most in `tsc` and in completion alike.
 
 ## Selection: plurals and selects
 
 These are MessageFormat 2's rules, restricted to the constructs above:
 
-- **`local n = count: plural` selects the CLDR cardinal category of `count`** for the message's locale, through a function compiled from CLDR's rules for that locale alone. A whole, non-negative count, the usual one, takes a path with the fraction operands folded away; any other count is rounded to three fraction digits first, as `Intl.PluralRules` rounds it. That is 4–11 ns a call against 124–249 ns for a cached `Intl.PluralRules` (`docs/runtime.md`), and every locale agrees with `Intl.PluralRules` on 0–10,000, on fractions and on negative counts. The rules are CLDR 48's, from the `cldr-core` package, so a project's categories are the same on every engine; the compile checks the variants against them.
+- **`local n = count: plural` selects the CLDR cardinal category of `count`** for the message's locale, through a function compiled from CLDR's rules for that locale alone. A whole, non-negative count, the usual one, takes a path with the fraction operands folded away; any other count is rounded to three fraction digits first, as `Intl.PluralRules` rounds it. That is 4–11 ns a call against 124–249 ns for a cached `Intl.PluralRules` (`plurals`), and every locale agrees with `Intl.PluralRules` on 0–10,000, on fractions and on negative counts. The rules are CLDR 48's, from the `cldr-core` package, so a project's categories are the same on every engine; the compile checks the variants against them.
 - **A selector on an input matches a key when `String(value)` equals it.** That is MessageFormat 2's string selection, so `1` and `"1"` both match the key `1`.
 - **The variant is chosen by MessageFormat 2's preference:** among the variants whose every key matches, a literal key comes before `*`, selector by selector, and then the order written.
 - **A selection must be exhaustive, or it is a compile error:**
@@ -158,16 +151,12 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 
 - **The options are Intl's, by name.** MessageFormat 2's `:number` and `:integer` options already are `Intl.NumberFormat`'s, and `:number` also takes `style` and the options that go with it, such as `style=percent` or `style=currency currency=EUR`. MessageFormat 2's date and time functions are a draft whose options are still changing, so `:datetime`, `:date` and `:time` take `Intl.DateTimeFormat`'s options, such as `dateStyle=long`. Given no option that shapes the text, they use MessageFormat 2's defaults: a medium date, a short time.
 - **The options are checked when compiling,** by making the formatter once. An option a function does not take, or a value Intl refuses, is a compile error naming them.
-- **Each locale and options gets one formatter, in `formats.js`, made the first time it formats.** Formatters made at module scope would all be made on every page load, for every locale, at 20–100 µs each. Measured against `Intl` used directly, with the formatter made once:
-  - a number takes 244 ns against 238 ns;
-  - a date takes 465 ns against 461 ns.
-
-  A new formatter per call takes 8.9 µs and 24 µs. One formatter adds about 100 bytes min+gzip to the page that uses it.
-- **A formatted input is typed by its formatter:** `number` for a number, and `Date | number` for a date. It is passed to Intl through `Number()`, as Intl itself takes a date by its time value.
+- **Each locale and options gets one formatter, in `formats.js`, made the first time it formats.** Made at module scope, every locale's formatters would be made on every page load. A formatter made once formats a number in 207–213 ns and a date in 462–526 ns, against 8.3–9.3 µs and 21.7–23.9 µs for a new one per call (`intl`).
+- **A formatted value is passed to Intl through `Number()`,** as Intl itself takes a date by its time value.
 
 ## Errors
 
-- **Every failure is a `GraiError`** with a `code`, the `file`, and the `key` and `locale` where they apply. Its message says what is wrong and what to do: for example, `messages/pl.json: "cart_items" (pl): the plural selector countPlural has no variant for "many". Add countPlural=many, or countPlural=*.`
+- **Every failure is a `GraiError`** with a `code`, the `file`, and the `key` and `locale` where they apply. Its message says what is wrong and what to do: for example, `messages/pl.json: "cart_items" (pl): no variant matches countPlural=many. Add one, or a variant with * for the selectors it does not care about.`
 - **A compile reports every error at once, sorted by file, key and locale, and exits non-zero.** It leaves the last good output in place, and the Vite plugin shows the errors in the overlay while the last good output keeps serving.
 - **Anything grai needs that it cannot read or parse is an error that names it:**
   - the config file, a field of it, a configured locale's catalog, or a catalog that is not JSON;
@@ -177,21 +166,21 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 
 ## Incremental compiles and atomic output
 
-- **A compile reads the catalogs as bytes and hashes them first.** When the manifest says the output was compiled from the same config and bytes by the same compiler, and every file it lists is there, the compile stops: nothing is parsed and no file is touched. "The same compiler" is a hash of grai's own modules, taken once a process (about 1–2 ms), because the version alone would miss a local build of grai.
+- **A compile reads the catalogs as bytes and hashes them first.** When the manifest says the output was compiled from the same config and bytes by the same compiler, and every file it lists is there, the compile stops: nothing is parsed and no file is touched. "The same compiler" is a hash of grai's own modules, taken once a process, because the version alone would miss a local build of grai.
 - **A recompile after an edit redoes only what the edit changed.** It keeps the last build in memory: each catalog's bytes and parse, each key's compiled code, each shard's text.
   - A catalog whose bytes are the same is not parsed again.
   - An edited catalog laid out one entry per line, as editors and formatters write them, has a line break and the same indent before each top-level key and nowhere else, because a JSON string holds no raw line break. The edit's changed bytes lie between two such entry starts, so only that span is parsed, in the old file and in the new. Whenever that cannot be shown exactly (another layout, a duplicated key, a span that does not parse), the whole file is parsed instead.
   - Only the keys whose messages changed are compiled, and only their shards are rendered and written.
   - A failed recompile leaves the last good build as it was, so the next one starts from it.
 - **Watching covers the config and the catalog files, nothing else.** No other file can start a compile, so a framework's generated files never trigger one.
-  - Each file is watched as a file, not through its directory: on macOS a directory's events arrive about 11 ms late, a file's in 0.2 ms.
+  - Each file is watched as a file, not through its directory, whose events macOS reports late.
   - The watches are set up again before each compile, so a file an editor saves by renaming another over it is seen, and so is a change during the compile.
   - A catalog that does not exist yet is watched for through its directory.
 - **Each file is written to a temporary file in `.grai/` and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. A file whose content is already there is not written, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
 - **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime first, then the shards, then `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
 - **One writer per outdir.** The writer takes a lock: a file holding its pid, linked into place so that it never exists empty. A lock whose process is gone is taken over, and a live one is waited for. The CLI's `watch` and the Vite plugin can then share an outdir.
-- **In dev, the Vite plugin serves from memory and sends HMR itself.** It watches the config and the catalogs with `fs.watch` (3–10 ms to see a save, against 48–114 ms for Vite's watcher) and ignores every other file, and the output directory's changes are its own, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
-- **An edit patches the page in place.** The dev module keeps every key's locales in a table. After an edit the plugin sends only the changed keys' functions, as a module the page imports; the page writes them into the table and dispatches a cancelable `grai:change` event on `window`. A framework adapter that renders again cancels it; otherwise the page reloads. A key added or removed, or a change of locales, reloads the page, and the server's environments take the module again. Measured: 12 ms from the save to the page on app A, against 202 ms for re-sending the whole module (`docs/runtime.md`).
+- **In dev, the Vite plugin serves from memory and sends HMR itself.** It watches the config and the catalogs with `fs.watch` (3–10 ms to see a save, against 48–114 ms for Vite's watcher: `hmr`) and ignores every other file, and the output directory's changes are its own, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
+- **An edit patches the page in place.** The dev module keeps every key's locales in a table. After an edit the plugin sends only the changed keys' functions, as a module the page imports; the page writes them into the table and dispatches a cancelable `grai:change` event on `window`. A framework adapter that renders again cancels it; otherwise the page reloads. The server's dev render takes the same patch, so an edit never evaluates the app again. A key added or removed, or a change of locales, reloads the page, and the server's environments take the module again. It is 17–30 ms from the save to the page, against 202–459 ms for re-sending the whole module (`hmr`).
 
 ## Runtime
 
@@ -237,7 +226,6 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
     - A message no unit changes is left as it is written, and the rest go to the catalog in one write.
   - **Machine translation is not grai's.** grai fetches nothing, and a provider, its key, its prompts and a glossary are each app's choice. A script exports `--json`, translates, and merges, and the merge's checks refuse an answer that breaks a placeholder or a plural.
   - The XML reader reads only what this XLIFF needs, and strictly: no DTD, no entities beyond XML's five and numeric references. A tool's comments, CDATA, groups, segments, notes and metadata are read past or joined.
-- Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
 - `grai import --from i18next|icu <file or dir>…` converts another library's catalogs into the project's catalogs, for a migration. Each source file's locale is its name (`en.json`) or its directory's (`en/common.json`).
   - **It writes new catalogs only, and nothing at all on an error:** an unreadable source, a file whose locale is unclear, two source keys that become one key, or a catalog that exists already. A migration then never overwrites edits.
@@ -256,11 +244,12 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - `grai check --fix` removes each key no source names, then checks. A key that a read by a computed name may reach stays, and the report names the read: `m[expr]`, narrowed by a template's or a concatenation's literal start, `m` used whole (`Object.keys(m)`, `typeof m`), or per-key modules loaded by a built path.
   - **Catalogs are edited as text.** A rename changes the key's string, and a removal takes the entry with the separator before it, so every other byte of the catalog stays, layout included.
   - **The edits are written all or none:** each file's new text goes to a temporary file first, and they are renamed into place once all are written.
+- Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 
 ## Package
 
 - **One package, `grai`.** A project installs one thing, and the adapters version with the compiler they wrap. Subpath exports, each added with its code:
   - `grai`: the compiler's API;
-  - `grai/vite`, `grai/sveltekit`, `grai/next`, `grai/server`: the adapters, each thin, each taking the project's generated modules;
+  - `grai/vite`: the Vite plugin; the SvelteKit and Next adapters come as `grai/sveltekit` and `grai/next`, each thin, each taking the project's generated modules;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite is an optional peer dependency of `grai/vite`, as each framework will be of its adapter.

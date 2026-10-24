@@ -1,6 +1,6 @@
 # Runtime
 
-How a message call, a page and a dev edit are made fast, decided by measurement. The baseline is Paraglide 2.29.1, compiled from the same catalogs. The catalogs are app A (SvelteKit on Cloudflare Workers, 6,366 keys × 3 locales), app B (SvelteKit, 13,326 keys × 3) and `bench/synthetic.mjs`, which has app A's shape so that anyone can run every bench. The numbers are medians on an M-series Mac, with Node 24.16 and Chromium 156.
+How a message call, a page and a dev edit are made fast, decided by measurement. The baseline is Paraglide 2.29.1, compiled from the same catalogs. The catalogs are app A (SvelteKit on Cloudflare Workers, 6,366 keys × 3 locales when measured), app B (SvelteKit, 13,326 keys × 3) and `bench/synthetic.mjs`, which has app A's shape so that anyone can run every bench. The numbers are medians on an M-series Mac, with Node 24.16 and Chromium 156.
 
 Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` and `pnpm browsers` there. `GRAI_BENCH_A` and `GRAI_BENCH_B` point the benches at an app's checkout, and `GRAI_BENCH_A_STRATEGY` (or `_B_`) gives its strategy.
 
@@ -8,21 +8,21 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 
 | | grai | because |
 |---|---|---|
-| Browser | One locale per bundle. A page's message chunks hold only that locale's functions. | Message bytes per page fall by 52–55% (brotli), and hydrating a page of 2,000 messages takes 14–32% less time. |
-| Locale in the browser | Fixed by the bundle the page loads. A call looks nothing up. | A call costs what a plain function call costs, 0.5 ns. |
-| Locale on the server | Resolved once per request into `AsyncLocalStorage`. A call reads it once, through one shared dispatcher, and indexes the key's per-locale table. | The read is the floor while concurrent requests share the module: 13–23 ns a call in Node, 21 ns a read in workerd. A module variable bound per request costs 0.3 ns, but 50 of 200 interleaved renders then get another request's locale. |
-| Plurals | CLDR's rules compiled into a function per locale, integers first. | 4–11 ns a call, against 124–249 ns for a cached `Intl.PluralRules`, for 158 more bytes min+gzip per locale. |
-| Formatters | One `Intl` formatter per locale and options, made the first time it formats. | 207–213 ns a number, against 695–770 ns for a cache keyed by the options and 8–9 µs for a formatter per call. |
-| Per-locale chunks in SvelteKit | Same chunk names in a directory per locale, an import map, and modulepreload links the server writes for the locale's copies. | Browsers apply no import map to modulepreload, so Kit's own links also download the shared chunks: 51% more message bytes than no split at all. |
-| Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 17–30 ms from the save to the page, against 202–459 ms re-evaluating the module. |
-| Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface fits in 378 bytes min+gzip; Paraglide's is 1.9–2.1 KB. |
+| Browser | One locale per bundle. A page's message chunks hold only that locale's functions. | Message bytes per page fall by 52–55% (brotli, `bytes`), and hydrating a page of 2,000 messages takes 14–32% less time (`hydrate`). |
+| Locale in the browser | Fixed by the bundle the page loads. A call looks nothing up. | A call costs what a plain function call costs, 0.5 ns (`server`). |
+| Locale on the server | Resolved once per request into `AsyncLocalStorage`. A call reads it once, through one shared dispatcher, and indexes the key's per-locale table. | The read is the floor while concurrent requests share the module: 13–23 ns a call in Node (`server`), 21 ns a read in workerd (`workerd`). A module variable bound per request costs 0.3 ns, but 50 of 200 interleaved renders then get another request's locale (`interleave`). |
+| Plurals | CLDR's rules compiled into a function per locale, integers first. | 4–11 ns a call, against 124–249 ns for a cached `Intl.PluralRules`, for 158 more bytes min+gzip per locale (`plurals`). |
+| Formatters | One `Intl` formatter per locale and options, made the first time it formats. | 207–213 ns a number, against 695–770 ns for a cache keyed by the options and 8–9 µs for a formatter per call (`intl`). |
+| Per-locale chunks in SvelteKit | Same chunk names in a directory per locale, an import map, and modulepreload links the server writes for the locale's copies. | Browsers apply no import map to modulepreload, so Kit's own links also download the shared chunks: 51% more message bytes than no split at all (`preload`). |
+| Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 17–30 ms from the save to the page, against 202–459 ms re-evaluating the module (`hmr`). |
+| Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface fits in 378 bytes min+gzip; Paraglide's is 1.9–2.1 KB (`runtime-size`). |
 
-**Opt-in, later: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.1–2.3 ms against 5.5–5.8 ms with per-locale modules, a server render 0.02–0.04 ms against 0.07–0.13 ms, and the bundle 19.1 KB against 22.3 KB. On app A's largest page the messages take 17.2 KB against 24.5 KB. But every component then has code per locale, so the server needs every locale's components and the client a build per locale, and those costs are not measured yet (`docs/followups.md`). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
+**Opt-in, later: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.1–2.3 ms against 5.5–5.8 ms with per-locale modules, and the bundle 19.1 KB against 22.3 KB (`hydrate`); a server render takes 0.02–0.04 ms against 0.07–0.13 ms (`ssr`). On app A's largest page the messages take 17.2 KB against 24.5 KB (`bytes`). But every component then has code per locale, so the server needs every locale's components and the client a build per locale, and those costs are not measured yet (`docs/followups.md`). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
 
 Not adopted:
 - **A strategy lookup per call.** The locale is resolved once per request on the server, and fixed by the bundle in the browser.
-- **A dispatcher generated per key.** It is slower than one shared dispatcher, 25–52 ns against 13–23 ns a call: the engine keeps one hot function fast, and thousands of small copies slow.
-- **Anything more for "only the keys a page uses".** Per-key modules already do it: on app A, the keys a page loads match the keys its code names, to within two.
+- **A dispatcher generated per key.** It is slower than one shared dispatcher, 25–52 ns against 13–23 ns a call (`server`): the engine keeps one hot function fast, and thousands of small copies slow.
+- **Anything more for "only the keys a page uses".** Per-key modules already do it: on app A, the keys a page loads match the keys its code names, to within two (`bytes`).
 
 ## Compared with other libraries
 
@@ -31,20 +31,20 @@ grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageforma
 | | grai | Paraglide | i18next | use-intl |
 |---|---|---|---|---|
 | A text message on the server (`server`) | 16 ns | 17–33 ns | 1,170–1,859 ns | 2,396–3,058 ns |
-| A plural message on the server | 111–171 ns | 552–646 ns | 3,501–4,102 ns | 3,680–4,079 ns |
+| A plural message on the server (`server`) | 111–171 ns | 552–646 ns | 3,501–4,102 ns | 3,680–4,079 ns |
 | Server render of a page of 2,000 messages (`ssr`) | 0.15–0.16 ms | 0.18–0.21 ms | 4.16–4.17 ms | 5.70–6.18 ms |
 | Hydrating that page, at full CPU speed and at 4× slower (`hydrate`) | 7.6 / 34.7 ms | 10.7 / 50.0 ms | 16.1 / 75.6 ms | 22.3 / 104.5 ms |
-| That page's JS, brotli | 22.7 KB | 38.6 KB | 125.2 KB | 122.6 KB |
+| That page's JS, brotli (`hydrate`) | 22.7 KB | 38.6 KB | 125.2 KB | 122.6 KB |
 | A new server process: loading every locale's messages, then the first render (`startup`) | 24 + 3 ms | 56 + 2 ms | 14 + 12 ms | 13 + 27 ms |
-| Heap the messages hold | 5.3 MB | 8.3 MB | 3.4 MB | 10.3 MB |
+| Heap the messages hold (`startup`) | 5.3 MB | 8.3 MB | 3.4 MB | 10.3 MB |
 | The runtime in the browser, brotli (`library-bytes`) | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB |
 | The messages a page downloads (`bytes`) | its own keys, in its locale: 24.5 KB on the largest page | its own keys, in every locale: 51.5 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
 | A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
 | One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
 | Type checking 500 calls with `tsc` 7 (`types`) | 82 ms | 278 ms | 609 ms | 521 ms |
-| The editor's first completion of a key, TypeScript 6 | 0.2 s | 1.0 s | 49 s | 21 s |
+| The editor's first completion of a key, TypeScript 6 (`types`) | 0.2 s | 1.0 s | 49 s | 21 s |
 
-The server rows use grai's shared dispatcher, with the locale from `AsyncLocalStorage`. In the browser a grai bundle holds one locale and a call looks nothing up, 0.5 ns; the hydration row shows what the others cost there. The startup rows bundle each library into one file, as a server build does. i18next and use-intl load faster than grai and render slower: their catalogs are 1.6 MB of strings, which V8 reads faster than grai's 1.8 MB of compiled functions, and they work out each message on its first call. Through the first render the three are close, 26–40 ms. Each is measured bundled, so none of this is the cost of an unbundled module graph. On app B, twice app A's size, the gaps widen: i18next's first completion takes 258 s against grai's 0.3 s, Paraglide's 3.4 s, and the page's JS is 208 KB against 21 KB. use-intl's completion on app B was not measured. Each bench prints app B and the synthetic catalog too.
+The server rows run the prototype of grai's shared dispatcher in `bench/prototype.mjs`, with the locale from `AsyncLocalStorage`; timing grai's own output is open (`docs/followups.md`). In the browser a grai bundle holds one locale and a call looks nothing up. The startup rows bundle each library into one file, as a server build does. i18next and use-intl load faster than grai and render slower: their catalogs are 1.6 MB of strings, which V8 reads faster than grai's 1.8 MB of compiled functions, and they work out each message on its first call. Through the first render the three are close, 26–40 ms (`startup`). On app B, twice app A's size, the gaps widen: i18next's first completion takes 258 s against grai's 0.3 s and Paraglide's 3.4 s (`types`), and the page's JS is 208 KB against 21 KB (`hydrate`). Each bench prints app B and the synthetic catalog too.
 
 ## Server
 
