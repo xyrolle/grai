@@ -3,7 +3,6 @@
 export {
 	assertIsLocale,
 	baseLocale,
-	cookieName,
 	deLocalizeUrl,
 	extractLocaleFromUrl,
 	GraiError,

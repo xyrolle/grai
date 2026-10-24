@@ -225,7 +225,7 @@ The locale is resolved once per request on the server, or once per page on the c
 - **On the client,** the page's `<html lang>` is the locale, else the base locale. `setLocale(locale)` writes the cookie (`cookie`) or goes to the localized URL (`url`), and reloads. With `{ reload: false }` it switches in the page, which holds every locale until an adapter builds one locale per page; what it does then is the open question above.
 
 The runtime's names are the ones existing Paraglide call sites use, so migrating changes imports, not calls. Only the middleware has a name of its own:
-- `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `cookieName`, `getTextDirection`, `MessagePart`;
+- `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `getTextDirection`, `MessagePart`;
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`. Without it they leave every URL as it is, since no URL then names a locale: in an app that keeps the locale in a cookie, `/de/…` is a path of its own, and a prefix would lead to a page it does not have;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
