@@ -4,3 +4,11 @@
 export declare const locales: readonly string[];
 /** The locale a call renders in when it names none. */
 export declare const baseLocale: string;
+/** Where the server's middleware looks for a request's locale, in order, before the base locale. */
+export declare const strategy: readonly (
+	| "cookie"
+	| "preferredLanguage"
+	| "url"
+)[];
+/** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
+export declare const cookieName: string | undefined;

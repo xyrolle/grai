@@ -1,8 +1,10 @@
 // The runtime is JavaScript the compiler copies into every project's output, so it is checked
-// as JavaScript, on its own: allowJs cannot go with tsconfig.json's isolatedDeclarations.
+// as JavaScript, on its own: allowJs cannot go with tsconfig.json's isolatedDeclarations. It runs
+// in browsers too, so it sees the DOM's types.
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
+		"lib": ["es2024", "dom"],
 		"allowJs": true,
 		"checkJs": true,
 		"isolatedDeclarations": false,

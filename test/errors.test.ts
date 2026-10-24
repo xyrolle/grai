@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -63,6 +63,19 @@ describe("the config", () => {
 			await errorsOf({ en: { title: "Title" } }, { locales: ["en", "en"] }),
 		).toEqual([
 			'config-invalid: grai.config.json: "locales" must be a non-empty list of distinct BCP 47 language tags, such as ["en", "de"].',
+		]);
+	});
+	it("names a strategy it does not know, and a cookie strategy without its cookie", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { strategy: ["header"] })).toEqual([
+			'config-invalid: grai.config.json: "strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url".',
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["cookie"] })).toEqual([
+			'config-invalid: grai.config.json: "cookieName" must name the cookie the "cookie" strategy reads.',
+		]);
+		expect(await errorsOf(catalogs, { cookieName: "lang" })).toEqual([
+			'config-invalid: grai.config.json: "cookieName" is read only by the "cookie" strategy, which "strategy" does not list.',
 		]);
 	});
 });
