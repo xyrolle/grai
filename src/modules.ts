@@ -1,4 +1,4 @@
-import { type Formatter, formatterOf } from "./formats.ts";
+import { type Formatter, formatterOf } from "./formatters.ts";
 import type { LocaleMessage } from "./message.ts";
 import { type Part, plainText } from "./pattern.ts";
 import { pluralName } from "./plurals.ts";

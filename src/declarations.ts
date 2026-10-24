@@ -1,5 +1,5 @@
 import type { Config } from "./config.ts";
-import type { Format } from "./formats.ts";
+import type { Format } from "./format-options.ts";
 import type { LocaleMessage } from "./message.ts";
 import { catchAll } from "./selection.ts";
 

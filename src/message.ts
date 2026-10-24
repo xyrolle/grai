@@ -1,5 +1,5 @@
 import { isRecord } from "./config.ts";
-import { type Format, parseFormat } from "./formats.ts";
+import { type Format, parseFormat } from "./format-options.ts";
 import { parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
