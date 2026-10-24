@@ -97,12 +97,7 @@ export const cart_items = /*#__PURE__*/ message(
   - One locale may use a plain pattern where another selects: the German above needs no plural.
 - **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options: {}, attributes: {} }`. The app then decides how markup looks, and translators decide where it stands.
 - **Inputs are read as `i.name`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B).
-- **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and its locale's plural and format functions. An opt-in bundler transform, later, can then replace a call in a per-locale build (`docs/runtime.md`):
-  - with the string, for a message without inputs;
-  - with the body, when the argument is an object literal of side-effect-free values, each read once;
-  - with a direct call of the locale's arrow, otherwise.
-
-  There is then no dispatch and no call, and a key no call site names is never emitted. The transform gets the arrows from the compiler's model, not by parsing output. A message used as a value (`label: m.cart_title`) stays a function.
+- **Calls are not inlined at their call sites.** Each locale's function is a pure arrow of its inputs, so a client build could put a call's text or arrow in its place. Measured, that makes a call 3–4 ns cheaper and a page's JS about 1% smaller, but hydration does the same work: the framework compiled the call as a dynamic expression before any bundler transform sees it (`docs/runtime.md`). It would cost a client build per locale, which SvelteKit's one client build cannot serve, or a copy per locale of every chunk that calls a message, 981 more files on app A. Inlining text into templates before the framework compiles them is a separate question, still open (`docs/followups.md`).
 
 ## Declarations
 

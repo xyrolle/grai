@@ -14,6 +14,12 @@ A production page holds only its locale's words, and `setLocale(locale, { reload
 
 Done when: the design records one option as a decision, and a browser test shows that a production build and dev switch the same way.
 
+## Decide whether to inline text into Svelte's templates
+
+Text inlined into a template before Svelte compiles it is the one inlining that changes hydration: Svelte then sees static text, and a page of 2,000 messages hydrates in 2.1–2.3 ms against 5.5–5.8 ms (`docs/runtime.md`). It needs a Svelte step in the adapter, and a copy per locale of every component chunk with such a text, behind the import map. Svelte trims the whitespace at the edges of an element's text, so a text's own edge whitespace has to stay an expression, `{" "}`.
+
+Done when: it is measured on app A's real pages (the time until hydrated at full speed and at a 4× slowdown, the page JS, and the build time and files with the copies), with each page's text compared exactly against today's, and the design records the decision.
+
 ## Show a server text call at 20 ns or less
 
 A text message called in a request reads the request's locale from `AsyncLocalStorage`. `bench/server.mjs` times a prototype of the output's dispatcher at 14–23 ns, not grai's own output.
