@@ -1,0 +1,25 @@
+{
+	"cart": {
+		"title": "Ваша корзина",
+		"greeting": "Привет, {{name}}!",
+		"raw": "Привет {{- name}}",
+		"item_one": "{{count}} товар",
+		"item_few": "{{count}} товара",
+		"item_many": "{{count}} товаров",
+		"item_other": "{{count}} товара",
+		"summary": "У {{name}} {{count}} товаров"
+	},
+	"braces": "Скобки {literal} и \\\\ слэш",
+	"see": "См. $t(cart.title)",
+	"friend": "Друг",
+	"friend_male": "Парень",
+	"place_ordinal_other": "{{count}}-й",
+	"price": "Стоит {{value, number}}",
+	"nested": {
+		"deeper": {
+			"key": "Глубокий текст"
+		}
+	},
+	"short_one": "{{count}} короткий",
+	"short_other": "{{count}} коротких"
+}

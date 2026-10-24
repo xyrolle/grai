@@ -1,0 +1,27 @@
+{
+	"cart": {
+		"title": "Arabic cart",
+		"greeting": "Ahlan {{name}}!",
+		"raw": "Hi {{- name}}",
+		"item_zero": "zero items",
+		"item_one": "one item",
+		"item_two": "two items",
+		"item_few": "{{count}} few items",
+		"item_many": "{{count}} many items",
+		"item_other": "{{count}} other items",
+		"summary": "{{name}}: {{count}}"
+	},
+	"braces": "ar {literal} \\\\",
+	"see": "ar $t(cart.title)",
+	"friend": "ar friend",
+	"friend_male": "ar boyfriend",
+	"place_ordinal_other": "{{count}}.",
+	"price": "ar {{value, number}}",
+	"nested": {
+		"deeper": {
+			"key": "ar deep"
+		}
+	},
+	"short_one": "ar one short",
+	"short_other": "ar {{count}} short"
+}
