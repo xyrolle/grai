@@ -155,6 +155,36 @@ describe("grai export", () => {
 			'<note category="variant">nOrdinal: one, as for 1, 2, 21, 22, 31, 32, …</note>',
 		);
 	});
+	it("writes a number selector's exact keys as they are, and a unit per category the locale needs", async () => {
+		const files = [
+			{
+				declarations: ["input count", "local n = count: number"],
+				selectors: ["n"],
+				match: {
+					"n=0": "No files",
+					"n=one": "One file",
+					"n=*": "{n} files",
+				},
+			},
+		];
+		const { config } = project({ en: { files }, ru: { files } });
+
+		const result = await exportLocale(config, "ru", {
+			json: true,
+			untranslated: false,
+		});
+		const units: { id: string; source: string; note: string }[] =
+			"document" in result ? JSON.parse(result.document).units : [];
+
+		expect(units.map(({ id, source }) => [id, source])).toEqual([
+			["files.n.0", "No files"],
+			["files.n.one", "{n} files"],
+			["files.n.few", "{n} files"],
+			["files.n.many", "{n} files"],
+			["files.n.other", "{n} files"],
+		]);
+		expect(units[0]?.note).toBe("n: 0");
+	});
 });
 
 describe("grai merge", () => {
