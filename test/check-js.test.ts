@@ -43,7 +43,8 @@ it.each([
 							},
 						},
 					],
-					cart_terms: "Read the {#link}terms{/link}",
+					cart_terms:
+						"Read the {#link href=|/terms| rel=$rel @translate=no}terms{/link}",
 					cart_total: "Total {amount :number style=currency currency=EUR}",
 					cart_shipped: "Shipped {when :date}",
 					cart_guests: "With {names :list}, {days :relativetime unit=day}",
@@ -96,7 +97,7 @@ it.each([
 							match: { "speed=fast": "توصيل سريع", "speed=slow": "توصيل بطيء" },
 						},
 					],
-					cart_terms: "اقرأ {#link}الشروط{/link}",
+					cart_terms: "اقرأ {#link href=|/terms| rel=$rel}الشروط{/link}",
 					cart_total: "المجموع {amount :number style=currency currency=EUR}",
 					cart_shipped: "شحن {when :date}",
 					cart_guests: "مع {names :list}، {days :relativetime unit=day}",
