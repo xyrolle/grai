@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { find, foundLines } from "../src/find.ts";
 import { project } from "./project.ts";
-import { cartSvelte, headerTsx, i18nTs, writeSources } from "./sources.ts";
+import {
+	cartSvelte,
+	cartTest,
+	headerTsx,
+	i18nTs,
+	writeSources,
+} from "./sources.ts";
 
 const catalogs = {
 	en: { cart_title: "Your cart", cart_total: "{count} items" },
@@ -30,6 +36,19 @@ describe("grai find", () => {
 			"src/Header.tsx:4:27: return <h1 aria-label={m.cart_title()}>{m?.cart_title()}</h1>;",
 			"src/Header.tsx:4:45: return <h1 aria-label={m.cart_title()}>{m?.cart_title()}</h1>;",
 			'src/labels.ts:1:25: export const labels = { cart_title: "Cart" }; (not a call site)',
+		]);
+	});
+
+	it("finds a key's call sites in tests too, which check does not count", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/cart.test.ts": `import { m } from "$lib/i18n";\n${cartTest}`,
+		});
+
+		const found = await find(config, "cart_title");
+
+		expect(found.callSites.map(({ file, line }) => `${file}:${line}`)).toEqual([
+			"src/cart.test.ts:2",
 		]);
 	});
 

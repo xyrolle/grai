@@ -3,6 +3,7 @@ import { rename } from "../src/rename.ts";
 import { project } from "./project.ts";
 import {
 	cartSvelte,
+	cartTest,
 	handLaid,
 	headerTsx,
 	i18nTs,
@@ -67,6 +68,19 @@ describe("grai rename", () => {
 		await rename(config, "cart_title", "basket_title");
 
 		expect(readText(dir, "messages/de.json")).toBe(catalog("basket_title"));
+	});
+
+	it("renames the key in tests too, which check does not count", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/cart.test.ts": `import { m } from "$lib/i18n";\n${cartTest}`,
+		});
+
+		await rename(config, "cart_title", "basket_title");
+
+		expect(readText(dir, "src/cart.test.ts")).toBe(
+			`import { m } from "$lib/i18n";\n${cartTest.replace("cart_title", "basket_title")}`,
+		);
 	});
 
 	it("renames a per-key import's path and name, and every use of the name it binds", async () => {
