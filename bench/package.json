@@ -21,7 +21,8 @@
 		"runtime-size": "node runtime-size.mjs",
 		"hmr": "node hmr.mjs",
 		"call-sites": "node call-sites.mjs",
-		"startup": "node startup.mjs"
+		"startup": "node startup.mjs",
+		"library-bytes": "node library-bytes.mjs"
 	},
 	"devDependencies": {
 		"@formatjs/cli": "6.16.35",
