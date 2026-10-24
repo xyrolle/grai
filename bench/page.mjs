@@ -36,15 +36,17 @@ function inlineText(pattern, inputs) {
 
 /**
  * The page's Svelte source. `from` is the module messages are imported from; `inline` gives the
- * locale's catalog when text is inlined instead (plurals still call their function).
+ * locale's catalog when text is inlined instead (plurals still call their function), and
+ * `translate` calls a library's `t(key, values)` from `from` instead.
  */
-export function pageSource(app, { from, inline }) {
+export function pageSource(app, { from, inline, translate }) {
 	const calls = sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW);
-	const keys = [...new Set(calls.map((call) => call.key))];
+	const keys = translate ? ["t"] : [...new Set(calls.map((call) => call.key))];
 	const alias = new Map(keys.map((key, index) => [key, `k${index}`]));
 	const expression = (call, inputs) => {
 		const value = inline?.[call.key];
 		if (typeof value === "string") return inlineText(value, inputs);
+		if (translate) return `{k0(${JSON.stringify(call.key)}, ${inputs})}`;
 		return `{${alias.get(call.key)}(${call.kind === "text" ? "" : inputs})}`;
 	};
 	const shell = calls
@@ -82,8 +84,8 @@ export const visibleText = (html) =>
 		.replace(/\s+/g, " ")
 		.trim();
 
-/** The props the page renders: the sample's inputs and the table's rows. */
-export function pageProps(app) {
+/** The props the page renders: each call's values, as `values` writes them, and the table's rows. */
+export function pageProps(app, values = (call) => call.inputs) {
 	const calls = sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW);
 	const rows = Array.from({ length: ROWS }, (_, id) => ({
 		id,
@@ -94,7 +96,7 @@ export function pageProps(app) {
 			]),
 		),
 	}));
-	return { inputs: calls.map((call) => call.inputs), rows };
+	return { inputs: calls.map(values), rows };
 }
 
 /** Compiles a page for the server or the browser and writes it beside the others; returns its path. */

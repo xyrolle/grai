@@ -109,7 +109,7 @@ export declare function getLocale(): Locale;
  * browser it keeps the locale in the cookie or the URL and reloads, unless \`{ reload: false }\`.
  */
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;
-/** The direction a locale's script is written in, the current locale's by default. */
+/** The direction a locale's script is written in, the bound locale's by default. */
 export declare function getTextDirection(locale?: Locale): "ltr" | "rtl";
 /** The locale a URL's first path segment names, else the base locale. */
 export declare function extractLocaleFromUrl(url: string | URL): Locale;
@@ -142,6 +142,32 @@ export type Message<Inputs extends object = Record<string, never>> = Call<Inputs
 export type MarkupMessage<Inputs extends object = Record<string, never>> = Message<Inputs> & {
 	parts: Call<Inputs, MessagePart[]>;
 };
+// What the rest of the output calls; not for apps.
+/** Lets server.js bind each request's locale. Apps bind it through the middleware. */
+export declare function bindRequests(storage: {
+	getStore(): number | undefined;
+	enterWith(index: number): void;
+}): void;
+/** A message's inputs as its compiled code reads them; the key's declaration types them. */
+type CompiledInputs = { readonly [input: string]: unknown };
+/** A compiled message without inputs: its text in each locale, in \`locales\` order. */
+export declare function text(...texts: string[]): Message;
+/** A compiled message with inputs: a function per locale, in \`locales\` order. */
+export declare function message(
+	...variants: ((inputs: CompiledInputs) => string)[]
+): Message<CompiledInputs>;
+/** A compiled message with markup: its text and its parts, a function per locale for each. */
+export declare function markup(
+	strings: ((inputs: CompiledInputs) => string)[],
+	parts: ((inputs: CompiledInputs) => MessagePart[])[],
+): MarkupMessage<CompiledInputs>;
+/** Throws for a value a closed select does not list. */
+export declare function unmatched(
+	key: string,
+	locale: string,
+	selector: string,
+	value: unknown,
+): never;
 `;
 }
 
