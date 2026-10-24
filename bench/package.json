@@ -24,7 +24,8 @@
 		"startup": "node startup.mjs",
 		"library-bytes": "node library-bytes.mjs",
 		"compile-time": "node compile-time.mjs",
-		"types": "node types.mjs"
+		"types": "node types.mjs",
+		"refactor": "node refactor.mjs"
 	},
 	"devDependencies": {
 		"@formatjs/cli": "6.16.35",
