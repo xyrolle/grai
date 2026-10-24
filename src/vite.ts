@@ -5,6 +5,7 @@ import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import { keyModulePrefix, keyPrefix } from "./locale-chunks.ts";
+import { moduleOf } from "./message-imports.ts";
 import {
 	chunkFileName,
 	keyModule,
@@ -37,7 +38,11 @@ export function grai(options: GraiOptions = {}): Plugin {
 	let build: Build | undefined;
 	/** The first compile: its build, or the errors that kept it from one. */
 	let first: Promise<Build | readonly Error[]> | undefined;
-	let patchOf: (id: string) => string | undefined = () => undefined;
+	let devModuleOf: (id: string) => string | undefined = () => undefined;
+	let missingKeyImport = (
+		_key: string,
+		_importer: string,
+	): string | undefined => undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
@@ -112,31 +117,45 @@ export function grai(options: GraiOptions = {}): Plugin {
 			first = new Promise((resolve) => {
 				ready = resolve;
 			});
-			({ patch: patchOf, close: closeMessages } = serveMessages(
-				server,
-				files,
-				(compiled) => {
-					if ("compilation" in compiled) build = compiled;
-					ready(compiled);
-				},
-			));
+			({
+				module: devModuleOf,
+				missingKeyImport,
+				close: closeMessages,
+			} = serveMessages(server, files, (compiled) => {
+				if ("compilation" in compiled) build = compiled;
+				ready(compiled);
+			}));
 		},
 		// The dev server calls it as it closes: the compile under way finishes first, so nothing is
 		// written into the project once the server has closed.
 		async buildEnd() {
 			await closeMessages();
 		},
-		async resolveId(id) {
-			if (id.startsWith(keyPrefix) || id.startsWith(patchPrefix))
-				return `\0${id}`;
-			// Until the first compile has written the output, an import of it waits rather than fails:
-			// a page that failed to import it would be reloaded once the file appears.
-			if (serving) await first;
-			return null;
+		resolveId: {
+			// Before Vite's resolver, which takes a per-key path to keys.js and so to its exports alone.
+			order: "pre",
+			async handler(id, importer, options) {
+				if (id.startsWith(keyPrefix) || id.startsWith(patchPrefix))
+					return `\0${id}`;
+				if (!serving) return null;
+				const resolve = () =>
+					this.resolve(id, importer, { ...options, skipSelf: true });
+				let resolved = await resolve();
+				// Until the first compile has written the output, an import of it waits rather than fails:
+				// a page that failed to import it would be reloaded once the file appears.
+				if (resolved === null) {
+					await first;
+					resolved = await resolve();
+				}
+				const module = moduleOf(id);
+				const perKey = module.type === "key" && resolved?.id === files.keysFile;
+				if (!perKey || importer === undefined) return resolved;
+				return missingKeyImport(module.key, importer) ?? resolved;
+			},
 		},
 		async load(id) {
-			const patch = patchOf(id);
-			if (patch !== undefined) return patch;
+			const served = devModuleOf(id);
+			if (served !== undefined) return served;
 			if (id !== files.keysFile && !id.startsWith(keyModulePrefix)) return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;
