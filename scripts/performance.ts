@@ -21,8 +21,12 @@ await compile(process.argv[1]);
 console.log(performance.now() - started);
 `;
 
-/** The median of three runs on CI's runner, rounded up: an edit took 4.8, 3.6 and 4.0 ms. */
-const baselines = { cold: 110, noop: 3, edit: 4, process: 160 };
+/**
+ * Each step's median time over ten runs on CI's runners, rounded up; the budget is twice it. The
+ * runners differ by up to half: a first compile in a fresh process took 145 to 249 ms, a no-op 1.5 to
+ * 2.5 ms, an edit 3.7 to 6.1 ms and the CLI 177 to 273 ms.
+ */
+const baselines = { cold: 200, noop: 2, edit: 4, process: 240 };
 const keys = 6667;
 /** Runs made before the timed ones of a step, while the engine still optimizes it. */
 const warmupRuns = 10;
