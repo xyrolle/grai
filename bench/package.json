@@ -40,7 +40,8 @@
 		"refactor": "node refactor.mjs",
 		"nextjs": "node nextjs.mjs",
 		"astro": "node astro.mjs",
-		"vue": "node vue.mjs"
+		"vue": "node vue.mjs",
+		"nuxt": "node nuxt.mjs"
 	},
 	"devDependencies": {
 		"@astrojs/svelte": "9.1.1",
@@ -50,6 +51,7 @@
 		"@inlang/plugin-m-function-matcher": "2.3.4",
 		"@inlang/plugin-message-format": "4.5.5",
 		"@intlify/unplugin-vue-i18n": "11.2.7",
+		"@nuxtjs/i18n": "10.6.0",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
 		"@vitejs/plugin-vue": "6.0.10",
 		"astro": "7.4.2",
@@ -59,6 +61,7 @@
 		"make-plural": "8.1.0",
 		"next": "16.4.3",
 		"next-intl": "4.14.9",
+		"nuxt": "4.6.2",
 		"playwright-core": "1.64.1",
 		"react": "19.3.1",
 		"react-dom": "19.3.1",
