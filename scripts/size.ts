@@ -26,7 +26,7 @@ import { grai } from "../src/vite.ts";
  * 43,380 B with grai/vite's plugin, grai/sveltekit 541 B with its import map, grai/sveltekit/vite
  * 45,942 B with grai/vite's plugin, grai/sveltekit/client 382 B, grai/sveltekit/navigation 210 B,
  * grai/next 516 B, grai/next/config 29,358 B, grai/next/proxy 265 B, grai/react 413 B, grai/astro
- * 46,391 B with grai/vite's plugin and grai/astro/middleware 1,838 B.
+ * 46,391 B with grai/vite's plugin, grai/astro/middleware 1,838 B and grai/vue 426 B.
  */
 const budgets: Record<string, number> = {
 	runtime: 1024,
@@ -43,6 +43,7 @@ const budgets: Record<string, number> = {
 	"grai/react": 500,
 	"grai/astro": 55_500,
 	"grai/astro/middleware": 2_200,
+	"grai/vue": 520,
 };
 
 const root = new URL("../", import.meta.url);

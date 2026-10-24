@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+import { createSSRApp, h } from "vue";
+import { renderToString } from "vue/server-renderer";
+import {
+	Markup,
+	type MarkupElement,
+	type MarkupPart,
+} from "../src/vue/markup.ts";
+import { project, thrown } from "./project.ts";
+
+const markup: Record<string, MarkupElement> = {
+	link: (children) => h("a", { href: "/terms" }, children),
+	b: (children) => h("b", children),
+	br: () => h("br"),
+};
+
+/** Vue's markers around a fragment's children in server-rendered HTML, which hydration reads. */
+const fragmentMarkers = /<!--\[-->|<!--\]-->/g;
+
+/** The HTML a Vue server render of `Markup` writes for `parts`, its fragment markers left out. */
+async function html(
+	parts: readonly MarkupPart[],
+	elements = markup,
+): Promise<string> {
+	const app = createSSRApp({
+		render: () => h(Markup, { parts, markup: elements }),
+	});
+	return (await renderToString(app)).replaceAll(fragmentMarkers, "");
+}
+
+describe("Markup", () => {
+	it("draws a compiled message's elements with the app's functions, in the translators' places", async () => {
+		const { m } = await project({
+			en: { terms: "Read the {#link}{#b}terms{/b} of {name}{/link}.{#br/}" },
+		}).load();
+		const parts = m.terms?.parts?.({ name: "Ana's shop" }) ?? [];
+
+		expect(await html(parts)).toBe(
+			'Read the <a href="/terms"><b>terms</b> of Ana&#39;s shop</a>.<br>',
+		);
+	});
+
+	it("gives an element the options and attributes the message writes on its start", async () => {
+		const { m } = await project({
+			en: {
+				terms: "Read the {#link href=|/terms| @rel=nofollow}terms{/link}.",
+			},
+		}).load();
+		const parts = m.terms?.parts?.() ?? [];
+
+		expect(
+			await html(parts, {
+				link: (children, { options, attributes }) =>
+					h("a", { href: String(options.href), rel: attributes.rel }, children),
+			}),
+		).toBe('Read the <a href="/terms" rel="nofollow">terms</a>.');
+	});
+
+	it("closes an end's innermost element of its name, draws a stray end as nothing, and closes what is open at the end", async () => {
+		const piece = (type: "markup-start" | "markup-end", name: string) =>
+			({ type, name, options: {}, attributes: {} }) satisfies MarkupPart;
+		const start = (name: string) => piece("markup-start", name);
+		const end = (name: string) => piece("markup-end", name);
+		const text = (value: string): MarkupPart => ({ type: "text", value });
+
+		expect(
+			await html([
+				start("link"),
+				start("b"),
+				text("a"),
+				end("link"),
+				text("b"),
+			]),
+		).toBe('<a href="/terms"><b>a</b></a>b');
+		expect(await html([text("a"), end("b"), start("b"), text("c")])).toBe(
+			"a<b>c</b>",
+		);
+	});
+
+	it("throws for an element the app does not draw, naming it", () => {
+		// Parts that do not type their elements, as before a message names them in its type.
+		const parts: MarkupPart[] = [
+			{ type: "markup-standalone", name: "icon", options: {}, attributes: {} },
+		];
+
+		expect(thrown(() => Markup({ parts, markup }))).toMatchObject({
+			message:
+				'Markup has no function for the message\'s element "icon". Add icon to its markup.',
+		});
+	});
+});
