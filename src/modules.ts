@@ -1,5 +1,10 @@
 import type { Formatter } from "./formatters.ts";
-import { localeFunction, type Used } from "./locale-function.ts";
+import {
+	arrow,
+	functionExpression,
+	localeFunction,
+	type Used,
+} from "./locale-function.ts";
 import type { LocaleMessage } from "./message.ts";
 import { plainText } from "./pattern.ts";
 
@@ -7,12 +12,15 @@ import { plainText } from "./pattern.ts";
 export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
 
 /**
- * A key compiled: its line in keys.js, the runtime functions, the locales' plural functions and the
- * formatters it calls, and its parts one locale at a time, for an adapter that writes a module per
- * locale.
+ * A key compiled: its line in keys.js and in a server build, the runtime functions, the locales'
+ * plural functions and the formatters it calls, and its parts one locale at a time, for an adapter
+ * that writes a module per locale.
  */
 export type KeyModule = {
+	/** Its line in keys.js, each locale's function an arrow function. */
 	code: string;
+	/** Its line in a server build, each locale's function a function expression. */
+	serverCode: string;
 	uses: ReadonlySet<RuntimeFunction>;
 	plurals: ReadonlySet<string>;
 	/** The formatters it calls, by name. */
@@ -42,38 +50,51 @@ export function keyModule(
 		const texts = messages.map((message) =>
 			JSON.stringify(plainText(message.variants[0]?.pattern ?? [])),
 		);
-		return keyCode(key, "text", texts, [], used);
+		const code = exportCode(key, "text", texts, []);
+		return {
+			code,
+			serverCode: code,
+			...used,
+			kind: "text",
+			variants: texts,
+			parts: [],
+		};
 	}
+	const kind = hasMarkup ? "markup" : "message";
+	used.uses.add(kind);
 	const strings = messages.map((message) =>
 		localeFunction(key, message, "string", used),
 	);
-	if (!hasMarkup) {
-		used.uses.add("message");
-		return keyCode(key, "message", strings, [], used);
-	}
-	const parts = messages.map((message) =>
-		localeFunction(key, message, "parts", used),
-	);
-	used.uses.add("markup");
-	return keyCode(key, "markup", strings, parts, used);
+	const parts = hasMarkup
+		? messages.map((message) => localeFunction(key, message, "parts", used))
+		: [];
+	const variants = strings.map(arrow);
+	const partArrows = parts.map(arrow);
+	return {
+		code: exportCode(key, kind, variants, partArrows),
+		serverCode: exportCode(
+			key,
+			kind,
+			strings.map(functionExpression),
+			parts.map(functionExpression),
+		),
+		...used,
+		kind,
+		variants,
+		parts: partArrows,
+	};
 }
 
-function keyCode(
+/** A key's export: the runtime call that holds its variants, and for markup its parts. */
+function exportCode(
 	key: string,
 	kind: KeyModule["kind"],
 	variants: readonly string[],
 	parts: readonly string[],
-	used: Used,
-): KeyModule {
+): string {
 	const call =
 		kind === "markup"
 			? `markup([${variants.join(", ")}], [${parts.join(", ")}])`
 			: `${kind}(${variants.join(", ")})`;
-	return {
-		code: `export const ${key} = /*#__PURE__*/ ${call};\n`,
-		...used,
-		kind,
-		variants,
-		parts,
-	};
+	return `export const ${key} = /*#__PURE__*/ ${call};\n`;
 }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import {
 	build,
@@ -9,7 +10,7 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
-import { project } from "./project.ts";
+import { type Messages, project } from "./project.ts";
 
 /**
  * What a test's dev server leaves Vite's watcher off: the page and render files the test writes
@@ -25,11 +26,14 @@ const catalogs = {
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
 };
 
-/** What a Vite build of `entries` writes: every file, and each entry's code with its imports'. */
+/**
+ * What a Vite build of `entries` writes, for a browser or, with `ssr`, for a server: every file,
+ * and each entry's code with its imports'.
+ */
 async function built(
 	dir: string,
 	entries: Record<string, string>,
-	{ write = false } = {},
+	{ write = false, ssr = false } = {},
 ) {
 	for (const [name, code] of Object.entries(entries))
 		writeFileSync(join(dir, `${name}.js`), code);
@@ -40,6 +44,7 @@ async function built(
 		plugins: [grai()],
 		build: {
 			write,
+			ssr,
 			outDir: join(dir, "dist"),
 			rolldownOptions: {
 				input: Object.fromEntries(
@@ -99,6 +104,30 @@ describe("the Vite plugin's build", () => {
 			entries.b?.includes("Fußzeile"),
 			entries.b?.includes("Hallo"),
 		]).toEqual([false, true, true]);
+	});
+
+	it("writes a message's functions as arrows for a browser, and as function expressions for a server", async () => {
+		const { dir } = project(catalogs);
+		const { entries: browser } = await built(dir, {
+			page: `import { m } from "./out/messages.js";\ndocument.body.textContent = m.greeting({ name: "Ana" });\n`,
+		});
+		const { entries: server, entryFiles } = await built(
+			dir,
+			{ server: `export { m } from "./out/messages.js";\n` },
+			{ write: true, ssr: true },
+		);
+		const { m }: { m: Messages } = await import(
+			pathToFileURL(join(dir, "dist", entryFiles.server ?? "")).href
+		);
+
+		expect(browser.page).toMatch(/=>`Hallo \$\{/);
+		expect(server.server).toMatch(
+			/function ?\(i\) \{\s*return `Hallo \$\{i\.name\}`/,
+		);
+		expect([
+			m.greeting?.({ name: "Ana" }, { locale: "en" }),
+			m.greeting?.({ name: "Ana" }, { locale: "de" }),
+		]).toEqual(["Hello Ana", "Hallo Ana"]);
 	});
 
 	it("fails the build with the compiler's errors", async () => {

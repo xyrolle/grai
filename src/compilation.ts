@@ -13,9 +13,11 @@ import { MessageProblem } from "./problem.ts";
  * A key compiled from its raw messages, one per locale, kept so an unchanged key is not compiled
  * again. Its kind, variants and parts are per locale, for an adapter that writes modules per locale.
  */
-export type CompiledKey = Pick<KeyModule, "kind" | "variants" | "parts"> & {
+export type CompiledKey = Pick<
+	KeyModule,
+	"code" | "serverCode" | "kind" | "variants" | "parts"
+> & {
 	values: readonly unknown[];
-	code: string;
 	declaration: string;
 	/** The lines the declaration takes, for the declaration maps. */
 	declarationLines: number;
@@ -116,6 +118,7 @@ function compileKey(
 	return {
 		values,
 		code: module.code,
+		serverCode: module.serverCode,
 		declaration,
 		declarationLines: lineCount(declaration),
 		uses: module.uses,

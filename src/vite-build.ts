@@ -19,15 +19,20 @@ export function keysModule(build: Build): string {
 		.join("\n");
 }
 
-/** A key's module in a build, from the compiler's model, or nothing for an id that is no key's. */
+/**
+ * A key's module in a build, from the compiler's model, or nothing for an id that is no key's: the
+ * key's code for the browser, or its code for a server.
+ */
 export function keyModule(
 	outdir: string,
 	build: Build,
 	id: string,
+	consumer: "client" | "server",
 ): string | undefined {
 	const key = build.compilation.keys.get(id.slice(keyModulePrefix.length));
 	if (key === undefined) return undefined;
-	return `${outputImports(outdir, [key], key.uses)}\n${key.code}`;
+	const code = consumer === "server" ? key.serverCode : key.code;
+	return `${outputImports(outdir, [key], key.uses)}\n${code}`;
 }
 
 /**
