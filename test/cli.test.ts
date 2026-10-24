@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -58,6 +58,42 @@ describe("grai compile", () => {
 			"grai: 2 errors",
 			"",
 		]);
+	});
+});
+
+describe("grai check", () => {
+	it("reports keys no source names and inputs the locales disagree on, and writes nothing", async () => {
+		const { dir } = project({
+			en: { cart_title: "Your cart", cart_greeting: "Hello {name}" },
+			de: { cart_title: "Ihr Warenkorb", cart_greeting: "Hallo" },
+		});
+		writeFileSync(
+			join(dir, "app.ts"),
+			'console.log(m.cart_greeting({ name: "Ana" }));',
+		);
+		const { code, stderr } = await grai(dir, "check");
+
+		expect(code).toBe(1);
+		expect(stderr).toBe(
+			[
+				'messages/de.json: "cart_greeting" (de): the message never reads {name}, which en reads. Read it here too, or drop it everywhere.',
+				'messages/en.json: "cart_title": no source file under . names the key. Remove it from every catalog, or use it.',
+				"grai: 2 errors",
+				"",
+			].join("\n"),
+		);
+		expect(existsSync(join(dir, "out"))).toBe(false);
+	});
+
+	it("says so when there is no problem", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "app.ts"), "m.cart_title(); m.cart_greeting;");
+
+		expect(await grai(dir, "check")).toEqual({
+			code: 0,
+			stdout: "grai: no problems\n",
+			stderr: "",
+		});
 	});
 });
 

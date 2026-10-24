@@ -80,7 +80,8 @@ function sameConfig(a: Config, b: Config): boolean {
 	return shape(a) === shape(b);
 }
 
-async function readProject(
+/** Reads a project's config and every catalog file, or returns every error doing so. */
+export async function readProject(
 	configFile: string,
 ): Promise<
 	{ config: Config; sources: CatalogSource[] } | { errors: GraiError[] }
@@ -104,19 +105,8 @@ async function build(
 	hashes: readonly string[],
 	previous?: Build,
 ): Promise<{ result: CompileResult; build?: Build }> {
-	const catalogs: Catalog[] = [];
-	const errors: GraiError[] = [];
-	sources.forEach((source, index) => {
-		try {
-			catalogs.push(parsed(source, index, previous));
-		} catch (error) {
-			if (!(error instanceof GraiError)) throw error;
-			errors.push(error);
-		}
-	});
-	if (errors.length > 0) {
-		return { result: { written: [], errors: sortErrors(errors) } };
-	}
+	const { catalogs, errors } = parseCatalogs(sources, previous);
+	if (errors.length > 0) return { result: { written: [], errors } };
 	const compilation = compileCatalogs(config, catalogs, previous?.compilation);
 	if (compilation.errors.length > 0) {
 		return { result: { written: [], errors: [...compilation.errors] } };
@@ -143,6 +133,27 @@ async function build(
 		result: { written, errors: [] },
 		build: { config, sources, hashes, catalogs, compilation, rendered },
 	};
+}
+
+/**
+ * Parses every catalog, taking from the previous build each catalog whose bytes are the same, or
+ * returns every catalog's error.
+ */
+export function parseCatalogs(
+	sources: readonly CatalogSource[],
+	previous?: Build,
+): { catalogs: Catalog[]; errors: GraiError[] } {
+	const catalogs: Catalog[] = [];
+	const errors: GraiError[] = [];
+	sources.forEach((source, index) => {
+		try {
+			catalogs.push(parsed(source, index, previous));
+		} catch (error) {
+			if (!(error instanceof GraiError)) throw error;
+			errors.push(error);
+		}
+	});
+	return { catalogs, errors: sortErrors(errors) };
 }
 
 /** A catalog parsed, or taken from the previous build when its bytes are the same. */
