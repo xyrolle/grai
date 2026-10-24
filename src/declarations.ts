@@ -109,7 +109,7 @@ export declare function getLocale(): Locale;
  * browser it keeps the locale in the cookie or the URL and reloads, unless \`{ reload: false }\`.
  */
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;
-/** The direction a locale's script is written in, the current locale's by default. */
+/** The direction a locale's script is written in, the bound locale's by default. */
 export declare function getTextDirection(locale?: Locale): "ltr" | "rtl";
 /** The locale a URL's first path segment names, else the base locale. */
 export declare function extractLocaleFromUrl(url: string | URL): Locale;

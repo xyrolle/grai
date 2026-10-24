@@ -213,4 +213,4 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - `grai`: the compiler's API;
   - `grai/vite`, `grai/sveltekit`, `grai/next`, `grai/server`: the adapters, each thin, each taking the project's generated modules;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform: `AsyncLocalStorage` on the server, and `Intl.Locale` for `getTextDirection`. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, SvelteKit and Next are optional peer dependencies of their adapters.
