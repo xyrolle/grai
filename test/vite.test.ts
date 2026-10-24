@@ -542,6 +542,22 @@ window.loaded = performance.timeOrigin;
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
 	});
 
+	it("tells an adapter of each call, so that it knows which renders to draw again after an edit", async () => {
+		const { dir } = project(catalogs);
+		const { title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+let reads = 0;
+globalThis[Symbol.for("grai.read")] = () => { reads += 1; };
+m.title();
+m.greeting({ name: "Ana" });
+document.getElementById("title").textContent = String(reads);
+`,
+		);
+
+		await title("2");
+	});
+
 	it("throws for a call in another locale than the page's, as a build does, naming the key", async () => {
 		const { dir } = project(catalogs);
 		const { title } = await devPage(
