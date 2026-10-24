@@ -11,22 +11,24 @@ function describe(app, key) {
 		const value = app.messages[locale][key];
 		if (typeof value === "string") {
 			for (const [, name] of value.matchAll(placeholder))
-				inputs.set(name, "Ana");
+				if (!inputs.has(name)) inputs.set(name, "Ana");
 			continue;
 		}
 		for (const message of value ?? []) {
+			const locals = new Set();
 			for (const declaration of message.declarations) {
-				const local = declaration.match(/^local \w+ = (\w+): plural$/);
+				const local = declaration.match(/^local (\w+) = (\w+): plural$/);
 				if (local) {
-					inputs.set(local[1], 3);
+					locals.add(local[1]);
+					inputs.set(local[2], 3);
 					plural = true;
 				}
 			}
 			const [firstMatch] = Object.keys(message.match);
 			message.selectors.forEach((selector, index) => {
 				const value = firstMatch.split(",")[index]?.split("=")[1];
-				if (!inputs.has(selector) && value !== undefined && value !== "*")
-					inputs.set(selector, value);
+				if (locals.has(selector) || inputs.has(selector)) return;
+				if (value !== undefined && value !== "*") inputs.set(selector, value);
 			});
 			for (const pattern of Object.values(message.match)) {
 				for (const [, name] of pattern.matchAll(placeholder))
