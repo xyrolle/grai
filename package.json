@@ -44,6 +44,10 @@
 		"./react": {
 			"types": "./dist/react/markup.d.ts",
 			"default": "./dist/react/markup.js"
+		},
+		"./astro/middleware": {
+			"types": "./dist/astro/middleware.d.ts",
+			"default": "./dist/astro/middleware.js"
 		}
 	},
 	"bin": {
@@ -65,6 +69,7 @@
 		"test:performance": "node scripts/performance.ts"
 	},
 	"peerDependencies": {
+		"astro": ">=7",
 		"magic-string": ">=1",
 		"next": ">=16.3",
 		"react": ">=19",
@@ -72,6 +77,9 @@
 		"vite": ">=8"
 	},
 	"peerDependenciesMeta": {
+		"astro": {
+			"optional": true
+		},
 		"magic-string": {
 			"optional": true
 		},
@@ -94,6 +102,7 @@
 		"@types/node": "24.19.2",
 		"@types/react": "19.3.0",
 		"@types/react-dom": "19.3.0",
+		"astro": "7.4.2",
 		"bun": "runtime:1.4.4",
 		"cldr-core": "48.0.0",
 		"deno": "runtime:2.9.6",
