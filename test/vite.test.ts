@@ -11,6 +11,15 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import { project } from "./project.ts";
 
+/**
+ * What a test's dev server leaves Vite's watcher off: the page and render files the test writes
+ * just before the server starts. macOS reports files written that late as changed once the
+ * watcher runs (14 of 20 trials, about 110 ms after the start), and Vite reloads the page for
+ * them, or keeps the reload for the page that connects next. Tests edit catalogs only, which Vite
+ * still watches, so a test still sees a reload the plugin would let through.
+ */
+const fixtures = { ignored: ["**/index.html", "**/main.js", "**/render.js"] };
+
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
@@ -199,6 +208,7 @@ describe("the Vite plugin's dev server", () => {
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
+			server: { watch: fixtures },
 			plugins: [grai()],
 		});
 		onTestFinished(() => server.close());
@@ -234,7 +244,7 @@ describe("the Vite plugin's dev server", () => {
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0 },
+			server: { port: 0, watch: fixtures },
 			plugins: [grai()],
 		});
 		await server.listen();
@@ -264,7 +274,7 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0 },
+			server: { port: 0, watch: fixtures },
 			plugins: [grai()],
 		});
 		onTestFinished(() => server.close());
@@ -296,6 +306,7 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
+			server: { watch: fixtures },
 			plugins: [grai()],
 		});
 		await server.close();
@@ -375,7 +386,7 @@ import.meta.hot.on("test:ping", () => { window.pinged = true; });
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0 },
+			server: { port: 0, watch: fixtures },
 			plugins: [
 				grai(),
 				{
