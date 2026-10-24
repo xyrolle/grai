@@ -66,24 +66,44 @@ describe("the example, with Workers' default Node.js compatibility", () => {
 	});
 });
 
-it("keeps each of 30 interleaved requests in its own locale, with only nodejs_als", async () => {
+describe("30 requests interleaved, ten in each locale, with only nodejs_als", () => {
 	const worker = server.getWorker("interleave");
-
-	const answered = await Promise.all(
-		sent.map(async (locale) =>
-			(
-				await worker.fetch(`/?requests=${sent.length}`, {
+	/** The interleaving Worker's answers to `sent`, all in flight at once. */
+	const answers = (sent: { locale: string; switchTo?: string }[]) =>
+		Promise.all(
+			sent.map(async ({ locale, switchTo }) => {
+				const query = new URLSearchParams({
+					requests: String(sent.length),
+					...(switchTo === undefined ? {} : { switchTo }),
+				});
+				const response = await worker.fetch(`/?${query}`, {
 					headers: { cookie: `lang=${locale}` },
-				})
-			).json(),
-		),
-	);
+				});
+				return response.json();
+			}),
+		);
 
-	expect(answered).toEqual(
-		sent.map((locale) => ({
-			locale,
-			bound: locale,
-			renders: [titleOf(locale), titleOf(locale)],
-		})),
-	);
+	it("keeps each request in its own locale", async () => {
+		expect(await answers(sent.map((locale) => ({ locale })))).toEqual(
+			sent.map((locale) => ({
+				locale,
+				bound: locale,
+				renders: [titleOf(locale), titleOf(locale)],
+			})),
+		);
+	});
+
+	it("lets setLocale switch only the request that calls it", async () => {
+		const switching = sent.map((locale) =>
+			locale === "ro" ? { locale, switchTo: "ar" } : { locale },
+		);
+
+		expect(await answers(switching)).toEqual(
+			switching.map(({ locale, switchTo = locale }) => ({
+				locale,
+				bound: switchTo,
+				renders: [titleOf(locale), titleOf(switchTo)],
+			})),
+		);
+	});
 });

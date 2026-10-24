@@ -5,7 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { baseLocale, cookieName, locales, strategy } from "./config.js";
 import { bindRequests, extractLocaleFromUrl } from "./runtime.js";
 
-/** @type {AsyncLocalStorage<number>} */
+/** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
@@ -23,7 +23,7 @@ const vary = headersRead().join(", ");
  */
 export async function middleware(request, handler) {
 	const locale = localeOf(request);
-	const response = await requests.run(locales.indexOf(locale), () =>
+	const response = await requests.run({ index: locales.indexOf(locale) }, () =>
 		handler({ request, locale }),
 	);
 	return vary === "" ? response : withVary(response);

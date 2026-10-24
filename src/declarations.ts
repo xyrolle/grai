@@ -201,9 +201,10 @@ export type MarkupMessage<
 // What the rest of the output calls; not for apps.
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
 export declare function bindRequests(storage: {
-	getStore(): number | undefined;
-	enterWith(index: number): void;
+	getStore(): RequestLocale | undefined;
 }): void;
+/** A request's locale, by its position in \`locales\`. */
+export type RequestLocale = { index: number };
 /** A message's inputs as its compiled code reads them; the key's declaration types them. */
 type CompiledInputs = { readonly [input: string]: unknown };
 /** A compiled message without inputs: its text in each locale, in \`locales\` order. */
