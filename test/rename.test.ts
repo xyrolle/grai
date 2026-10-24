@@ -3,9 +3,11 @@ import { rename } from "../src/rename.ts";
 import { project } from "./project.ts";
 import {
 	cartSvelte,
+	handLaid,
 	headerTsx,
 	i18nTs,
 	readText,
+	schemaEntry,
 	writeSources,
 } from "./sources.ts";
 
@@ -53,6 +55,18 @@ describe("grai rename", () => {
 			"<h1 aria-label={m.basket_title()}>{m?.basket_title()}</h1>",
 		);
 		expect((await shop.load()).m.basket_title?.()).toBe("Your cart");
+	});
+
+	it("changes only the key's string in a catalog, leaving every other byte as it is written", async () => {
+		const { dir, config } = app();
+		const total = '"cart_total" :  "{count} Artikel \\u00e9"';
+		const catalog = (key: string) =>
+			handLaid(schemaEntry, `"${key}":"Ihr Warenkorb"`, total);
+		writeSources(dir, { "messages/de.json": catalog("cart_title") });
+
+		await rename(config, "cart_title", "basket_title");
+
+		expect(readText(dir, "messages/de.json")).toBe(catalog("basket_title"));
 	});
 
 	it("renames a per-key import's path and name, and every use of the name it binds", async () => {
