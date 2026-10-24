@@ -19,8 +19,32 @@ const baselines = { cold: 110, noop: 3, edit: 4, process: 160 };
 const keys = 6667;
 /** Edits made before the timed ones, while the engine still optimizes the recompile. */
 const warmupEdits = 10;
-/** Edits timed; their median is the step's time, which one slow edit on a busy runner cannot move. */
+/**
+ * How many times each step after the first compile is timed. Its median is the step's time, which
+ * one slow run on a busy runner cannot move.
+ */
 const timedEdits = 31;
+const timedNoops = 11;
+const timedProcesses = 3;
+
+/**
+ * The median time of `runs` runs of `step`, after `warmups` untimed ones. A step that returns a
+ * number has timed itself, leaving out its own setup.
+ */
+async function median(
+	runs: number,
+	step: () => Promise<number | undefined | void>,
+	warmups = 0,
+): Promise<number> {
+	const times: number[] = [];
+	for (let run = 0; run < warmups + runs; run++) {
+		const started = performance.now();
+		const own = await step();
+		if (run >= warmups)
+			times.push(typeof own === "number" ? own : performance.now() - started);
+	}
+	return times.toSorted((a, b) => a - b)[Math.floor(runs / 2)] ?? 0;
+}
 
 function catalog(locale: string, revision = 0): Record<string, unknown> {
 	const categories =
@@ -74,27 +98,28 @@ try {
 		}),
 	);
 
-	let start = performance.now();
+	const start = performance.now();
 	await compile(config);
 	const cold = performance.now() - start;
-	start = performance.now();
-	await compile(config);
-	const noop = performance.now() - start;
+	const noop = await median(timedNoops, async () => {
+		await compile(config);
+	});
 	let { build } = await recompile(config, undefined);
-	const times: number[] = [];
-	for (let revision = 1; revision <= warmupEdits + timedEdits; revision++) {
-		write(dir, "pl", revision);
-		start = performance.now();
-		const next = await recompile(config, build);
-		if (revision > warmupEdits) times.push(performance.now() - start);
-		build = next.build;
-	}
-	const edit = times.toSorted((a, b) => a - b)[Math.floor(timedEdits / 2)] ?? 0;
-
-	rmSync(join(dir, "out"), { recursive: true });
-	start = performance.now();
-	execFileSync(process.execPath, [cli, "compile", "--config", config]);
-	const fresh = performance.now() - start;
+	let revision = 0;
+	const edit = await median(
+		timedEdits,
+		async () => {
+			write(dir, "pl", ++revision);
+			const started = performance.now();
+			build = (await recompile(config, build)).build;
+			return performance.now() - started;
+		},
+		warmupEdits,
+	);
+	const fresh = await median(timedProcesses, async () => {
+		rmSync(join(dir, "out"), { recursive: true, force: true });
+		execFileSync(process.execPath, [cli, "compile", "--config", config]);
+	});
 
 	const steps: [string, number, number][] = [
 		["cold", cold, baselines.cold],
