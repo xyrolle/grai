@@ -71,6 +71,7 @@
 	"scripts": {
 		"build": "node scripts/build.ts",
 		"prepack": "pnpm build",
+		"prepublishOnly": "pnpm check && pnpm typecheck && pnpm build && pnpm test && pnpm check:package && pnpm size",
 		"check": "biome check .",
 		"typecheck": "tsc && tsc -p tsconfig.runtime.json && tsc -p tsconfig.browser.json",
 		"test": "vitest run",
