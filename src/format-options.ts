@@ -11,7 +11,9 @@ import {
 	type OptionValue,
 	type SelectedNumber,
 	shapesText,
+	timeUnits,
 } from "./format-functions.ts";
+import { checkFormat } from "./intl-formatters.ts";
 import { MessageProblem } from "./problem.ts";
 
 /** How a value is shown: through an Intl formatter, with the options Intl takes. */
@@ -105,11 +107,7 @@ export function parseCall(
 	};
 	const format: Format = { formatter: spec.formatter, options };
 	try {
-		if (format.formatter === "number") {
-			new Intl.NumberFormat(undefined, options);
-		} else {
-			new Intl.DateTimeFormat(undefined, options);
-		}
+		checkFormat(format);
 	} catch (error) {
 		throw new MessageProblem(
 			"message-invalid",
@@ -180,5 +178,9 @@ function optionValue(
 			return digits.test(text)
 				? Number(text)
 				: invalid("a whole number or auto");
+		case "timeUnit":
+			return timeUnits.has(text)
+				? text
+				: invalid(`a unit of time: ${[...timeUnits].join(", ")}`);
 	}
 }
