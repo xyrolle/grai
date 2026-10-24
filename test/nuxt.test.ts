@@ -4,6 +4,10 @@ import type { NuxtPage } from "nuxt/schema";
 import { describe, expect, it } from "vitest";
 import module from "../src/nuxt/module.ts";
 import { localizedPages } from "../src/nuxt/pages.ts";
+import {
+	type HeadTag,
+	pointAtLocaleChunks,
+} from "../src/nuxt/runtime/locale-chunks.ts";
 import { project } from "./project.ts";
 
 describe("the module", { timeout: 30_000 }, () => {
@@ -71,5 +75,45 @@ describe("the pages of the url strategy", () => {
 				],
 			},
 		]);
+	});
+});
+
+describe("a page's locale's message chunks", () => {
+	const importMap = (imports: Record<string, string>): HeadTag => ({
+		tag: "script",
+		props: { type: "importmap" },
+		innerHTML: JSON.stringify({ imports }),
+	});
+	const link = (rel: string, href: string): HeadTag => ({
+		tag: "link",
+		props: { rel, href },
+	});
+
+	it("maps the shared chunks to the locale's copies in Nuxt's import map, and preloads the copies", () => {
+		const tags = [
+			importMap({ "#entry": "/_nuxt/Bx1.js" }),
+			link("modulepreload", "/_nuxt/grai/a.js"),
+			link("prefetch", "/_nuxt/grai/b.js"),
+			link("modulepreload", "/_nuxt/c.js"),
+		];
+
+		pointAtLocaleChunks(tags, "ro");
+
+		expect(JSON.parse(tags[0]?.innerHTML ?? "")).toEqual({
+			imports: { "#entry": "/_nuxt/Bx1.js", "/_nuxt/grai/": "/_nuxt/grai-ro/" },
+		});
+		expect(tags.slice(1).map(({ props }) => props.href)).toEqual([
+			"/_nuxt/grai-ro/a.js",
+			"/_nuxt/grai-ro/b.js",
+			"/_nuxt/c.js",
+		]);
+	});
+
+	it("leaves a page without Nuxt's import map as it is, which loads every locale's words", () => {
+		const tags = [link("modulepreload", "/_nuxt/grai/a.js")];
+
+		pointAtLocaleChunks(tags, "ro");
+
+		expect(tags).toEqual([link("modulepreload", "/_nuxt/grai/a.js")]);
 	});
 });
