@@ -25,7 +25,7 @@ const plugins = [
 ].map((name) => installed(`${name}/dist/index.js`));
 
 /** The inlang project Paraglide reads: the app's catalogs in place, the plugins from disk. */
-function writeProject(app, directory) {
+export function writeProject(app, directory) {
 	const project = join(directory, "project.inlang");
 	mkdirSync(project, { recursive: true });
 	const settings = {
