@@ -1,0 +1,13 @@
+{
+	"name": "workers-example",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "grai compile && wrangler dev",
+		"deploy": "grai compile && wrangler deploy"
+	},
+	"devDependencies": {
+		"grai": "workspace:*",
+		"wrangler": "4.152.0"
+	}
+}

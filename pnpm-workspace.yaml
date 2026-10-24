@@ -1,1 +1,6 @@
 engineStrict: true
+packages:
+  - examples/*
+allowBuilds:
+  esbuild: true
+  workerd: true
