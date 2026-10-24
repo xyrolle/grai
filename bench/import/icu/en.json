@@ -1,0 +1,17 @@
+{
+	"cart": {
+		"title": "Your cart",
+		"greeting": "Hello {name}!",
+		"items": "{n, plural, =0 {No items} one {# item} few {never chosen} other {# items}}",
+		"owner": "{g, select, male {He} female {She} other {They}} found {n, plural, one {# cat} other {# cats}}.",
+		"nested": "{g, select, male {{n, plural, =0 {none of his} one {his # cat} other {his # cats}}} other {their cats}}",
+		"quote": "It's {name}'s, a literal '{brace}' and '' quotes",
+		"bold": "Hello <b>{name}</b>, you have <i>{n, plural, one {# cat} other {# cats}}</i>",
+		"price": "{value, number}",
+		"rank": "{n, selectordinal, one {#st} other {#th}}",
+		"offset": "{n, plural, offset:1 =0 {nobody} other {# others}}",
+		"both": "{n, plural, one {{g, select, male {his one} other {their one}}} other {{g, select, male {his #} other {their #}}}}",
+		"split": "{g, select, male {{n, plural, one {he has one} other {he has #}}} other {{n, plural, =0 {they have none} one {they have one} other {they have #}}}}"
+	},
+	"app.title": "Shop"
+}

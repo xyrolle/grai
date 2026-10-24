@@ -1,0 +1,25 @@
+{
+	"cart": {
+		"title": "Your cart",
+		"greeting": "Hello {{name}}!",
+		"raw": "Hi {{- name}}",
+		"item_zero": "No items",
+		"item_one": "One item",
+		"item_other": "{{count}} items",
+		"summary": "{{name}} has {{count}} items"
+	},
+	"braces": "A {literal} and a \\\\ backslash",
+	"see": "See $t(cart.title) now",
+	"friend": "A friend",
+	"friend_male": "A boyfriend",
+	"place_ordinal_one": "{{count}}st",
+	"place_ordinal_other": "{{count}}th",
+	"price": "Costs {{value, number}}",
+	"nested": {
+		"deeper": {
+			"key": "Deep text"
+		}
+	},
+	"short_one": "one short",
+	"short_other": "{{count}} short"
+}
