@@ -137,7 +137,8 @@ function differingInputs(
 	catalogs: readonly Catalog[],
 ): GraiError[] {
 	const inputs = new Map<Catalog, ReadonlySet<string>>();
-	for (const catalog of catalogs) {
+	// A locale without the key takes its fallback's message, whose inputs are its fallback's.
+	for (const catalog of catalogs.filter(({ messages }) => messages.has(key))) {
 		try {
 			inputs.set(
 				catalog,

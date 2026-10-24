@@ -14,8 +14,9 @@ import { writeAll } from "./write-all.ts";
 
 /**
  * Adds a key to every catalog that lacks it, with its text in each of those locales, then compiles.
- * It writes nothing unless some catalog lacks the key, a text is given for each that does and for
- * no other, and every text is a valid message.
+ * A locale that falls back to another needs no text of its own, though it may be given one. It
+ * writes nothing unless some text is to be added, one is given for each other locale that lacks the
+ * key and for no locale that has it, and every text is a valid message.
  */
 export async function add(
 	configFile: string,
@@ -32,7 +33,9 @@ export async function add(
 	const where = { file: base?.file ?? "", key };
 	const invalid = invalidName(key, catalogs, where);
 	const problems =
-		invalid === undefined ? textProblems(catalogs, texts, where) : [invalid];
+		invalid === undefined
+			? textProblems(catalogs, texts, read.config.fallbacks, where)
+			: [invalid];
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
 	const catalogTexts = new Map<string, string>();
 	for (const [locale, path] of read.config.catalogs) {
@@ -71,33 +74,48 @@ function invalidName(
 }
 
 /**
- * What is wrong with the texts: the key is in every catalog already, a catalog that lacks it has
- * no text or an invalid one, or one that has it is given a text.
+ * What is wrong with the texts: there is nothing to add, as every catalog has the key or takes it
+ * from its fallback and none is given a text; a catalog that lacks it and has no fallback has no
+ * text, or an invalid one; or one that has it is given a text.
  */
 function textProblems(
 	catalogs: readonly Catalog[],
 	texts: Readonly<Record<string, string>>,
+	fallbacks: ReadonlyMap<string, string>,
 	{ file, key }: { file: string; key: string },
 ): GraiError[] {
-	if (catalogs.every((catalog) => catalog.messages.has(key))) {
+	const lacking = catalogs.filter((catalog) => !catalog.messages.has(key));
+	const fromFallbacks = lacking.every(
+		({ locale }) => fallbacks.has(locale) && texts[locale] === undefined,
+	);
+	if (fromFallbacks) {
 		return [
 			new GraiError(
 				"key-exists",
 				{ file, key },
-				"the key is already in the catalogs. Edit its messages there.",
+				lacking.length === 0
+					? "the key is already in the catalogs. Edit its messages there."
+					: `the key is already in the catalogs, and ${lacking.map(({ locale }) => locale).join(", ")} take${lacking.length === 1 ? "s" : ""} it from a fallback. Edit its messages there, or give a locale its own text.`,
 			),
 		];
 	}
 	return catalogs.flatMap(
-		(catalog) => textProblem(catalog, key, texts[catalog.locale]) ?? [],
+		(catalog) =>
+			textProblem(
+				catalog,
+				key,
+				texts[catalog.locale],
+				fallbacks.has(catalog.locale),
+			) ?? [],
 	);
 }
 
-/** What is wrong with one catalog's text, if anything. */
+/** What is wrong with one catalog's text, if anything. One that falls back may have none. */
 function textProblem(
 	catalog: Catalog,
 	key: string,
 	text: string | undefined,
+	fallsBack: boolean,
 ): GraiError | undefined {
 	const where = { file: catalog.file, key, locale: catalog.locale };
 	if (catalog.messages.has(key)) {
@@ -110,11 +128,13 @@ function textProblem(
 				);
 	}
 	if (text === undefined) {
-		return new GraiError(
-			"key-missing",
-			where,
-			`give the key's text in ${catalog.locale} too, with --${catalog.locale}.`,
-		);
+		return fallsBack
+			? undefined
+			: new GraiError(
+					"key-missing",
+					where,
+					`give the key's text in ${catalog.locale} too, with --${catalog.locale}.`,
+				);
 	}
 	try {
 		parseMessage(catalog.locale, text);

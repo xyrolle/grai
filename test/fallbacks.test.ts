@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
+import { add } from "../src/add.ts";
+import { check } from "../src/check.ts";
 import { recompile } from "../src/compile.ts";
 import { errorsOf, type Messages, project } from "./project.ts";
 
@@ -99,4 +101,43 @@ it("compiles again when a locale's fallback changes, from scratch and in watch",
 	await compile();
 
 	expect([before, watched, colours()]).toEqual([2, 1, 2]);
+});
+
+it("adds a key without a text for a locale that falls back", async () => {
+	const { dir, config } = project(catalogs, { fallbacks });
+	const result = await add(config, "total", { en: "Total" });
+
+	expect(result.errors).toEqual([]);
+	expect(readFileSync(join(dir, "messages", "en-GB.json"), "utf8")).toBe(
+		JSON.stringify(catalogs["en-GB"], null, "\t"),
+	);
+});
+
+it("adds a key a locale takes from its fallback only as that locale's own text", async () => {
+	const { dir, config } = project(catalogs, { fallbacks });
+	const nothing = await add(config, "cart", {});
+	const own = await add(config, "cart", { "en-GB": "Basket" });
+
+	expect(nothing.errors.map((error) => error.message)).toEqual([
+		'messages/en.json: "cart": the key is already in the catalogs, and en-GB takes it from a fallback. Edit its messages there, or give a locale its own text.',
+	]);
+	expect(own.errors).toEqual([]);
+	expect(
+		JSON.parse(readFileSync(join(dir, "messages", "en-GB.json"), "utf8")),
+	).toEqual({ color: "Colour", cart: "Basket" });
+});
+
+it("checks the inputs of a key some locales take from their fallback", async () => {
+	const { config } = project(
+		{
+			en: { greeting: "Hello {name}" },
+			"en-GB": {},
+			de: { greeting: "Hallo" },
+		},
+		{ fallbacks },
+	);
+
+	expect((await check(config)).problems.map((error) => error.code)).toContain(
+		"inputs-differ",
+	);
 });
