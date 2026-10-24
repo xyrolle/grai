@@ -10,7 +10,7 @@ import {
 	strategy,
 } from "./config.js";
 
-export { baseLocale, cookieName, locales };
+export { baseLocale, locales };
 
 /** Whether a URL names its locale: only under the `url` strategy, else every path is the app's own. */
 const urlsNameLocales = strategy.includes("url");

@@ -13,8 +13,6 @@ export declare const baseLocale: ${JSON.stringify(config.baseLocale)};
 export declare function isLocale(value: unknown): value is Locale;
 /** The value, if it is one of the project's locales; otherwise throws a GraiError. */
 export declare function assertIsLocale(value: unknown): Locale;
-/** The cookie the server's "cookie" strategy reads, and \`setLocale\` writes. */
-export declare const cookieName: ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};
 /** The locale messages render in: the request's on the server, the page's in a browser. */
 export declare function getLocale(): Locale;
 /**
@@ -37,7 +35,7 @@ export declare function localizeHref(href: string, options?: { locale?: Locale }
 export declare class GraiError extends Error {
 	readonly code: string;
 }
-export type MessageOptions = { locale?: Locale };
+type MessageOptions = { locale?: Locale };
 /**
  * A run of a message's text, or a piece of its markup, as \`.parts()\` gives them: its name one
  * of the message's tags, each option's value, and each attribute's, true for one without a value.
