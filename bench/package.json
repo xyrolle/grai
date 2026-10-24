@@ -1,0 +1,23 @@
+{
+	"name": "grai-bench",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@12.15.0",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"browsers": "playwright-core install chromium webkit"
+	},
+	"devDependencies": {
+		"@inlang/paraglide-js": "2.29.1",
+		"@inlang/plugin-m-function-matcher": "2.3.4",
+		"@inlang/plugin-message-format": "4.5.5",
+		"make-plural": "8.1.0",
+		"playwright-core": "1.64.1",
+		"rolldown": "1.2.15",
+		"svelte": "5.57.2",
+		"vite": "8.3.5",
+		"wrangler": "4.152.0"
+	}
+}
