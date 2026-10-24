@@ -23,6 +23,8 @@ export type FormatFunction = {
 	fixed?: IntlOptions;
 	/** Options it formats with when it is given none that shape the text. */
 	defaults?: IntlOptions;
+	/** True when a selector can be made of it, which then takes the `select` option. */
+	selects?: true;
 };
 
 /** Options that set how a date or time is written, beside its fields and styles. */
@@ -85,6 +87,7 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 			roundingIncrement: "digits",
 			roundingMode: "text",
 		},
+		selects: true,
 	},
 	integer: {
 		formatter: "number",
@@ -95,6 +98,7 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 			maximumSignificantDigits: "digits",
 		},
 		fixed: { maximumFractionDigits: 0 },
+		selects: true,
 	},
 	datetime: {
 		formatter: "datetime",

@@ -12,7 +12,7 @@ import { plainText } from "./pattern.ts";
 export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
 
 /**
- * A key compiled: its line in keys.js and in a server build, the runtime functions, the plural
+ * A key compiled: its line in keys.js and in a server build, the runtime functions, plurals.js's
  * functions and the formatters it calls, and its parts one locale at a time, for an adapter that
  * writes a module per locale.
  */
@@ -22,7 +22,7 @@ export type KeyModule = {
 	/** Its line in a server build, each locale's function a function expression. */
 	serverCode: string;
 	uses: ReadonlySet<RuntimeFunction>;
-	/** The plural functions it calls, by name. */
+	/** The functions of plurals.js it calls, by name. */
 	plurals: ReadonlySet<string>;
 	/** The formatters it calls, by name. */
 	formats: ReadonlyMap<string, Formatter>;

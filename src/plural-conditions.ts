@@ -54,7 +54,7 @@ export function chain(
 }
 
 /** Compiles a rule such as `v = 0 and i % 10 = 2..4 or n = 7`, folding the operands it knows. */
-function compileRule(rule: string, operands: Operands): Code {
+export function compileRule(rule: string, operands: Operands): Code {
 	return rule.split(" or ").reduce<Code>(
 		(any, alternative) =>
 			or(
