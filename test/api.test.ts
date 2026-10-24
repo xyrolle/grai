@@ -32,7 +32,6 @@ it("exports from the output's runtime.js only the API apps call", async () => {
 		"setLocale",
 	]);
 	expect(await importableNames(dir, "./out/runtime.js")).toEqual([
-		"Call",
 		"GraiError",
 		"Locale",
 		"MarkupMessage",

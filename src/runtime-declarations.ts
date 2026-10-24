@@ -62,6 +62,8 @@ export type MarkupMessage<
 > = Message<Inputs> & {
 	parts: Call<Inputs, MessagePart<Tag>[]>;
 };
+// A declaration file without an export list exports every name it declares, Call included.
+export {};
 `;
 }
 
