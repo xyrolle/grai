@@ -170,3 +170,16 @@ function preference(variant: Variant, selectors: readonly Selector[]): number {
 		return rank * 3 + weight;
 	}, 0);
 }
+
+/**
+ * The rules a selector counts by for a key, if it counts: a plural's for any key, and a number's,
+ * unless select=exact, for a key that is not a number.
+ */
+export function countingRules(
+	selector: Selector | undefined,
+	key: string,
+): PluralType | undefined {
+	if (selector?.kind === "plural") return selector.type;
+	if (selector?.kind === "number" && !isExactKey(key)) return selector.rules;
+	return undefined;
+}

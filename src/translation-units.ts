@@ -8,7 +8,7 @@ import type { Catalog } from "./catalog.ts";
 import { parseMessage } from "./message.ts";
 import { type Piece, patternPieces } from "./pattern-pieces.ts";
 import { isSeed } from "./seed.ts";
-import { catchAll } from "./selection.ts";
+import { catchAll, countingRules } from "./selection.ts";
 import {
 	alignedVariants,
 	baseCategoryOf,
@@ -84,10 +84,10 @@ function messageUnits(
 			],
 		);
 		const inBase = combination.map((key, index) => {
-			const selector = message.selectors[index];
-			return selector?.kind === "plural"
-				? baseCategoryOf(key, baseLocale, locale, selector.type)
-				: key;
+			const rules = countingRules(message.selectors[index], key);
+			return rules === undefined || key === catchAll
+				? key
+				: baseCategoryOf(key, baseLocale, locale, rules);
 		});
 		const source = chosen(sources, inBase) ?? "";
 		const target =

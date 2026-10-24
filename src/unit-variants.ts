@@ -8,7 +8,7 @@ import { parseVariantKey } from "./match.ts";
 import { parseMessage } from "./message.ts";
 import { categoriesOf, type PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
-import { catchAll, type Selector } from "./selection.ts";
+import { catchAll, countingRules, type Selector } from "./selection.ts";
 
 /** A message's variants as written: each one's keys, one per selector, and its pattern. */
 export type Variants = readonly (readonly [
@@ -58,32 +58,38 @@ export function translatedVariants(
 }
 
 /**
- * The combinations of keys a locale needs. The variants are taken in rows, by their keys for the
- * selectors other than plurals. A plural takes each of the locale's categories in a row that tells
- * counts apart, or in the row of anything else; in a row that does not, such as `count=0`, it
- * keeps `*`, one text for any count.
+ * The combinations of keys a locale needs. The variants are taken in rows, by their keys that do
+ * not count: those of a select, and a number's exact ones. A key that counts, a plural's or a
+ * number's category or `*`, takes each of the locale's categories in a row that tells counts
+ * apart, or in the row of anything else; in a row that does not, such as `count=0`, it keeps `*`,
+ * one text for any count.
  */
 export function combinations(
 	selectors: readonly Selector[],
 	variants: Variants,
 	locale: string,
 ): string[][] {
-	const plural = selectors.map((selector) => selector.kind === "plural");
+	const counting = (key: string, index: number) =>
+		countingRules(selectors[index], key) !== undefined;
 	const rows = new Map<string, (readonly string[])[]>();
 	for (const [keys] of variants) {
-		const row = keys.filter((_, index) => !plural[index]).join("\0");
+		const row = keys
+			.map((key, index) => (counting(key, index) ? "" : key))
+			.join("\0");
 		rows.set(row, [...(rows.get(row) ?? []), keys]);
 	}
 	const all = new Map<string, string[]>();
 	for (const row of rows.values()) {
 		const [first = []] = row;
 		const anything = first.every(
-			(key, index) => plural[index] || key === catchAll,
+			(key, index) => counting(key, index) || key === catchAll,
 		);
 		const keyLists = selectors.map((selector, index) => {
-			if (selector.kind !== "plural") return [first[index] ?? catchAll];
+			const key = first[index] ?? catchAll;
+			const rules = countingRules(selector, key);
+			if (rules === undefined) return [key];
 			const counts = anything || row.some((keys) => keys[index] !== catchAll);
-			return counts ? [...categoriesOf(locale, selector.type)] : [catchAll];
+			return counts ? [...categoriesOf(locale, rules)] : [catchAll];
 		});
 		for (const combination of product(keyLists)) {
 			all.set(combination.join("\0"), combination);
@@ -179,15 +185,15 @@ export function noteOf(
 ): string {
 	return variant
 		.map(([name, key], index) => {
-			const selector = selectors[index];
-			if (selector?.kind !== "plural") {
+			const rules = countingRules(selectors[index], key);
+			if (rules === undefined) {
 				return key === catchAll
 					? `${name}: any other value`
 					: `${name}: ${key}`;
 			}
 			return key === catchAll
 				? `${name}: any count`
-				: `${name}: ${key}, as for ${examplesOf(key, locale, selector.type)}`;
+				: `${name}: ${key}, as for ${examplesOf(key, locale, rules)}`;
 		})
 		.join("; ");
 }

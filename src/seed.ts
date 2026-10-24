@@ -14,16 +14,17 @@ import { GraiError } from "./error.ts";
 import { readLocaleCatalogs } from "./locale-catalogs.ts";
 import { parseMessage } from "./message.ts";
 import { parseDeclarations } from "./message-declarations.ts";
+import { selectRules } from "./number-select.ts";
 import { categoriesOf } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 import { catchAll } from "./selection.ts";
 import { writeAll } from "./write-all.ts";
 
 /**
- * A base message as it is seeded into a locale: the same text. A plural keeps the variants the
- * locale can choose, and its `other` becomes `*` where there is no `*`, so it covers the locale's
- * categories the base locale lacks, such as `few`. Throws a MessageProblem for an invalid
- * declaration; the rest of the message is taken as it is.
+ * A base message as it is seeded into a locale: the same text. A plural, or a number selector's
+ * categories, keeps the variants the locale can choose, and its `other` becomes `*` where there
+ * is no `*`, so it covers the locale's categories the base locale lacks, such as `few`. Throws a
+ * MessageProblem for an invalid declaration; the rest of the message is taken as it is.
  */
 export function seedValue(value: unknown, locale: string): unknown {
 	const fields = Array.isArray(value) ? value[0] : undefined;
@@ -31,15 +32,21 @@ export function seedValue(value: unknown, locale: string): unknown {
 	const declarations = Array.isArray(fields.declarations)
 		? fields.declarations.filter((item) => typeof item === "string")
 		: [];
-	const locals = parseDeclarations(declarations).plurals;
-	/** Each plural selector, with the categories of its type the locale has. */
+	const locals = parseDeclarations(declarations);
+	const rulesOf = (name: string) => {
+		const number = locals.formatted.get(name);
+		return number === undefined
+			? locals.plurals.get(name)?.type
+			: selectRules(number);
+	};
+	/** Each selector that counts, with the categories of its rules the locale has. */
 	const plurals = (
 		Array.isArray(fields.selectors) ? fields.selectors : []
 	).flatMap((name): [string, ReadonlySet<string>][] => {
-		const local = typeof name === "string" ? locals.get(name) : undefined;
-		return local === undefined
+		const rules = typeof name === "string" ? rulesOf(name) : undefined;
+		return rules === undefined
 			? []
-			: [[name, new Set(categoriesOf(locale, local.type))]];
+			: [[name, new Set(categoriesOf(locale, rules))]];
 	});
 	if (plurals.length === 0) return value;
 	const variants = Object.entries(fields.match).map(

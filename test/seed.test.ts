@@ -126,6 +126,36 @@ describe("grai seed", () => {
 		expect(m.place?.({ n: 21 }, { locale: "ru" })).toBe("21th");
 	});
 
+	it("seeds a number selector with its exact keys, and the variants of the locale's categories", async () => {
+		const files = (match: Record<string, string>) => [
+			{
+				declarations: ["input count", "local n = count: number select=ordinal"],
+				selectors: ["n"],
+				match,
+			},
+		];
+		const { dir, config, load } = project({
+			en: {
+				files: files({
+					"n=1": "first",
+					"n=one": "{n}st",
+					"n=two": "{n}nd",
+					"n=few": "{n}rd",
+					"n=other": "{n}th",
+				}),
+			},
+			ru: {},
+		});
+
+		await seed(config, "ru");
+		const { m } = await load();
+
+		expect(catalog(dir, "ru")).toEqual({
+			files: files({ "n=1": "first", "n=*": "{n}th" }),
+		});
+		expect(m.files?.({ count: 2 }, { locale: "ru" })).toBe("2th");
+	});
+
 	it("creates the catalog of a locale that has none, in the base catalog's layout", async () => {
 		const { dir, config } = project({
 			en: { cart_title: "Your cart" },
