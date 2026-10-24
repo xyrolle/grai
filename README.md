@@ -105,7 +105,17 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 
 ## Config
 
-The config's fields, and what each accepts, are being documented alongside the config's validation, which is still in progress.
+`grai.config.json` is read by the CLI, the Vite plugin and the adapters alike. Paths in it are relative to it.
+
+| Field | |
+|---|---|
+| `locales` | The project's locales, as BCP 47 tags in their canonical form: `en-US`, not `en-us`. |
+| `baseLocale` | One of `locales`: the one the others are translated from, whose text the editor shows and `grai seed` copies, and the locale a request gets when its strategy finds none. |
+| `catalogs` | Each locale's catalog, a path with `{locale}` in it. |
+| `outdir` | Where the compiled output goes. |
+| `strategy` | Optional. Where the server looks for a request's locale, in order: `cookie`, `preferredLanguage` (its `Accept-Language`), `url` (its first path segment; the base locale has no prefix). |
+| `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. |
+| `switch` | Optional. How a page changes locale: `"reload"`, the default, reloads it, and `"live"` changes it in place (`docs/design.md`). |
 
 ## Measured
 
