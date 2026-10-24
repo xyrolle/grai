@@ -26,6 +26,19 @@ export function catalogEntries(text: string): CatalogEntry[] {
 	return entries;
 }
 
+/** The text with one entry's key renamed, and every other byte as it was. */
+export function withKeyRenamed(
+	text: string,
+	entry: CatalogEntry,
+	key: string,
+): string {
+	return (
+		text.slice(0, entry.keyStart) +
+		JSON.stringify(key) +
+		text.slice(entry.keyEnd)
+	);
+}
+
 const whitespace = " \t\r\n";
 
 function skipSpace(text: string, at: number): number {

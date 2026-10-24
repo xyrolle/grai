@@ -7,6 +7,7 @@ import { exportCommand } from "./cli/export.ts";
 import { findCommand } from "./cli/find.ts";
 import { importCommand } from "./cli/import.ts";
 import { mergeCommand } from "./cli/merge.ts";
+import { renameCommand } from "./cli/rename.ts";
 import { seedCommand } from "./cli/seed.ts";
 import { watchCommand } from "./cli/watch.ts";
 
@@ -21,6 +22,7 @@ const commands: Record<string, Command> = {
 	add: addCommand,
 	import: importCommand,
 	find: findCommand,
+	rename: renameCommand,
 };
 
 const usage = `Usage: grai <command> [--config <file>]
