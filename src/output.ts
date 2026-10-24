@@ -41,14 +41,15 @@ export async function isUpToDate(
 
 /**
  * Writes the output level by level, the files of a level at once, each atomically: to a file
- * beside it, then renamed over it. A file whose content is already on disk is left untouched.
- * Files of the last write that are no longer output go next, then the manifest. Returns the files
- * written.
+ * beside it, then renamed over it. A file whose content is already there is left untouched: as
+ * the previous write left it, when that is known, else as it is on disk. Files of the last write
+ * that are no longer output go next, then the manifest. Returns the files written.
  */
 export async function writeOutput(
 	outdir: string,
 	output: Output,
 	inputs: string,
+	previous?: ReadonlyMap<string, string>,
 ): Promise<string[]> {
 	const state = join(outdir, stateDirectory);
 	await mkdir(state, { recursive: true });
@@ -65,7 +66,11 @@ export async function writeOutput(
 			const changed = await Promise.all(
 				level.map(async ([file, content]) => {
 					const path = join(outdir, file);
-					if (await holds(path, content)) return undefined;
+					const same =
+						previous === undefined
+							? await holds(path, content)
+							: previous.get(file) === content;
+					if (same) return undefined;
 					const temporary = join(state, `${file.replaceAll("/", "-")}.tmp`);
 					await replace(path, temporary, content);
 					return file;
@@ -74,7 +79,11 @@ export async function writeOutput(
 			for (const file of changed) if (file !== undefined) written.push(file);
 		}
 		const names = new Set(output.flat().map(([file]) => file));
-		for (const file of manifest?.files ?? []) {
+		const before = new Set([
+			...(manifest?.files ?? []),
+			...(previous?.keys() ?? []),
+		]);
+		for (const file of before) {
 			if (!names.has(file))
 				await unlink(join(outdir, file)).catch(ignoreMissing);
 		}
