@@ -17,6 +17,10 @@
 		"noEmit": true
 	},
 	"include": ["src", "test", "scripts"],
-	// The page's modules see the DOM, so tsconfig.browser.json checks them.
-	"exclude": ["src/sveltekit-client.ts", "src/vue/client.ts"]
+	// The modules of the app's own bundle see the DOM, so tsconfig.browser.json checks them.
+	"exclude": [
+		"src/sveltekit-client.ts",
+		"src/vue/client.ts",
+		"src/nuxt/runtime"
+	]
 }
