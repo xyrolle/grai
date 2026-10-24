@@ -242,6 +242,14 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - **A request's locale holds across its awaits in workerd, Bun and Deno, as in Node.** In the test, 30 requests in three locales are all in flight at once in each runtime, and each renders again after an await in its own locale, or in the one its `setLocale` chose.
 - **The tests get Bun and Deno from pnpm's runtime protocol** (`"bun": "runtime:1.4.4"` in the devDependencies), as they get workerd from Wrangler: one `pnpm install` brings every runtime they serve the example in, at a pinned version, with nothing installed globally.
 
+## SvelteKit
+
+- **`handleLocale({ middleware, getTextDirection })` is the whole server adapter.** It takes the two functions from the project's output, as every adapter takes the project's generated modules, and runs the middleware around Kit's `resolve`. The locale is resolved and bound once, for the page's render and its loads alike.
+- **The page's locale and direction are written into `src/app.html` through `%grai.lang%` and `%grai.dir%`,** by `transformPageChunk`. They are placeholders, as Paraglide's `%paraglide.lang%` is, so migrating renames them, and the app keeps its `<html>` as it wrote it.
+- **The browser needs nothing from the adapter.** The runtime takes `<html lang>` as the page's locale.
+- **`reroute` is one line in the app,** `deLocalizeUrl(url).pathname`, and not an export: wrapping the output's own helper would add a name and no behaviour.
+- **The import map to the page's locale's message chunks is not written yet** (`docs/followups.md`), so a page still loads every locale's words.
+
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
