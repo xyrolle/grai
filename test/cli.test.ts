@@ -150,6 +150,43 @@ describe("grai seed", () => {
 	});
 });
 
+describe("grai find, rename and check --fix", () => {
+	it("finds a key, renames it everywhere, then removes the key no source names", async () => {
+		const { dir } = project({
+			en: { cart_title: "Your cart", cart_old: "Old" },
+			de: { cart_title: "Ihr Warenkorb", cart_old: "Alt" },
+		});
+		writeFileSync(
+			join(dir, "app.ts"),
+			'import { m } from "./out/messages.js";\nm.cart_title();\n',
+		);
+
+		expect((await grai(dir, "find", "cart_title")).stdout).toBe(
+			[
+				'messages/en.json:2:2: "cart_title": "Your cart",',
+				'messages/de.json:2:2: "cart_title": "Ihr Warenkorb",',
+				"app.ts:2:3: m.cart_title();",
+				'grai: "cart_title" is in 2 catalogs and 1 call site',
+				"",
+			].join("\n"),
+		);
+		expect(
+			(await grai(dir, "rename", "cart_title", "basket_title")).stdout,
+		).toMatch(
+			/^grai: renamed cart_title to basket_title in messages\/en\.json, messages\/de\.json, app\.ts\ngrai: wrote \d+ files in out/,
+		);
+		expect((await grai(dir, "check", "--fix", "--json")).code).toBe(2);
+		expect(await grai(dir, "check", "--fix")).toEqual({
+			code: 0,
+			stdout: 'removed: "cart_old" from every catalog\ngrai: no problems\n',
+			stderr: "",
+		});
+		expect(readFileSync(join(dir, "app.ts"), "utf8")).toContain(
+			"m.basket_title()",
+		);
+	});
+});
+
 describe("grai add", () => {
 	it("adds a key with each locale's text to every catalog, in its layout, then compiles", async () => {
 		const { dir } = project(catalogs);

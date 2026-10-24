@@ -7,6 +7,7 @@ import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { find, foundLines } from "./find.ts";
+import { fixLines, removeUnusedKeys } from "./fix.ts";
 import {
 	importCatalogs,
 	importFormats,
@@ -25,6 +26,8 @@ const usage = `Usage: grai <command> [--config <file>]
                                report every problem and write nothing: what compile reports,
                                keys no source file names, inputs the locales do not agree on;
                                and the keys each locale has not translated yet
+  check --fix [--source <dir>]...
+                               remove the keys no source can name from every catalog, then check
   seed <locale>                give the locale's catalog the base text of each key it lacks,
                                creating it if need be, then compile
   add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
@@ -69,8 +72,17 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		const { config, values } = parsed(args, {
 			source: { type: "string", multiple: true },
 			json: { type: "boolean" },
+			fix: { type: "boolean" },
 		});
 		const sources = sourcesOf(values);
+		if (values.fix === true && values.json === true) {
+			throw new UsageError("check takes --fix or --json, not both");
+		}
+		if (values.fix === true) {
+			const fixed = await removeUnusedKeys(config, sources);
+			for (const line of fixLines(fixed)) console.log(line);
+			if (fixed.errors.length > 0) return failed(fixed.errors);
+		}
 		const { problems, untranslated } = await check(config, sources);
 		if (values.json === true) {
 			console.log(
