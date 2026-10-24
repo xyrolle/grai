@@ -1,24 +1,37 @@
 import { check } from "../check.ts";
 import type { GraiError } from "../error.ts";
+import { fixLines, removeUnusedKeys } from "../fix.ts";
 import {
 	type Command,
 	failed,
 	parsed,
 	sourceOption,
 	sourcesOf,
+	UsageError,
 } from "./command.ts";
 
 export const checkCommand: Command = {
 	usage: `  check [--source <dir>]... [--json]
                                report every problem and write nothing: what compile reports,
                                keys no source file names, inputs the locales do not agree on;
-                               and the keys each locale has not translated yet`,
+                               and the keys each locale has not translated yet
+  check --fix [--source <dir>]...
+                               remove the keys no source can name from every catalog, then check`,
 	async run(args) {
 		const { config, values } = parsed(args, {
 			...sourceOption,
 			json: { type: "boolean" },
+			fix: { type: "boolean" },
 		});
 		const sources = sourcesOf(values);
+		if (values.fix === true && values.json === true) {
+			throw new UsageError("check takes --fix or --json, not both");
+		}
+		if (values.fix === true) {
+			const fixed = await removeUnusedKeys(config, sources);
+			for (const line of fixLines(fixed)) console.log(line);
+			if (fixed.errors.length > 0) return failed(fixed.errors);
+		}
 		const { problems, untranslated } = await check(config, sources);
 		if (values.json === true) {
 			console.log(
