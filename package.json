@@ -23,6 +23,10 @@
 		"./vite": {
 			"types": "./dist/vite.d.ts",
 			"default": "./dist/vite.js"
+		},
+		"./react": {
+			"types": "./dist/react/markup.d.ts",
+			"default": "./dist/react/markup.js"
 		}
 	},
 	"bin": {
@@ -44,9 +48,13 @@
 		"test:performance": "node scripts/performance.ts"
 	},
 	"peerDependencies": {
+		"react": ">=19",
 		"vite": ">=8"
 	},
 	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		},
 		"vite": {
 			"optional": true
 		}
@@ -54,8 +62,12 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.6.2",
 		"@types/node": "24.19.2",
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
 		"cldr-core": "48.0.0",
 		"playwright-core": "1.64.1",
+		"react": "19.3.1",
+		"react-dom": "19.3.1",
 		"typescript": "7.0.2",
 		"vite": "8.3.5",
 		"vitest": "5.0.5"
