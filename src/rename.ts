@@ -87,11 +87,13 @@ function nameProblems(
 		(key) => key !== from && key.toLowerCase() === to.toLowerCase(),
 	);
 	if (taken === undefined) return [];
+	const collision =
+		taken === to ? "" : `, which "${to}" would collide with, ignoring case`;
 	return [
 		new GraiError(
 			"key-exists",
 			where,
-			`the catalogs have "${taken}" already, which "${to}" would collide with${taken === to ? "" : ", ignoring case"}. Choose another name.`,
+			`the catalogs have "${taken}" already${collision}. Choose another name.`,
 		),
 	];
 }

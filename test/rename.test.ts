@@ -93,9 +93,16 @@ describe("grai rename", () => {
 		expect(readText(dir, "messages/en.json")).toContain('"cart_title"');
 	});
 
-	it("refuses a name another key has, ignoring case, and a name that is no key name", async () => {
+	it("refuses a name another key has, in any case, and a name that is no key name", async () => {
 		const { config } = app();
 
+		expect(
+			(await rename(config, "cart_title", "cart_total")).errors.map(
+				(error) => error.message,
+			),
+		).toEqual([
+			'messages/en.json: "cart_title": the catalogs have "cart_total" already. Choose another name.',
+		]);
 		expect(
 			(await rename(config, "cart_title", "Cart_Total")).errors.map(
 				(error) => error.message,
