@@ -14,35 +14,6 @@ A production page holds only its locale's words, and `setLocale(locale, { reload
 
 Done when: the design records one option as a decision, and a browser test shows that a production build and dev switch the same way.
 
-## Bind the locale, and index the variant directly
-
-A message call renders in `options.locale ?? baseLocale`, and finds its variant with `locales.indexOf` on every call. The runtime lane's measured design binds the locale once (per request on the server, per page in the browser) and keeps its index.
-
-Done when: the runtime binds the locale through the adapters, a call indexes its variant without a search, and a test renders two interleaved requests in different locales.
-
-## Plural rules compiled from CLDR
-
-`plural` uses one `Intl.PluralRules` per locale, 124–249 ns a call. CLDR's rules compiled into a function with an integer path first take 4–11 ns, for 158 more bytes per locale (`docs/runtime.md`).
-
-Done when: `plural` uses each configured locale's rule compiled from CLDR's plural rules, kept in the repository rather than installed, with a test that it agrees with `Intl.PluralRules` on 0–10,000 and on fractions.
-
-## Patch an edited message in place in dev
-
-Re-evaluating the one dev module after an edit takes 202 ms on app A and 459 ms on app B. Sending the changed keys' functions as a patch, from grai's own `fs.watch` on the catalogs, takes 17–30 ms from the save to the page.
-
-Done when: the Vite plugin patches in place and a browser test edits a catalog and sees the page change without a reload.
-
-## Offer inlining text into templates, as an opt-in setting
-
-The default is per-locale modules. Inlining text into templates before the framework compiles them halves hydration again (5.5 to 2.1 ms for 2,000 messages on app A) and cuts a server render from 0.08 to 0.02 ms (`docs/runtime.md`). It comes after the compiler and the Vite and SvelteKit adapters, and an app turns it on only if its costs measure acceptable. On app A, 43% of message uses would become static text; the rest keep the per-locale call.
-
-Done when, measured on app A:
-- the build shape is chosen by build time against today's single build: a build per locale, or one Rolldown pass that emits each component once per locale;
-- the server's cost is known: one module graph per locale in the Worker, its upload size and its cold start;
-- switching locale navigates to the other locale's build, and the client-switch decision above accounts for it;
-- dev keeps one module and the patch, and a test shows no behaviour differs between dev and the inlined build but speed;
-- text the framework would alter stays exact: Svelte trims the spaces at the edges of an element's text.
-
 ## Support MessageFormat 2's formatting functions
 
 `:number`, `:integer`, `:datetime`, `:date` and `:time` are compile errors today, and so are function options (such as `select=ordinal`) and markup options and attributes. Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
