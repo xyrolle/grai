@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { check } from "../src/check.ts";
 import { seed } from "../src/seed.ts";
 import { project } from "./project.ts";
+import { handLaid, schemaEntry } from "./sources.ts";
 
 const items = (match: Record<string, string>) => [
 	{
@@ -35,6 +36,42 @@ describe("grai seed", () => {
 			["cart_title", "Your cart"],
 			["cart_empty", "Empty"],
 		]);
+	});
+
+	it("gives a catalog the keys it lacks in its own layout, leaving its entries' bytes as they are", async () => {
+		const { dir, config } = project({
+			en: {
+				cart_title: "Your cart",
+				cart_items: items({
+					"countPlural=one": "{count} item",
+					"countPlural=*": "{count} items",
+				}),
+			},
+			de: { cart_title: "Ihr Warenkorb" },
+		});
+		const own = [schemaEntry, '"cart_title":"Ihr Warenkorb \\u00e9"'];
+		writeFileSync(join(dir, "messages", "de.json"), handLaid(...own));
+
+		await seed(config, "de");
+
+		const seededItems = `"cart_items": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} item",
+        "countPlural=*": "{count} items"
+      }
+    }
+  ]`.replaceAll("\n", "\r\n");
+		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
+			handLaid(...own, seededItems),
+		);
 	});
 
 	it("seeds a plural so that it covers the categories of the locale, not only the base locale's", async () => {

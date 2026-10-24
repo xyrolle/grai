@@ -11,6 +11,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { project } from "./project.ts";
+import { handLaid, schemaEntry } from "./sources.ts";
 
 const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 
@@ -238,6 +239,31 @@ describe("grai add", () => {
 		expect(stdout).toMatch(/^grai: wrote 13 files in out/);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
 			JSON.stringify({ ...catalogs.de, cart_empty: "Leer" }, null, "\t"),
+		);
+	});
+
+	it("adds the key after the last entry, leaving every other byte of a catalog as it is written", async () => {
+		const { dir } = project(catalogs);
+		const own = [
+			schemaEntry,
+			'"cart_title":"Ihr Warenkorb \\u00e9"',
+			'"cart_greeting" :  "Hallo {name}"',
+		];
+		writeFileSync(join(dir, "messages", "de.json"), handLaid(...own));
+
+		const added = await grai(
+			dir,
+			"add",
+			"cart_empty",
+			"--en",
+			"E",
+			"--de",
+			"L",
+		);
+
+		expect(added.code).toBe(0);
+		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
+			handLaid(...own, '"cart_empty": "L"'),
 		);
 	});
 

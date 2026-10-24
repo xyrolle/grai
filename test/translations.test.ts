@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { exportLocale, mergeDocument } from "../src/translations.ts";
 import { project } from "./project.ts";
+import { handLaid, schemaEntry } from "./sources.ts";
 
 const items = (match: Record<string, string>) => [
 	{
@@ -248,6 +249,33 @@ describe("grai merge", () => {
 			{ type: "text", value: " & " },
 			{ type: "markup-standalone", name: "br", options: {}, attributes: {} },
 		]);
+	});
+
+	it("writes a translation in place, leaving every other byte of the catalog as it is written", async () => {
+		const { dir, config } = project({
+			en: { cart_title: "Your cart", cart_total: "Total {count}" },
+			de: { cart_title: "Ihr Warenkorb", cart_total: "Total {count}" },
+		});
+		const title = '"cart_title":"Ihr Warenkorb \\u00e9"';
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			handLaid(schemaEntry, title, '"cart_total" :  "Total {count}"'),
+		);
+		const result = await exportLocale(config, "de", {
+			json: true,
+			untranslated: true,
+		});
+		const document = "document" in result ? JSON.parse(result.document) : {};
+		for (const unit of document.units) unit.target = "Summe {count}";
+		const file = join(dir, "de-units.json");
+		writeFileSync(file, JSON.stringify(document));
+
+		await mergeDocument(config, file);
+
+		expect(readFileSync(catalog, "utf8")).toBe(
+			handLaid(schemaEntry, title, '"cart_total" :  "Summe {count}"'),
+		);
 	});
 
 	it("merges JSON units, whose targets keep each placeholder as the source writes it", async () => {

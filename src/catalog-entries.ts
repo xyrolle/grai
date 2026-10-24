@@ -1,10 +1,11 @@
 /** Where a catalog's entries lie in its text: the scan that every edit of a catalog's text reads. */
 
-/** A catalog's top-level entry, by offsets in its text: its key's string, and where its value ends. */
+/** A catalog's top-level entry, by offsets in its text: its key's string, and its value. */
 export type CatalogEntry = {
 	key: string;
 	keyStart: number;
 	keyEnd: number;
+	valueStart: number;
 	valueEnd: number;
 };
 
@@ -21,7 +22,7 @@ export function catalogEntries(text: string): CatalogEntry[] {
 		const key: unknown = JSON.parse(text.slice(keyStart, keyEnd));
 		const valueStart = skipSpace(text, skipSpace(text, keyEnd) + 1);
 		const valueEnd = valueEndAt(text, valueStart);
-		entries.push({ key: String(key), keyStart, keyEnd, valueEnd });
+		entries.push({ key: String(key), keyStart, keyEnd, valueStart, valueEnd });
 		index = skipSpace(text, valueEnd);
 		if (text[index] === ",") index = skipSpace(text, index + 1);
 	}
