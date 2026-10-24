@@ -39,7 +39,8 @@
 		"import-fuzz": "node import-fuzz.mjs",
 		"refactor": "node refactor.mjs",
 		"nextjs": "node nextjs.mjs",
-		"astro": "node astro.mjs"
+		"astro": "node astro.mjs",
+		"vue": "node vue.mjs"
 	},
 	"devDependencies": {
 		"@astrojs/svelte": "9.1.1",
@@ -48,7 +49,9 @@
 		"@inlang/paraglide-js": "2.29.1",
 		"@inlang/plugin-m-function-matcher": "2.3.4",
 		"@inlang/plugin-message-format": "4.5.5",
+		"@intlify/unplugin-vue-i18n": "11.2.7",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
+		"@vitejs/plugin-vue": "6.0.10",
 		"astro": "7.4.2",
 		"grai": "file:..",
 		"i18next": "26.4.7",
@@ -67,6 +70,8 @@
 		"typescript6": "npm:typescript@6.0.3",
 		"use-intl": "4.14.9",
 		"vite": "8.3.5",
+		"vue": "3.5.44",
+		"vue-i18n": "11.4.16",
 		"wrangler": "4.152.0"
 	}
 }
