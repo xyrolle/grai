@@ -223,6 +223,20 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - `grai seed <locale>` gives a locale's catalog the base text of every key it lacks, and creates the catalog if there is none.
   - **Every key is in every locale, so an untranslated message is a seed, and equality to it is the only marker.** Nothing is kept beside the catalogs. A list of texts that are rightly identical would come only if the report proves noisy.
   - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` when it has no `*`. It then compiles in a locale with more categories, such as `few` in `ru`.
+- `grai export <locale>` prints a locale's messages for translators, or only the untranslated ones. `grai merge <file>` writes the translations back into the locale's catalog.
+  - **The file is XLIFF 2.0**, the OASIS standard translation tools exchange, and both Weblate and Phrase read it.
+    - A placeholder is a `<ph>`, and a pair of tags is a `<pc>` around its words, so a tool keeps a translator from breaking either.
+    - CSV, which every tool also reads, holds placeholders as text a translator can mistype, and has no plurals.
+    - `--json` writes the same units for scripts, with each code as the catalog writes it, since Node reads no XML.
+  - **A plural is one unit per category of the target locale,** each with a note of the counts it is for.
+    - Each starts from the base text for the same counts. For `ru`'s `one` (1, 21, 31…), English gives both `one` and `other`, so the unit starts from `other`, which shows the count.
+    - A translation may place any code of its message.
+    - A row that does not tell counts apart, such as `count=0`, stays one unit.
+  - **`merge` refuses a unit, never the file.** A unit made from a base text that has changed since is stale, and one that places a code its message lacks is invalid.
+    - A message must still compile and read the base's inputs. A plural needs every form, from the file or from its current translation.
+    - A message no unit changes is left as it is written, and the rest go to the catalog in one write.
+  - **Machine translation is not grai's.** grai fetches nothing, and a provider, its key, its prompts and a glossary are each app's choice. A script exports `--json`, translates, and merges, and the merge's checks refuse an answer that breaks a placeholder or a plural.
+  - The XML reader reads only what this XLIFF needs, and strictly: no DTD, no entities beyond XML's five and numeric references. A tool's comments, CDATA, groups, segments, notes and metadata are read past or joined.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
 - `grai import --from i18next|icu <file or dir>…` converts another library's catalogs into the project's catalogs, for a migration. Each source file's locale is its name (`en.json`) or its directory's (`en/common.json`).
