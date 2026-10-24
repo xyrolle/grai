@@ -101,3 +101,19 @@ it("reports a broken catalog after its save, without waiting for another", async
 		.poll(() => reported[1]?.errors.map((error) => error.code))
 		.toEqual(["catalog-invalid"]);
 });
+
+it("compiles for development, with the config's pseudo-locale", async () => {
+	const { config } = project(catalogs, { pseudoLocale: "en-XA" });
+	let reported: (locales: readonly string[] | undefined) => void = () => {};
+	const locales = new Promise((resolve) => {
+		reported = resolve;
+	});
+	const watcher = watch(
+		config,
+		(_result, _milliseconds, build) => reported(build?.config.locales),
+		() => reported(undefined),
+	);
+	onTestFinished(() => watcher.close());
+
+	expect(await locales).toEqual(["en", "de", "en-XA"]);
+});

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraiError } from "./error.ts";
+import { categoriesOf } from "./plurals.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -15,6 +16,8 @@ export type Config = {
 	strategy: readonly Strategy[];
 	/** The cookie the `cookie` strategy reads and `setLocale` writes. */
 	cookieName: string | undefined;
+	/** A locale made from the base's messages for development and tests, which no build ships. */
+	pseudoLocale: string | undefined;
 };
 
 /** A place a request can name its locale in. */
@@ -33,6 +36,7 @@ const fields = new Set([
 	"outdir",
 	"strategy",
 	"cookieName",
+	"pseudoLocale",
 ]);
 const localePlaceholder = "{locale}";
 
@@ -57,6 +61,7 @@ export function readConfig(file: string): Config {
 		outdir,
 		strategy = [],
 		cookieName,
+		pseudoLocale,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -89,6 +94,10 @@ export function readConfig(file: string): Config {
 				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
 		);
 	}
+	if (pseudoLocale !== undefined) {
+		const problem = pseudoLocaleProblem(pseudoLocale, locales, baseLocale);
+		if (problem !== undefined) throw invalid(problem);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -103,7 +112,26 @@ export function readConfig(file: string): Config {
 		outdir: resolve(root, outdir),
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
+		pseudoLocale: typeof pseudoLocale === "string" ? pseudoLocale : undefined,
 	};
+}
+
+/**
+ * Why a pseudo-locale cannot be one, if it cannot: it must be a language tag of its own, and
+ * choose among the base's plural categories, since its messages are the base's.
+ */
+function pseudoLocaleProblem(
+	pseudoLocale: unknown,
+	locales: readonly string[],
+	baseLocale: string,
+): string | undefined {
+	if (!isLanguageTag(pseudoLocale) || locales.includes(pseudoLocale)) {
+		return '"pseudoLocale" must be a BCP 47 language tag that "locales" does not list, such as "en-XA"';
+	}
+	const own = categoriesOf(pseudoLocale).join(", ");
+	const base = categoriesOf(baseLocale).join(", ");
+	if (own === base) return undefined;
+	return `"pseudoLocale" takes its plurals from ${baseLocale}, so it must have its plural categories, ${base}, and ${pseudoLocale} has ${own}. Name it after ${baseLocale}'s language, such as "${baseLocale.split("-")[0]}-XA"`;
 }
 
 function isStrategy(value: unknown): value is Strategy[] {
