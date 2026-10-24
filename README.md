@@ -110,7 +110,7 @@ They were taken on an M-series Mac; `docs/runtime.md` explains how to run the be
 
 App A's Paraglide compile includes the TypeScript declarations that its `sync` writes; app B's does not.
 
-At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-intl 4.14:
+At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-intl 4.14. The server rows time a prototype of grai's dispatcher (`bench/prototype.mjs`) until `bench/` runs grai's own output:
 
 | | grai | Paraglide | i18next | use-intl | `bench/` |
 | --- | --- | --- | --- | --- | --- |
@@ -125,7 +125,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 
 ## Limitations
 
-- **A new server process loads grai's messages more slowly than i18next or use-intl:** 24 ms, against 13–14 ms on app A, because V8 reads compiled functions more slowly than strings. grai's faster first render makes up most of it, but the gap is still open.
+- **A new server process loads grai's messages more slowly than i18next or use-intl:** 24 ms, against 13–14 ms on app A (`startup`), because V8 reads compiled functions more slowly than strings. grai's faster first render makes up most of it, but the gap is still open.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
   - ordinal plurals;
@@ -138,10 +138,11 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 
 ## Coming from Paraglide or i18next
 
-Paraglide's inlang message-format catalogs compile unchanged, and its calls stay the same: `m.key(inputs, { locale })`. Two things differ at a call site:
+Paraglide's inlang message-format catalogs compile unchanged, and its calls stay the same: `m.key(inputs, { locale })`. Three things differ at a call site:
 
 - **A message without inputs takes none.** `m.cart_title({ count })` is a type error, where Paraglide accepts it. An input a message never reads is a mistake at the call: a wrong key, or a placeholder a translation lost.
 - **A key missing from any locale fails the compile.** No page ships another locale's words, or a key's name, in its place.
+- **In the browser, `{ locale }` must be the page's locale.** A built page is meant to hold only its own locale's words, so a call in another throws `locale-not-loaded`, in dev and tests as in a build.
 
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
 - **Converted:** plurals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's `number` and `datetime` formats.
