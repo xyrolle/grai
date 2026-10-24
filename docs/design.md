@@ -206,6 +206,15 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - inputs one locale reads and another never does, which is a translation that lost or invented a placeholder.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
+- `grai import --from i18next|icu <file or dir>…` converts another library's catalogs into the project's catalogs, for a migration. Each source file's locale is its name (`en.json`) or its directory's (`en/common.json`).
+  - **It writes new catalogs only, and nothing at all on an error:** an unreadable source, a file whose locale is unclear, two source keys that become one key, or a catalog that exists already. A migration then never overwrites edits.
+  - **A message that cannot be converted in one locale is left out of every locale,** so the catalogs compile, and the report names it, its locales and why. The report also names what renders differently. A partial conversion would otherwise ship as a missing key or another locale's words.
+  - **A key is its source path joined by `_`,** every character an identifier cannot hold as `_`. When a locale's directory holds several files, each key starts with its file's name, i18next's namespace.
+  - **A plural is MessageFormat 2's `local nPlural = n: plural`.** ICU's and i18next's `other` becomes `*`, because both take it for any count the other forms do not cover. An exact `=0`, and i18next's `_zero` in a locale without a zero category, becomes a choice on the input itself, written before the category, as both libraries try it first. A category the locale does not have is dropped, since neither library ever chooses it.
+  - **Nested and sequential choices become several selectors, outermost first,** so MessageFormat 2's preference picks what ICU picks.
+  - **What grai cannot express is left out, never approximated:** `number`, `date` and `time` arguments, `selectordinal` and `_ordinal_`, `offset`, i18next's formats, nested values, and `$t()` with options or of a message with inputs. `$t(key)` of a text is inlined.
+  - **Two differences are reported, not left out:** ICU's `#` shows a count formatted for the locale (1,000), and grai shows it as written (1000); and an i18next plural that lacks a locale's form shows its `_other` text, where i18next showed the key's name.
+  - `bench/import-equivalence.mjs` renders every imported message with grai and with i18next or intl-messageformat, for each locale and a range of inputs, and fails on any difference the report does not name. The libraries are the bench's dependencies, not grai's.
 
 ## Package
 

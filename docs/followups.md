@@ -31,3 +31,9 @@ Done when: the Next adapter binds the locale per request (React's request scope 
 On the client, a forced `{ locale }` other than the current one throws, and every key must be in every locale. Neither app is known to break either rule outside its tests.
 
 Done when: a local branch of each reference app on grai passes its own checks and tests, and the README cites the measured cold `dev`, one-message edit and `sync` times.
+
+## Import what `grai import` leaves out
+
+It leaves out ICU's `number`, `date` and `time` arguments and i18next's formats, which wait for MessageFormat 2's functions above, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. Its `#` shows a count unformatted, which `:number` would fix. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+
+Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
