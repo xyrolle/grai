@@ -60,6 +60,35 @@ describe("grai seed", () => {
 		expect(m.cart_items?.({ count: 3 }, { locale: "ru" })).toBe("3 items");
 	});
 
+	it("seeds an ordinal with the variants of the locale's ordinal categories", async () => {
+		const place = (match: Record<string, string>) => [
+			{
+				declarations: ["input n", "local nOrdinal = n: plural type=ordinal"],
+				selectors: ["nOrdinal"],
+				match,
+			},
+		];
+		const { dir, config, load } = project({
+			en: {
+				place: place({
+					"nOrdinal=one": "{n}st",
+					"nOrdinal=two": "{n}nd",
+					"nOrdinal=few": "{n}rd",
+					"nOrdinal=other": "{n}th",
+				}),
+			},
+			ru: {},
+		});
+
+		await seed(config, "ru");
+		const { m } = await load();
+
+		expect(catalog(dir, "ru")).toEqual({
+			place: place({ "nOrdinal=*": "{n}th" }),
+		});
+		expect(m.place?.({ n: 21 }, { locale: "ru" })).toBe("21th");
+	});
+
 	it("creates the catalog of a locale that has none, in the base catalog's layout", async () => {
 		const { dir, config } = project({
 			en: { cart_title: "Your cart" },

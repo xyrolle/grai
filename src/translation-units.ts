@@ -83,11 +83,12 @@ function messageUnits(
 				combination[index] ?? catchAll,
 			],
 		);
-		const inBase = combination.map((key, index) =>
-			message.selectors[index]?.kind === "plural"
-				? baseCategoryOf(key, baseLocale, locale)
-				: key,
-		);
+		const inBase = combination.map((key, index) => {
+			const selector = message.selectors[index];
+			return selector?.kind === "plural"
+				? baseCategoryOf(key, baseLocale, locale, selector.type)
+				: key;
+		});
 		const source = chosen(sources, inBase) ?? "";
 		const target =
 			targets === undefined ? undefined : chosen(targets, combination);

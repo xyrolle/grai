@@ -130,6 +130,31 @@ describe("grai export", () => {
 			["files.countPlural.other", "{count} files"],
 		]);
 	});
+
+	it("writes a unit per ordinal form the locale needs, each with the counts it is for", async () => {
+		const place = [
+			{
+				declarations: ["input n", "local nOrdinal = n: plural type=ordinal"],
+				selectors: ["nOrdinal"],
+				match: {
+					"nOrdinal=one": "{n}st",
+					"nOrdinal=two": "{n}nd",
+					"nOrdinal=few": "{n}rd",
+					"nOrdinal=*": "{n}th",
+				},
+			},
+		];
+		const { config } = project({ en: { place }, sv: { place: "{n}" } });
+
+		const xliff = await exported(config, "sv");
+
+		expect(
+			[...xliff.matchAll(/<unit id="([^"]+)"/g)].map(([, id]) => id),
+		).toEqual(["place.nOrdinal.one", "place.nOrdinal.other"]);
+		expect(xliff).toContain(
+			'<note category="variant">nOrdinal: one, as for 1, 2, 21, 22, 31, 32, …</note>',
+		);
+	});
 });
 
 describe("grai merge", () => {

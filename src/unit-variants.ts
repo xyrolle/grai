@@ -6,7 +6,7 @@
 import { isRecord } from "./config.ts";
 import { parseVariantKey } from "./match.ts";
 import { parseMessage } from "./message.ts";
-import { categoriesOf } from "./plurals.ts";
+import { categoriesOf, type PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 import { catchAll, type Selector } from "./selection.ts";
 
@@ -80,10 +80,10 @@ export function combinations(
 		const anything = first.every(
 			(key, index) => plural[index] || key === catchAll,
 		);
-		const keyLists = selectors.map((_, index) => {
-			if (!plural[index]) return [first[index] ?? catchAll];
+		const keyLists = selectors.map((selector, index) => {
+			if (selector.kind !== "plural") return [first[index] ?? catchAll];
 			const counts = anything || row.some((keys) => keys[index] !== catchAll);
-			return counts ? [...categoriesOf(locale, "cardinal")] : [catchAll];
+			return counts ? [...categoriesOf(locale, selector.type)] : [catchAll];
 		});
 		for (const combination of product(keyLists)) {
 			all.set(combination.join("\0"), combination);
@@ -133,12 +133,13 @@ export function baseCategoryOf(
 	category: string,
 	baseLocale: string,
 	locale: string,
+	type: PluralType,
 ): string {
-	const memo = `${baseLocale} ${locale} ${category}`;
+	const memo = `${type} ${baseLocale} ${locale} ${category}`;
 	const known = baseCategories.get(memo);
 	if (known !== undefined) return known;
-	const rules = pluralRulesOf(locale);
-	const base = pluralRulesOf(baseLocale);
+	const rules = pluralRulesOf(locale, type);
+	const base = pluralRulesOf(baseLocale, type);
 	const categories = new Set<string>();
 	for (const count of sampleCounts) {
 		if (rules.select(count) === category) categories.add(base.select(count));
@@ -152,9 +153,10 @@ export function baseCategoryOf(
 const baseCategories = new Map<string, string>();
 const pluralRules = new Map<string, Intl.PluralRules>();
 
-function pluralRulesOf(locale: string): Intl.PluralRules {
-	const rules = pluralRules.get(locale) ?? new Intl.PluralRules(locale);
-	pluralRules.set(locale, rules);
+function pluralRulesOf(locale: string, type: PluralType): Intl.PluralRules {
+	const memo = `${type} ${locale}`;
+	const rules = pluralRules.get(memo) ?? new Intl.PluralRules(locale, { type });
+	pluralRules.set(memo, rules);
 	return rules;
 }
 
@@ -177,23 +179,28 @@ export function noteOf(
 ): string {
 	return variant
 		.map(([name, key], index) => {
-			if (selectors[index]?.kind !== "plural") {
+			const selector = selectors[index];
+			if (selector?.kind !== "plural") {
 				return key === catchAll
 					? `${name}: any other value`
 					: `${name}: ${key}`;
 			}
 			return key === catchAll
 				? `${name}: any count`
-				: `${name}: ${key}, as for ${examplesOf(key, locale)}`;
+				: `${name}: ${key}, as for ${examplesOf(key, locale, selector.type)}`;
 		})
 		.join("; ");
 }
 
-function examplesOf(category: string, locale: string): string {
-	const memo = `${locale} ${category}`;
+function examplesOf(
+	category: string,
+	locale: string,
+	type: PluralType,
+): string {
+	const memo = `${type} ${locale} ${category}`;
 	const known = examples.get(memo);
 	if (known !== undefined) return known;
-	const rules = pluralRulesOf(locale);
+	const rules = pluralRulesOf(locale, type);
 	const counts: number[] = [];
 	for (let count = 0; count <= 1000 && counts.length < 6; count++) {
 		if (rules.select(count) === category) counts.push(count);
