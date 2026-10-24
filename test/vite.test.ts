@@ -16,6 +16,7 @@ import {
 	type Plugin,
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
+import { recompile } from "../src/compile.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { type Messages, project } from "./project.ts";
 
@@ -137,6 +138,22 @@ describe("the Vite plugin's build", () => {
 			m.greeting?.({ name: "Ana" }, { locale: "en" }),
 			m.greeting?.({ name: "Ana" }, { locale: "de" }),
 		]).toEqual(["Hello Ana", "Hallo Ana"]);
+	});
+
+	it("ships no pseudo-locale, even over the output of a dev server that compiled one", async () => {
+		const { dir, config } = project(catalogs, { pseudoLocale: "en-XA" });
+		await recompile(config, undefined, { pseudoLocale: true });
+
+		const { sources } = await built(dir, {
+			a: `import { m } from "./out/messages.js";\nimport { locales } from "./out/runtime.js";\nconsole.log(m.title(), locales);\n`,
+		});
+
+		const shipped = [...sources.values()].join("\n");
+		expect([shipped.includes("Titel"), shipped.includes("en-XA")]).toEqual([
+			true,
+			false,
+		]);
+		expect(shipped).not.toContain("Ţîţļé");
 	});
 
 	it("fails the build with the compiler's errors", async () => {
