@@ -9,8 +9,9 @@ export function writeAll(texts: ReadonlyMap<string, string>): void {
 	const staged: string[] = [];
 	try {
 		for (const [path, text] of texts) {
-			writeFileSync(`${path}.tmp`, text);
+			// Staged first, so a write that fails partway has its own temporary file removed too.
 			staged.push(path);
+			writeFileSync(`${path}.tmp`, text);
 		}
 	} catch (error) {
 		for (const path of staged) rmSync(`${path}.tmp`, { force: true });
