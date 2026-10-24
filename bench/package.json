@@ -23,13 +23,19 @@
 		"call-sites": "node call-sites.mjs"
 	},
 	"devDependencies": {
+		"@formatjs/cli": "6.16.35",
+		"@formatjs/icu-messageformat-parser": "3.5.22",
 		"@inlang/paraglide-js": "2.29.1",
 		"@inlang/plugin-m-function-matcher": "2.3.4",
 		"@inlang/plugin-message-format": "4.5.5",
+		"i18next": "26.4.7",
 		"make-plural": "8.1.0",
 		"playwright-core": "1.64.1",
 		"rolldown": "1.2.15",
 		"svelte": "5.57.2",
+		"typescript": "7.0.2",
+		"typescript6": "npm:typescript@6.0.3",
+		"use-intl": "4.14.9",
 		"vite": "8.3.5",
 		"wrangler": "4.152.0"
 	}

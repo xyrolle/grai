@@ -1,8 +1,9 @@
 // Browser: the message-heavy page (page.mjs) server-rendered, then loaded and hydrated in Chromium,
-// with its messages from Paraglide's client runtime, from grai's per-locale module, or inlined into
-// the template. Each run is a fresh page with the whole bundle inline, so nothing but parsing,
-// evaluating and hydrating is timed; runs alternate between variants. After hydrating, the page
-// mounts itself again, the client work of a locale switch that does not reload.
+// with its messages from Paraglide's client runtime, from grai's per-locale module, inlined into
+// the template, or from i18next or use-intl with the locale's whole catalog in the bundle. Each run
+// is a fresh page with the whole bundle inline, so nothing but parsing, evaluating and hydrating
+// is timed; runs alternate between variants. After hydrating, the page mounts itself again, the
+// client work of a locale switch that does not reload.
 //   node hydrate.mjs [app...]
 import { join } from "node:path";
 import { brotliCompressSync } from "node:zlib";
@@ -10,6 +11,7 @@ import { chromium } from "playwright-core";
 import { rolldown } from "rolldown";
 import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
+import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { PAGE_CALLS, pageProps, pageSource, writePage } from "./page.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
@@ -58,12 +60,22 @@ async function bundle(page) {
 
 async function variants(app, locale) {
 	const prototype = writePrototype(app);
+	const { directory: libraries } = writeLibraryModules(app, locale);
 	return {
 		Paraglide: { from: join(await paraglideOutput(app), "messages/_index.js") },
 		"grai, per-locale module": { from: join(prototype, `${locale}.js`) },
 		"inlined into the template": {
 			from: join(prototype, `${locale}.js`),
 			inline: app.messages[locale],
+		},
+		i18next: {
+			from: join(libraries, `${locale}.i18next.js`),
+			translate: true,
+			values: (call) => i18nextValues(app, call.key, call.inputs),
+		},
+		"use-intl": {
+			from: join(libraries, `${locale}.use-intl.js`),
+			translate: true,
 		},
 	};
 }
@@ -95,9 +107,9 @@ const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 async function benchLocale(browser, app, locale) {
-	const props = pageProps(app);
 	const documents = [];
 	for (const [name, variant] of Object.entries(await variants(app, locale))) {
+		const props = pageProps(app, variant.values);
 		documents.push({
 			name,
 			...(await documentFor(app, locale, documents.length, variant, props)),

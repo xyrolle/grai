@@ -1,12 +1,15 @@
-// Server: what a message call costs inside a request, Paraglide against the shapes grai could take.
+// Server: what a message call costs inside a request: Paraglide, i18next and use-intl against the
+// shapes grai could take.
 // Each variant renders the same 2,000 calls through static call sites, 20 to a function as a
 // component holds them, so the engine optimizes them as it would a real render. Every variant's
 // text is checked against Paraglide's before it is timed.
 //   node server.mjs [app...]
+import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { kindsOf, sampleCalls } from "./calls.mjs";
+import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { template, writePrototype } from "./prototype.mjs";
@@ -61,6 +64,7 @@ async function variants(app, locale, calls, directory) {
 			: `${f}(${d})`;
 	};
 	const from = (file) => join(prototype, file);
+	const { directory: libraries } = writeLibraryModules(app, locale);
 	return {
 		"Paraglide `m.key()`": await write("paraglide", {
 			from: messages,
@@ -95,6 +99,17 @@ async function variants(app, locale, calls, directory) {
 			from: localeModule,
 			call: inlined,
 		}),
+		"i18next `t(key, values)`": await write("i18next", {
+			from: join(libraries, `${locale}.i18next.js`),
+			names: () => "t",
+			call: (c, f, d) =>
+				`${f}(${JSON.stringify(c.key)}, ${d.replace("d[", "d.i18next[")})`,
+		}),
+		"use-intl `t(key, values)` (intl-messageformat)": await write("use-intl", {
+			from: join(libraries, `${locale}.use-intl.js`),
+			names: () => "t",
+			call: (c, f, d) => `${f}(${JSON.stringify(c.key)}, ${d})`,
+		}),
 	};
 }
 
@@ -104,7 +119,10 @@ async function benchLocale(app, locale) {
 		const calls = sampleCalls(app, CALLS, kind === "page" ? undefined : kind);
 		const data = Object.assign(
 			calls.map((c) => c.inputs),
-			{ options: { locale } },
+			{
+				options: { locale },
+				i18next: calls.map((c) => i18nextValues(app, c.key, c.inputs)),
+			},
 		);
 		const directory = join(cacheDir, "server", app.id, kind);
 		mkdirSync(directory, { recursive: true });
@@ -131,7 +149,17 @@ async function benchLocale(app, locale) {
 	}
 }
 
-for (const app of selectedApps()) {
+const apps = selectedApps();
+if (apps.length > 1) {
+	// Each app in a process of its own: the modules of all three no longer fit one heap.
+	for (const app of apps)
+		execFileSync(
+			process.execPath,
+			[new URL(import.meta.url).pathname, app.id],
+			{ stdio: "inherit" },
+		);
+} else {
+	const [app] = apps;
 	const mix = kindsOf(sampleCalls(app, CALLS));
 	console.log(
 		`\n### ${app.name}: Paraglide ${paraglideVersion}, Node ${process.versions.node}, page of ${CALLS} calls ${JSON.stringify(mix)}\n`,
