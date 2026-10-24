@@ -13,6 +13,8 @@ export type CompiledKey = {
 	code: string;
 	declaration: string;
 	uses: ReadonlySet<RuntimeFunction>;
+	/** The locales whose plural function the key's code calls. */
+	plurals: ReadonlySet<string>;
 	markup: boolean;
 };
 
@@ -105,6 +107,7 @@ function compileKey(
 		code: module.code,
 		declaration: keyDeclaration(key, messages, base?.messages.get(key)),
 		uses: module.uses,
+		plurals: module.plurals,
 		markup: messages.some((message) => message.markup),
 	};
 }

@@ -93,24 +93,6 @@ export function markup(strings, parts) {
 	return Object.assign(message(...strings), { parts: message(...parts) });
 }
 
-/** @type {Map<string, Intl.PluralRules>} */
-const pluralRules = new Map();
-
-/**
- * The CLDR cardinal category of `count` in `locale`, with one `Intl.PluralRules` per locale.
- *
- * @param {string} locale
- * @param {number} count
- */
-export function plural(locale, count) {
-	let rules = pluralRules.get(locale);
-	if (rules === undefined) {
-		rules = new Intl.PluralRules(locale);
-		pluralRules.set(locale, rules);
-	}
-	return rules.select(count);
-}
-
 /**
  * Throws for a value a closed select does not list; the message's input type excludes it.
  *

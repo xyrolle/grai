@@ -2,6 +2,7 @@ import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
 import { runtimeDeclarations } from "./declarations.ts";
 import type { RuntimeFunction } from "./modules.ts";
+import { pluralModule, pluralName } from "./plurals.ts";
 
 /** The output's files, level by level: a file imports only files of earlier levels. */
 export type Output = readonly (readonly (readonly [string, string])[])[];
@@ -62,6 +63,7 @@ export function renderOutput(
 				`export const locales = ${JSON.stringify(config.locales)};\nexport const baseLocale = ${JSON.stringify(config.baseLocale)};\n`,
 			],
 			["runtime.d.ts", runtimeDeclarations(config)],
+			["plurals.js", pluralModule(config.locales)],
 		],
 		[["runtime.js", runtimeSource], ...declarations],
 		[...modules, ["keys.d.ts", keysIndex]],
@@ -100,9 +102,21 @@ function regroup(
 
 function shardModule(keys: readonly CompiledKey[]): string {
 	const uses = new Set<RuntimeFunction>();
-	for (const key of keys) for (const name of key.uses) uses.add(name);
+	const plurals = new Set<string>();
+	for (const key of keys) {
+		for (const name of key.uses) uses.add(name);
+		for (const locale of key.plurals) plurals.add(pluralName(locale));
+	}
+	const imports = [
+		`import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n`,
+	];
+	if (plurals.size > 0) {
+		imports.push(
+			`import { ${[...plurals].sort().join(", ")} } from "../plurals.js";\n`,
+		);
+	}
 	const code = keys.map((key) => key.code).join("");
-	return `import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n\n${code}`;
+	return `${imports.join("")}\n${code}`;
 }
 
 function shardDeclarations(keys: readonly CompiledKey[]): string {

@@ -42,6 +42,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.6.2",
 		"@types/node": "24.19.2",
+		"cldr-core": "48.0.0",
 		"typescript": "7.0.2",
 		"vitest": "5.0.5"
 	}

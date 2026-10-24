@@ -35,7 +35,7 @@ describe("grai compile", () => {
 		const { dir } = project(catalogs);
 
 		expect((await grai(dir, "compile")).stdout).toMatch(
-			/^grai: wrote 9 files in out \(.+ ms\)\n$/,
+			/^grai: wrote 10 files in out \(.+ ms\)\n$/,
 		);
 		expect((await grai(dir, "compile")).stdout).toMatch(
 			/^grai: out is up to date \(.+ ms\)\n$/,
@@ -111,7 +111,7 @@ describe("grai add", () => {
 		);
 
 		expect(code).toBe(0);
-		expect(stdout).toMatch(/^grai: wrote 9 files in out/);
+		expect(stdout).toMatch(/^grai: wrote 10 files in out/);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
 			JSON.stringify({ ...catalogs.de, cart_empty: "Leer" }, null, "\t"),
 		);
@@ -167,7 +167,7 @@ it("grai watch writes the output, then the shard a catalog's edit changes", asyn
 	const next = async () => String((await lines.next()).value);
 
 	expect(await next()).toBe("grai: watching grai.config.json and its catalogs");
-	expect(await next()).toMatch(/^grai: wrote 9 files in out/);
+	expect(await next()).toMatch(/^grai: wrote 10 files in out/);
 	writeFileSync(
 		join(dir, "messages", "de.json"),
 		JSON.stringify({ ...catalogs.de, cart_title: "Warenkorb" }, null, "\t"),

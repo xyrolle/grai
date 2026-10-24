@@ -1,17 +1,20 @@
 import type { LocaleMessage } from "./message.ts";
 import { type Part, plainText } from "./pattern.ts";
+import { pluralName } from "./plurals.ts";
 import { catchAll, type Selector } from "./selection.ts";
 
 /** The runtime functions compiled messages call. */
-export type RuntimeFunction =
-	| "markup"
-	| "message"
-	| "plural"
-	| "text"
-	| "unmatched";
+export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
 
-/** A key's line in keys.js, and the runtime functions it calls. */
-export type KeyModule = { code: string; uses: ReadonlySet<RuntimeFunction> };
+/**
+ * A key's line in keys.js, the runtime functions it calls, and the locales whose plural function
+ * it calls.
+ */
+export type KeyModule = {
+	code: string;
+	uses: ReadonlySet<RuntimeFunction>;
+	plurals: ReadonlySet<string>;
+};
 
 type Mode = "string" | "parts";
 
@@ -20,7 +23,8 @@ export function keyModule(
 	key: string,
 	messages: readonly LocaleMessage[],
 ): KeyModule {
-	const uses = new Set<RuntimeFunction>();
+	const used: Used = { uses: new Set(), plurals: new Set() };
+	const { uses } = used;
 	const hasMarkup = messages.some((message) => message.markup);
 	const hasInputs = messages.some((message) => message.inputs.size > 0);
 	let call: string;
@@ -32,11 +36,11 @@ export function keyModule(
 		call = `text(${texts.join(", ")})`;
 	} else {
 		const strings = messages.map((message) =>
-			localeFunction(key, message, "string", uses),
+			localeFunction(key, message, "string", used),
 		);
 		if (hasMarkup) {
 			const parts = messages.map((message) =>
-				localeFunction(key, message, "parts", uses),
+				localeFunction(key, message, "parts", used),
 			);
 			uses.add("markup");
 			call = `markup([${strings.join(", ")}], [${parts.join(", ")}])`;
@@ -45,8 +49,11 @@ export function keyModule(
 			call = `message(${strings.join(", ")})`;
 		}
 	}
-	return { code: `export const ${key} = /*#__PURE__*/ ${call};\n`, uses };
+	return { code: `export const ${key} = /*#__PURE__*/ ${call};\n`, ...used };
 }
+
+/** What a key's code calls: runtime functions, and the plural functions of locales. */
+type Used = { uses: Set<RuntimeFunction>; plurals: Set<string> };
 
 /**
  * One locale's function: its variants as a chain of conditions in the order they are tried. The
@@ -56,7 +63,7 @@ function localeFunction(
 	key: string,
 	message: LocaleMessage,
 	mode: Mode,
-	uses: Set<RuntimeFunction>,
+	used: Used,
 ): string {
 	const { variants, closed } = message;
 	const reads = new Set<string>();
@@ -69,16 +76,16 @@ function localeFunction(
 		pattern: patternCode(variant.pattern, mode, value),
 	}));
 	let body = closed
-		? unmatchedCode(key, message, value, uses)
+		? unmatchedCode(key, message, value, used.uses)
 		: (branches.pop()?.pattern ?? "");
 	for (const { condition, pattern } of branches.toReversed()) {
 		body = `${condition} ? ${pattern} : ${body}`;
 	}
 	const locals = [...message.plurals].filter(([name]) => reads.has(name));
-	if (locals.length > 0) uses.add("plural");
+	if (locals.length > 0) used.plurals.add(message.locale);
 	const declarations = locals.map(
 		([name, counted]) =>
-			`const $${name} = plural(${JSON.stringify(message.locale)}, ${value(counted)}); `,
+			`const $${name} = ${pluralName(message.locale)}(${value(counted)}); `,
 	);
 	const parameter = [...reads].some((name) => !message.plurals.has(name))
 		? "i"
