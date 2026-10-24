@@ -104,11 +104,20 @@ const operands = (n) => {
 ${functions.join("\n")}`;
 }
 
+/**
+ * A locale's function of a type. A locale whose every count is other, such as ru's ordinals, reads
+ * no count, so a bundle of it needs no operands; it still takes the count the keys' code passes,
+ * as an app's checkJs counts the arguments.
+ */
 function pluralFunction(locale: string, type: PluralType): string {
+	const name = pluralName(locale, type);
 	const rules = rulesOf(locale, type);
+	if (Object.keys(rules).length === 0) {
+		return `/** @param {unknown} _n */\nexport const ${name} = (_n) => "other";\n`;
+	}
 	const integer = chain(rules, integerOperands);
 	const decimal = chain(rules, decimalOperands);
-	return `/** @param {unknown} n */\nexport const ${pluralName(locale, type)} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(Number(n));\n\treturn ${decimal};\n};\n`;
+	return `/** @param {unknown} n */\nexport const ${name} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(Number(n));\n\treturn ${decimal};\n};\n`;
 }
 
 /** The categories' conditions as one expression, choosing the first that holds, else other. */
