@@ -144,7 +144,8 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
   - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
-  - `:percent`, `:currency` and `:unit` (`:number style=percent` and `style=currency` work);
+  - `:unit`'s `usage`, which converts to the locale's units;
+  - an option's value taken from an input, such as `unit=$unit`;
   - markup options and attributes;
   - nested keys in a catalog, which `grai import` flattens.
 
@@ -159,7 +160,7 @@ Paraglide's inlang message-format catalogs compile unchanged, and its calls stay
 - **In the browser, `{ locale }` must be the page's locale.** A built page is meant to hold only its own locale's words, so a call in another throws `locale-not-loaded`, in dev and tests as in a build.
 
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
-- **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's `number` and `datetime` formats.
+- **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
 - **Left out:** anything else, from every locale, and named in the report.
 
 A key becomes its path joined by `_`, so `t("cart.title")` becomes `m.cart_title()`.
