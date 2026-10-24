@@ -4,7 +4,7 @@
  */
 
 /** The Intl formatter a function formats with. */
-export type IntlFormatter = "number" | "datetime";
+export type IntlFormatter = "number" | "datetime" | "relativetime" | "list";
 
 /** An option's value, as Intl takes it. */
 export type OptionValue = string | number | boolean;
@@ -14,14 +14,29 @@ export type IntlOptions = Readonly<Record<string, OptionValue>>;
 
 /**
  * How an option's text is read: as a count of digits, as true or false, as a count of digits or
- * `auto`, or as it is.
+ * `auto`, as a unit of time, or as it is.
  */
 export type OptionKind =
 	| "digits"
 	| "boolean"
 	| "grouping"
 	| "digitsOrAuto"
+	| "timeUnit"
 	| "text";
+
+/** The units of time Intl.RelativeTimeFormat formats in, singular or plural. */
+export const timeUnits: ReadonlySet<string> = new Set(
+	[
+		"year",
+		"quarter",
+		"month",
+		"week",
+		"day",
+		"hour",
+		"minute",
+		"second",
+	].flatMap((unit) => [unit, `${unit}s`]),
+);
 
 /**
  * The number a selector on a function compares, from its input: the input as a number, rounded to
@@ -180,6 +195,20 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 			usage:
 				"usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.",
 		},
+	},
+	relativetime: {
+		formatter: "relativetime",
+		options: {
+			unit: "timeUnit",
+			numeric: "text",
+			style: "text",
+			numberingSystem: "text",
+		},
+		required: { option: "unit", example: "unit=day" },
+	},
+	list: {
+		formatter: "list",
+		options: { type: "text", style: "text" },
 	},
 	datetime: {
 		formatter: "datetime",

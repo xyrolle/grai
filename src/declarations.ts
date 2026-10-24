@@ -41,7 +41,9 @@ function inputType(name: string, messages: readonly LocaleMessage[]): string {
 	) {
 		return "number";
 	}
+	if (formatters.has("relativetime")) return "number";
 	if (formatters.has("datetime")) return "Date | number";
+	if (formatters.has("list")) return "readonly string[]";
 	let accepted: Set<string> | undefined;
 	for (const message of messages) {
 		const index = message.selectors.findIndex(
