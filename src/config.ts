@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraiError } from "./error.ts";
+import { isGlob } from "./globs.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -17,6 +18,8 @@ export type Config = {
 	cookieName: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
+	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
+	tests: readonly string[];
 };
 
 /**
@@ -42,10 +45,16 @@ const fields = new Set([
 	"strategy",
 	"cookieName",
 	"switch",
+	"tests",
 ]);
 const localePlaceholder = "{locale}";
 /** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
 const cookieNameToken = /^[\w!#$%&'*+\-.^`|~]+$/;
+/** Test files as Vitest and Jest name them, and folders of tests. A test ships nothing. */
+const conventionalTests = [
+	"**/*.{test,spec}.*",
+	"**/{test,tests,__tests__}/**",
+];
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
 export function readConfig(file: string): Config {
@@ -69,6 +78,7 @@ export function readConfig(file: string): Config {
 		strategy = [],
 		cookieName,
 		switch: localeSwitch = "reload",
+		tests = conventionalTests,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -119,6 +129,11 @@ export function readConfig(file: string): Config {
 			'"switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place',
 		);
 	}
+	if (!isPatternList(tests)) {
+		throw invalid(
+			'"tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -134,6 +149,7 @@ export function readConfig(file: string): Config {
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 		switch: localeSwitch,
+		tests,
 	};
 }
 
@@ -142,6 +158,13 @@ function isStrategy(value: unknown): value is Strategy[] {
 		Array.isArray(value) &&
 		value.every((item) => typeof item === "string" && strategies.has(item)) &&
 		new Set(value).size === value.length
+	);
+}
+
+function isPatternList(value: unknown): value is string[] {
+	return (
+		Array.isArray(value) &&
+		value.every((item) => typeof item === "string" && isGlob(item))
 	);
 }
 
