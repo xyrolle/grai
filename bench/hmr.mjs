@@ -3,7 +3,9 @@
 // locale of every key in one table. "whole" lets Vite re-send and re-evaluate it on each edit;
 // "patch" sends a custom HMR event naming a module of only the changed functions, which the page
 // imports and writes into the table; "patch, fs.watch" does the same from its own watcher on the
-// catalogs instead of Vite's. The edits go to a copy of the catalogs under .cache, never the app's.
+// catalogs instead of Vite's. Beside them: Paraglide's own Vite plugin, which compiles again on an
+// edit, and i18next and use-intl, whose page imports the locale's JSON and accepts its update. The
+// edits go to a copy of the catalogs under .cache, never the app's.
 //   node hmr.mjs [app...]
 import {
 	cpSync,
@@ -14,10 +16,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { chromium } from "playwright-core";
 import { createServer } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
+import { writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
 
@@ -170,7 +174,7 @@ function devPlugin(root, locales, design, timings) {
 	};
 }
 
-/** For i18next: Vite's own JSON update, timed when it reaches the plugins. */
+/** For the libraries: when the edited catalog's update reaches the plugins. */
 function timingPlugin(catalogFile, timings) {
 	return {
 		name: "edit-timing",
@@ -182,20 +186,63 @@ function timingPlugin(catalogFile, timings) {
 	};
 }
 
+/** The page's module per design: it renders 500 messages and renders them again on an update. */
+function pageModule(design, locale, shown) {
+	const lang = JSON.stringify(locale);
+	const render = (call) => `function render() {
+	document.getElementById("target").textContent = ${call("shown[0]")};
+	const list = document.getElementById("list");
+	list.replaceChildren(...shown.slice(1).map((key) => Object.assign(document.createElement("li"), { textContent: ${call("key")} })));
+}
+render();`;
+	const accept = (specifier, update) =>
+		`if (import.meta.hot) import.meta.hot.accept(${JSON.stringify(specifier)}, (next) => { ${update}; render(); });`;
+	const pages = {
+		grai: `import * as messages from "virtual:messages";
+let m = messages;
+m.setLocale(${lang});
+${render((key) => `m[${key}]()`)}
+addEventListener("grai:change", render);
+${accept("virtual:messages", `m = next; m.setLocale(${lang})`)}`,
+		paraglide: `import * as messages from "./paraglide/messages.js";
+let m = messages.m;
+const options = { locale: ${lang} };
+${render((key) => `m[${key}]({}, options)`)}
+${accept("./paraglide/messages.js", "m = next.m")}`,
+		i18next: `import i18next from "i18next";
+import translation from "./messages/${locale}.json";
+const instance = i18next.createInstance();
+instance.init({ lng: ${lang}, resources: { ${lang}: { translation } }, initAsync: false, interpolation: { escapeValue: false } });
+${render((key) => `instance.t(${key})`)}
+${accept(`./messages/${locale}.json`, `instance.addResourceBundle(${lang}, "translation", next.default, true, true)`)}`,
+		"use-intl": `import { createTranslator } from "use-intl/core";
+import messages from "./messages/${locale}.json";
+let t = createTranslator({ locale: ${lang}, messages });
+${render((key) => `t(${key})`)}
+${accept(`./messages/${locale}.json`, `t = createTranslator({ locale: ${lang}, messages: next.default })`)}`,
+	};
+	return `const shown = ${JSON.stringify(shown)};
+${pages[design] ?? pages.grai}
+new MutationObserver(() => { window.changed = { at: performance.timeOrigin + performance.now(), text: document.getElementById("target").textContent }; })
+	.observe(document.getElementById("target"), { childList: true, characterData: true, subtree: true });
+window.ready = true;
+`;
+}
+
 /**
- * The page: 500 messages of the locale, the first one the edited target. With i18next, the
- * catalog is the locale's i18next JSON, imported by the page, which accepts its update and
- * hands it to i18next.
+ * The page and its catalogs: 500 messages of the locale, the first one the edited target. i18next
+ * and use-intl edit their own format of the locale's catalog, which the page imports as JSON.
  */
 function writeFixture(root, app, locale, design) {
 	rmSync(root, { recursive: true, force: true });
 	mkdirSync(join(root, "messages"), { recursive: true });
 	for (const each of app.locales)
 		cpSync(app.catalogs[each], join(root, "messages", `${each}.json`));
-	if (design === "i18next")
+	const converted = { i18next: "i18next", "use-intl": "icu" }[design];
+	if (converted)
 		writeFileSync(
 			join(root, "messages", `${locale}.json`),
-			JSON.stringify(libraryCatalogs(app, locale).i18next, null, "\t"),
+			JSON.stringify(libraryCatalogs(app, locale)[converted], null, "\t"),
 		);
 	const plain = (key) =>
 		app.locales.every(
@@ -208,42 +255,31 @@ function writeFixture(root, app, locale, design) {
 		join(root, "index.html"),
 		`<!doctype html><meta charset="utf-8"><p id="target"></p><ul id="list"></ul><script type="module" src="/main.js"></script>`,
 	);
-	const observe = `new MutationObserver(() => { window.changed = { at: performance.timeOrigin + performance.now(), text: document.getElementById("target").textContent }; })
-	.observe(document.getElementById("target"), { childList: true, characterData: true, subtree: true });
-window.ready = true;`;
-	const i18next = `import i18next from "i18next";
-import translation from "./messages/${locale}.json";
-const shown = ${JSON.stringify(shown)};
-const instance = i18next.createInstance();
-instance.init({ lng: ${JSON.stringify(locale)}, resources: { ${JSON.stringify(locale)}: { translation } }, initAsync: false, interpolation: { escapeValue: false } });
-function render() {
-	document.getElementById("target").textContent = instance.t(shown[0]);
-	const list = document.getElementById("list");
-	list.replaceChildren(...shown.slice(1).map((key) => Object.assign(document.createElement("li"), { textContent: instance.t(key) })));
-}
-render();
-if (import.meta.hot) import.meta.hot.accept("./messages/${locale}.json", (next) => { instance.addResourceBundle(${JSON.stringify(locale)}, "translation", next.default, true, true); render(); });
-${observe}
-`;
-	writeFileSync(
-		join(root, "main.js"),
-		design === "i18next"
-			? i18next
-			: `import * as messages from "virtual:messages";
-const shown = ${JSON.stringify(shown)};
-function render(m) {
-	m.setLocale(${JSON.stringify(locale)});
-	document.getElementById("target").textContent = m[shown[0]]();
-	const list = document.getElementById("list");
-	list.replaceChildren(...shown.slice(1).map((key) => Object.assign(document.createElement("li"), { textContent: m[key]() })));
-}
-render(messages);
-addEventListener("grai:change", () => render(messages));
-if (import.meta.hot) import.meta.hot.accept("virtual:messages", (next) => render(next));
-${observe}
-`,
-	);
+	writeFileSync(join(root, "main.js"), pageModule(design, locale, shown));
 	return shown[0];
+}
+
+/** The design's plugins: grai's dev plugin, or Paraglide's Vite plugin, or none but the timing. */
+function pluginsFor(design, app, root, locale, timings) {
+	const catalogFile = join(root, "messages", `${locale}.json`);
+	if (design === "paraglide") {
+		const catalogs = Object.fromEntries(
+			app.locales.map((each) => [each, join(root, "messages", `${each}.json`)]),
+		);
+		const project = writeProject({ ...app, catalogs }, root);
+		return [
+			paraglideVitePlugin({
+				project,
+				outdir: join(root, "paraglide"),
+				outputStructure: "locale-modules",
+				strategy: app.compilerOptions.strategy,
+			}),
+			timingPlugin(catalogFile, timings),
+		];
+	}
+	if (design === "i18next" || design === "use-intl")
+		return [timingPlugin(catalogFile, timings)];
+	return [devPlugin(root, app.locales, design, timings)];
 }
 
 const median = (values) =>
@@ -259,11 +295,7 @@ async function measure(browser, app, design) {
 		configFile: false,
 		logLevel: "silent",
 		server: { port: PORT, strictPort: true },
-		plugins: [
-			design === "i18next"
-				? timingPlugin(join(root, "messages", `${locale}.json`), timings)
-				: devPlugin(root, app.locales, design, timings),
-		],
+		plugins: pluginsFor(design, app, root, locale, timings),
 	});
 	await server.listen();
 	const page = await browser.newPage();
@@ -288,7 +320,7 @@ async function measure(browser, app, design) {
 			.waitForFunction(
 				(text) => window.changed?.text === text && window.changed,
 				catalog[key],
-				{ timeout: 30_000 },
+				{ timeout: 120_000 },
 			)
 			.then((handle) => handle.jsonValue());
 		const reached = timings.edits.at(-1);
@@ -306,16 +338,25 @@ async function measure(browser, app, design) {
 	const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 	const served = timings.generate
 		? `${megabytes(timings.generate.bytes)}, ${timings.generate.ms.toFixed(0)} ms`
-		: `${megabytes(catalogBytes)} of JSON`;
+		: `${megabytes(catalogBytes)} catalog`;
 	const cell = (field) =>
 		median(latencies.map((latency) => latency[field])).toFixed(1);
-	console.log(
-		`| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`,
-	);
+	return `| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`;
 }
 
 const browser = await chromium.launch();
 for (const app of selectedApps()) {
+	const designs = [
+		"whole",
+		"patch",
+		"patch, fs.watch",
+		"paraglide",
+		"i18next",
+		"use-intl",
+	];
+	// Paraglide's plugin logs each compile, so the table is printed once every design has run.
+	const rows = [];
+	for (const design of designs) rows.push(await measure(browser, app, design));
 	console.log(
 		`\n### ${app.name}: one message edited until the page shows it, Vite dev, Chromium ${browser.version()}, median of ${EDITS} edits, ms\n`,
 	);
@@ -323,7 +364,6 @@ for (const app of selectedApps()) {
 		"| design | dev module, generated in | page load | edit to page | watcher | plugin | browser |",
 	);
 	console.log("|---|---|---|---|---|---|---|");
-	for (const design of ["whole", "patch", "patch, fs.watch", "i18next"])
-		await measure(browser, app, design);
+	for (const row of rows) console.log(row);
 }
 await browser.close();
