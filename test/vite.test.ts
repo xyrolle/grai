@@ -8,6 +8,7 @@ import {
 	isRunnableDevEnvironment,
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
+import { recompile } from "../src/compile.ts";
 import { grai } from "../src/vite.ts";
 import { project } from "./project.ts";
 
@@ -99,6 +100,22 @@ describe("the Vite plugin's build", () => {
 			entries.b?.includes("Fußzeile"),
 			entries.b?.includes("Hallo"),
 		]).toEqual([false, true, true]);
+	});
+
+	it("ships no pseudo-locale, even over the output of a dev server that compiled one", async () => {
+		const { dir, config } = project(catalogs, { pseudoLocale: "en-XA" });
+		await recompile(config, undefined, { pseudoLocale: true });
+
+		const { sources } = await built(dir, {
+			a: `import { m } from "./out/messages.js";\nimport { locales } from "./out/runtime.js";\nconsole.log(m.title(), locales);\n`,
+		});
+
+		const shipped = [...sources.values()].join("\n");
+		expect([shipped.includes("Titel"), shipped.includes("en-XA")]).toEqual([
+			true,
+			false,
+		]);
+		expect(shipped).not.toContain("Ţîţļé");
 	});
 
 	it("fails the build with the compiler's errors", async () => {
