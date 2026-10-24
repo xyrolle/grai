@@ -1,6 +1,6 @@
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
-import { runtimeDeclarations } from "./declarations.ts";
+import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule, pluralName } from "./plurals.ts";
 
@@ -22,7 +22,7 @@ const keysPerShard = 512;
  */
 export function renderOutput(
 	config: Config,
-	runtimeSource: string,
+	runtime: { runtime: string; server: string },
 	compilation: Compilation,
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
@@ -58,14 +58,13 @@ export function renderOutput(
 		.join("");
 	const output: Output = [
 		[
-			[
-				"config.js",
-				`export const locales = ${JSON.stringify(config.locales)};\nexport const baseLocale = ${JSON.stringify(config.baseLocale)};\n`,
-			],
+			["config.js", configModule(config)],
 			["runtime.d.ts", runtimeDeclarations(config)],
+			["server.d.ts", serverDeclarations],
 			["plurals.js", pluralModule(config.locales)],
 		],
-		[["runtime.js", runtimeSource], ...declarations],
+		[["runtime.js", runtime.runtime], ...declarations],
+		[["server.js", runtime.server]],
 		[...modules, ["keys.d.ts", keysIndex]],
 		[
 			["keys.js", keysIndex],
@@ -141,4 +140,15 @@ function shardOf(key: string, shards: number): number {
 		hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193);
 	}
 	return (hash >>> 0) % shards;
+}
+
+/** config.js: the project's config, as the runtime reads it. */
+function configModule(config: Config): string {
+	return [
+		`export const locales = ${JSON.stringify(config.locales)};`,
+		`export const baseLocale = ${JSON.stringify(config.baseLocale)};`,
+		`export const strategy = ${JSON.stringify(config.strategy)};`,
+		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
+		"",
+	].join("\n");
 }

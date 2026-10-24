@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,7 +20,7 @@ export type Project = {
 	config: string;
 	compile: () => Promise<CompileResult>;
 	/** Compiles, expecting no error, and imports the output's `m` namespace and runtime. */
-	load: () => Promise<{ m: Messages; runtime: Record<string, unknown> }>;
+	load: () => Promise<{ m: Messages; runtime: Runtime }>;
 };
 
 /** A compiled message, as the test calls it. */
@@ -26,11 +32,24 @@ export type Message = ((
 };
 export type Messages = Record<string, Message>;
 
+/** The output's runtime, as the tests call it. */
+export type Runtime = {
+	getLocale(): string;
+	setLocale(locale: string, options?: { reload?: boolean }): void;
+	localizeHref(href: string, options?: { locale?: string }): string;
+	localizeUrl(url: string | URL, options?: { locale?: string }): URL;
+	deLocalizeUrl(url: string | URL): URL;
+	extractLocaleFromUrl(url: string | URL): string;
+	getTextDirection(locale?: string): "ltr" | "rtl";
+};
+
 export function project(
 	catalogs: Record<string, unknown>,
 	config: Record<string, unknown> = {},
 ): Project {
-	const dir = mkdtempSync(join(tmpdir(), "grai-"));
+	// Its real path: the temporary directory can be a symlink (macOS's /var), and a module imported
+	// through it and through its real path would be two modules.
+	const dir = realpathSync(mkdtempSync(join(tmpdir(), "grai-")));
 	onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
 	mkdirSync(join(dir, "messages"));
 	for (const [locale, catalog] of Object.entries(catalogs)) {

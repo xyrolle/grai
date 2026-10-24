@@ -11,9 +11,29 @@ export type Config = {
 	/** Each locale's catalog file, in `locales` order. */
 	catalogs: ReadonlyMap<string, string>;
 	outdir: string;
+	/** Where the server's middleware looks for a request's locale, in order, before the base locale. */
+	strategy: readonly Strategy[];
+	/** The cookie the `cookie` strategy reads and `setLocale` writes. */
+	cookieName: string | undefined;
 };
 
-const fields = new Set(["locales", "baseLocale", "catalogs", "outdir"]);
+/** A place a request can name its locale in. */
+export type Strategy = "cookie" | "preferredLanguage" | "url";
+
+const strategies: ReadonlySet<string> = new Set([
+	"cookie",
+	"preferredLanguage",
+	"url",
+]);
+
+const fields = new Set([
+	"locales",
+	"baseLocale",
+	"catalogs",
+	"outdir",
+	"strategy",
+	"cookieName",
+]);
 const localePlaceholder = "{locale}";
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
@@ -30,7 +50,14 @@ export function readConfig(file: string): Config {
 			);
 		}
 	}
-	const { locales, baseLocale, catalogs, outdir } = raw;
+	const {
+		locales,
+		baseLocale,
+		catalogs,
+		outdir,
+		strategy = [],
+		cookieName,
+	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
 			'"locales" must be a non-empty list of distinct BCP 47 language tags, such as ["en", "de"]',
@@ -49,6 +76,19 @@ export function readConfig(file: string): Config {
 	if (typeof outdir !== "string" || outdir === "") {
 		throw invalid('"outdir" must be the path of the output directory');
 	}
+	if (!isStrategy(strategy)) {
+		throw invalid(
+			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
+		);
+	}
+	const readsCookie = strategy.includes("cookie");
+	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
+		throw invalid(
+			readsCookie
+				? '"cookieName" must name the cookie the "cookie" strategy reads'
+				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -61,7 +101,17 @@ export function readConfig(file: string): Config {
 			]),
 		),
 		outdir: resolve(root, outdir),
+		strategy,
+		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 	};
+}
+
+function isStrategy(value: unknown): value is Strategy[] {
+	return (
+		Array.isArray(value) &&
+		value.every((item) => typeof item === "string" && strategies.has(item)) &&
+		new Set(value).size === value.length
+	);
 }
 
 function readText(file: string, where: { file: string }): string {

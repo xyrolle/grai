@@ -29,9 +29,11 @@ it("writes the whole output once, then only the files an edit changes", async ()
 	expect((await compile()).written).toEqual([
 		"config.js",
 		"runtime.d.ts",
+		"server.d.ts",
 		"plurals.js",
 		"runtime.js",
 		"keys/0.d.ts",
+		"server.js",
 		"keys/0.js",
 		"keys.d.ts",
 		"keys.js",
@@ -89,16 +91,17 @@ it("waits for a live writer's lock before it writes", async () => {
 	expect((await compiling).written).toContain("keys.js");
 });
 
-it("writes output whose every import is a file of the output", async () => {
+it("writes output whose every import is a file of the output, or Node's async_hooks", async () => {
 	const { dir, compile } = project(catalogs);
 	await compile();
 	const out = join(dir, "out");
 	const imports = readdirSync(out, { recursive: true, encoding: "utf8" })
 		.filter((file) => file.endsWith(".js"))
 		.flatMap((file) =>
-			[
-				...readFileSync(join(out, file), "utf8").matchAll(/from "([^"]+)"/g),
-			].map(([, specifier = ""]) => resolve(out, dirname(file), specifier)),
+			[...readFileSync(join(out, file), "utf8").matchAll(/from "([^"]+)"/g)]
+				.map(([, specifier = ""]) => specifier)
+				.filter((specifier) => specifier !== "node:async_hooks")
+				.map((specifier) => resolve(out, dirname(file), specifier)),
 		);
 
 	expect(imports.length).toBeGreaterThan(0);

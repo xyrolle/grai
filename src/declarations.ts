@@ -100,6 +100,25 @@ export declare const baseLocale: ${JSON.stringify(config.baseLocale)};
 export declare function isLocale(value: unknown): value is Locale;
 /** The value, if it is one of the project's locales; otherwise throws a GraiError. */
 export declare function assertIsLocale(value: unknown): Locale;
+/** The cookie the server's "cookie" strategy reads, and \`setLocale\` writes. */
+export declare const cookieName: ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};
+/** The locale messages render in: the request's on the server, the page's in a browser. */
+export declare function getLocale(): Locale;
+/**
+ * Sets the locale: for the rest of the request on the server, for the process in a script. In a
+ * browser it keeps the locale in the cookie or the URL and reloads, unless \`{ reload: false }\`.
+ */
+export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;
+/** The direction a locale's script is written in, the current locale's by default. */
+export declare function getTextDirection(locale?: Locale): "ltr" | "rtl";
+/** The locale a URL's first path segment names, else the base locale. */
+export declare function extractLocaleFromUrl(url: string | URL): Locale;
+/** A URL without its locale prefix. */
+export declare function deLocalizeUrl(url: string | URL): URL;
+/** A URL with a locale's prefix: the current locale's, unless \`options.locale\` names another. */
+export declare function localizeUrl(url: string | URL, options?: { locale?: Locale }): URL;
+/** A path such as \`/cart\` with a locale's prefix; any other href as it is. */
+export declare function localizeHref(href: string, options?: { locale?: Locale }): string;
 /** A message called with an unknown locale, or with a value none of its variants accepts. */
 export declare class GraiError extends Error {
 	readonly code: string;
@@ -125,3 +144,16 @@ export type MarkupMessage<Inputs extends object = Record<string, never>> = Messa
 };
 `;
 }
+
+/** server.d.ts: the middleware, typed with the project's locales. */
+export const serverDeclarations = `import type { Locale } from "./runtime.js";
+
+/**
+ * Resolves a request's locale by the config's strategy and binds it for the handler and all it
+ * calls. Returns what the handler returns.
+ */
+export declare function middleware<Result>(
+	request: Request,
+	handler: (resolved: { request: Request; locale: Locale }) => Result,
+): Result;
+`;

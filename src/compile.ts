@@ -26,11 +26,15 @@ export type Build = {
 	rendered: Rendered;
 };
 
-const runtimeSource = readFileSync(
-	new URL("./runtime/runtime.js", import.meta.url),
-	"utf8",
-);
-const runtimeHash = hash("sha1", runtimeSource);
+/** The runtime's modules, which every output carries as they are. */
+const runtime = {
+	runtime: readFileSync(
+		new URL("./runtime/runtime.js", import.meta.url),
+		"utf8",
+	),
+	server: readFileSync(new URL("./runtime/server.js", import.meta.url), "utf8"),
+};
+const runtimeHash = hash("sha1", runtime.runtime + runtime.server);
 
 /**
  * Compiles a project's catalogs and writes its output, unless the output is already that of the
@@ -113,7 +117,7 @@ async function build(
 	}
 	const { output, rendered } = renderOutput(
 		config,
-		runtimeSource,
+		runtime,
 		compilation,
 		previous?.rendered,
 	);
@@ -173,6 +177,13 @@ function parsed(
 function inputsOf(config: Config, hashes: readonly string[]): string {
 	return hash(
 		"sha1",
-		JSON.stringify([runtimeHash, config.locales, config.baseLocale, hashes]),
+		JSON.stringify([
+			runtimeHash,
+			config.locales,
+			config.baseLocale,
+			config.strategy,
+			config.cookieName,
+			hashes,
+		]),
 	);
 }
