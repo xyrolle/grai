@@ -17,9 +17,10 @@ The reference workloads are two production SvelteKit apps: app A with 6,366 keys
   - text and `{name}` placeholders;
   - markup: `{#tag}…{/tag}` and `{#tag/}`;
   - variants: `declarations` (`input x`, `local y = x: plural`), `selectors` and `match`, with `*`, several selectors, and `""` for a message without selectors;
+  - formatting: `:number`, `:integer`, `:datetime`, `:date` and `:time` with their options, in a placeholder (`{x :number}`) or as a local (`local y = x: number`);
   - the escapes `\{`, `\}` and `\\`.
 
-  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:number` and `:datetime`, options, nested keys, and markup options and attributes (`docs/followups.md`).
+  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:currency`, plural options such as `select=ordinal`, selecting on a formatted value, nested keys, and markup options and attributes (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is a compile error naming the locales that lack it. A missing translation would otherwise ship as a failed import or as another locale's words.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
@@ -153,6 +154,17 @@ These are MessageFormat 2's rules, restricted to the constructs above:
   An uncovered count would otherwise render the key's name. Both reference catalogs already meet this rule.
 - **A select on an input without `*`** (`month=1` … `month=12`) is closed by its type. A value outside it at run time throws a `GraiError` naming the key, the locale and the value.
 
+## Formatting: numbers and dates
+
+- **The options are Intl's, by name.** MessageFormat 2's `:number` and `:integer` options already are `Intl.NumberFormat`'s, and `:number` also takes `style` and the options that go with it, such as `style=percent` or `style=currency currency=EUR`. MessageFormat 2's date and time functions are a draft whose options are still changing, so `:datetime`, `:date` and `:time` take `Intl.DateTimeFormat`'s options, such as `dateStyle=long`. Given no option that shapes the text, they use MessageFormat 2's defaults: a medium date, a short time.
+- **The options are checked when compiling,** by making the formatter once. An option a function does not take, or a value Intl refuses, is a compile error naming them.
+- **Each locale and options gets one formatter, in `formats.js`, made the first time it formats.** Formatters made at module scope would all be made on every page load, for every locale, at 20–100 µs each. Measured against `Intl` used directly, with the formatter made once:
+  - a number takes 244 ns against 238 ns;
+  - a date takes 465 ns against 461 ns.
+
+  A new formatter per call takes 8.9 µs and 24 µs. One formatter adds about 100 bytes min+gzip to the page that uses it.
+- **A formatted input is typed by its formatter:** `number` for a number, and `Date | number` for a date. It is passed to Intl through `Number()`, as Intl itself takes a date by its time value.
+
 ## Errors
 
 - **Every failure is a `GraiError`** with a `code`, the `file`, and the `key` and `locale` where they apply. Its message says what is wrong and what to do: for example, `messages/pl.json: "cart_items" (pl): the plural selector countPlural has no variant for "many". Add countPlural=many, or countPlural=*.`
@@ -214,8 +226,9 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - **A key is its source path joined by `_`,** every character an identifier cannot hold as `_`. When a locale's directory holds several files, each key starts with its file's name, i18next's namespace.
   - **A plural is MessageFormat 2's `local nPlural = n: plural`.** ICU's and i18next's `other` becomes `*`, because both take it for any count the other forms do not cover. An exact `=0`, and i18next's `_zero` in a locale without a zero category, becomes a choice on the input itself, written before the category, as both libraries try it first. A category the locale does not have is dropped, since neither library ever chooses it.
   - **Nested and sequential choices become several selectors, outermost first,** so MessageFormat 2's preference picks what ICU picks.
-  - **What grai cannot express is left out, never approximated:** `number`, `date` and `time` arguments, `selectordinal` and `_ordinal_`, `offset`, i18next's formats, nested values, and `$t()` with options or of a message with inputs. `$t(key)` of a text is inlined.
-  - **Two differences are reported, not left out:** ICU's `#` shows a count formatted for the locale (1,000), and grai shows it as written (1000); and an i18next plural that lacks a locale's form shows its `_other` text, where i18next showed the key's name.
+  - **A formatted value is formatted alike.** ICU's `#` becomes `{n :number}`. Its `number`, `date` and `time` arguments become `:number`, `:integer` and `:date` or `:time` with the Intl options of intl-messageformat's styles. i18next's `number` and `datetime` without options become `:number`, and `:date` with Intl's default fields.
+  - **What grai cannot express is left out, never approximated:** an ICU currency or skeleton style, `selectordinal` and `_ordinal_`, `offset`, i18next's other formats and formats with options, nested values, and `$t()` with options or of a message with inputs. `$t(key)` of a text is inlined.
+  - **One difference is reported, not left out:** an i18next plural that lacks a locale's form shows its `_other` text, where i18next showed the key's name.
   - `bench/import-equivalence.mjs` renders every imported message with grai and with i18next or intl-messageformat, for each locale and a range of inputs, and fails on any difference the report does not name. The libraries are the bench's dependencies, not grai's.
 
 ## Package

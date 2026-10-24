@@ -20,11 +20,17 @@ A text message called in a request reads the request's locale from `AsyncLocalSt
 
 Done when: `bench/` runs grai's own output on a quiet machine and shows a text call in a request at 20 ns or less, or the design records why the floor is higher.
 
-## Support MessageFormat 2's formatting functions
+## Support ordinals, number selection, more functions and markup options
 
-`:number`, `:integer`, `:datetime`, `:date` and `:time` are compile errors today, and so are function options (such as `select=ordinal`) and markup options and attributes. Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
+These are compile errors today:
+- an ordinal plural, `local p = n: plural select=ordinal`;
+- selecting on a `:number` local, which MessageFormat 2 does by plural category after an exact match;
+- `:percent`, `:currency` and `:unit`;
+- markup options and attributes.
 
-Done when: each compiles to its `Intl` formatter, created once per locale and options, with a test per function and its options, and the design lists it among the constructs.
+Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
+
+Done when: each compiles, with a test, and the design lists it among the constructs.
 
 ## Bind the locale in Next.js server components
 
@@ -44,14 +50,8 @@ Done when: a local branch of each reference app on grai passes its own checks an
 
 Done when: the Vite plugin serves that module and reports the key, with a test that a page importing a missing key loads and throws the `GraiError` only when the message is called.
 
-## Format a count with `:number`, its default formatting first
-
-An imported ICU `#` shows a count as ICU formats it for the locale (1,000 in English), and grai shows it as written (1000). The import reports each such message, but the faithful fix is `:number` without options: the locale's default `Intl.NumberFormat`, and the first of MessageFormat 2's functions above to support.
-
-Done when: `{n :number}` compiles to a formatter created once per locale, the import writes `#` as it, and `bench/import-equivalence.mjs` finds no `#` difference left to report.
-
 ## Import what `grai import` leaves out
 
-It leaves out ICU's `number`, `date` and `time` arguments and i18next's formats, which wait for MessageFormat 2's functions above, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+It leaves out ICU's currency and skeleton styles and i18next's formats with options or other than `number` and `datetime`, which need their options mapped one by one, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
