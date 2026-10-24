@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraiError } from "./error.ts";
+import { isGlob } from "./globs.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -15,6 +16,8 @@ export type Config = {
 	strategy: readonly Strategy[];
 	/** The cookie the `cookie` strategy reads and `setLocale` writes. */
 	cookieName: string | undefined;
+	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
+	tests: readonly string[];
 };
 
 /** A place a request can name its locale in. */
@@ -33,8 +36,14 @@ const fields = new Set([
 	"outdir",
 	"strategy",
 	"cookieName",
+	"tests",
 ]);
 const localePlaceholder = "{locale}";
+/** Test files as Vitest and Jest name them, and folders of tests. A test ships nothing. */
+const conventionalTests = [
+	"**/*.{test,spec}.*",
+	"**/{test,tests,__tests__}/**",
+];
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
 export function readConfig(file: string): Config {
@@ -57,6 +66,7 @@ export function readConfig(file: string): Config {
 		outdir,
 		strategy = [],
 		cookieName,
+		tests = conventionalTests,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -89,6 +99,11 @@ export function readConfig(file: string): Config {
 				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
 		);
 	}
+	if (!isPatternList(tests)) {
+		throw invalid(
+			'"tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -103,6 +118,7 @@ export function readConfig(file: string): Config {
 		outdir: resolve(root, outdir),
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
+		tests,
 	};
 }
 
@@ -111,6 +127,13 @@ function isStrategy(value: unknown): value is Strategy[] {
 		Array.isArray(value) &&
 		value.every((item) => typeof item === "string" && strategies.has(item)) &&
 		new Set(value).size === value.length
+	);
+}
+
+function isPatternList(value: unknown): value is string[] {
+	return (
+		Array.isArray(value) &&
+		value.every((item) => typeof item === "string" && isGlob(item))
 	);
 }
 

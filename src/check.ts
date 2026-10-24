@@ -7,7 +7,13 @@ import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
 import { untranslatedKeys } from "./seed.ts";
-import { namesIn, sourceFiles } from "./sources.ts";
+import {
+	namesIn,
+	sourceFiles,
+	splitTests,
+	type TestNames,
+	testsNaming,
+} from "./sources.ts";
 
 /** What a check found: the problems, and each locale's keys that are still untranslated. */
 export type Checked = {
@@ -17,10 +23,11 @@ export type Checked = {
 
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
- * key no source file names, and each input one locale reads and another never does. Source files
- * are those under the project's root, or under `sources` when given, outside the outdir,
- * dependencies, build output and dot-directories. Beside them, the keys each locale has not
- * translated yet, which are not problems: a message can rightly read as the base locale's.
+ * key no shipped source file names, and each input one locale reads and another never does. Source
+ * files are those under the project's root, or under `sources` when given, outside the outdir,
+ * dependencies, build output and dot-directories; those the config's `tests` match ship nothing.
+ * Beside them, the keys each locale has not translated yet, which are not problems: a message can
+ * rightly read as the base locale's.
  */
 export async function check(
 	configFile: string,
@@ -34,10 +41,14 @@ export async function check(
 	const { config } = read;
 	const compilation = compileCatalogs(config, catalogs);
 	const roots = sources ?? [config.root];
-	const names = namesIn(sourceFiles(roots, config.root, config.outdir));
+	const files = sourceFiles(roots, config.root, config.outdir);
+	const { shipped, tests } = splitTests(files, config.tests);
+	const names = namesIn(shipped);
 	const problems = [...compilation.errors];
 	for (const key of compilation.keys.keys()) {
-		if (!names.has(key)) problems.push(unused(key, config, catalogs, roots));
+		if (!names.has(key)) {
+			problems.push(unused(key, config, catalogs, roots, tests));
+		}
 		problems.push(...differingInputs(key, catalogs));
 	}
 	return {
@@ -51,14 +62,16 @@ function unused(
 	config: Config,
 	catalogs: readonly Catalog[],
 	roots: readonly string[],
+	tests: readonly TestNames[],
 ): GraiError {
 	const base = catalogs.find((catalog) => catalog.locale === config.baseLocale);
 	const where = roots.map((root) => shownFrom(config.root, root)).join(", ");
-	return new GraiError(
-		"key-unused",
-		{ file: base?.file ?? "", key },
-		`no source file under ${where} names the key. Remove it from every catalog, or use it.`,
-	);
+	const testing = testsNaming(tests, key);
+	const detail =
+		testing === undefined
+			? `no source file under ${where} names the key. Remove it from every catalog, or use it.`
+			: `no source file under ${where} names the key but tests, which ship nothing: ${testing}. Remove it from every catalog and from those tests, or use it.`;
+	return new GraiError("key-unused", { file: base?.file ?? "", key }, detail);
 }
 
 /** A directory as the project names it: relative to its root, or in full when outside it. */

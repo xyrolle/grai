@@ -91,6 +91,27 @@ describe("grai check", () => {
 		expect(existsSync(join(dir, "out"))).toBe(false);
 	});
 
+	it("counts a key that only tests name as unused, naming the tests, unless the config says no file is one", async () => {
+		const sources = {
+			"app.ts": "m.cart_title();",
+			"src/greeting.spec.ts": "expect(m.cart_greeting({ name: 'Ana' }));",
+			"tests/helpers.ts": "export const greet = () => m.cart_greeting;",
+		};
+		const shipping = project(catalogs);
+		const counting = project(catalogs, { tests: [] });
+		for (const { dir } of [shipping, counting]) {
+			for (const [path, text] of Object.entries(sources)) {
+				mkdirSync(join(dir, path, ".."), { recursive: true });
+				writeFileSync(join(dir, path), text);
+			}
+		}
+
+		expect((await grai(shipping.dir, "check")).stderr.split("\n")[0]).toBe(
+			'messages/en.json: "cart_greeting": no source file under . names the key but tests, which ship nothing: src/greeting.spec.ts, tests/helpers.ts. Remove it from every catalog and from those tests, or use it.',
+		);
+		expect((await grai(counting.dir, "check")).code).toBe(0);
+	});
+
 	it("counts no name that ends a longer word, such as 2xl's xl, as the key", async () => {
 		const { dir } = project({
 			en: { xl: "Extra large" },

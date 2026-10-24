@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { extname, join, relative } from "node:path";
+import { extname, join, relative, sep } from "node:path";
+import { globMatcher } from "./globs.ts";
 
 /** Files that can name a message: JavaScript, TypeScript and the components of Svelte and Vue. */
 const sourceExtensions = new Set([
@@ -67,6 +68,44 @@ export function namesIn(files: readonly SourceFile[]): Set<string> {
 		for (const name of text.match(identifier) ?? []) names.add(name);
 	}
 	return names;
+}
+
+/** A test file, by the path the project shows, and the identifiers it writes. */
+export type TestNames = { file: string; names: ReadonlySet<string> };
+
+/**
+ * The source files that ship, and the names each test writes. A file is a test when one of the
+ * config's `tests` globs matches its path from the project's root.
+ */
+export function splitTests(
+	files: readonly SourceFile[],
+	tests: readonly string[],
+): { shipped: SourceFile[]; tests: TestNames[] } {
+	const isTest = globMatcher(tests);
+	const shipped: SourceFile[] = [];
+	const testNames: TestNames[] = [];
+	for (const source of files) {
+		if (isTest(source.file.replaceAll(sep, "/"))) {
+			testNames.push({ file: source.file, names: namesIn([source]) });
+		} else {
+			shipped.push(source);
+		}
+	}
+	return { shipped, tests: testNames };
+}
+
+/** The tests that write a name, sorted by path, for a message: the first three, then how many more. */
+export function testsNaming(
+	tests: readonly TestNames[],
+	name: string,
+): string | undefined {
+	const files = tests
+		.filter(({ names }) => names.has(name))
+		.map(({ file }) => file)
+		.toSorted();
+	if (files.length === 0) return undefined;
+	const more = files.length > 3 ? ` and ${files.length - 3} more` : "";
+	return files.slice(0, 3).join(", ") + more;
 }
 
 /** The line and column, both from 1, of an offset in a text. */

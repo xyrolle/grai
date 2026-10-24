@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, tests.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -76,6 +76,14 @@ describe("the config", () => {
 		]);
 		expect(await errorsOf(catalogs, { cookieName: "lang" })).toEqual([
 			'config-invalid: grai.config.json: "cookieName" is read only by the "cookie" strategy, which "strategy" does not list.',
+		]);
+	});
+
+	it("names test globs that are not a list of globs", async () => {
+		expect(
+			await errorsOf({ en: { title: "Title" } }, { tests: "**/*.test.ts" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test.',
 		]);
 	});
 });

@@ -13,10 +13,11 @@ import {
 export const checkCommand: Command = {
 	usage: `  check [--source <dir>]... [--json]
                                report every problem and write nothing: what compile reports,
-                               keys no source file names, inputs the locales do not agree on;
+                               keys no shipped source names, inputs the locales do not agree on;
                                and the keys each locale has not translated yet
   check --fix [--source <dir>]...
-                               remove the keys no source can name from every catalog, then check`,
+                               remove the keys no shipped source can name from every catalog,
+                               then check`,
 	async run(args) {
 		const { config, values } = parsed(args, {
 			...sourceOption,
