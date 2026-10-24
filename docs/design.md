@@ -224,6 +224,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - **Every key is in every locale, so an untranslated message is a seed, and equality to it is the only marker.** Nothing is kept beside the catalogs. A list of texts that are rightly identical would come only if the report proves noisy.
   - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` when it has no `*`. It then compiles in a locale with more categories, such as `few` in `ru`.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
+- **Each command is wired in its own module of `src/commands/`:** its lines in the usage, how it reads its arguments, and what it prints. `cli.ts` only lists the commands and dispatches, so commands added side by side touch one line of it each.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog at once, and refuses unless every locale is given.
 - `grai import --from i18next|icu <file or dir>…` converts another library's catalogs into the project's catalogs, for a migration. Each source file's locale is its name (`en.json`) or its directory's (`en/common.json`).
   - **It writes new catalogs only, and nothing at all on an error:** an unreadable source, a file whose locale is unclear, two source keys that become one key, or a catalog that exists already. A migration then never overwrites edits.
