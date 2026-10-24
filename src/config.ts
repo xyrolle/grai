@@ -44,6 +44,8 @@ const fields = new Set([
 	"switch",
 ]);
 const localePlaceholder = "{locale}";
+/** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
+const cookieNameToken = /^[\w!#$%&'*+\-.^`|~]+$/;
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
 export function readConfig(file: string): Config {
@@ -105,6 +107,11 @@ export function readConfig(file: string): Config {
 			readsCookie
 				? '"cookieName" must name the cookie the "cookie" strategy reads'
 				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
+		);
+	}
+	if (typeof cookieName === "string" && !cookieNameToken.test(cookieName)) {
+		throw invalid(
+			'"cookieName" must be a cookie name, as RFC 6265 has it: letters, digits and !#$%&\'*+-.^_`|~, without spaces',
 		);
 	}
 	if (localeSwitch !== "reload" && localeSwitch !== "live") {

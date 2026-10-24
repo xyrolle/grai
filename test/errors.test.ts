@@ -88,6 +88,17 @@ describe("the config", () => {
 		]);
 	});
 
+	it("is an error when the cookie's name is not one a cookie can have", async () => {
+		expect(
+			await errorsOf(
+				{ en: { title: "Title" } },
+				{ strategy: ["cookie"], cookieName: "my lang;" },
+			),
+		).toEqual([
+			'config-invalid: grai.config.json: "cookieName" must be a cookie name, as RFC 6265 has it: letters, digits and !#$%&\'*+-.^_`|~, without spaces.',
+		]);
+	});
+
 	it("names a locale switch it does not know", async () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { switch: "instant" }),
