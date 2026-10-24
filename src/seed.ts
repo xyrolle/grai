@@ -43,7 +43,7 @@ export function seedValue(value: unknown, locale: string): unknown {
 			pattern,
 		],
 	);
-	const categories = new Set(categoriesOf(locale));
+	const categories = new Set(categoriesOf(locale, "cardinal"));
 	const open = new Set(
 		plurals.filter((name) =>
 			variants.some(([keys]) => keys.get(name) === catchAll),

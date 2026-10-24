@@ -126,7 +126,7 @@ function convertPlural(
 				"it has no _other form, which i18next needs for every count its other forms do not cover.",
 			);
 		}
-		const categories = categoriesOf(locale);
+		const categories = categoriesOf(locale, "cardinal");
 		const patterns = new Map<string, Pattern>();
 		for (const [form, value] of forms) {
 			// i18next takes _zero for a count of 0 in every locale: an exact 0 where it is no category.

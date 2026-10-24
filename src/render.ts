@@ -133,7 +133,8 @@ function shardModule(keys: readonly CompiledKey[]): string {
 	const formats = new Set<string>();
 	for (const key of keys) {
 		for (const name of key.uses) uses.add(name);
-		for (const locale of key.plurals) plurals.add(pluralName(locale));
+		for (const locale of key.plurals)
+			plurals.add(pluralName(locale, "cardinal"));
 		for (const name of key.formats.keys()) formats.add(name);
 	}
 	const imports = [

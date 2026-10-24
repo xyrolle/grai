@@ -1,4 +1,13 @@
-import { pluralRules } from "./plural-rules.ts";
+import { cardinalRules, ordinalRules } from "./plural-rules.ts";
+
+/** CLDR's two kinds of plural rules: for counting (1 item), and for ranking (1st). */
+export type PluralType = "cardinal" | "ordinal";
+
+const pluralTypes: readonly PluralType[] = ["cardinal", "ordinal"];
+
+const rulesByType: Readonly<
+	Record<PluralType, Readonly<Record<string, Readonly<Record<string, string>>>>>
+> = { cardinal: cardinalRules, ordinal: ordinalRules };
 
 /** CLDR's plural categories, in its order: a locale's rules are tried in this order. */
 const categoryOrder = ["zero", "one", "two", "few", "many", "other"];
@@ -27,10 +36,13 @@ const decimalOperands: Operands = {
 };
 
 /** The CLDR rules of a locale: its own, else those of the language it falls back to, else none. */
-function rulesOf(locale: string): Readonly<Record<string, string>> {
+function rulesOf(
+	locale: string,
+	type: PluralType,
+): Readonly<Record<string, string>> {
 	let tag = Intl.getCanonicalLocales(locale)[0] ?? locale;
 	for (;;) {
-		const rules = pluralRules[tag];
+		const rules = rulesByType[type][tag];
 		if (rules !== undefined) return rules;
 		const cut = tag.lastIndexOf("-");
 		if (cut === -1) return {};
@@ -38,33 +50,35 @@ function rulesOf(locale: string): Readonly<Record<string, string>> {
 	}
 }
 
-/** A locale's plural categories, other last, as CLDR names them. */
-export function categoriesOf(locale: string): readonly string[] {
-	const rules = rulesOf(locale);
+/** A locale's plural categories of a type, other last, as CLDR names them. */
+export function categoriesOf(
+	locale: string,
+	type: PluralType,
+): readonly string[] {
+	const rules = rulesOf(locale, type);
 	return categoryOrder.filter(
 		(category) => category === "other" || category in rules,
 	);
 }
 
-/** The name the output gives a locale's plural function. */
-export function pluralName(locale: string): string {
-	return `plural_${locale.replaceAll("-", "_")}`;
+/** The name the output gives a locale's plural function of a type: `plural_en` or `ordinal_en`. */
+export function pluralName(locale: string, type: PluralType): string {
+	const prefix = type === "cardinal" ? "plural" : "ordinal";
+	return `${prefix}_${locale.replaceAll("-", "_")}`;
 }
 
 /**
- * plurals.js: a function per locale giving a count's category, compiled from CLDR's rules. A
- * count is taken as a number, as Intl.PluralRules takes it. A whole, non-negative count, the usual
- * one, takes a path with the fraction and exponent operands folded away; any other is split into
- * its operands first. That path also tests the count's type, which Number.isInteger implies, as
- * TypeScript narrows by `typeof` and not by Number.isInteger, and an app's checkJs reads this file.
+ * plurals.js: a function per locale and type giving a count's category, compiled from CLDR's
+ * rules. A count is taken as a number, as Intl.PluralRules takes it. A whole, non-negative count,
+ * the usual one, takes a path with the fraction and exponent operands folded away; any other is
+ * split into its operands first. That path also tests the count's type, which Number.isInteger
+ * implies, as TypeScript narrows by `typeof` and not by Number.isInteger, and an app's checkJs
+ * reads this file.
  */
 export function pluralModule(locales: readonly string[]): string {
-	const functions = locales.map((locale) => {
-		const rules = rulesOf(locale);
-		const integer = chain(rules, integerOperands);
-		const decimal = chain(rules, decimalOperands);
-		return `/** @param {unknown} n */\nexport const ${pluralName(locale)} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(Number(n));\n\treturn ${decimal};\n};\n`;
-	});
+	const functions = pluralTypes.flatMap((type) =>
+		locales.map((locale) => pluralFunction(locale, type)),
+	);
 	return `// Plural rules from Unicode CLDR, © Unicode, Inc., under the Unicode License v3.
 
 /**
@@ -88,6 +102,13 @@ const operands = (n) => {
 };
 
 ${functions.join("\n")}`;
+}
+
+function pluralFunction(locale: string, type: PluralType): string {
+	const rules = rulesOf(locale, type);
+	const integer = chain(rules, integerOperands);
+	const decimal = chain(rules, decimalOperands);
+	return `/** @param {unknown} n */\nexport const ${pluralName(locale, type)} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(Number(n));\n\treturn ${decimal};\n};\n`;
 }
 
 /** The categories' conditions as one expression, choosing the first that holds, else other. */

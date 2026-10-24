@@ -17,7 +17,8 @@ export function outputImports(
 	const formats = new Set<string>();
 	for (const key of keys) {
 		if (key.uses.has("unmatched")) uses.add("unmatched");
-		for (const locale of key.plurals) plurals.add(pluralName(locale));
+		for (const locale of key.plurals)
+			plurals.add(pluralName(locale, "cardinal"));
 		for (const name of key.formats.keys()) formats.add(name);
 	}
 	const from = (file: string) => JSON.stringify(join(outdir, file));
