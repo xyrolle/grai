@@ -1,0 +1,98 @@
+# Runtime
+
+How a message call, a page and a dev edit are made fast, decided by measurement. The baseline is Paraglide 2.29.1, compiled from the same catalogs. The catalogs are app A (SvelteKit on Cloudflare Workers, 6,366 keys × 3 locales), app B (SvelteKit, 13,326 keys × 3) and `bench/synthetic.mjs`, which has app A's shape so that anyone can run every bench. The numbers are medians on an M-series Mac, with Node 24.16 and Chromium 156.
+
+Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` and `pnpm browsers` there. `GRAI_BENCH_A` and `GRAI_BENCH_B` point the benches at an app's checkout, and `GRAI_BENCH_A_STRATEGY` (or `_B_`) gives its strategy.
+
+## Decisions
+
+| | grai | because |
+|---|---|---|
+| Browser | One locale per bundle. A page's message chunks hold only that locale's functions. | Message bytes per page fall by 52–55% (brotli), and hydrating a page of 2,000 messages takes 14–32% less time. |
+| Locale in the browser | Fixed by the bundle the page loads. A call looks nothing up. | A call costs what a plain function call costs, 0.5 ns. |
+| Locale on the server | Resolved once per request into `AsyncLocalStorage`. A call reads it once, through one shared dispatcher, and indexes the key's per-locale table. | The read is the floor while concurrent requests share the module: 13–23 ns a call in Node, 21 ns a read in workerd. A module variable bound per request costs 0.3 ns, but 50 of 200 interleaved renders then get another request's locale. |
+| Plurals | CLDR's rules compiled into a function per locale, integers first. | 4–11 ns a call, against 124–249 ns for a cached `Intl.PluralRules`, for 158 more bytes min+gzip per locale. |
+| Formatters | One `Intl` formatter per locale and options, created at module scope. | 207–213 ns a number, against 695–770 ns for a cache keyed by the options and 8–9 µs for a formatter per call. |
+| Per-locale chunks in SvelteKit | Same chunk names in a directory per locale, an import map, and modulepreload links the server writes for the locale's copies. | Browsers apply no import map to modulepreload, so Kit's own links also download the shared chunks: 51% more message bytes than no split at all. |
+| Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 17–30 ms from the save to the page, against 202–459 ms re-evaluating the module. |
+| Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface fits in 378 bytes min+gzip; Paraglide's is 1.9–2.1 KB. |
+
+**Opt-in, later: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.1–2.3 ms against 5.5–5.8 ms with per-locale modules, a server render 0.02–0.04 ms against 0.07–0.13 ms, and the bundle 19.1 KB against 22.3 KB. On app A's largest page the messages take 17.2 KB against 24.5 KB. But every component then has code per locale, so the server needs every locale's components and the client a build per locale, and those costs are not measured yet (`docs/followups.md`). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
+
+Not adopted:
+- **A strategy lookup per call.** The locale is resolved once per request on the server, and fixed by the bundle in the browser.
+- **A dispatcher generated per key.** It is slower than one shared dispatcher, 25–52 ns against 13–23 ns a call: the engine keeps one hot function fast, and thousands of small copies slow.
+- **Anything more for "only the keys a page uses".** Per-key modules already do it: on app A, the keys a page loads match the keys its code names, to within two.
+
+## Server
+
+A message call inside a request, through 2,000 static call sites, 20 to a function (`server`). App A, in `ro` and `ru`:
+
+| | text | with inputs | plural | 2,000 calls |
+|---|---|---|---|---|
+| Paraglide | 25–28 ns | 64–95 ns | 533–644 ns | 102–105 µs |
+| grai, shared dispatcher, locale from ALS | 14–23 ns | 70–74 ns | 99–163 ns | 49–53 µs |
+| grai, per-locale module | 0.5 ns | 14–15 ns | 71–97 ns | 11–12 µs |
+
+App B gives the same picture. The plural column uses compiled rules without the integer path.
+
+- `AsyncLocalStorage` costs 21 ns a read in workerd, and a module variable 0.3 ns (`workerd`).
+- A module variable bound per request is not safe: of 200 renders that await between two messages, 50 render another request's locale, and none through `AsyncLocalStorage` (`interleave`).
+- In a Svelte server render of a page of 2,000 messages (`ssr`), messages are 76–80% of 0.10–0.17 ms.
+
+## Browser
+
+A server-rendered Svelte page of 2,000 message calls, hydrated, then mounted again, the client's part of a locale switch without a reload (`hydrate`). App A, `ro`, at full CPU speed and at a 4× slowdown:
+
+| | JS, brotli | hydrate | hydrated at | mount again |
+|---|---|---|---|---|
+| Paraglide | 37.9 KB | 7.6 / 33.4 ms | 20.3 / 80.3 ms | 2.9 / 12.7 ms |
+| grai, per-locale module | 22.3 KB | 5.5 / 24.4 ms | 14.5 / 56.9 ms | 2.3 / 10.2 ms |
+| inlined into the template | 19.1 KB | 2.1 / 10.1 ms | 10.1 / 37.5 ms | 1.0 / 4.9 ms |
+
+On app B, whose URL strategy makes Paraglide's per-call lookup cheaper, the per-locale module hydrates 14–18% faster instead of 27–32%.
+
+## Bytes per page
+
+Every page of app A's production build, its keys bundled and minified by Rolldown per scheme (`record-build` in a copy of the app, then `bytes`). Brotli KB:
+
+| page | keys | page JS | every locale | Paraglide's per-locale build | grai, one locale | no-input messages exported as strings | no-input messages inlined |
+|---|---|---|---|---|---|---|---|
+| largest | 991 | 531 | 51.5 | 30.0 | 24.5 | 24.4 | 17.2 |
+| 10th | 672 | 445 | 43.1 | 23.7 | 19.7 | 19.6 | 15.0 |
+| all 73, summed | | 21,055 | 2,005 | 1,102 | 916 | 913 | 692 |
+
+Exporting a message without inputs as its string instead of a function saves almost nothing. Its bytes go only when the text moves into the calling component's code, which is the opt-in inlining.
+
+App B already copies its message chunks per locale after the build and points each document at its locale's copies with an import map (`variants`). The copies are 49% smaller than the shared chunks, but Kit's modulepreload links name the shared ones, and Chromium and WebKit then fetch both (`preload`): 3,509 KB over its 89 pages, against 2,326 KB without the split.
+
+## Plurals and formatters
+
+Every variant agrees with `Intl.PluralRules` on 0–10,000 and on fractions before it is timed on 0–999 (`plurals`):
+
+| | ro | ru | en | bytes, min+gzip |
+|---|---|---|---|---|
+| Paraglide | 537 ns | 458 ns | 428 ns | |
+| `Intl.PluralRules`, cached | 249 ns | 162 ns | 124 ns | 97 |
+| CLDR rules compiled | 56 ns | 63 ns | 40 ns | 184 |
+| compiled, integer path first | 6.8 ns | 11.4 ns | 3.9 ns | 255 |
+
+A formatter per locale and options formats a number in 207–213 ns and a date in 462–526 ns. Paraglide's cache takes 695–770 ns and 947–1,038 ns, and a new formatter per call 8.3–9.3 µs and 21.7–23.9 µs (`intl`).
+
+## Dev
+
+One message edited in a catalog until the page shows it, through Vite's dev server and Chromium (`hmr`):
+
+| | dev module | edit to page | of which the file watcher |
+|---|---|---|---|
+| app A, whole module re-evaluated | 1.9 MB | 202 ms | 48 ms |
+| app A, patch, Vite's watcher | 1.9 MB | 123 ms | 114 ms |
+| app A, patch, grai's `fs.watch` | 1.9 MB | 16.6 ms | 4.3 ms |
+| app B, whole module re-evaluated | 4.3 MB | 459 ms | 78 ms |
+| app B, patch, grai's `fs.watch` | 4.3 MB | 30.1 ms | 9.8 ms |
+
+Vite's watcher alone takes 48–114 ms to report a save, and `fs.watch` 3–10 ms. With a patch, the browser's part is 2–3 ms whatever the module's size.
+
+## Runtime size
+
+The runtime the apps call (`getLocale`, `setLocale`, `locales`, `baseLocale`, `isLocale`, `localizeHref`, `deLocalizeUrl`), bundled for the browser (`runtime-size`): Paraglide's is 2,132 bytes min+gzip with a cookie strategy and 1,881 with a URL strategy, and a sketch with the locale fixed per bundle is 378.
