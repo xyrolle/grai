@@ -18,6 +18,7 @@ Catalogs are the inlang message format, one JSON file per locale, as Paraglide r
 
 ```json
 {
+	"$schema": "./node_modules/grai/config.schema.json",
 	"locales": ["en", "de"],
 	"baseLocale": "en",
 	"catalogs": "messages/{locale}.json",

@@ -54,7 +54,8 @@
 		"grai": "./dist/cli.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"config.schema.json"
 	],
 	"packageManager": "pnpm@12.15.0",
 	"engines": {

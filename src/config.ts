@@ -60,13 +60,15 @@ export type LocaleSwitch = "reload" | "live";
 /** A place a request can name its locale in. */
 export type Strategy = "cookie" | "preferredLanguage" | "url";
 
-const strategies: ReadonlySet<string> = new Set([
+/** The strategies, in the order the docs and config.schema.json list them. */
+export const strategies: ReadonlySet<string> = new Set([
 	"cookie",
 	"preferredLanguage",
 	"url",
 ]);
 
-const fields = new Set([
+/** The config's fields, which config.schema.json describes. */
+export const configFields: ReadonlySet<string> = new Set([
 	"locales",
 	"baseLocale",
 	"catalogs",
@@ -85,14 +87,17 @@ const localePlaceholder = "{locale}";
 /**
  * Test files as Vitest and Jest name them, Jest's `__tests__` folders, and the project's own
  * `test` and `tests` folders. A test ships nothing. A folder named `tests` deeper down may ship,
- * as a SvelteKit route at `src/routes/tests/` does, so only the root's are tests.
+ * as a SvelteKit route at `src/routes/tests/` does, so only the root's are tests. The default of
+ * `tests`, which config.schema.json gives too.
  */
-const conventionalTests = [
+export const conventionalTests: readonly string[] = [
 	"**/*.{test,spec}.*",
 	"**/__tests__/**",
 	"test/**",
 	"tests/**",
 ];
+/** The field that names the config's JSON schema, for editors; grai does not read it. */
+const schemaField = "$schema";
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
 export function readConfig(file: string): Config {
@@ -102,9 +107,9 @@ export function readConfig(file: string): Config {
 		new GraiError("config-invalid", where, `${detail}.`);
 
 	for (const field of Object.keys(raw)) {
-		if (!fields.has(field)) {
+		if (field !== schemaField && !configFields.has(field)) {
 			throw invalid(
-				`"${field}" is not a config field; the fields are ${[...fields].join(", ")}`,
+				`"${field}" is not a config field; the fields are ${[...configFields].join(", ")}`,
 			);
 		}
 	}
