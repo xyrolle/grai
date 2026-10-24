@@ -7,10 +7,10 @@ import { type CompileResult, compile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import {
-	type ImportFormat,
-	type ImportNotice,
 	importCatalogs,
 	importFormats,
+	reportLines,
+	summaryLine,
 } from "./import.ts";
 import { watch } from "./watch.ts";
 
@@ -100,45 +100,19 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 				"import takes --from i18next or --from icu, and the files or directories to import",
 			);
 		}
-		return imported(config, format, positionals);
+		const result = importCatalogs(
+			config,
+			format,
+			positionals.map((input) => resolve(input)),
+		);
+		for (const line of reportLines(result)) console.log(line);
+		if (result.errors.length > 0) return failed(result.errors);
+		console.log(summaryLine(result));
+		return 0;
 	},
 };
 
 class UsageError extends Error {}
-
-/** Prints the import's report: what it left out and changed, then what it wrote, or its errors. */
-function imported(
-	config: string,
-	format: ImportFormat,
-	inputs: readonly string[],
-): number {
-	const result = importCatalogs(
-		config,
-		format,
-		inputs.map((input) => resolve(input)),
-	);
-	const notice = ({ file, key, locales, detail }: ImportNotice) =>
-		`${file}: "${key}" (${locales.join(", ")}): ${detail}`;
-	for (const left of result.leftOut) console.log(`left out: ${notice(left)}`);
-	// A difference many messages share is said once.
-	for (const [detail, notices] of Map.groupBy(
-		result.changed,
-		(changed) => changed.detail,
-	)) {
-		const [first] = notices;
-		console.log(
-			notices.length === 1 && first !== undefined
-				? `changed: ${notice(first)}`
-				: `changed: ${notices.length} messages, such as "${first?.key}": ${detail}`,
-		);
-	}
-	if (result.errors.length > 0) return failed(result.errors);
-	const leftOut = new Set(result.leftOut.map((notice) => notice.key)).size;
-	console.log(
-		`grai: imported ${result.keys} ${result.keys === 1 ? "key" : "keys"} into ${result.written.join(", ")}${leftOut > 0 ? `, and left ${leftOut} out` : ""}`,
-	);
-	return 0;
-}
 
 /** What a command line gave: each option's value, by name. */
 type Values = Readonly<
