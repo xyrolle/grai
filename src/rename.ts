@@ -1,7 +1,8 @@
 import { join, relative } from "node:path";
 import { type FileUses, type Use, usesIn } from "./call-sites.ts";
 import type { Catalog } from "./catalog.ts";
-import { catalogEntries, withKeyRenamed } from "./catalog-entries.ts";
+import { catalogEntries } from "./catalog-entries.ts";
+import { withKeyRenamed } from "./catalog-text.ts";
 import {
 	type CompileResult,
 	compile,
