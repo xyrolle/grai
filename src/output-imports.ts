@@ -4,7 +4,8 @@ import { pluralName } from "./plurals.ts";
 
 /**
  * The imports a module of keys needs from the output: the runtime functions it names, the
- * `unmatched` the keys' code throws with, and the plural functions of the locales they count in.
+ * `unmatched` the keys' code throws with, the plural functions of the locales they count in, and
+ * the formatters they call.
  */
 export function outputImports(
 	outdir: string,
@@ -13,9 +14,11 @@ export function outputImports(
 ): string {
 	const uses = new Set(functions);
 	const plurals = new Set<string>();
+	const formats = new Set<string>();
 	for (const key of keys) {
 		if (key.uses.has("unmatched")) uses.add("unmatched");
 		for (const locale of key.plurals) plurals.add(pluralName(locale));
+		for (const name of key.formats.keys()) formats.add(name);
 	}
 	const from = (file: string) => JSON.stringify(join(outdir, file));
 	const lines = [
@@ -24,6 +27,11 @@ export function outputImports(
 	if (plurals.size > 0) {
 		lines.push(
 			`import { ${[...plurals].sort().join(", ")} } from ${from("plurals.js")};`,
+		);
+	}
+	if (formats.size > 0) {
+		lines.push(
+			`import { ${[...formats].sort().join(", ")} } from ${from("formats.js")};`,
 		);
 	}
 	return lines.join("\n");

@@ -1,3 +1,4 @@
+import { type Formatter, formatterOf } from "./formats.ts";
 import type { LocaleMessage } from "./message.ts";
 import { type Part, plainText } from "./pattern.ts";
 import { pluralName } from "./plurals.ts";
@@ -7,13 +8,16 @@ import { catchAll, type Selector } from "./selection.ts";
 export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
 
 /**
- * A key compiled: its line in keys.js, the runtime functions and the locales' plural functions it
- * calls, and its parts one locale at a time, for an adapter that writes a module per locale.
+ * A key compiled: its line in keys.js, the runtime functions, the locales' plural functions and the
+ * formatters it calls, and its parts one locale at a time, for an adapter that writes a module per
+ * locale.
  */
 export type KeyModule = {
 	code: string;
 	uses: ReadonlySet<RuntimeFunction>;
 	plurals: ReadonlySet<string>;
+	/** The formatters it calls, by name. */
+	formats: ReadonlyMap<string, Formatter>;
 	/** How the dispatcher holds the key: a string per locale, or a function per locale, with parts. */
 	kind: "text" | "message" | "markup";
 	/** Per locale, in the config's order: a string literal for text, else a function of the inputs. */
@@ -29,7 +33,11 @@ export function keyModule(
 	key: string,
 	messages: readonly LocaleMessage[],
 ): KeyModule {
-	const used: Used = { uses: new Set(), plurals: new Set() };
+	const used: Used = {
+		uses: new Set(),
+		plurals: new Set(),
+		formats: new Map(),
+	};
 	const hasMarkup = messages.some((message) => message.markup);
 	const hasInputs = messages.some((message) => message.inputs.size > 0);
 	if (!hasInputs && !hasMarkup) {
@@ -73,8 +81,15 @@ function keyCode(
 	};
 }
 
-/** What a key's code calls: runtime functions, and the plural functions of locales. */
-type Used = { uses: Set<RuntimeFunction>; plurals: Set<string> };
+/** What a key's code calls: runtime functions, the plural functions of locales, and formatters. */
+type Used = {
+	uses: Set<RuntimeFunction>;
+	plurals: Set<string>;
+	formats: Map<string, Formatter>;
+};
+
+/** The code of an input, or of a local, by its name. */
+type Value = (name: string) => string;
 
 /**
  * One locale's function: its variants as a chain of conditions in the order they are tried. The
@@ -92,9 +107,19 @@ function localeFunction(
 		reads.add(name);
 		return message.plurals.has(name) ? `$${name}` : `i.${name}`;
 	};
+	/** A placeholder's code: its value, through its formatter if it has one. */
+	const placeholder = (part: VariablePart) => {
+		const local = message.formatted.get(part.name);
+		const format = part.format ?? local?.format;
+		const operand = value(local?.input ?? part.name);
+		if (format === undefined) return operand;
+		const formatter = formatterOf(message.locale, format);
+		used.formats.set(formatter.name, formatter);
+		return `${formatter.name}(${operand})`;
+	};
 	const branches = variants.map((variant) => ({
 		condition: conditionCode(variant.keys, message.selectors, value),
-		pattern: patternCode(variant.pattern, mode, value),
+		pattern: patternCode(variant.pattern, mode, placeholder),
 	}));
 	let body = closed
 		? unmatchedCode(key, message, value, used.uses)
@@ -120,7 +145,7 @@ function localeFunction(
 function conditionCode(
 	keys: readonly string[],
 	selectors: readonly Selector[],
-	value: (name: string) => string,
+	value: Value,
 ): string {
 	const tests: string[] = [];
 	keys.forEach((key, index) => {
@@ -139,7 +164,7 @@ function conditionCode(
 function unmatchedCode(
 	key: string,
 	message: LocaleMessage,
-	value: (name: string) => string,
+	value: Value,
 	uses: Set<RuntimeFunction>,
 ): string {
 	uses.add("unmatched");
@@ -152,13 +177,18 @@ function unmatchedCode(
 	return `unmatched(${JSON.stringify(key)}, ${JSON.stringify(message.locale)}, ${JSON.stringify(name)}, ${value(name)})`;
 }
 
+type VariablePart = Extract<Part, { type: "variable" }>;
+
+/** The code of a placeholder, given its part. */
+type Placeholder = (part: VariablePart) => string;
+
 function patternCode(
 	pattern: readonly Part[],
 	mode: Mode,
-	value: (name: string) => string,
+	placeholder: Placeholder,
 ): string {
 	if (mode === "parts") {
-		return `[${pattern.map((part) => partCode(part, value)).join(", ")}]`;
+		return `[${pattern.map((part) => partCode(part, placeholder)).join(", ")}]`;
 	}
 	if (!pattern.some((part) => part.type === "variable")) {
 		return JSON.stringify(plainText(pattern));
@@ -166,17 +196,17 @@ function patternCode(
 	let template = "";
 	for (const part of pattern) {
 		if (part.type === "text") template += templateText(part.value);
-		else if (part.type === "variable") template += `\${${value(part.name)}}`;
+		else if (part.type === "variable") template += `\${${placeholder(part)}}`;
 	}
 	return `\`${template}\``;
 }
 
-function partCode(part: Part, value: (name: string) => string): string {
+function partCode(part: Part, placeholder: Placeholder): string {
 	switch (part.type) {
 		case "text":
 			return `{ type: "text", value: ${JSON.stringify(part.value)} }`;
 		case "variable":
-			return `{ type: "text", value: String(${value(part.name)}) }`;
+			return `{ type: "text", value: String(${placeholder(part)}) }`;
 		default:
 			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: {}, attributes: {} }`;
 	}

@@ -6,6 +6,7 @@ import {
 	shardMap,
 } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
+import { formatModule } from "./formats.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule, pluralName } from "./plurals.ts";
 
@@ -76,6 +77,7 @@ export function renderOutput(
 			["runtime.d.ts", runtimeDeclarations(config)],
 			["server.d.ts", serverDeclarations],
 			["plurals.js", pluralModule(config.locales)],
+			...formatsFile(compilation),
 		],
 		[["runtime.js", runtime.runtime], ...declarations],
 		[["server.js", runtime.server]],
@@ -90,6 +92,15 @@ export function renderOutput(
 		output,
 		rendered: { files: new Map(output.flat()), shards, lines },
 	};
+}
+
+/** formats.js, when a message calls a formatter. */
+function formatsFile(compilation: Compilation): [string, string][] {
+	if (compilation.formatted.size === 0) return [];
+	const formatters = [...compilation.formatted].flatMap((key) => [
+		...(compilation.keys.get(key)?.formats.values() ?? []),
+	]);
+	return [["formats.js", formatModule(formatters)]];
 }
 
 /** Every key in its shard, each shard's keys sorted. */
@@ -119,9 +130,11 @@ function regroup(
 function shardModule(keys: readonly CompiledKey[]): string {
 	const uses = new Set<RuntimeFunction>();
 	const plurals = new Set<string>();
+	const formats = new Set<string>();
 	for (const key of keys) {
 		for (const name of key.uses) uses.add(name);
 		for (const locale of key.plurals) plurals.add(pluralName(locale));
+		for (const name of key.formats.keys()) formats.add(name);
 	}
 	const imports = [
 		`import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n`,
@@ -129,6 +142,11 @@ function shardModule(keys: readonly CompiledKey[]): string {
 	if (plurals.size > 0) {
 		imports.push(
 			`import { ${[...plurals].sort().join(", ")} } from "../plurals.js";\n`,
+		);
+	}
+	if (formats.size > 0) {
+		imports.push(
+			`import { ${[...formats].sort().join(", ")} } from "../formats.js";\n`,
 		);
 	}
 	const code = keys.map((key) => key.code).join("");

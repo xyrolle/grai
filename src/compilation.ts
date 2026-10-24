@@ -21,6 +21,8 @@ export type CompiledKey = Pick<KeyModule, "kind" | "variants" | "parts"> & {
 	uses: ReadonlySet<RuntimeFunction>;
 	/** The locales whose plural function the key's code calls. */
 	plurals: ReadonlySet<string>;
+	/** The formatters the key's code calls, by name. */
+	formats: KeyModule["formats"];
 	markup: boolean;
 };
 
@@ -31,6 +33,8 @@ export type Compilation = {
 	keys: ReadonlyMap<string, CompiledKey>;
 	/** The keys compiled again, added or removed since the previous compilation. */
 	changed: ReadonlySet<string>;
+	/** The keys whose code calls a formatter, so formats.js is written from them alone. */
+	formatted: ReadonlySet<string>;
 	errors: readonly GraiError[];
 };
 
@@ -88,7 +92,14 @@ export function compileCatalogs(
 			if (!candidates.has(key)) changed.add(key);
 		}
 	}
-	return { catalogs, keys, changed, errors: sortErrors(errors) };
+	const formatted = new Set(
+		edited === undefined ? undefined : previous?.formatted,
+	);
+	for (const key of edited === undefined ? keys.keys() : changed) {
+		if ((keys.get(key)?.formats.size ?? 0) > 0) formatted.add(key);
+		else formatted.delete(key);
+	}
+	return { catalogs, keys, changed, formatted, errors: sortErrors(errors) };
 }
 
 /** Compiles one key, or adds why it cannot be to the errors. A key no catalog has any more is undefined. */
@@ -116,6 +127,7 @@ function compileKey(
 		declarationLines: lineCount(declaration),
 		uses: module.uses,
 		plurals: module.plurals,
+		formats: module.formats,
 		kind: module.kind,
 		variants: module.variants,
 		parts: module.parts,

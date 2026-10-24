@@ -1,12 +1,18 @@
+import { type Format, parseFormat } from "./formats.ts";
 import { MessageProblem } from "./problem.ts";
 
-/** A piece of a message's text: words, a placeholder, or markup the app draws. */
+/**
+ * A piece of a message's text: words, a placeholder, or markup the app draws. A placeholder that
+ * calls a formatting function, such as `{count :number}`, has its format.
+ */
 export type Part =
 	| { type: "text"; value: string }
-	| { type: "variable"; name: string }
+	| { type: "variable"; name: string; format?: Format }
 	| { type: "markup-start" | "markup-end" | "markup-standalone"; name: string };
 
 const identifier = /^[A-Za-z_$][\w$]*$/;
+/** A placeholder calling a function, as `{count :number}` or as a declaration writes it, `{count: number}`. */
+const call = /^([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z]\w*)(\s.*)?$/;
 const markupStart = /^#([^\s/=@]+)$/;
 const markupStandalone = /^#([^\s/=@]+)\s*\/$/;
 const markupEnd = /^\/([^\s/=@]+)$/;
@@ -59,10 +65,18 @@ function placeholder(body: string): Part {
 			`the markup {${body}} has options or attributes, which grai does not support yet. Write it as {#name}, {/name} or {#name/}.`,
 		);
 	}
+	const [, name, fn, options = ""] = call.exec(body) ?? [];
+	if (name !== undefined && fn !== undefined) {
+		return {
+			type: "variable",
+			name,
+			format: parseFormat(fn, options, `{${body}}`),
+		};
+	}
 	if (body.includes(":")) {
 		throw new MessageProblem(
 			"unsupported",
-			`the placeholder {${body}} calls a function, which grai does not support yet. Write the value as {name} and format it before the call.`,
+			`the placeholder {${body}} calls a function on something other than an input, which grai does not support. Write it as {name :function}.`,
 		);
 	}
 	throw new MessageProblem(

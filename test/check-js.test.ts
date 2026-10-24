@@ -44,6 +44,8 @@ it.each([
 						},
 					],
 					cart_terms: "Read the {#link}terms{/link}",
+					cart_total: "Total {amount :number style=currency currency=EUR}",
+					cart_shipped: "Shipped {when :date}",
 				},
 				ar: {
 					cart_title: "سلة التسوق",
@@ -70,6 +72,8 @@ it.each([
 						},
 					],
 					cart_terms: "اقرأ {#link}الشروط{/link}",
+					cart_total: "المجموع {amount :number style=currency currency=EUR}",
+					cart_shipped: "شحن {when :date}",
 				},
 			},
 			{ outdir: "src/lib/i18n", ...config },
