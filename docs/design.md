@@ -292,10 +292,32 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   The files are written all or none: each new text goes to a temporary file first, and they are renamed into place once all are written.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 
+## Next.js
+
+Next runs the proxy apart from the render, renders a request's layouts and pages side by side, and renders client components on the server in a module graph of their own. `grai/next` gives each of these the request's locale the way Next lets it, and a message call stays a plain function.
+
+- **The proxy hands the locale over in the path.** `proxy` resolves it by the config's strategy, through the output's `middleware`, and rewrites the request to the same path under `/<locale>`; the pages live under `app/[locale]/`. Next's docs pass data from a proxy by the URL, headers or cookies, and the path is the one that keeps pages static: Next routes the locale as a segment, `generateStaticParams` renders each locale ahead of time, and `next/root-params` reads it anywhere. The URL stays as the strategy has it, so with `url` the base locale has no prefix, and a cookie or `Accept-Language` app has none at all.
+- **A server component reads the locale from React's `cache`, which React keeps for one request's render.** Each page, layout and `generateMetadata` calls `bindLocale(locale)` with its param before any message. Measured in Next 16.4: a page and its `generateMetadata` start before the layout's `await params` returns, and a client navigation renders only the segments that change, so no single place can bind it for the others. A message before the binding throws a `GraiError` saying so, rather than rendering the base locale's words. The cache holds the request's `{ index }` record, which `setLocale` in the render changes in place.
+- **Outside a render, a call names its locale** (`m.saved({}, { locale })`). React keeps no `cache` in server actions or route handlers (measured), and `next/root-params` does not reach them either.
+- **A client component on the server reads the locale from React context.** Next renders client components in a module graph of their own, with no call an app could wrap in a scope, so `LocaleProvider`, in the root layout, gives the request's locale as context, and the dispatcher reads it with `use`. On the server a client component's code runs only while it renders, which is where `use` works. That record is read-only, and `setLocale` there throws: what a client component renders on the server must be what it hydrates with. Interleaved requests keep their own locales, in server and client components alike (`test/next.test.ts`).
+- **In a browser the locale is the page's `<html lang>`, and the page keeps it.** Next keeps the root layout through a client navigation into another locale, since only the param's value changes. Once React has written the new `<html lang>`, `LocaleProvider` switches with `setLocale`, which loads that page: a mounted component, memoized by hand or by the React Compiler, would otherwise keep its old words. A page whose `<html lang>` is not its locale is never reloaded, so that mistake cannot loop.
+- **`withGrai` points `grai/next/output/*` at the outdir in Turbopack and webpack.** grai/next's modules then bind the app's own runtime, one instance per layer Next bundles, and the app writes no glue: the client-side binding has to run in a `"use client"` module, which the app could not hand the runtime to from a server component. next-intl's plugin aliases its request config the same way.
+  - `next build` compiles and fails on any error.
+  - `next dev` compiles only when the output is not current, so Next starts at once, then watches. Next asks for its config twice in one process, and the watch starts once.
+  - Any other command, such as `next start`, bundles nothing, and gets the config as it is.
+- **Per-key paths need nothing from the adapter:** package.json `imports` map them to keys.js in Turbopack, webpack and TypeScript alike.
+- **A server component's messages send no code to the browser,** only the HTML they render. A client component's messages ship as their keys' functions with every locale's variants: one Next build serves every locale, and Next gives an adapter no way to point a page at one locale's chunks. Unused keys are left out by the bundler, so only the keys client code names ship (`docs/runtime.md`).
+- **In dev, Turbopack watches the outdir.** An edit rewrites one shard in about 27 ms, 20 of them waiting for the save to settle, and Next's own refresh takes the rest.
+
+`grai/react`'s `Markup` draws a markup message's `.parts()` with the app's function for each element. It is React's, not Next's, so a React app on Vite uses it too, and it renders in server and client components alike. An element the message names and the app does not draw throws, naming it.
+
 ## Package
 
 - **One package, `grai`.** A project installs one thing, and the adapters version with the compiler they wrap. Subpath exports, each added with its code:
   - `grai`: the compiler's API;
-  - `grai/vite`: the Vite plugin; the SvelteKit and Next adapters come as `grai/sveltekit` and `grai/next`, each thin, each taking the project's generated modules;
+  - `grai/vite`: the Vite plugin; the SvelteKit adapter comes as `grai/sveltekit`, thin, taking the project's generated modules;
+  - `grai/svelte`: the Vite plugin for a Svelte app, whose client build also reads a call without inputs as its string;
+  - `grai/next`, `grai/next/config` and `grai/next/proxy`: the Next adapter, also thin, which finds the project's generated modules through `withGrai`;
+  - `grai/react`: the `Markup` component;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite is an optional peer dependency of `grai/vite`, as each framework will be of its adapter.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next and React are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
