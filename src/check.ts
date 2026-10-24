@@ -80,14 +80,18 @@ function unused(
 	roots: readonly string[],
 ): GraiError {
 	const base = catalogs.find((catalog) => catalog.locale === config.baseLocale);
-	const where = roots
-		.map((root) => relative(config.root, root) || ".")
-		.join(", ");
+	const where = roots.map((root) => shownFrom(config.root, root)).join(", ");
 	return new GraiError(
 		"key-unused",
 		{ file: base?.file ?? "", key },
 		`no source file under ${where} names the key. Remove it from every catalog, or use it.`,
 	);
+}
+
+/** A directory as the project names it: relative to its root, or in full when outside it. */
+function shownFrom(root: string, directory: string): string {
+	const path = relative(root, directory);
+	return path === "" ? "." : path.startsWith("..") ? directory : path;
 }
 
 /** An error for each locale that never reads an input another locale reads. */
