@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { build, createServer } from "vite";
+import { build, createServer, type HotPayload } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import { project } from "./project.ts";
@@ -203,5 +203,112 @@ window.loaded = performance.timeOrigin;
 		await title("Überschrift");
 
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+});
+
+describe("the Vite plugin's dev server, after a compile fails", () => {
+	const broken = (dir: string) =>
+		writeFileSync(join(dir, "messages", "de.json"), '{ "title": "Tit');
+	const fixed = (dir: string, title: string) =>
+		writeFileSync(
+			join(dir, "messages", "de.json"),
+			JSON.stringify({ ...catalogs.de, title }, null, "\t"),
+		);
+
+	/** A dev server of the project, with the payloads it sends its pages, and a browser. */
+	async function devServer(dir: string) {
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><html lang="de"><p id="title"></p><script type="module" src="/main.js"></script>`,
+		);
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.title(); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+import.meta.hot.on("test:ping", () => { window.pinged = true; });
+`,
+		);
+		const sent: string[] = [];
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { port: 0 },
+			plugins: [
+				grai(),
+				{
+					name: "sent",
+					configureServer(vite) {
+						const hot = vite.environments.client.hot;
+						const send = hot.send.bind(hot);
+						hot.send = (payload: HotPayload | string, data?: unknown) => {
+							if (typeof payload === "string") {
+								sent.push(payload);
+								send(payload, data);
+							} else {
+								sent.push(payload.type);
+								send(payload);
+							}
+						};
+					},
+				},
+			],
+		});
+		await server.listen();
+		onTestFinished(() => server.close());
+		const browser = await chromium.launch();
+		onTestFinished(() => browser.close());
+		return { server, sent, browser };
+	}
+
+	it("takes the error down for a page that connects after the fix", async () => {
+		const { dir } = project(catalogs);
+		const { server, sent, browser } = await devServer(dir);
+		await expect
+			.poll(() => existsSync(join(dir, "out", "messages.js")))
+			.toBe(true);
+		broken(dir);
+		await expect.poll(() => sent.includes("error")).toBe(true);
+		const errors = sent.length;
+		fixed(dir, "Überschrift");
+		await expect.poll(() => sent.length > errors).toBe(true);
+
+		const page = await browser.newPage();
+		await page.goto(server.resolvedUrls?.local[0] ?? "");
+		// Pages get their payloads in order: once a ping has come, an error kept for the page has too.
+		await expect
+			.poll(async () => {
+				server.ws.send("test:ping");
+				return await page.evaluate("window.pinged === true").catch(() => false);
+			})
+			.toBe(true);
+
+		expect(
+			await page.evaluate(
+				`[document.getElementById("title").textContent, document.querySelector("vite-error-overlay") === null]`,
+			),
+		).toEqual(["Überschrift", true]);
+	});
+
+	it("takes the error down from an open page", async () => {
+		const { dir } = project(catalogs);
+		const { server, browser } = await devServer(dir);
+		const page = await browser.newPage();
+		await page.goto(server.resolvedUrls?.local[0] ?? "");
+		await page.waitForFunction(
+			`document.getElementById("title").textContent === "Titel"`,
+		);
+		broken(dir);
+		await page.waitForFunction(
+			`document.querySelector("vite-error-overlay") !== null`,
+		);
+
+		fixed(dir, "Überschrift");
+
+		await page.waitForFunction(
+			`document.querySelector("vite-error-overlay") === null && document.getElementById("title").textContent === "Überschrift"`,
+		);
 	});
 });

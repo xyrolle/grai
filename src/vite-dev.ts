@@ -17,7 +17,7 @@ export const patchPrefix = "grai:patch/";
 /**
  * The dev server's side: compiles when the server starts and whenever the config or a catalog
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
- * failed, which the page shows in Vite's overlay. After an edit, the page gets a patch of the
+ * failed, which the page shows in Vite's overlay until a build succeeds. After an edit, the page gets a patch of the
  * changed keys; a key added or removed, or a change of locales, reloads it. The server's other
  * environments take the messages again, so the next server render has the new words. `close`
  * stops following once the compile under way has finished.
@@ -65,12 +65,25 @@ export function serveMessages(
 	};
 
 	/** Shows what went wrong in the server's log and the page's overlay. */
+	let showing = false;
 	const shown = (message: string, stack = "") => {
 		server.config.logger.error(`grai: ${message}`);
 		client.hot.send({
 			type: "error",
 			err: { message, stack, plugin: "grai" },
 		});
+		showing = true;
+	};
+	/**
+	 * Takes an error shown before down, from the open pages and from the page that connects next:
+	 * Vite's client takes its overlay down on an update, and while no page is open Vite's server
+	 * keeps the last error, or reload, for the next page to connect.
+	 */
+	const cleared = () => {
+		if (!showing) return;
+		showing = false;
+		client.hot.send({ type: "update", updates: [] });
+		if (server.ws.clients.size === 0) client.hot.send({ type: "full-reload" });
 	};
 	/** A compile or an update that threw, as when the outdir cannot be written. */
 	const failed = (error: unknown) =>
@@ -89,6 +102,7 @@ export function serveMessages(
 			const before = previous;
 			previous = next;
 			compiled(next);
+			cleared();
 			if (before !== undefined) update(before, next).catch(failed);
 		},
 		failed,
