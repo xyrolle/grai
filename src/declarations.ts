@@ -155,14 +155,17 @@ export declare class GraiError extends Error {
 	readonly code: string;
 }
 export type MessageOptions = { locale?: Locale };
-/** A run of a message's text, or a piece of its markup, as \`.parts()\` gives them. */
+/**
+ * A run of a message's text, or a piece of its markup, as \`.parts()\` gives them: each option's
+ * value, and each attribute's, true for one without a value.
+ */
 export type MessagePart =
 	| { type: "text"; value: string }
 	| {
 			type: "markup-start" | "markup-end" | "markup-standalone";
 			name: string;
-			options: Record<string, never>;
-			attributes: Record<string, never>;
+			options: Readonly<Record<string, unknown>>;
+			attributes: Readonly<Record<string, string | true>>;
 	  };
 type Call<Inputs, Result> = {} extends Inputs
 	? (inputs?: Inputs, options?: MessageOptions) => Result
