@@ -143,7 +143,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
-  - selecting on a formatted value;
+  - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:percent`, `:currency` and `:unit` (`:number style=percent` and `style=currency` work);
   - markup options and attributes;
   - nested keys in a catalog, which `grai import` flattens.

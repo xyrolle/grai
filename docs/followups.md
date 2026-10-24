@@ -26,10 +26,10 @@ The Vite plugin's server build writes each message function as a function expres
 
 Done when: such a server loads function expressions while the browser keeps arrows, and `startup`'s row for the compiler's output shows the gain.
 
-## Support number selection, more functions and markup options
+## Support more functions, number selection with digit options, and markup options
 
 These are compile errors today:
-- selecting on a `:number` local, which MessageFormat 2 does by plural category after an exact match;
+- selecting on a `:number` local whose options change its digits (`maximumFractionDigits`, significant digits, rounding, `notation`, `style`), which MessageFormat 2 selects on by the number those digits show;
 - `:percent`, `:currency` and `:unit`;
 - markup options and attributes.
 
