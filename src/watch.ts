@@ -8,9 +8,10 @@ import { GraiError } from "./error.ts";
  * Compiles, then compiles again whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. Changes that come during a compile are taken together by the next one. Each result
- * is reported with how long the compile took, and with its build when it succeeded. It watches
- * until the process ends or `close` is called, whose promise settles once the compile under way,
- * if any, has finished, so the project can then be removed.
+ * is reported with how long the compile took, and with its build when it succeeded; a compile
+ * that throws, as when the outdir cannot be written, goes to `failed`, and the next change
+ * compiles again. It watches until the process ends or `close` is called, whose promise settles
+ * once the compile under way, if any, has finished, so the project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -19,6 +20,7 @@ export function watch(
 		milliseconds: number,
 		build: Build | undefined,
 	) => void,
+	failed: (error: unknown) => void,
 ): { close: () => Promise<void> } {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
@@ -44,11 +46,16 @@ export function watch(
 	const compileChanges = async () => {
 		do {
 			again = false;
-			follow();
 			const started = performance.now();
-			const next = await recompile(configFile, build);
-			build = next.build ?? build;
-			if (!closed) report(next.result, performance.now() - started, next.build);
+			try {
+				follow();
+				const next = await recompile(configFile, build);
+				build = next.build ?? build;
+				if (!closed)
+					report(next.result, performance.now() - started, next.build);
+			} catch (error) {
+				failed(error);
+			}
 		} while (again && !closed);
 	};
 
