@@ -10,8 +10,16 @@ export type Position = readonly [line: number, column: number];
  * Where each top-level key of a catalog starts, at the first character of its name. A catalog laid
  * out one entry per line has each key at the start of a line, after the first key's indent; in a
  * catalog on one line, each key is found where its name is first written.
+ *
+ * `keys` are the catalog's keys as its parse holds them, mostly in the file's order. A key found
+ * where the next of them is expected is stored under the parse's string, not a slice of the text:
+ * the parse's strings are interned, so a lookup by a compiled key compares them in one step, where
+ * comparing a slice reads it from the text and took most of the time the maps took.
  */
-export function keyPositions(text: string): Map<string, Position> {
+export function keyPositions(
+	text: string,
+	keys: Iterable<string> = [],
+): Map<string, Position> {
 	const positions = new Map<string, Position>();
 	const indent = /^\{\r?\n([ \t]*)"/.exec(text)?.[1];
 	if (indent === undefined) {
@@ -22,19 +30,33 @@ export function keyPositions(text: string): Map<string, Position> {
 		return positions;
 	}
 	const start = `${indent}"`;
+	const parsed = keys[Symbol.iterator]();
+	let expected = parsed.next();
 	let line = 0;
 	for (let from = 0; from < text.length; line++) {
 		const end = text.indexOf("\n", from);
 		const next = end === -1 ? text.length : end + 1;
 		if (text.startsWith(start, from)) {
 			const name = from + start.length;
-			const key = text.slice(name, text.indexOf('"', name));
+			let key: string;
+			if (
+				expected.done !== true &&
+				text.startsWith(expected.value, name) &&
+				text.charCodeAt(name + expected.value.length) === quote
+			) {
+				key = expected.value;
+				expected = parsed.next();
+			} else {
+				key = text.slice(name, text.indexOf('"', name));
+			}
 			if (!positions.has(key)) positions.set(key, [line, start.length]);
 		}
 		from = next;
 	}
 	return positions;
 }
+
+const quote = 34;
 
 /**
  * The declaration map of a shard's `.d.ts`: each declaration's name, at `column` of its line, to
