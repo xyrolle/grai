@@ -14,11 +14,17 @@ A production page holds only its locale's words, and `setLocale(locale, { reload
 
 Done when: `bench/` measures the load-then-switch option on app A, the design records one option as a decision, and a browser test shows that a production build and dev switch the same way.
 
-## Measure plural rules and the bound locale
+## Bind the locale, and index the variant directly
 
-`plural` uses one `Intl.PluralRules` per locale, and a message call on the server reads the request's locale from `AsyncLocalStorage`. Neither is measured yet against its alternative: compiled CLDR rules, and a strategy lookup per call.
+A message call renders in `options.locale ?? baseLocale`, and finds its variant with `locales.indexOf` on every call. The runtime lane's measured design binds the locale once (per request on the server, per page in the browser) and keeps its index.
 
-Done when: `bench/` has both comparisons on an SSR page that renders thousands of messages, and the runtime keeps whichever is faster for its bytes.
+Done when: the runtime binds the locale through the adapters, a call indexes its variant without a search, and a test renders two interleaved requests in different locales.
+
+## Plural rules compiled from CLDR
+
+`plural` uses one `Intl.PluralRules` per locale, measured at 157–243 ns a call against 5.6–6.9 ns for rules compiled from CLDR.
+
+Done when: the runtime lane's compiled rules have landed and `plural` uses them, with a test across each locale's categories.
 
 ## Support MessageFormat 2's formatting functions
 
