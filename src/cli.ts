@@ -22,7 +22,7 @@ const usage = `Usage: grai <command> [--config <file>]
                                keys no source file names, inputs the locales do not agree on
   add <key> --<locale> <text>  with a text for each locale: add the key to every catalog,
                                then compile
-  import --from i18next <file or dir>...
+  import --from i18next|icu <file or dir>...
                                convert another library's catalogs into new grai catalogs, and
                                report each message left out or rendered differently
 
@@ -97,7 +97,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 		const format = importFormats.find((name) => name === values.from);
 		if (format === undefined || positionals.length === 0) {
 			throw new UsageError(
-				"import takes --from i18next, and the files or directories to import",
+				"import takes --from i18next or --from icu, and the files or directories to import",
 			);
 		}
 		return imported(config, format, positionals);

@@ -208,3 +208,97 @@ describe("grai import --from i18next", () => {
 		).toEqual(["catalog-exists", "catalog-exists"]);
 	});
 });
+
+describe("grai import --from icu", () => {
+	it("converts plural with # and =0, select, and choices nested and in sequence", async () => {
+		const m = await imported("icu", {
+			"en.json": {
+				items: "{n, plural, =0 {No items} one {# item} other {# items}}",
+				owner:
+					"{g, select, male {He} other {They}} found {n, plural, one {# cat} other {# cats}}.",
+				nested:
+					"{g, select, male {{n, plural, one {his cat} other {his # cats}}} other {their cats}}",
+			},
+			"ru.json": {
+				items:
+					"{n, plural, =0 {Нет} one {# товар} few {# товара} other {# товаров}}",
+				owner:
+					"{g, select, male {Он} other {Они}}: {n, plural, one {# кот} other {# котов}}.",
+				nested:
+					"{g, select, male {{n, plural, one {его кот} other {его коты: #}}} other {их коты}}",
+			},
+		}).load();
+
+		expect(counts((n) => m.items?.({ n }))).toEqual([
+			"No items",
+			"1 item",
+			"2 items",
+			"5 items",
+			"21 items",
+		]);
+		expect(counts((n) => m.items?.({ n }, { locale: "ru" }))).toEqual([
+			"Нет",
+			"1 товар",
+			"2 товара",
+			"5 товаров",
+			"21 товар",
+		]);
+		expect(m.owner?.({ g: "female", n: 2 })).toBe("They found 2 cats.");
+		expect(m.nested?.({ g: "male", n: 3 })).toBe("his 3 cats");
+		expect(m.nested?.({ g: "x", n: 3 }, { locale: "ru" })).toBe("их коты");
+	});
+
+	it("turns tags into markup and reads ICU's apostrophes", async () => {
+		const m = await imported(
+			"icu",
+			{
+				"en.json": {
+					bold: "Hi <b>{name}</b>, it's '{literal}' and ''quoted''",
+				},
+			},
+			["en"],
+		).load();
+
+		expect(m.bold?.parts?.({ name: "Ana" })).toEqual([
+			{ type: "text", value: "Hi " },
+			{ type: "markup-start", name: "b", options: {}, attributes: {} },
+			{ type: "text", value: "Ana" },
+			{ type: "markup-end", name: "b", options: {}, attributes: {} },
+			{ type: "text", value: ", it's {literal} and 'quoted'" },
+		]);
+	});
+
+	it("leaves out formatted arguments, ordinals and offsets, and reports how # renders", () => {
+		const { result } = imported(
+			"icu",
+			{
+				"en.json": {
+					price: "{value, number, ::currency/EUR}",
+					day: "{d, date, short}",
+					rank: "{n, selectordinal, one {#st} other {#th}}",
+					others: "{n, plural, offset:1 other {# others}}",
+					items: "{n, plural, one {# item} other {# items}}",
+				},
+			},
+			["en"],
+		);
+
+		expect(
+			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
+		).toEqual([
+			"price: {value, number} formats the value as :number, which grai does not support yet. Format it before the call and pass the text as {value}.",
+			"day: {d, date} formats the value as :datetime, which grai does not support yet. Format it before the call and pass the text as {d}.",
+			"rank: {n, selectordinal} picks an ordinal form, which grai does not support yet.",
+			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
+		]);
+		expect(result.changed).toEqual([
+			{
+				file: "source/en.json",
+				key: "items",
+				locales: ["en"],
+				detail:
+					"# shows the count as written (1000), where ICU formats it for the locale (1,000).",
+			},
+		]);
+	});
+});
