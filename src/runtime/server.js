@@ -3,9 +3,9 @@
 // Workers too, by default from compatibility date 2026-08-04, else with the nodejs_als flag.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { baseLocale, cookieName, locales, strategy } from "./config.js";
-import { bindRequests, extractLocaleFromUrl } from "./runtime.js";
+import { bindRequests, extractLocaleFromUrl } from "./dispatch.js";
 
-/** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
+/** @type {AsyncLocalStorage<import("./dispatch.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
