@@ -37,3 +37,9 @@ Done when: a local branch of each reference app on grai passes its own checks an
 `docs/design.md` says a per-key path to a key that does not exist resolves, in dev, to a module whose export throws a `GraiError` naming the key, with the key in the overlay. The Vite plugin does not yet: such an import fails when the page links its modules.
 
 Done when: the Vite plugin serves that module and reports the key, with a test that a page importing a missing key loads and throws the `GraiError` only when the message is called.
+
+## Import what `grai import` leaves out
+
+It leaves out ICU's `number`, `date` and `time` arguments and i18next's formats, which wait for MessageFormat 2's functions above, and ordinals (`selectordinal`, i18next's `_ordinal_`), which need an ordinal plural selector. Its `#` shows a count unformatted, which `:number` would fix. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+
+Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
