@@ -5,12 +5,13 @@
 
 import { mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
-import { type Catalog, readCatalogSources } from "./catalog.ts";
-import { appendMessages } from "./catalog-file.ts";
-import { type CompileResult, compile, parseCatalogs } from "./compile.ts";
-import { type Config, isRecord, readConfig } from "./config.ts";
+import type { Catalog } from "./catalog.ts";
+import { writeMessages } from "./catalog-file.ts";
+import { type CompileResult, compile } from "./compile.ts";
+import { isRecord } from "./config.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError } from "./error.ts";
+import { readLocaleCatalogs } from "./locale-catalogs.ts";
 import { parseMessage } from "./message.ts";
 import { parseDeclarations } from "./message-declarations.ts";
 import { categoriesOf } from "./plurals.ts";
@@ -136,57 +137,26 @@ export async function seed(
 	configFile: string,
 	locale: string,
 ): Promise<Seeded | { errors: GraiError[] }> {
-	let config: Config;
-	try {
-		config = readConfig(configFile);
-	} catch (error) {
-		if (error instanceof GraiError) return { errors: [error] };
-		throw error;
-	}
-	const path = config.catalogs.get(locale);
-	if (path === undefined || locale === config.baseLocale) {
-		const others = config.locales.filter(
-			(other) => other !== config.baseLocale,
-		);
-		const where = { file: relative(config.root, configFile) };
-		const detail = `"${locale}" is not a locale to seed. Seed one of ${others.join(", ")}, from the base locale ${config.baseLocale}.`;
-		return { errors: [new GraiError("config-invalid", where, detail)] };
-	}
-	// The locale's catalog may not exist yet, or hold nothing: that is what seeding is for.
-	const absent = (error: GraiError) =>
-		(error.code === "catalog-missing" || error.code === "catalog-empty") &&
-		error.locale === locale;
-	const read = await readCatalogSources(config);
-	const parsed = parseCatalogs(read.sources);
-	const errors = [...read.errors, ...parsed.errors].filter(
-		(error) => !absent(error),
-	);
-	if (errors.length > 0) return { errors };
-	const base = parsed.catalogs.find(
-		(catalog) => catalog.locale === config.baseLocale,
-	);
-	const target = parsed.catalogs.find((catalog) => catalog.locale === locale);
+	const read = await readLocaleCatalogs(configFile, locale, "seed");
+	if ("errors" in read) return read;
+	const { config, path, base, target } = read;
 	const seeded: [string, unknown][] = [];
 	const problems: GraiError[] = [];
-	for (const [key, value] of base?.messages ?? []) {
+	for (const [key, value] of base.messages) {
 		if (target?.messages.has(key)) continue;
 		try {
 			parseMessage(config.baseLocale, value);
 			seeded.push([key, seedValue(value, locale)]);
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
-			const where = { file: base?.file ?? "", key, locale: config.baseLocale };
+			const where = { file: base.file, key, locale: config.baseLocale };
 			problems.push(new GraiError(error.code, where, error.message));
 		}
 	}
 	if (problems.length > 0) return { errors: problems };
 	if (seeded.length > 0) {
 		mkdirSync(dirname(path), { recursive: true });
-		appendMessages(
-			path,
-			seeded,
-			config.catalogs.get(config.baseLocale) ?? path,
-		);
+		writeMessages(path, seeded, config.catalogs.get(config.baseLocale) ?? path);
 	}
 	return {
 		file: relative(config.root, path),

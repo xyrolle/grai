@@ -4,11 +4,12 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { isRecord } from "./config.ts";
 
 /**
- * Adds messages at the end of a catalog, through a temporary file renamed into place, keeping the
- * catalog's indent and its final line break. A catalog that does not exist yet is written in the
- * layout of `like`, another catalog of the project, with its `$schema`.
+ * Sets messages in a catalog, through a temporary file renamed into place, keeping the catalog's
+ * indent and its final line break: a key it has keeps its place, and a new one goes at the end. A
+ * catalog that does not exist yet is written in the layout of `like`, another catalog of the
+ * project, with its `$schema`.
  */
-export function appendMessages(
+export function writeMessages(
 	path: string,
 	messages: Iterable<readonly [string, unknown]>,
 	like: string,
