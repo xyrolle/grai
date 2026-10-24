@@ -1,5 +1,11 @@
 import { execFile, spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -152,6 +158,39 @@ describe("grai add", () => {
 		]);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(before);
 		expect(existsSync(join(dir, "out"))).toBe(false);
+	});
+});
+
+describe("grai import", () => {
+	it("prints what it left out, then what it wrote, and needs --from", async () => {
+		const { dir } = project({ en: {}, de: {} });
+		rmSync(join(dir, "messages"), { recursive: true });
+		mkdirSync(join(dir, "i18n"));
+		writeFileSync(
+			join(dir, "i18n", "en.json"),
+			JSON.stringify({ cart: { title: "Cart" }, price: "{{p, number}}" }),
+		);
+		writeFileSync(
+			join(dir, "i18n", "de.json"),
+			JSON.stringify({ cart: { title: "Warenkorb" }, price: "{{p, number}}" }),
+		);
+
+		expect((await grai(dir, "import", "i18n")).code).toBe(2);
+		expect(
+			(await grai(dir, "import", "--from", "i18next", "i18n")).stdout,
+		).toBe(
+			[
+				'left out: i18n/en.json: "price" (en, de): {{p, number}} formats the value, which grai does not support yet. Format it before the call and pass the text.',
+				"grai: imported 1 key into messages/en.json, messages/de.json, and left 1 out",
+				"",
+			].join("\n"),
+		);
+		expect(
+			JSON.parse(readFileSync(join(dir, "messages", "de.json"), "utf8")),
+		).toEqual({
+			$schema: "https://inlang.com/schema/inlang-message-format",
+			cart_title: "Warenkorb",
+		});
 	});
 });
 
