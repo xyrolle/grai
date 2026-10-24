@@ -1,0 +1,22 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"language_name": "English",
+	"home_link": "Home",
+	"about_link": "About",
+	"greeting": "Hello",
+	"about_title": "About this example",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} item in your cart",
+				"countPlural=*": "{count} items in your cart"
+			}
+		}
+	],
+	"cart_add": "Add an item",
+	"drawn_by_svelte": "Drawn by Svelte in the browser",
+	"welcome": "Welcome, {name}!",
+	"drawn_by_react": "Drawn by React in the browser"
+}
