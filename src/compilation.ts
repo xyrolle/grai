@@ -16,8 +16,10 @@ import { MessageProblem } from "./problem.ts";
  */
 export type CompiledKey = Pick<
 	KeyModule,
-	"code" | "serverCode" | "kind" | "variants" | "parts"
+	"value" | "serverValue" | "kind" | "variants" | "parts"
 > & {
+	/** The key's name, which its module exports it under. */
+	name: string;
 	values: readonly unknown[];
 	declaration: string;
 	/** The lines the declaration takes, for the declaration maps. */
@@ -27,6 +29,8 @@ export type CompiledKey = Pick<
 	plurals: ReadonlySet<string>;
 	/** The formatters the key's code calls, by name. */
 	formats: KeyModule["formats"];
+	/** The globals the key's code calls, such as `String`. */
+	globals: KeyModule["globals"];
 	markup: boolean;
 };
 
@@ -133,14 +137,16 @@ function compileKey(
 	const module = keyModule(key, messages);
 	const declaration = keyDeclaration(key, messages, base?.messages.get(key));
 	return {
+		name: key,
 		values,
-		code: module.code,
-		serverCode: module.serverCode,
+		value: module.value,
+		serverValue: module.serverValue,
 		declaration,
 		declarationLines: lineCount(declaration),
 		uses: module.uses,
 		plurals: module.plurals,
 		formats: module.formats,
+		globals: module.globals,
 		kind: module.kind,
 		variants: module.variants,
 		parts: module.parts,

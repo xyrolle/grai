@@ -1,5 +1,5 @@
 import { type Formatter, formatterOf } from "./formatters.ts";
-import { localeReads } from "./locale-reads.ts";
+import { globalCalled, localeReads } from "./locale-reads.ts";
 import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
@@ -8,11 +8,12 @@ import { catchAll } from "./selection.ts";
 
 type Mode = "string" | "parts";
 
-/** What a key's code calls: runtime functions, plurals.js's functions and formatters, by name. */
+/** What a key's code calls: runtime functions, plurals.js's functions, formatters and globals, by name. */
 export type Used = {
 	uses: Set<RuntimeFunction>;
 	plurals: Set<string>;
 	formats: Map<string, Formatter>;
+	globals: Set<string>;
 };
 
 /** The code of an input, or of a local, by its name. */
@@ -62,7 +63,7 @@ export function localeFunction(
 	used: Used,
 ): LocaleFunction {
 	const { variants, closed } = message;
-	const { value, condition, prologue } = localeReads(message, used.plurals);
+	const { value, condition, prologue } = localeReads(message, used);
 	/** A placeholder's code: its value, through its formatter if it has one, with the option an input gives. */
 	const placeholder = (part: VariablePart) => {
 		const local = message.formatted.get(part.name);
@@ -77,7 +78,7 @@ export function localeFunction(
 	};
 	const branches = variants.map((variant) => ({
 		condition: condition(variant.keys),
-		pattern: patternCode(variant.pattern, mode, placeholder),
+		pattern: patternCode(variant.pattern, mode, placeholder, used.globals),
 	}));
 	let body = closed
 		? unmatchedCode(key, message, value, used.uses)
@@ -114,9 +115,10 @@ function patternCode(
 	pattern: readonly Part[],
 	mode: Mode,
 	placeholder: Placeholder,
+	globals: Set<string>,
 ): string {
 	if (mode === "parts") {
-		return `[${pattern.map((part) => partCode(part, placeholder)).join(", ")}]`;
+		return `[${pattern.map((part) => partCode(part, placeholder, globals)).join(", ")}]`;
 	}
 	if (!pattern.some((part) => part.type === "variable")) {
 		return JSON.stringify(plainText(pattern));
@@ -129,12 +131,16 @@ function patternCode(
 	return `\`${template}\``;
 }
 
-function partCode(part: Part, placeholder: Placeholder): string {
+function partCode(
+	part: Part,
+	placeholder: Placeholder,
+	globals: Set<string>,
+): string {
 	switch (part.type) {
 		case "text":
 			return `{ type: "text", value: ${JSON.stringify(part.value)} }`;
 		case "variable":
-			return `{ type: "text", value: String(${placeholder(part)}) }`;
+			return `{ type: "text", value: ${globalCalled("String", globals)}(${placeholder(part)}) }`;
 		default:
 			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${JSON.stringify(Object.fromEntries(part.attributes))} }`;
 	}

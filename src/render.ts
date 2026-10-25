@@ -7,7 +7,8 @@ import {
 } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import { formatModule } from "./formatters.ts";
-import type { RuntimeFunction } from "./modules.ts";
+import { keyExports } from "./key-exports.ts";
+import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import { pluralModule } from "./plurals.ts";
 
 /** The output's files, level by level: a file imports only files of earlier levels. */
@@ -128,29 +129,8 @@ function regroup(
 }
 
 function shardModule(keys: readonly CompiledKey[]): string {
-	const uses = new Set<RuntimeFunction>();
-	const plurals = new Set<string>();
-	const formats = new Set<string>();
-	for (const key of keys) {
-		for (const name of key.uses) uses.add(name);
-		for (const name of key.plurals) plurals.add(name);
-		for (const name of key.formats.keys()) formats.add(name);
-	}
-	const imports = [
-		`import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n`,
-	];
-	if (plurals.size > 0) {
-		imports.push(
-			`import { ${[...plurals].sort().join(", ")} } from "../plurals.js";\n`,
-		);
-	}
-	if (formats.size > 0) {
-		imports.push(
-			`import { ${[...formats].sort().join(", ")} } from "../formats.js";\n`,
-		);
-	}
-	const code = keys.map((key) => key.code).join("");
-	return `${imports.join("")}\n${code}`;
+	const names = calledNames(keys);
+	return `${outputImports(names, (file) => `"../${file}"`)}\n\n${keyExports(keys, everyName(names))}`;
 }
 
 /** A shard's module and declarations, and the line each declaration is on. */

@@ -21,10 +21,22 @@ export type LocaleReads = {
 	prologue: () => { parameter: string; declarations: string };
 };
 
-/** The reads of a message's function, adding the functions of plurals.js they call to `plurals`. */
+/**
+ * A global the code calls, such as `String`, by its name, added to the globals the key's code
+ * calls: a module binds no key under such a name.
+ */
+export function globalCalled(name: string, globals: Set<string>): string {
+	globals.add(name);
+	return name;
+}
+
+/**
+ * The reads of a message's function, adding the functions of plurals.js they call to `plurals`,
+ * and the globals they call to `globals`.
+ */
 export function localeReads(
 	message: LocaleMessage,
-	plurals: Set<string>,
+	{ plurals, globals }: { plurals: Set<string>; globals: Set<string> },
 ): LocaleReads {
 	const { locale, selectors } = message;
 	const reads = new Set<string>();
@@ -48,7 +60,7 @@ export function localeReads(
 			case "plural":
 				return `${value(selector.name)} === ${literal}`;
 			case "input":
-				return `String(${value(selector.name)}) === ${literal}`;
+				return `${globalCalled("String", globals)}(${value(selector.name)}) === ${literal}`;
 			case "number":
 				if (isExactKey(key)) return `${value(selector.name)} === ${key}`;
 				value(selector.name);
@@ -76,7 +88,7 @@ export function localeReads(
 			if (selector.kind !== "number" || !reads.has(selector.name)) return [];
 			const reader =
 				selector.number === "number"
-					? "Number"
+					? globalCalled("Number", globals)
 					: called(numberReaders[selector.number]);
 			const consts = [
 				`const $${selector.name} = ${reader}(${value(selector.input)}); `,

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { type EnvironmentOptions, minifySync } from "vite";
 import type { Build } from "./compile.ts";
+import { keyExports } from "./key-exports.ts";
 import {
 	besideDirectory,
 	inDirectory,
@@ -13,7 +14,12 @@ import {
 	messageOnly,
 	textModulePrefix,
 } from "./locale-chunks.ts";
-import { outputImports } from "./output-imports.ts";
+import {
+	calledNames,
+	everyName,
+	inOutdir,
+	outputImports,
+} from "./output-imports.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
 export function keysModule(build: Build): string {
@@ -24,7 +30,7 @@ export function keysModule(build: Build): string {
 
 /**
  * A key's module in a build, from the compiler's model, or nothing for an id that is no key's: the
- * key's code for the browser, or its code for a server.
+ * key's value for the browser, or for a server, exported under the key.
  */
 export function keyModule(
 	outdir: string,
@@ -32,10 +38,12 @@ export function keyModule(
 	id: string,
 	consumer: "client" | "server",
 ): string | undefined {
-	const key = build.compilation.keys.get(id.slice(keyModulePrefix.length));
+	const name = id.slice(keyModulePrefix.length);
+	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
-	const code = consumer === "server" ? key.serverCode : key.code;
-	return `${outputImports(outdir, [key], key.uses)}\n${code}`;
+	const names = calledNames([key]);
+	const value = consumer === "server" ? key.serverValue : key.value;
+	return `${outputImports(names, inOutdir(outdir))}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 
 /**
@@ -50,7 +58,9 @@ export function textModule(
 	const name = id.slice(textModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key?.kind !== "text") return undefined;
-	return `${outputImports(outdir, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
+	const names = calledNames([key], ["pageText"]);
+	const value = `/*#__PURE__*/ pageText(${key.variants.join(", ")})`;
+	return `${outputImports(names, inOutdir(outdir))}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 
 /**
