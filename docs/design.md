@@ -109,7 +109,8 @@ They come through an import map, which keeps the framework's single client build
 - **Inlining the text into the template would close the rest,** for a copy per locale of every component chunk with such a text; whether that pays is open (`docs/followups.md`).
 - **The string modules go into the message chunks, and into their copies per locale,** like the keys, so a page still loads only its locale's words.
 - **A call is rewritten only where it is certain to be grai's.** Names are followed to keys.js through the app's own re-exports, as the bundler binds them. A component that declares one of those names again, as an `{#each}` item or a parameter, is left as it is, and so are calls with arguments (a forced locale among them), markup, values and dynamic keys.
-- **The server build and dev keep every call:** a server renders each request in its own locale, and dev patches a message's function in place. So does `"switch": "live"`, whose page re-renders in another locale.
+- **The server build reads the same calls as a property:** `.text` of the key's text module, whose getter calls the key in the request's locale. Under `experimental.async`, Svelte takes a call made after a component's `await` as writing whatever it touches, and every later read of the namespace as waiting on that await. A call kept on the server then compiles into blocks of its own that the client's string lacks, and Svelte draws the page again instead of hydrating it. A property read waits on nothing, as the string does, so both sides compile the same blocks.
+- **Dev keeps every call,** since it patches a message's function in place, and so does `"switch": "live"`, whose page re-renders in another locale.
 - **The plugin reads each component after Svelte's preprocessors and before its compile,** so `grai()` is listed before `sveltekit()`. Listed after, the build fails and says so.
 
 ### Switching locale on the client: a choice
