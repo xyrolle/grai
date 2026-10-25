@@ -5,20 +5,25 @@
  */
 
 import { isRecord } from "./config.ts";
+import type { Descriptions } from "./descriptions.ts";
 import { type Piece, patternPieces, piecesPattern } from "./pattern-pieces.ts";
 import { MessageProblem } from "./problem.ts";
 import type { ReturnedPiece, ReturnedUnit } from "./returned-units.ts";
 import type { Unit } from "./translation-units.ts";
 
-/** A locale's units as a JSON document. */
+/** A locale's units as a JSON document, each with its key's description, if it has one. */
 export function writeUnitsJson(
 	srcLang: string,
 	trgLang: string,
 	units: readonly Unit[],
+	descriptions: Descriptions,
 ): string {
 	const written = units.map((unit) => ({
 		id: unit.id,
 		key: unit.key,
+		...(descriptions.has(unit.key) && {
+			description: descriptions.get(unit.key),
+		}),
 		...(unit.variant.length > 0 && {
 			variant: Object.fromEntries(unit.variant),
 		}),
