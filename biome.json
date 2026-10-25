@@ -13,6 +13,19 @@
 	},
 	"overrides": [
 		{
+			"includes": [
+				"src/nuxt/**",
+				"src/vue/**",
+				"examples/vue/**",
+				"examples/nuxt/**"
+			],
+			"linter": {
+				"domains": {
+					"react": "none"
+				}
+			}
+		},
+		{
 			"includes": ["examples/nuxt/app/pages/**"],
 			"linter": {
 				"rules": {
