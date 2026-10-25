@@ -221,7 +221,7 @@ The locale is resolved once per request on the server, or once per page on the c
 
 - **On the server, `server.js`'s middleware resolves the locale and binds it** to the request through `AsyncLocalStorage`. Its strategies:
   - `cookie`;
-  - `preferredLanguage` (`Accept-Language`): its ranges by weight, as RFC 9110 reads them. A malformed range or weight (`q=2`, `de_DE`) is left out, and `q` is read in any case. `q=0` refuses every locale its range names (`en;q=0` refuses `en` and `en-GB`), and `*` takes any locale no other range names, the base locale first;
+  - `preferredLanguage` (`Accept-Language`): its ranges by weight, as RFC 9110 reads them. A malformed range or weight (`q=2`, `de_DE`) is left out, and `q` is read in any case. `q=0` refuses every locale its range names (`en;q=0` refuses `en` and `en-GB`), and `*` takes any locale no other range names, the base locale first. A range reaches a locale as itself, then as each parent it is cut down to, as written and then in its likely form from CLDR (`zh-Hant-TW`, `zh-Hant`, `zh`; `zh-TW` is `zh-Hant-TW`), and never as a sibling: `en-AU` reaches `en`, not `en-GB` or `en-US`, which a config's order would otherwise choose between. A site that wants `en-AU` to read `en-GB` lists `en-AU` with a fallback to `en-GB`;
   - `url`: a non-base locale is the first path segment, and the base locale has no prefix. A locale's home page is `/de`, not `/de/`, which SvelteKit and Next would redirect to drop the slash; every other path keeps the slash the app wrote.
 
   The base locale is always the last resort, so the config does not list it. `url` can only come last: every path names a locale, the base locale's when it has no prefix, so the config rejects a strategy after it, which would never be read.

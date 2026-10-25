@@ -114,6 +114,43 @@ describe("the middleware", () => {
 			);
 	};
 
+	it("matches an Accept-Language tag as itself, then as each parent, as written and in its likely form, never as a sibling", async () => {
+		const localesFor = await acceptLanguage([
+			"en-US",
+			"en",
+			"zh-Hans",
+			"zh-Hant",
+			"pt-BR",
+		]);
+
+		expect(
+			await localesFor([
+				"en-GB",
+				"zh-Hant-TW",
+				"zh-Hant-HK",
+				"zh-TW",
+				"zh-CN",
+				"pt-PT",
+				"zh-Latn",
+				"sr",
+			]),
+		).toEqual([
+			"en",
+			"zh-Hant",
+			"zh-Hant",
+			"zh-Hant",
+			"zh-Hans",
+			"en-US",
+			"en-US",
+			"en-US",
+		]);
+		const regional = await acceptLanguage(["en-GB", "en-US", "de"]);
+		expect(await regional(["en-AU, de;q=0.9", "en, de;q=0.9"])).toEqual([
+			"de",
+			"en-US",
+		]);
+	});
+
 	it("keeps out a language the request refuses, and takes * as any language it names no other way", async () => {
 		const localesFor = await acceptLanguage(["en", "de", "fr"]);
 
