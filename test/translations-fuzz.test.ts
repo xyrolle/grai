@@ -53,6 +53,13 @@ const codes = [
 	"{#br/}",
 	"{#a title=|{x}| href=|a\\|b}|/}",
 ];
+/** Tags around words: a pair, two pairs that cross, and a tag never closed or never opened. "" is words. */
+const tagShapes = [
+	["{#b}", "", "{/b}"],
+	["{#b}", "", "{#i}", "", "{/b}", "", "{/i}"],
+	["{#i}", ""],
+	["", "{/i}"],
+];
 
 function pieces(next: () => number): Piece[] {
 	const result: Piece[] = [];
@@ -71,14 +78,17 @@ function pieces(next: () => number): Piece[] {
 				source: codes[Math.floor(next() * codes.length)] ?? "{name}",
 			});
 		} else {
-			result.push(
-				{ id: "", kind: "open", source: "{#b}" },
-				{ text: text() },
-				{ id: "", kind: "close", source: "{/b}" },
-			);
+			const shape = tagShapes[Math.floor(next() * tagShapes.length)] ?? [];
+			for (const code of shape) {
+				result.push(code === "" ? { text: text() } : tag(code));
+			}
 		}
 	}
 	return result;
+}
+
+function tag(source: string): Piece {
+	return { id: "", kind: source.startsWith("{/") ? "close" : "open", source };
 }
 
 /** Every code of the base, so that a translation reads the same inputs, and new words around them. */
