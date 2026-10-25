@@ -42,8 +42,7 @@ Done when: such a server loads function expressions while the browser keeps arro
 
 These are compile errors today:
 - selecting on a `:number` local whose options change its digits (`maximumFractionDigits`, significant digits, rounding, `notation`, `style`), which MessageFormat 2 selects on by the number those digits show;
-- `:unit`'s `usage`, which converts the value into the locale's preferred units and which Intl cannot do;
-- `:relativetime`'s unit taken from an input, such as Paraglide's `unit=$unit`. Intl takes the unit with each value, so it needs no formatter per value, but a unit Intl refuses must still throw a `GraiError` that names it.
+- `:unit`'s `usage`, which converts the value into the locale's preferred units and which Intl cannot do.
 
 Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
 

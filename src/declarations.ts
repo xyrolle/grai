@@ -159,6 +159,8 @@ export declare function unmatched(
 	selector: string,
 	value: unknown,
 ): never;
+/** The unit of time an input gives a relative time; throws for a value that is not one. */
+export declare function timeUnit(unit: unknown): Intl.RelativeTimeFormatUnit;
 /** The formatter for a call with the value an input gives one of its options, kept by the value. */
 export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateTimeFormat>(
 	made: Map<unknown, Made>,
