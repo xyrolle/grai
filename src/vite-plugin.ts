@@ -11,6 +11,7 @@ import {
 	textPrefix,
 } from "./locale-chunks.ts";
 import { moduleOf } from "./message-imports.ts";
+import { shippedMissingKeyCalls } from "./missing-key-calls.ts";
 import {
 	chunkFileName,
 	keyModule,
@@ -50,6 +51,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		_key: string,
 		_importer: string,
 	): string | undefined => undefined;
+	/** The places the shipped sources name a key no catalog has, found once for every environment. */
+	let missingCalls: readonly Error[] | undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
@@ -133,6 +136,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			);
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
+			missingCalls ??= shippedMissingKeyCalls(compiled);
+			if (missingCalls.length > 0) this.error(messagesOf(missingCalls));
 		},
 		configureServer(server) {
 			let ready: (compiled: Build | readonly Error[]) => void = () => {};

@@ -4,6 +4,7 @@
  * Svelte or Vue template such a call would ship as a call of nothing.
  */
 
+import type { Build } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import {
 	type MessageBindings,
@@ -16,6 +17,8 @@ import {
 	occurrencesOf,
 	positionOf,
 	type SourceFile,
+	sourceFiles,
+	splitTests,
 } from "./sources.ts";
 
 /** A key a source names: the key, where its name starts, and how the source writes it. */
@@ -47,6 +50,26 @@ export function missingKeyCalls(
 					`${written} names a key no catalog has. Add it with grai add ${key} ${texts}, or fix the name.`,
 				);
 			}),
+	);
+}
+
+/**
+ * The places the project's shipped sources name a key no catalog has, for a build to fail on as
+ * check does: a Svelte or Vue template's or JavaScript's call of no key would ship as a call of
+ * nothing, where the bundler only warns.
+ */
+export function shippedMissingKeyCalls({
+	config,
+	catalogs,
+}: Build): GraiError[] {
+	const files = sourceFiles([config.root], config.root, config.outdir);
+	const keys = new Set(
+		catalogs.flatMap(({ messages }) => [...messages.keys()]),
+	);
+	return missingKeyCalls(
+		splitTests(files, config.tests).shipped,
+		keys,
+		config.locales,
 	);
 }
 
