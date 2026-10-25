@@ -100,6 +100,7 @@ async function askEditor(
 					grai: [source("index.ts")],
 					"grai/vite": [source("vite.ts")],
 					"grai/svelte": [source("svelte.ts")],
+					"grai/sveltekit": [source("sveltekit.ts")],
 					"grai/next": [source("next/render.ts")],
 					"grai/next/config": [source("next/config.ts")],
 					"grai/next/proxy": [source("next/proxy.ts")],
