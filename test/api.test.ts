@@ -50,19 +50,21 @@ it("exports from the output's runtime.js only the API apps call", async () => {
 	]);
 });
 
-it("exports the middleware from server.js, m from messages.js and each key from keys.js", async () => {
+it("exports the middleware from server.js, useLocale from testing.js, m from messages.js and each key from keys.js", async () => {
 	const { dir, compile } = project(catalogs);
 	await compile();
 	const output = (file: string) =>
 		import(pathToFileURL(join(dir, "out", file)).href);
 
 	expect(Object.keys(await output("server.js"))).toEqual(["middleware"]);
+	expect(Object.keys(await output("testing.js"))).toEqual(["useLocale"]);
 	expect(Object.keys(await output("messages.js"))).toEqual(["m"]);
 	expect(Object.keys(await output("keys.js")).sort()).toEqual([
 		"cart_items",
 		"cart_title",
 	]);
 	expect(await importableNames(dir, "./out/server.js")).toEqual(["middleware"]);
+	expect(await importableNames(dir, "./out/testing.js")).toEqual(["useLocale"]);
 	expect(await importableNames(dir, "./out/messages.js")).toEqual(["m"]);
 	expect(await importableNames(dir, "./out/keys.js")).toEqual([
 		"cart_items",

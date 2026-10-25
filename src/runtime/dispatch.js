@@ -102,6 +102,16 @@ export function bindRequests(storage) {
 	requests = storage;
 }
 
+/**
+ * Binds a locale outside a request, by its position in `locales`: for the process, or the page.
+ * testing.js binds a test's locale with it.
+ *
+ * @param {number} index
+ */
+export function bindLocale(index) {
+	current = index;
+}
+
 /** The position in `locales` of the bound locale: the request's, else the one outside a request. */
 function bound() {
 	return requests?.getStore()?.index ?? current;

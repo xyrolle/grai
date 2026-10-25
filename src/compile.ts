@@ -38,6 +38,7 @@ const runtime = {
 	dispatch: runtimeModule("dispatch.js"),
 	runtime: runtimeModule("runtime.js"),
 	server: runtimeModule("server.js"),
+	testing: runtimeModule("testing.js"),
 };
 
 function runtimeModule(file: string): string {
