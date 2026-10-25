@@ -275,7 +275,7 @@ describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
 		);
 	}
 
-	it("renders an edited message again in place, keeping the page's state, and the server renders it next", async () => {
+	it("renders an edited message again in place, keeping the page's state, and the server's renders take it too", async () => {
 		await page.goto(`${origin}/ro/`);
 		await page.locator("#hydrated").waitFor();
 		await page.getByRole("button", { name: "Adaugă un produs" }).click();
@@ -288,7 +288,12 @@ describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
 
 		expect(await marked()).toBe(true);
 		expect(await text("#cart")).toBe("2 produse în coș");
-		const served = await fetch(`${origin}/ro/`).then((page) => page.text());
-		expect(served).toContain("Un magazin pe limba ta");
+		// Nuxt's server runs in a Vite server of its own, which takes the edit once its watcher sees
+		// the output's files change: that can be just after the page has patched itself.
+		await expect
+			.poll(() => fetch(`${origin}/ro/`).then((served) => served.text()), {
+				timeout: 10_000,
+			})
+			.toContain("Un magazin pe limba ta");
 	});
 });
