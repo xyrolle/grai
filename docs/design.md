@@ -278,7 +278,7 @@ The locale is resolved once per request on the server, or once per page on the c
 - **The cookie's policy is four options, named as Paraglide names them** (`cookieName`, `cookieMaxAge`, `cookieDomain`, `cookieSameSite`), each for a case an app meets: subdomains that share a preference, and a page embedded in another site's. `setLocale` writes the cookie Secure on https, as a browser drops a Secure cookie an http page sets. It is Secure always where the browser requires it: `SameSite=None`, and a `__Secure-` or `__Host-` name. A `__Host-` name with a domain is refused, as a browser would drop the cookie. There is no option to write it insecure on https, which nothing needs.
 
 The runtime's names are the ones existing Paraglide call sites use, so migrating changes imports, not calls. Only the middleware has a name of its own:
-- `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `cookieName`, `getTextDirection`, `MessagePart`;
+- `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `getTextDirection`, `MessagePart`;
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`. Without it they leave every URL as it is, since no URL then names a locale: in an app that keeps the locale in a cookie, `/de/…` is a path of its own, and a prefix would lead to a page it does not have;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
