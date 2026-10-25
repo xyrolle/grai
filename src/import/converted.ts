@@ -118,9 +118,17 @@ export function pluralLocal(
 	type: PluralType,
 	taken: ReadonlySet<string>,
 ): { name: string; declaration: string } {
-	const base = `${input}${type === "cardinal" ? "Plural" : "Ordinal"}`;
-	let name = base;
-	for (let suffix = 2; taken.has(name); suffix++) name = `${base}${suffix}`;
+	const name = untaken(
+		`${input}${type === "cardinal" ? "Plural" : "Ordinal"}`,
+		taken,
+	);
 	const options = type === "cardinal" ? "" : " type=ordinal";
 	return { name, declaration: `local ${name} = ${input}: plural${options}` };
+}
+
+/** The name, or with the first number after it that makes one the names taken do not hold. */
+export function untaken(base: string, taken: ReadonlySet<string>): string {
+	let name = base;
+	for (let suffix = 2; taken.has(name); suffix++) name = `${base}${suffix}`;
+	return name;
 }

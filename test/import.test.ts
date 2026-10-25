@@ -477,6 +477,33 @@ describe("grai import --from icu", () => {
 		).toEqual(["A X", "B X", "B Gb", "B Go"]);
 	});
 
+	it("converts a plural's offset: =n keys read the count, its categories and # the count less the offset", async () => {
+		const m = await imported("icu", {
+			"en.json": {
+				likes:
+					"{n, plural, offset:1 =0 {Nobody} =1 {Only you} one {You and # other} other {You and # others}}",
+				ahead: "{n, plural, offset:-2 one {# one} other {# other}}",
+			},
+			"ru.json": {
+				likes:
+					"{n, plural, offset:1 =0 {Никто} one {Вы и # другой} few {Вы и # других} other {Вы и # другого}}",
+				ahead: "{n, plural, offset:-2 other {#}}",
+			},
+		}).load();
+
+		expect([0, 1, 2, 3, 1001].map((n) => m.likes?.({ n }))).toEqual([
+			"Nobody",
+			"Only you",
+			"You and 1 other",
+			"You and 2 others",
+			"You and 1,000 others",
+		]);
+		expect(
+			[0, 2, 3, 22].map((n) => m.likes?.({ n }, { locale: "ru" })),
+		).toEqual(["Никто", "Вы и 1 другой", "Вы и 2 других", "Вы и 21 другой"]);
+		expect(m.ahead?.({ n: -1 })).toBe("1 one");
+	});
+
 	it("converts selectordinal with # and =n into an ordinal plural", async () => {
 		const m = await imported("icu", {
 			"en.json": {
@@ -684,7 +711,7 @@ describe("grai import --from icu", () => {
 		});
 	});
 
-	it("leaves out a style it does not convert, a skeleton stem or a date field Intl has no option for, and offsets", () => {
+	it("leaves out a style it does not convert, a skeleton stem or a date field Intl has no option for, and an ordinal's offset", () => {
 		const { result } = imported(
 			"icu",
 			{
@@ -695,7 +722,7 @@ describe("grai import --from icu", () => {
 					scaled: "{value, number, ::scale/100}",
 					week: "{d, date, ::yw}",
 					spaced: "{value, number, percent 'x}'}",
-					others: "{n, plural, offset:1 other {# others}}",
+					place: "{n, selectordinal, offset:1 one {#st} other {#th}}",
 				},
 			},
 			["en"],
@@ -710,7 +737,7 @@ describe("grai import --from icu", () => {
 			"scaled: {value, number, ::scale/100} uses the skeleton stem scale/100, which grai import does not convert. Write the call with the Intl options it needs.",
 			"week: {d, date, ::yw} uses the date field w, which grai import does not convert. Write the call with the Intl options it needs.",
 			"spaced: {value, number, percent 'x}'} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
-			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
+			"place: {n, selectordinal, offset:1} subtracts an offset from an ordinal's count, which grai does not support. Pass the count less the offset, and leave it out.",
 		]);
 	});
 

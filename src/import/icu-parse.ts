@@ -18,6 +18,8 @@ export type IcuNode =
 			type: "choice";
 			kind: ChoiceKind;
 			name: string;
+			/** What ICU's `offset:` takes off a plural's count for its categories and `#`; 0 for none. */
+			offset: number;
 			options: IcuOption[];
 	  }
 	| { type: "tag"; name: string; children: IcuNode[] };
@@ -91,13 +93,13 @@ class IcuParser extends IcuPatternReader {
 		if (!this.take(",")) {
 			throw invalid(`{${name}, ${kind} must list its options.`);
 		}
-		const options = this.options(name, kind, scope);
+		const { offset, options } = this.options(name, kind, scope);
 		if (!options.some((option) => option.key === "other")) {
 			throw invalid(
 				`{${name}, ${kind}} has no other option, which ICU requires.`,
 			);
 		}
-		return { type: "choice", kind, name: inputOf(name), options };
+		return { type: "choice", kind, name: inputOf(name), offset, options };
 	}
 
 	/** The rest of a formatted argument, `{name, type` read: its style, if any, and its `}`. */
@@ -146,12 +148,15 @@ class IcuParser extends IcuPatternReader {
 		return style;
 	}
 
-	/** A choice's options up to its closing `}`: each key, once, and its message in braces. */
+	/**
+	 * A choice's options up to its closing `}`: a plural's `offset:n` first, if it has one, then each
+	 * key, once, and its message in braces.
+	 */
 	private options(
 		name: string,
 		kind: ChoiceKind,
 		scope: PatternScope,
-	): IcuOption[] {
+	): { offset: number; options: IcuOption[] } {
 		const options: IcuOption[] = [];
 		const optionScope = {
 			nested: true,
@@ -159,7 +164,11 @@ class IcuParser extends IcuPatternReader {
 			counted: kind !== "select",
 		};
 		let key = this.key(name, kind);
-		if (kind !== "select" && key === "offset") throw this.offset(name, kind);
+		let offset = 0;
+		if (kind !== "select" && key === "offset") {
+			offset = this.offset(name, kind);
+			key = this.key(name, kind);
+		}
 		while (key !== "") {
 			if (options.some((option) => option.key === key)) {
 				throw invalid(`{${name}, ${kind}} lists the key ${key} twice.`);
@@ -180,7 +189,7 @@ class IcuParser extends IcuPatternReader {
 				`each option of {${name}, ${kind}} must be a key and a message in braces.`,
 			);
 		}
-		return options;
+		return { offset, options };
 	}
 
 	/** An option's key: an identifier, or a plural's `=` and whole number; empty if none is there. */
@@ -196,18 +205,15 @@ class IcuParser extends IcuPatternReader {
 		return `=${exact}`;
 	}
 
-	/** Why a plural's `offset:n`, which ICU reads before its keys, is left out. */
-	private offset(name: string, kind: ChoiceKind): MessageProblem {
+	/** The whole number of a plural's `offset:n`, which ICU reads before its keys. */
+	private offset(name: string, kind: ChoiceKind): number {
 		const offset = this.offsetValue();
 		if (offset === undefined) {
-			return invalid(
+			throw invalid(
 				`offset in {${name}, ${kind}} must be followed by : and ${wholeNumberNote}, as in offset:1.`,
 			);
 		}
-		return new MessageProblem(
-			"unsupported",
-			`{${name}, ${kind}, offset:${offset}} subtracts an offset from the count, which grai does not support.`,
-		);
+		return Number(offset);
 	}
 }
 
