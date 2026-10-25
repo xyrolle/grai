@@ -91,7 +91,7 @@ function linked(dir: string): string {
 async function built(
 	dir: string,
 	entries: Record<string, string>,
-	{ write = false, ssr = false } = {},
+	{ write = false, ssr = false, localeChunks = false } = {},
 ) {
 	for (const [name, code] of Object.entries(entries))
 		writeFileSync(join(dir, `${name}.js`), code);
@@ -99,7 +99,7 @@ async function built(
 		root: dir,
 		configFile: false,
 		logLevel: "silent",
-		plugins: [grai()],
+		plugins: [grai({ localeChunks })],
 		build: {
 			write,
 			ssr,
@@ -308,6 +308,7 @@ describe("the Vite plugin's message chunks", () => {
 					`import { m } from "./out/messages.js";\nconsole.log(m.title(), m.${page}());\n`,
 				]),
 			),
+			{ localeChunks: true },
 		);
 		const messageChunks = [...keysOf(chunks).keys()];
 		const words = (file: string, locale: string) =>
@@ -428,9 +429,19 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 		});
 	});
 
-	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
+	it("writes none unless the app asks for them", async () => {
 		const { dir } = project(catalogs);
 		const { sources } = await built(dir, { page });
+		const directories = new Set(
+			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
+		);
+
+		expect([...directories].sort()).toEqual(["assets", "assets/grai"]);
+	});
+
+	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
+		const { dir } = project(catalogs);
+		const { sources } = await built(dir, { page }, { localeChunks: true });
 		const directories = new Set(
 			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
 		);
@@ -445,7 +456,11 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 
 	it("puts the runtime in a chunk of its own and the messages in chunks copied per locale, for a project reached through a symlink", async () => {
 		const { dir } = project(catalogs);
-		const { chunks, sources } = await built(linked(dir), { page });
+		const { chunks, sources } = await built(
+			linked(dir),
+			{ page },
+			{ localeChunks: true },
+		);
 		const directories = new Set(
 			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
 		);
@@ -465,7 +480,7 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 
 	it("writes each message chunk once per locale, with only that locale's words", async () => {
 		const { dir } = project(catalogs);
-		const { sources } = await built(dir, { page });
+		const { sources } = await built(dir, { page }, { localeChunks: true });
 		const messageChunks = [...sources.keys()].filter((file) =>
 			file.startsWith("assets/grai/"),
 		);
@@ -496,6 +511,7 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 					`import { m } from "./out/messages.js";\nconsole.log(m.${key}());\n`,
 				]),
 			),
+			{ localeChunks: true },
 		);
 		const copies = [...sources.keys()].filter((file) =>
 			/^assets\/grai-(en|de)\//.test(file),
@@ -512,7 +528,11 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 
 	it("serves a page its locale's words alone through an import map", async () => {
 		const { dir } = project(catalogs);
-		const { entryFiles } = await built(dir, { page }, { write: true });
+		const { entryFiles } = await built(
+			dir,
+			{ page },
+			{ write: true, localeChunks: true },
+		);
 		const html = `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/assets/grai/":"/assets/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`;
 		const browser = await chromium.launch();
 		onTestFinished(() => browser.close());
@@ -552,7 +572,7 @@ try {
 }
 `,
 			},
-			{ write: true },
+			{ write: true, localeChunks: true },
 		);
 		const browser = await chromium.launch();
 		onTestFinished(() => browser.close());

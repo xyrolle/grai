@@ -34,6 +34,11 @@ const catalogs = {
 const nodeModules = fileURLToPath(new URL("../node_modules", import.meta.url));
 const withTexts = (): PluginOption[] => [grai(), svelte()];
 const withCalls = (): PluginOption[] => [graiVite(), svelte()];
+/** grai/svelte's plugin writing each message chunk's copies per locale, for an import map. */
+const withCopies = (): PluginOption[] => [
+	grai({ localeChunks: true }),
+	svelte(),
+];
 
 /**
  * A Svelte app in a project: its components, beside an entry that hydrates App.svelte in `#app`
@@ -115,7 +120,7 @@ describe("grai/svelte's client build", () => {
 			"App.svelte": `<script>import { m } from "./out/messages.js";</script>
 <h1 title={m.footer()}>{m.title()}</h1><p>{m.greeting({ name: "Ana" })}</p>`,
 		});
-		const { files } = await built(dir, withTexts(), "client");
+		const { files } = await built(dir, withCopies(), "client");
 
 		expect(code(files)).toContain('pageText("Title", "Titel")');
 		expect(code(files)).toContain('pageText("Footer", "Fußzeile")');
@@ -185,7 +190,7 @@ describe("grai/svelte's client build", () => {
 <h1 title={m.footer()}>{m.title()}</h1><Label text={m.title()} /><p>{m.greeting({ name: "Ana" })}</p>`,
 		});
 		const rendering = await built(dir, withTexts(), "server", true);
-		const { entry } = await built(dir, withTexts(), "client", true);
+		const { entry } = await built(dir, withCopies(), "client", true);
 		const server = await import(
 			pathToFileURL(join(dir, "server", rendering.entry)).href
 		);

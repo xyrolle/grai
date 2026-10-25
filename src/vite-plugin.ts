@@ -38,8 +38,16 @@ import {
  * - `reloadOnEdit`: in dev, reload the open pages after an edit rather than patch them in place,
  *   having sent the servers their patch first. For a framework whose pages the server draws and
  *   no client code could draw again, such as Astro's.
+ * - `localeChunks`: in the client build, write a copy of each message chunk per locale, beside
+ *   it, with only that locale's words. For an adapter that points each page at its locale's
+ *   copies, as `grai/sveltekit`'s `handleLocale` does; nothing else reads them, so they are off by
+ *   default.
  */
-export type GraiOptions = { config?: string; reloadOnEdit?: boolean };
+export type GraiOptions = {
+	config?: string;
+	reloadOnEdit?: boolean;
+	localeChunks?: boolean;
+};
 
 /** grai's Vite plugin, and the build its last compile made, for the adapters built on it. */
 export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
@@ -64,6 +72,9 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
 		!serving && environment?.name === "client";
+	/** Whether this build writes each message chunk's copies, one per locale. */
+	const copying = (environment: { name: string } | undefined) =>
+		options.localeChunks === true && building(environment);
 	/**
 	 * keys.js, a key's module or a text key's string module, from the compiler's model, for the
 	 * browser or a server.
@@ -114,7 +125,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			};
 		},
 		renderChunk(code, chunk) {
-			if (building(this.environment)) {
+			if (copying(this.environment)) {
 				copies.render(
 					chunk.fileName,
 					chunk.moduleIds,
@@ -125,7 +136,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			return null;
 		},
 		generateBundle(_, bundle) {
-			if (!building(this.environment)) return;
+			if (!copying(this.environment)) return;
 			const chunks = Object.values(bundle).filter(
 				(file) => file.type === "chunk",
 			);
