@@ -2,7 +2,7 @@
 
 import { hash } from "node:crypto";
 import type { Format } from "./format-options.ts";
-import { formatterCode } from "./intl-formatters.ts";
+import { formatterCode, runtimeImports } from "./intl-formatters.ts";
 
 /** A formatter of the output: a format in a locale, under the name formats.js exports it by. */
 export type Formatter = { name: string; locale: string; format: Format };
@@ -58,9 +58,13 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 	const sorted = [...byName.values()].sort((a, b) =>
 		a.name < b.name ? -1 : 1,
 	);
-	const imports = sorted.some(({ format }) => format.input !== undefined)
-		? 'import { formatterFor } from "./runtime.js";\n\n'
-		: "";
+	const imported = [
+		...new Set(sorted.flatMap(({ format }) => runtimeImports(format))),
+	].sort();
+	const imports =
+		imported.length === 0
+			? ""
+			: `import { ${imported.join(", ")} } from "./runtime.js";\n\n`;
 	const definitions = sorted.map(({ name, locale, format }) =>
 		formatterCode(name, locale, format),
 	);

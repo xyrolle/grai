@@ -80,9 +80,7 @@ function inputType(name: string, messages: readonly LocaleMessage[]): string {
 				: new Set([...accepted].filter((key) => keys.has(key)));
 	}
 	if (accepted === undefined) {
-		return messages.some((message) => givesOption(name, message))
-			? "string"
-			: "NonNullable<unknown>";
+		return optionType(name, messages) ?? "NonNullable<unknown>";
 	}
 	if (accepted.size === 0) return "never";
 	return [...accepted].sort(byValue).flatMap(literalTypes).join(" | ");
@@ -114,9 +112,17 @@ function formattersOf(
 		.map(({ format }) => format.formatter);
 }
 
-/** Whether an input gives one of a message's formatters an option, such as its currency. */
-function givesOption(name: string, message: LocaleMessage): boolean {
-	return formatsOf(message).some(({ format }) => format.input?.name === name);
+/** The type of the option an input gives one of the formatters, such as its currency, if it gives one. */
+function optionType(
+	name: string,
+	messages: readonly LocaleMessage[],
+): string | undefined {
+	for (const message of messages) {
+		for (const { format } of formatsOf(message)) {
+			if (format.input?.name === name) return format.input.type;
+		}
+	}
+	return undefined;
 }
 
 /** A key matches the values whose text it is: `1` and `"1"` for the key 1, `"a"` for the key a. */
@@ -244,6 +250,8 @@ export declare function unmatched(
 	selector: string,
 	value: unknown,
 ): never;
+/** The unit of time an input gives a relative time; throws for a value that is not one. */
+export declare function timeUnit(unit: unknown): Intl.RelativeTimeFormatUnit;
 /** The formatter for a call with the value an input gives one of its options, kept by the value. */
 export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateTimeFormat>(
 	made: Map<unknown, Made>,

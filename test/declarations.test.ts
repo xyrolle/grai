@@ -211,3 +211,23 @@ console.log(texts);
 	// Lines 8 and 9: a number given as text, and a date given as text.
 	expect(errors).toEqual(["8 TS2322", "9 TS2322"]);
 });
+
+it("types a relative time's unit from an input as one of Intl's units of time", async () => {
+	const { dir, compile } = project({
+		en: { ago: "{n :relativetime unit=$unit}" },
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+const texts: string[] = [m.ago({ n: -1, unit: "day" }), m.ago({ n: 2, unit: "weeks" })];
+m.ago({ n: 2, unit: "fortnight" });
+console.log(texts);
+`,
+	);
+
+	// Line 3: a unit that is not one of time.
+	expect(errors).toEqual(["3 TS2322"]);
+});

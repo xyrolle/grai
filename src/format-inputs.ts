@@ -1,8 +1,8 @@
 /**
  * An option a formatting function takes from an input, as MessageFormat 2 writes it:
  * `{amount :currency currency=$code}`. Only the options an app's data decides can come from an
- * input: which currency an amount is in, which unit a quantity is in, which time zone a reader is
- * in. How the value looks, its style and its fields, is the message's to write, so those stay
+ * input: which currency an amount is in, which unit a quantity or a relative time is in, which
+ * time zone a reader is in. How the value looks, its style and its fields, is the message's to write, so those stay
  * literal and are checked when compiling. A call takes one such option at most: a currency and a
  * unit go with different styles, and a time zone with a date.
  */
@@ -11,20 +11,24 @@ import type { IntlFormatter, IntlOptions } from "./format-functions.ts";
 import { MessageProblem } from "./problem.ts";
 
 /**
- * An option an input can give: a value it takes, which the compile checks a call with, and the
- * style it is formatted with, which the call must have, or Intl would leave it out.
+ * An option an input can give: a value it takes, which the compile checks a call with, the style
+ * it is formatted with, which the call must have, or Intl would leave it out, and the type its
+ * input is declared with.
  */
-type InputOptionSpec = { sample: string; style?: string };
+type InputOptionSpec = { sample: string; style?: string; type: string };
 
 /** The options an input can give, by the formatter that takes them. */
 const fromInputs: Readonly<
 	Partial<Record<IntlFormatter, Readonly<Record<string, InputOptionSpec>>>>
 > = {
 	number: {
-		currency: { sample: "EUR", style: "currency" },
-		unit: { sample: "meter", style: "unit" },
+		currency: { sample: "EUR", style: "currency", type: "string" },
+		unit: { sample: "meter", style: "unit", type: "string" },
 	},
-	datetime: { timeZone: { sample: "UTC" } },
+	datetime: { timeZone: { sample: "UTC", type: "string" } },
+	relativetime: {
+		unit: { sample: "day", type: "Intl.RelativeTimeFormatUnit" },
+	},
 };
 
 /**
@@ -53,7 +57,7 @@ export function optionInput(
 	if (spec === undefined) {
 		throw new MessageProblem(
 			"unsupported",
-			`${source}: "${token}" takes its value from an input, which only a currency, a number's unit and a date's time zone can: how a value looks is the message's to write. Write the value itself.`,
+			`${source}: "${token}" takes its value from an input, which only a currency, a unit and a time zone can: how a value looks is the message's to write. Write the value itself.`,
 		);
 	}
 	const name = reference.exec(text)?.[1];
