@@ -96,11 +96,12 @@ In a Svelte client build, `grai/svelte` reads each message without inputs as its
 
 | text messages as | JS, brotli | hydrate | mount again |
 |---|---|---|---|
-| calls (`grai/vite`) | 24.6 KB | 5.8 / 24.6 ms | 2.7 / 11.4 ms |
-| strings (`grai/svelte`) | 23.9 KB | 3.6 / 16.6 ms | 2.2 / 8.8 ms |
-| inlined into the template | 21.0 KB | 2.8 / 12.7 ms | 1.9 / 8.0 ms |
+| calls (`grai/vite`) | 24.7 KB | 5.8 / 24.3 ms | 2.6 / 10.9 ms |
+| strings (`grai/svelte`) | 23.9 KB | 3.8 / 16.2 ms | 2.0 / 8.2 ms |
+| strings put in place of the calls after Svelte compiled | 22.7 KB | 5.8 / 23.9 ms | 2.5 / 10.9 ms |
+| inlined into the template | 21.2 KB | 2.9 / 12.9 ms | 1.9 / 7.9 ms |
 
-`ru` gives 25.1, 16.7 and 13.3 ms at 4×.
+`ru` gives 23.3, 15.9, 24.1 and 12.5 ms at 4×.
 
 ## Bytes per page
 
