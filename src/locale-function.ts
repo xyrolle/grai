@@ -134,7 +134,7 @@ function partCode(part: Part, placeholder: Placeholder): string {
 		case "text":
 			return `{ type: "text", value: ${JSON.stringify(part.value)} }`;
 		case "variable":
-			return `{ type: "text", value: String(${placeholder(part)}) }`;
+			return `{ type: "text", value: \`\${${placeholder(part)}}\` }`;
 		default:
 			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${JSON.stringify(Object.fromEntries(part.attributes))} }`;
 	}

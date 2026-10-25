@@ -248,12 +248,13 @@ const texts: string[] = [
 ];
 m.picked({ n: 3 });
 m.picked({ n: "1" });
+m.greeting({ name: Symbol("Ana") });
 m.paid({ amount: 2, code: 12 });
 console.log(texts);
 `,
 	);
 
-	// Lines 10 to 12: a number the select does not list, a number given as text, and a currency
-	// given as a number.
-	expect(errors).toEqual(["10 TS2322", "11 TS2322", "12 TS2322"]);
+	// Lines 10 to 13: a number the select does not list, a number given as text, a symbol, which
+	// has no text, and a currency given as a number.
+	expect(errors).toEqual(["10 TS2322", "11 TS2322", "12 TS2322", "13 TS2322"]);
 });
