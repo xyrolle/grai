@@ -97,6 +97,45 @@ describe("grai seed", () => {
 		expect(m.cart_items?.({ count: 3 }, { locale: "ru" })).toBe("3 items");
 	});
 
+	it("covers the locale's categories in each branch of another selector, whatever another branch's *", async () => {
+		const gendered = (match: Record<string, string>) => [
+			{
+				declarations: [
+					"input gender",
+					"input count",
+					"local countPlural = count: plural",
+				],
+				selectors: ["gender", "countPlural"],
+				match,
+			},
+		];
+		const { dir, config, load } = project({
+			en: {
+				invited: gendered({
+					"gender=male,countPlural=*": "He invited {count}",
+					"gender=female,countPlural=one": "She invited {count} guest",
+					"gender=female,countPlural=other": "She invited {count} guests",
+				}),
+			},
+			ru: {},
+		});
+
+		const seeded = await seed(config, "ru");
+		const { m } = await load();
+
+		expect(seeded).toMatchObject({ result: { errors: [] } });
+		expect(catalog(dir, "ru")).toEqual({
+			invited: gendered({
+				"gender=male,countPlural=*": "He invited {count}",
+				"gender=female,countPlural=one": "She invited {count} guest",
+				"gender=female,countPlural=*": "She invited {count} guests",
+			}),
+		});
+		expect(m.invited?.({ gender: "female", count: 3 }, { locale: "ru" })).toBe(
+			"She invited 3 guests",
+		);
+	});
+
 	it("seeds an ordinal with the variants of the locale's ordinal categories", async () => {
 		const place = (match: Record<string, string>) => [
 			{
