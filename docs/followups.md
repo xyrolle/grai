@@ -20,6 +20,12 @@ Every message with inputs or markup dispatches through the runtime's one `messag
 
 Done when: each message with inputs or markup has a dispatcher of its own, on the server inside the server build's shape, and the server's load, a page's bytes, hydration and the call are measured on both reference apps against the shared dispatcher, the calls winning without the load or the bytes losing more.
 
+## Bound the formatters kept per value an input gives
+
+`formatterFor` keeps an Intl formatter for each value an input gives an option, in a map that nothing empties. Intl takes any well-formed three-letter currency code, and any offset time zone such as `+05:31`. So a server that formats a currency or a zone a request names can be made to keep up to 17,576 currency formatters, or 2,879 zone formatters, for each such formatter and locale. An app's own data names a few dozen values: Intl knows 162 currencies and 418 time zones by name. A formatter's memory sits mostly outside V8's heap, in ICU, so the heap does not show it.
+
+Done when: the map keeps a fixed number of values at most, dropping the oldest first. The number is chosen by measuring a formatter's resident memory and the cost of making one again, and a test shows that a value dropped and asked for again still formats.
+
 ## Function expressions on a server without Vite
 
 The Vite plugin's server build writes each message function as a function expression, which V8 only pre-parses, and loads app A's messages in 24–25 ms against 30 ms with arrows (`startup`). `keys.js` still writes arrows, and a server that loads it without the Vite plugin, such as a Next.js server bundle or a plain Node server, pays the difference.
