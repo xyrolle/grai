@@ -19,6 +19,10 @@ import {
 	localizeUrl,
 } from "./runtime.js";
 
+// Whether the build wrote a copy of each message chunk per locale, for an adapter that points a
+// page at its locale's copies only when they exist.
+export { localeCopies } from "./config.js";
+
 /** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
 bindRequests(requests);

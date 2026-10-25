@@ -149,12 +149,12 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		},
 		async buildStart() {
 			if (serving) return;
-			first ??= recompile(files.configFile, undefined).then(
-				({ result, build: next }) => {
-					build = next;
-					return next ?? result.errors;
-				},
-			);
+			first ??= recompile(files.configFile, undefined, {
+				localeCopies: options.localeChunks === true,
+			}).then(({ result, build: next }) => {
+				build = next;
+				return next ?? result.errors;
+			});
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
 			missingCalls ??= shippedMissingKeyCalls(compiled);

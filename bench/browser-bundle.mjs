@@ -11,7 +11,7 @@ import { graiOutput, graiSource } from "./grai.mjs";
 
 const { grai: graiPlugin } = await import(join(graiSource, "vite.ts"));
 const { localeDirectory, messageDirectory } = await import(
-	join(graiSource, "locale-chunks.ts")
+	join(graiSource, "message-directories.ts")
 );
 
 /** What a Vite build of `entry` with grai's plugin writes: its files' code by name, and the entry's. */

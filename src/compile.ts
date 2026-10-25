@@ -74,15 +74,21 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	const read = await readProject(configFile);
 	if ("errors" in read) return { written: [], errors: read.errors };
 	const hashes = read.sources.map((source) => hash("sha1", source.bytes));
-	if (await isUpToDate(read.config.outdir, inputsOf(read.config, hashes))) {
+	if (
+		await isUpToDate(read.config.outdir, inputsOf(read.config, hashes, false))
+	) {
 		return { written: [], errors: [] };
 	}
 	const { result } = await build(read.config, read.sources, hashes);
 	return result;
 }
 
-/** How a compile is for: development and tests take the config's pseudo-locale, a build never. */
-export type CompileOptions = { pseudoLocale?: boolean };
+/**
+ * How a compile is for: development and tests take the config's pseudo-locale, a build never. A
+ * build that writes a copy of each message chunk per locale says so in config.js (`localeCopies`),
+ * for the server that points pages at them.
+ */
+export type CompileOptions = { pseudoLocale?: boolean; localeCopies?: boolean };
 
 /**
  * Compiles again after an edit: reads the config and catalogs, parses only the catalogs that
@@ -147,7 +153,7 @@ async function build(
 	sources: readonly CatalogSource[],
 	hashes: readonly string[],
 	previous?: Build,
-	{ pseudoLocale = false }: CompileOptions = {},
+	{ pseudoLocale = false, localeCopies = false }: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
 	const parsed = parseCatalogs(sources, previous);
 	if (parsed.errors.length > 0) {
@@ -178,6 +184,7 @@ async function build(
 		runtime,
 		compilation,
 		{ path: config.catalogs.get(config.baseLocale) ?? "", positions, moved },
+		{ localeCopies },
 		previous?.rendered,
 	);
 	let written: string[];
@@ -185,7 +192,7 @@ async function build(
 		written = await writeOutput(
 			config.outdir,
 			output,
-			inputsOf(config, hashes),
+			inputsOf(config, hashes, localeCopies),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
@@ -253,13 +260,21 @@ function basePositionsMoved(
 }
 
 /**
- * What decides the output: the compiler, the config and every catalog's bytes. The whole config,
- * as no field is then left out by mistake: the catalogs' paths are in the declaration maps.
+ * What decides the output: the compiler, whether its build writes the locale copies, the config
+ * and every catalog's bytes. The whole config, as no field is then left out by mistake: the
+ * catalogs' paths are in the declaration maps.
  */
-function inputsOf(config: Config, hashes: readonly string[]): string {
+function inputsOf(
+	config: Config,
+	hashes: readonly string[],
+	localeCopies: boolean,
+): string {
 	return hash(
 		"sha1",
-		JSON.stringify([hashOfCompiler(), config, hashes], collectionsAsLists),
+		JSON.stringify(
+			[hashOfCompiler(), localeCopies, config, hashes],
+			collectionsAsLists,
+		),
 	);
 }
 
