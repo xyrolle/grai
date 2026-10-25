@@ -17,13 +17,19 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
 	process.on(signal, () => process.exit(128 + constants.signals[signal]));
 }
 
-/** Sends a signal to a process group; a group whose processes have all exited is left alone. */
+/**
+ * Sends a signal to a process group: whether any process of it is still there. A group whose
+ * processes have all exited, and been reaped, is left alone.
+ */
 function signalGroup(pid, signal) {
 	try {
 		process.kill(-pid, signal);
 		return true;
 	} catch (error) {
 		if (error.code === "ESRCH") return false;
+		// macOS refuses a signal to a process that has exited but is not reaped yet, and so to its
+		// group: the others still get it, and the group empties once its parent reaps it.
+		if (error.code === "EPERM") return true;
 		throw error;
 	}
 }
