@@ -25,5 +25,6 @@ declare module "grai/nuxt/output/config.js" {
 
 declare module "grai/nuxt/output/server.js" {
 	export function localeOf(request: Request): string;
+	export function redirectOf(request: Request): Response | undefined;
 	export const vary: string;
 }

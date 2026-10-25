@@ -26,7 +26,8 @@ const output = "grai/nuxt/output";
  * It compiles the catalogs before Nuxt builds anything, and grai/vite compiles again on each
  * edit in dev. A server middleware resolves each request's locale by the config's strategy, the
  * render binds it, and the page's `<html>` takes it with its direction. With the `url` strategy,
- * every page is routed under each locale's prefix too.
+ * every page is routed under each prefixed locale's prefix too, and a page asked for without the
+ * prefix it needs is sent to its locale's path.
  */
 const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 	meta: { name: "grai", configKey: "grai" },
@@ -58,7 +59,14 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		addPlugin(runtime("./runtime/plugin"));
 		if (config.strategy.includes("url")) {
 			nuxt.hook("pages:resolved", (pages) => {
-				pages.push(...localizedPages(pages, config.locales, config.baseLocale));
+				pages.push(
+					...localizedPages(
+						pages,
+						config.locales,
+						config.baseLocale,
+						config.urlRouting,
+					),
+				);
 			});
 		}
 	},
