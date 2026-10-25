@@ -30,6 +30,8 @@ export type Format = {
 	formatter: IntlFormatter;
 	options: IntlOptions;
 	input: OptionInput | undefined;
+	/** What `:offset` adds to the value before it is shown or compared; 0 for every other function. */
+	shift: number;
 };
 
 /**
@@ -51,6 +53,12 @@ export type Call = {
 const option = /^([A-Za-z]\w*)=(\S+)$/;
 
 const selectModes: readonly SelectMode[] = ["plural", "ordinal", "exact"];
+
+/** How `add` and `subtract` move a value, by name. */
+const shiftSigns: ReadonlyMap<string, number> = new Map([
+	["add", 1],
+	["subtract", -1],
+]);
 
 /** The format a placeholder's call asks for, such as `{n :number minimumFractionDigits=2}`. */
 export function parseFormat(
@@ -88,10 +96,22 @@ export function parseCall(
 	let input: OptionInput | undefined;
 	const takesSelect = spec.selects?.takesSelect === true;
 	let mode: SelectMode | undefined;
+	let shift: number | undefined;
 	for (const token of optionsText.trim().split(/\s+/).filter(Boolean)) {
 		const [, key = "", text = ""] = option.exec(token) ?? [];
 		if (key === "select" && takesSelect && mode === undefined) {
 			mode = selectModeOf(text, source, token);
+			continue;
+		}
+		const sign = spec.moves === true ? shiftSigns.get(key) : undefined;
+		if (sign !== undefined) {
+			if (shift !== undefined) {
+				throw new MessageProblem(
+					"message-invalid",
+					`${source}: :${name} takes add or subtract, not both.`,
+				);
+			}
+			shift = sign * Number(optionValue("digits", text, source, token));
 			continue;
 		}
 		const refused = ownEntry(spec.refused ?? {}, key);
@@ -118,6 +138,12 @@ export function parseCall(
 			given[key] = optionValue(kind, text, source, token);
 		} else input = fromInput;
 	}
+	if (spec.moves === true && shift === undefined) {
+		throw new MessageProblem(
+			"message-invalid",
+			`${source}: :${name} needs add or subtract, the whole number it moves the value by, such as subtract=1.`,
+		);
+	}
 	const { required } = spec;
 	if (
 		required !== undefined &&
@@ -135,7 +161,12 @@ export function parseCall(
 		...intlOptions(given),
 		...spec.fixed,
 	};
-	const format: Format = { formatter: spec.formatter, options, input };
+	const format: Format = {
+		formatter: spec.formatter,
+		options,
+		input,
+		shift: shift ?? 0,
+	};
 	const checked = checkedOptions(options, input, source);
 	try {
 		checkFormat({ ...format, options: checked });

@@ -226,6 +226,43 @@ describe("selecting on a :number local", () => {
 		]);
 	});
 
+	it("moves a value by :offset's subtract or add, then chooses and formats it as :number does", async () => {
+		const { m } = await project({
+			en: {
+				likes: [
+					{
+						declarations: [
+							"input count",
+							"local others = count: offset subtract=1",
+						],
+						selectors: ["count", "others"],
+						match: {
+							"count=0,others=*": "No likes",
+							"count=1,others=*": "You like it",
+							"count=*,others=one": "You and {others} other",
+							"count=*,others=*": "You and {others} others",
+						},
+					},
+				],
+				place: onNumber("offset add=1", { "n=1": "first", "n=*": "{n}th" }),
+				left: "{|5| :offset subtract=1} left",
+			},
+		}).load();
+
+		expect([0, 1, 2, 3, 1001].map((count) => m.likes?.({ count }))).toEqual([
+			"No likes",
+			"You like it",
+			"You and 1 other",
+			"You and 2 others",
+			"You and 1,000 others",
+		]);
+		expect([0, 4].map((count) => m.place?.({ count }))).toEqual([
+			"first",
+			"5th",
+		]);
+		expect(m.left?.()).toBe("4 left");
+	});
+
 	it("is an error for a key no value can match, or for a value no variant has", async () => {
 		expect(
 			await errorsOf({
@@ -240,17 +277,23 @@ describe("selecting on a :number local", () => {
 					mode: onNumber("number select=cardinal", { "n=*": "a" }),
 					percent_mode: onNumber("percent select=ordinal", { "n=*": "a" }),
 					price: onNumber("currency currency=EUR", { "n=*": "a" }),
+					still: onNumber("offset", { "n=*": "a" }),
+					both: onNumber("offset add=1 subtract=1", { "n=*": "a" }),
+					negative: onNumber("offset subtract=-1", { "n=*": "a" }),
 				},
 			}),
 		).toEqual([
+			'message-invalid: messages/en.json: "both" (en): "local n = count: offset add=1 subtract=1": :offset takes add or subtract, not both.',
 			'plural-category-unknown: messages/en.json: "category" (en): "few" is not a number or a plural category of en, so the variant n=few can never be chosen. Its categories are one, other.',
 			'message-invalid: messages/en.json: "exact" (en): the variant n=one can never be chosen: n selects by its exact value (select=exact), so a key is a number or *.',
 			'message-invalid: messages/en.json: "fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
 			'message-invalid: messages/en.json: "mode" (en): "local n = count: number select=cardinal": "select=cardinal" needs plural, ordinal or exact.',
+			'message-invalid: messages/en.json: "negative" (en): "local n = count: offset subtract=-1": "subtract=-1" needs a whole number.',
 			'selection-not-exhaustive: messages/en.json: "open" (en): no variant matches n=(any other value). Add one, or a variant with * for the selectors it does not care about.',
 			'message-invalid: messages/en.json: "percent_fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
 			'message-invalid: messages/en.json: "percent_mode" (en): "local n = count: percent select=ordinal": "select=ordinal" is not an option of :percent, or is given twice. Its options are signDisplay, useGrouping, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, roundingPriority, roundingMode, trailingZeroDisplay.',
 			'unsupported: messages/en.json: "price" (en): it selects on n, a :currency value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
+			'message-invalid: messages/en.json: "still" (en): "local n = count: offset": :offset needs add or subtract, the whole number it moves the value by, such as subtract=1.',
 			'selection-not-exhaustive: messages/en.json: "uncovered" (en): no variant matches n=other. Add one, or a variant with * for the selectors it does not care about.',
 			'message-invalid: messages/en.json: "written" (en): the variant n=1.0 can never be chosen: a number matches the key it is written as, 1. Write that instead.',
 		]);

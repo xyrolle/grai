@@ -367,7 +367,7 @@ describe("grai add", () => {
 			],
 			[
 				1,
-				'messages/en.json: "cart_total" (en): {sum :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+				'messages/en.json: "cart_total" (en): {sum :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			],
 		]);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(before);

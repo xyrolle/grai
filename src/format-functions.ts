@@ -61,6 +61,8 @@ export type FormatFunction = {
 	 * takes, or else always by the plural rules.
 	 */
 	selects?: { number: SelectedNumber; takesSelect: boolean };
+	/** Whether it moves its value by its `add` or `subtract`, a whole number, as `:offset` does. */
+	moves?: true;
 };
 
 /** The options that round a number to its significant digits, shared by the number functions. */
@@ -160,6 +162,14 @@ export const functions: Readonly<Record<string, FormatFunction>> = {
 		},
 		fixed: { style: "percent" },
 		selects: { number: "percent", takesSelect: false },
+	},
+	// MessageFormat 2's :offset, which ICU's plural offset becomes: the value moved by a whole number,
+	// formatted and selected on as :number does with no options.
+	offset: {
+		formatter: "number",
+		options: {},
+		moves: true,
+		selects: { number: "number", takesSelect: false },
 	},
 	currency: {
 		formatter: "number",

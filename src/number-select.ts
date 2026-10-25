@@ -23,6 +23,8 @@ export type NumberSelector = {
 	name: string;
 	input: string;
 	number: SelectedNumber;
+	/** What `:offset` adds to the number before it is compared; 0 for the other functions. */
+	shift: number;
 	rules: PluralType | undefined;
 	digits: IntlOptions | undefined;
 };
@@ -88,6 +90,7 @@ export function numberSelector(
 		name,
 		input: local.input,
 		number: local.selection.number,
+		shift: local.format.shift,
 		rules: selectRules(local),
 		digits: rounds ? digitOptions(local.format.options) : undefined,
 	};

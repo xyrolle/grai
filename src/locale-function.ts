@@ -1,6 +1,6 @@
 import type { Format } from "./format-options.ts";
 import { type Formatter, formatterOf } from "./formatters.ts";
-import { localeReads } from "./locale-reads.ts";
+import { localeReads, shiftedCode } from "./locale-reads.ts";
 import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
@@ -69,13 +69,17 @@ export function localeFunction(
 ): LocaleFunction {
 	const { variants, closed } = message;
 	const { value, condition, prologue } = localeReads(message, used);
-	/** An operand's code through a format's formatter, with the option an input gives it. */
+	/** An operand's code through a format's formatter, moved by what `:offset` adds, with the option an input gives it. */
 	const formatted = (format: Format, operand: string) => {
 		const formatter = formatterOf(message.locale, format);
 		used.formats.set(formatter.name, formatter);
 		const given =
 			format.input === undefined ? "" : `, ${value(format.input.name)}`;
-		return `${formatter.name}(${operand}${given})`;
+		const moved =
+			format.shift === 0
+				? operand
+				: `(${shiftedCode(`Number(${operand})`, format.shift)})`;
+		return `${formatter.name}(${moved}${given})`;
 	};
 	/** A placeholder's or a literal's code: its value, through its formatter if it has one. */
 	const placeholder = (part: VariablePart | LiteralPart) => {
