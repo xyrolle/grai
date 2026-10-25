@@ -227,6 +227,11 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			},
 		},
 		async load(id) {
+			if (!serving && id === join(files.outdir, "testing.js")) {
+				return this.error(
+					"The output's testing.js binds a test's locale, so a build refuses it: import it from test files alone.",
+				);
+			}
 			const served = devModuleOf(id);
 			if (served !== undefined) return served;
 			if (id !== files.keysFile && !isMessageModule(id)) return null;
