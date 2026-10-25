@@ -91,6 +91,12 @@ On the bench's page, `next dev`'s first response for the route takes longer with
 
 Done when: a profile of that compile names where the time goes, and either a change brings it level with next-intl's or the design records why it stays.
 
+## Next on a loopback address
+
+Next 16.4 started on `127.0.0.1` or `[::1]` (`--hostname`, or `HOSTNAME` behind a reverse proxy) takes every proxy rewrite for an external one. Next's `NextURL` renames a loopback host `localhost`, so the rewrite the proxy returns names `localhost`, while Next's router knows itself by the address it was started on. It proxies the request to itself, where grai/next's proxy rewrites it again, under another `/<locale>`, and the page never answers. A Next app without grai, whose proxy only rewrites `/` to `/en`, answers, but runs its proxy twice for the page. Once its proxy rewrites every path, as an unprefixed base locale's does, it never answers either: 259 runs of the proxy in 10 s. On Next's default host, `0.0.0.0`, `localhost` and the machine's address, the rewrites stay internal.
+
+Done when: Next keeps a loopback host's rewrites internal, or grai/next's proxy leaves a request Next sends to itself as it is, with a test that serves the example on `127.0.0.1`.
+
 ## Report markup elements the base locale does not have
 
 `Markup` throws for an element the app does not draw, and the app draws the base locale's. A translation that adds an element then throws in that locale only.
