@@ -35,6 +35,8 @@ type Match = {
 	inside: readonly Slot[];
 	/** The match as the message writes it. */
 	written: string;
+	/** Whether its text stands earlier in what this pass has left as it is. */
+	standsEarlier: boolean;
 };
 
 // i18next's patterns with its default options, from its Interpolator: `{{-name}}`, then `{{name}}`,
@@ -90,6 +92,7 @@ function fill(
 ): Slot[] {
 	const text = slots.map(passText).join("");
 	const filled: Slot[] = [];
+	const leftAsWritten: string[] = [];
 	let last = 0;
 	for (const match of text.matchAll(pattern)) {
 		const end = match.index + match[0].length;
@@ -98,8 +101,12 @@ function fill(
 		const part = filling({
 			inside: slots.slice(from, to),
 			written: slots.slice(match.index, end).map(writtenText).join(""),
+			standsEarlier: [...leftAsWritten, ...textRuns(before)].some((run) =>
+				run.includes(match[0]),
+			),
 		});
 		if (part === undefined) continue;
+		leftAsWritten.push(...textRuns(before));
 		filled.push(...before, part);
 		last = end;
 	}
@@ -112,13 +119,20 @@ function fill(
  * `escapes` and it shows text: as itself, or a list.
  */
 function placeholderOf(
-	{ inside, written }: Match,
+	{ inside, written, standsEarlier }: Match,
 	escapes: boolean,
 ): Filled | undefined {
 	const comma = inside.indexOf(",");
 	const read = comma === -1 ? inside : inside.slice(0, comma);
 	// A name made with a value is none a call passes, and i18next leaves the placeholder as written.
 	if (read.some(isFilled)) return undefined;
+	// i18next fills a placeholder by replacing the first text like it: here an earlier copy.
+	if (standsEarlier) {
+		throw new MessageProblem(
+			"unsupported",
+			`${written} stands earlier too, in text i18next leaves as written, and i18next fills that one instead. Write the earlier text another way.`,
+		);
+	}
 	const name = inputOf(textOfSlots(read).trim(), written);
 	const format =
 		comma === -1 ? "" : textOfSlots(inside.slice(comma + 1)).trim();
@@ -176,6 +190,22 @@ function nestedOf(
 		);
 	}
 	return { pattern, written, inputs: [], escaped: [] };
+}
+
+/** The stretches of text between the filled-in parts of the slots. */
+function textRuns(slots: readonly Slot[]): string[] {
+	const runs: string[] = [];
+	let run = "";
+	for (const slot of slots) {
+		if (typeof slot === "string") {
+			run += slot;
+		} else {
+			runs.push(run);
+			run = "";
+		}
+	}
+	runs.push(run);
+	return runs;
 }
 
 function isFilled(slot: Slot): slot is Filled {
