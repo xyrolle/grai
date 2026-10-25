@@ -21,6 +21,10 @@ The compiler, for a build script or a bundler grai has no adapter for.
 
 - `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin[]`: `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. List it before `sveltekit()` or `svelte()`. It needs `svelte` and `magic-string`.
 
+## `grai/sveltekit`
+
+- `handleLocale({ middleware, getTextDirection }): Handle`: the `handle` that renders each request in its locale, from the output's `server.js` and `runtime.js`. It resolves the locale by the config's `strategy`, binds it for everything the request renders and loads, and writes it and its direction into `src/app.html`'s `%grai.lang%` and `%grai.dir%`.
+
 ## `grai/next`
 
 - `bindLocale(locale: string): void`: binds the locale for the rest of the request's render. A page, a layout or `generateMetadata` calls it before any message, with the locale its params name.
