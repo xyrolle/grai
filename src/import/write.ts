@@ -36,10 +36,7 @@ export function writeCatalogs(
 			path,
 			withMessages(
 				"{}\n",
-				Object.entries(catalog).map(([key, value]): [KeyPath, unknown] => [
-					[key],
-					value,
-				]),
+				[...catalog].map(([key, value]): [KeyPath, unknown] => [[key], value]),
 				tabbedLayout,
 			),
 		);
