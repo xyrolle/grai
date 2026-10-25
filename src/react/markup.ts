@@ -1,18 +1,23 @@
 import { createElement, Fragment, type ReactNode } from "react";
 
-/** A message's part, as its `.parts()` gives it: a run of text, or a piece of its markup. */
-export type MarkupPart =
+/**
+ * A message's part, as its `.parts()` gives it: the runtime's `MessagePart`, a run of text or a
+ * piece of markup named by one of the message's tags.
+ */
+type MessagePart<Tag extends string> =
 	| { type: "text"; value: string }
 	| {
 			type: "markup-start" | "markup-end" | "markup-standalone";
-			name: string;
+			name: Tag;
+			options: Readonly<Record<string, unknown>>;
+			attributes: Readonly<Record<string, string | true>>;
 	  };
 
 /** Draws one markup element: what a `{#name}…{/name}` pair encloses, or nothing for `{#name/}`. */
-export type MarkupElement = (children?: ReactNode) => ReactNode;
+type MarkupElement = (children?: ReactNode) => ReactNode;
 
 /** An element still open: its name and what it encloses so far. */
-type Open = { name: string; children: ReactNode[] };
+type Open<Tag extends string> = { name: Tag; children: ReactNode[] };
 
 /**
  * Renders a markup message's parts, each element drawn by its function in `markup`: translators
@@ -20,17 +25,17 @@ type Open = { name: string; children: ReactNode[] };
  * name, an end with none open draws nothing, and an element left open closes at the end. An
  * element `markup` does not draw throws, naming it.
  */
-export function Markup({
+export function Markup<Tag extends string>({
 	parts,
 	markup,
 }: {
-	parts: readonly MarkupPart[];
-	markup: Readonly<Record<string, MarkupElement>>;
+	parts: readonly MessagePart<Tag>[];
+	markup: Readonly<Record<Tag, MarkupElement>>;
 }): ReactNode {
 	const root: ReactNode[] = [];
-	const open: Open[] = [];
+	const open: Open<Tag>[] = [];
 	const current = () => open.at(-1)?.children ?? root;
-	const draw = (name: string, children?: ReactNode[]) => {
+	const draw = (name: Tag, children?: ReactNode[]) => {
 		const element = markup[name];
 		if (element === undefined) {
 			throw new Error(

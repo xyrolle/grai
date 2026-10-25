@@ -39,8 +39,8 @@ export type Part =
 	| {
 			type: "markup-start" | "markup-end" | "markup-standalone";
 			name: string;
-			options: object;
-			attributes: object;
+			options: Readonly<Record<string, unknown>>;
+			attributes: Readonly<Record<string, string | true>>;
 	  };
 export type Messages = Record<string, Message>;
 
