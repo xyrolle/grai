@@ -134,30 +134,33 @@ function byKey(units: readonly Unit[]): Map<string, Unit[]> {
 	return keys;
 }
 
-/** The message the units give: a pattern, or the base's selectors with a variant per unit. */
+/**
+ * The message the units give, in the base's shape: a pattern, or the base's declarations and
+ * selectors with a variant per unit, which is one without a key when it has no selector.
+ */
 function messageOf(
 	source: unknown,
 	units: readonly Unit[],
 	accepted: ReadonlyMap<string, Piece[]>,
 ): unknown {
-	const [first] = units;
-	if (units.length === 1 && first !== undefined && first.variant.length === 0) {
-		const pieces = accepted.get(first.id) ?? first.target;
-		return pieces === undefined ? undefined : piecesPattern(pieces);
-	}
-	const fields = Array.isArray(source) ? source[0] : undefined;
-	if (!isRecord(fields)) return undefined;
-	const match: Record<string, string> = {};
+	const match = new Map<string, string>();
 	for (const unit of units) {
 		const pieces = accepted.get(unit.id) ?? unit.target;
 		if (pieces === undefined) return undefined;
 		const key = unit.variant
 			.map(([selector, value]) => `${selector}=${value}`)
 			.join(",");
-		match[key] = piecesPattern(pieces);
+		match.set(key, piecesPattern(pieces));
 	}
+	if (typeof source === "string") return match.get("");
+	const fields = Array.isArray(source) ? source[0] : undefined;
+	if (!isRecord(fields)) return undefined;
 	return [
-		{ declarations: fields.declarations, selectors: fields.selectors, match },
+		{
+			declarations: fields.declarations,
+			selectors: fields.selectors,
+			match: Object.fromEntries(match),
+		},
 	];
 }
 

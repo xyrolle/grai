@@ -15,7 +15,6 @@ import {
 	chosen,
 	combinations,
 	noteOf,
-	rawVariants,
 	translatedVariants,
 } from "./unit-variants.ts";
 
@@ -71,12 +70,6 @@ function messageUnits(
 	locale: string,
 ): Unit[] {
 	const message = parseMessage(baseLocale, value);
-	if (message.selectors.length === 0) {
-		const source =
-			typeof value === "string" ? value : (rawVariants(value)[0]?.[1] ?? "");
-		const target = typeof translation === "string" ? translation : undefined;
-		return [unit(key, [], source, target, undefined)];
-	}
 	const sources = alignedVariants(value, message.selectors);
 	const targets = translatedVariants(translation, locale, message.selectors);
 	return combinations(message.selectors, sources, locale).map((combination) => {
