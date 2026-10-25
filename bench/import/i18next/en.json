@@ -10,6 +10,7 @@
 	},
 	"braces": "A {literal} and a \\\\ backslash",
 	"see": "See $t(cart.title) now",
+	"passes": "{{x {{-name}} y}}, a {{}} and $t($t(cart.title)",
 	"friend": "A friend",
 	"friend_male": "A boyfriend",
 	"place_ordinal_one": "{{count}}st",
