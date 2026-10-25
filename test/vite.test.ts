@@ -801,6 +801,30 @@ export const render = () => \`\${title()} \${footer()}\`;
 		await expect.poll(rendered, devWait).toBe("Heading Footer");
 	});
 
+	it("gives the dev module no source map, which Vite would inline at several times its size", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		await ssr.runner.import("/render.js");
+
+		const keys = await ssr.transformRequest(join(dir, "out", "keys.js"));
+
+		expect(keys?.code).toContain("export");
+		expect(keys?.code).not.toContain("sourceMappingURL=data:");
+	});
+
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
 		const { dir } = project(catalogs);
 		const server = await createServer({
