@@ -22,30 +22,59 @@ function built(args: string[]): void {
 	}
 }
 
+/** A server the suite started, and the origin it printed. */
+type Served = { server: ChildProcess; origin: string };
+
 /**
- * Starts a server, resolving once it prints the address it listens on: 127.0.0.1 alone, as
- * localhost can be ::1 beside another process's server at the same port.
+ * Starts a server on 127.0.0.1 alone, as localhost can be ::1 beside another process's server, and
+ * on a port the system picks, so that runs of this file side by side never meet. It resolves once
+ * the server prints the address it listens on. The server leads a process group of its own, so
+ * that stopping it stops what it forks.
  */
 async function listening(
 	command: string,
 	args: string[],
 	env: Record<string, string> = {},
-): Promise<ChildProcess> {
+): Promise<Served> {
 	const server = spawn(command, args, {
 		cwd: example,
-		env: { ...process.env, ...env },
+		env: { ...process.env, NO_COLOR: "1", ...env },
+		detached: true,
 	});
 	let printed = "";
-	await new Promise<void>((resolve, reject) => {
-		server.stdout.on("data", (chunk) => {
+	const origin = await new Promise<string>((resolve, reject) => {
+		server.stdout?.on("data", (chunk) => {
 			printed += chunk;
-			if (/127\.0\.0\.1:\d+/.test(printed)) resolve();
+			const address = /http:\/\/127\.0\.0\.1:\d+/.exec(printed)?.[0];
+			if (address !== undefined) resolve(address);
 		});
 		server.on("exit", (code) =>
 			reject(new Error(`the server exited: ${code}\n${printed}`)),
 		);
 	});
-	return server;
+	return { server, origin };
+}
+
+/** Stops a server's whole process group, and resolves once the server has exited. */
+async function stopped(served: Served | undefined): Promise<void> {
+	if (served === undefined) return;
+	const { server } = served;
+	const exited =
+		server.exitCode === null && server.signalCode === null
+			? new Promise<void>((resolve) => server.once("exit", () => resolve()))
+			: undefined;
+	if (server.pid === undefined) return;
+	try {
+		process.kill(-server.pid, "SIGTERM");
+	} catch (error) {
+		// A group whose processes have all exited.
+		if (
+			!(error instanceof Error && "code" in error && error.code === "ESRCH")
+		) {
+			throw error;
+		}
+	}
+	await exited;
 }
 
 let browser: Browser;
@@ -80,24 +109,24 @@ function scripts(): Map<string, Promise<string>> {
 	return loaded;
 }
 
-/** The tests every build of the example passes, at its origin. */
-function aSite(origin: string) {
+/** The tests every build of the example passes, at the origin it is served at. */
+function aSite(site: { origin: string }) {
 	it("renders each locale's pages in that locale, with its text direction", async () => {
-		await page.goto(`${origin}/ro/about/`);
+		await page.goto(`${site.origin}/ro/about/`);
 		expect([await html("lang"), await html("dir")]).toEqual(["ro", "ltr"]);
 		expect(await text("h1")).toBe("Despre acest exemplu");
 
-		await page.goto(`${origin}/ar/`);
+		await page.goto(`${site.origin}/ar/`);
 		expect([await html("lang"), await html("dir")]).toEqual(["ar", "rtl"]);
 		expect(await text("h1")).toBe("مرحبا");
 
-		await page.goto(`${origin}/about/`);
+		await page.goto(`${site.origin}/about/`);
 		expect([await html("lang"), await html("dir")]).toEqual(["en", "ltr"]);
 		expect(await text("h1")).toBe("About this example");
 	});
 
 	it("hydrates the Svelte and React islands in the page's locale", async () => {
-		await page.goto(`${origin}/ro/`);
+		await page.goto(`${site.origin}/ro/`);
 		await page.locator("#svelte").waitFor();
 		await page.locator("#react").waitFor();
 
@@ -111,7 +140,7 @@ function aSite(origin: string) {
 
 	it("downloads only the page's locale's message chunks", async () => {
 		const loaded = scripts();
-		await page.goto(`${origin}/ar/`);
+		await page.goto(`${site.origin}/ar/`);
 		await page.locator("#svelte").waitFor();
 		await page.locator("#react").waitFor();
 		const paths = [...loaded.keys()];
@@ -129,7 +158,7 @@ function aSite(origin: string) {
 	});
 
 	it("links to each locale's page through Astro's i18n routing", async () => {
-		await page.goto(`${origin}/ro/about/`);
+		await page.goto(`${site.origin}/ro/about/`);
 
 		expect(await page.locator("#home").getAttribute("href")).toBe("/ro/");
 		const languages = await page.locator("#languages a").all();
@@ -141,23 +170,25 @@ function aSite(origin: string) {
 
 // Building the example takes seconds.
 describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
-	let server: ChildProcess | undefined;
+	const site = { origin: "" };
+	let served: Served | undefined;
 	beforeAll(async () => {
 		built([]);
 		// --ignore-lock: a one-off server in the foreground, which the suite stops. Astro starts its
 		// preview server in the background, out of the suite's reach, when an agent runs the suite.
-		server = await listening(astro, [
+		served = await listening(astro, [
 			"preview",
 			"--port",
-			"4826",
+			"0",
 			"--host",
 			"127.0.0.1",
 			"--ignore-lock",
 		]);
+		site.origin = served.origin;
 	}, 120_000);
-	afterAll(() => server?.kill());
+	afterAll(() => stopped(served));
 
-	aSite("http://127.0.0.1:4826");
+	aSite(site);
 
 	it("type-checks with astro check, the types grai compiled for it included", () => {
 		const { status, stdout, stderr } = spawnSync(astro, ["check"], {
@@ -172,19 +203,20 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 describe("the Astro example, rendered on demand by the Node adapter", {
 	timeout: 30_000,
 }, () => {
-	const origin = "http://127.0.0.1:4827";
-	let server: ChildProcess | undefined;
+	const site = { origin: "" };
+	let served: Served | undefined;
 	beforeAll(async () => {
 		built(["--config", "astro.server.config.ts"]);
-		server = await listening(
+		served = await listening(
 			process.execPath,
 			["dist-server/server/entry.mjs"],
-			{ PORT: "4827", HOST: "127.0.0.1" },
+			{ PORT: "0", HOST: "127.0.0.1" },
 		);
+		site.origin = served.origin;
 	}, 120_000);
-	afterAll(() => server?.kill());
+	afterAll(() => stopped(served));
 
-	aSite(origin);
+	aSite(site);
 
 	it("renders interleaved requests each in its own locale", async () => {
 		const titles: [path: string, title: string][] = [
@@ -195,7 +227,7 @@ describe("the Astro example, rendered on demand by the Node adapter", {
 		const requests = Array.from({ length: 8 }, () => titles).flat();
 		const pages = await Promise.all(
 			requests.map(([path]) =>
-				fetch(origin + path).then((page) => page.text()),
+				fetch(site.origin + path).then((page) => page.text()),
 			),
 		);
 
