@@ -258,7 +258,7 @@ describe("grai/vite's module kinds", () => {
 
 		expect(placed).toEqual({
 			"page.js": [undefined, "page"],
-			"out/runtime.js": ["runtime", "grai-runtime"],
+			"out/dispatch.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"out/plurals.js": ["plurals", "grai-runtime"],
 			"out/formats.js": ["formats", "grai-runtime"],
