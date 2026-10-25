@@ -478,6 +478,30 @@ it("grai watch writes the output, then the shard a catalog's edit changes", asyn
 	expect(await next()).toMatch(/^grai: wrote keys\/0\.js in out \(.+ ms\)$/);
 });
 
+it("grai watch says the output is up to date once a broken catalog is put back as it was", async () => {
+	const { dir } = project(catalogs);
+	const child = spawn(process.execPath, [cli, "watch"], { cwd: dir });
+	onTestFinished(() => {
+		child.kill();
+	});
+	const lines = createInterface({ input: child.stdout })[
+		Symbol.asyncIterator
+	]();
+	const next = async () => String((await lines.next()).value);
+	expect(await next()).toBe("grai: watching grai.config.json and its catalogs");
+	expect(await next()).toMatch(/^grai: wrote 13 files in out/);
+	const catalog = join(dir, "messages", "de.json");
+	const saved = readFileSync(catalog);
+
+	writeFileSync(catalog, "{");
+	for await (const line of createInterface({ input: child.stderr })) {
+		if (line === "grai: 1 error") break;
+	}
+	writeFileSync(catalog, saved);
+
+	expect(await next()).toMatch(/^grai: out is up to date \(.+ ms\)$/);
+});
+
 it("prints the usage and exits with 2 for a command it does not know", async () => {
 	const { dir } = project(catalogs);
 	for (const name of ["build", "constructor", "toString"]) {
