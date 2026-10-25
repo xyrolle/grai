@@ -35,6 +35,8 @@ export function localeReads(
 	const reads = new Set<string>();
 	/** The number selectors, by index, whose category a variant tests. */
 	const categorized = new Set<number>();
+	/** The inputs of the `:string` selectors, by index, whose NFC text a variant tests. */
+	const normalized = new Map<number, string>();
 	const isLocal = (name: string) =>
 		message.plurals.has(name) ||
 		selectors.some(
@@ -53,7 +55,12 @@ export function localeReads(
 			case "plural":
 				return `${value(selector.name)} === ${literal}`;
 			case "input":
-				return `String(${value(selector.name)}) === ${literal}`;
+				if (!selector.normalized) {
+					return `String(${value(selector.input)}) === ${literal}`;
+				}
+				value(selector.input);
+				normalized.set(index, selector.input);
+				return `$${index} === ${JSON.stringify(key.normalize("NFC"))}`;
 			case "number":
 				if (isExactKey(key)) {
 					const number = selector.digits === undefined ? key : literal;
@@ -103,8 +110,17 @@ export function localeReads(
 			? "Number"
 			: called(numberReaders[selector.number]);
 	};
+	const textConsts = () =>
+		[...normalized].map(
+			([index, input]) =>
+				`const $${index} = String(${value(input)}).normalize("NFC"); `,
+		);
 	const prologue = () => {
-		const declarations = [...pluralConsts(), ...numberConsts()].join("");
+		const declarations = [
+			...pluralConsts(),
+			...numberConsts(),
+			...textConsts(),
+		].join("");
 		const takesInputs = [...reads].some((name) => message.inputs.has(name));
 		return { parameter: takesInputs ? "i" : "", declarations };
 	};
