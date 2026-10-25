@@ -61,7 +61,7 @@ import { grai } from "grai/vite";
 export default { plugins: [grai()] };
 ```
 
-The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, each chunk holds only the keys its code uses, once per locale.
+The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, a page loads the keys its code uses in few chunks, each copied once per locale: keys the same pages use share a chunk, and small sets of them are pooled (`docs/design.md`).
 
 A tool that reads a client build's chunks can ask which of grai's modules an id is, rather than spell grai's module ids:
 

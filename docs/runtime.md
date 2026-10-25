@@ -24,7 +24,7 @@ Not adopted:
 - **Strings put in place of the calls after the framework compiled them.** Svelte has compiled each call as a dynamic expression, so the page hydrates as it does with the calls: 23.9–24.1 ms against 23.3–24.3 ms at a 4× slowdown, where `grai/svelte`'s strings take 15.9–16.2 ms (`svelte-texts`). It would also cost the build: SvelteKit has one client build, so a build per locale, 2 more client builds of 8.1 s on app A, cannot serve its pages, and copies per locale of the 326 of its 1,598 client chunks that call a message are 978 more files behind the import map (`inline-cost`).
 - **A strategy lookup per call.** The locale is resolved once per request on the server, and fixed by the bundle in the browser.
 - **A dispatcher generated per key for a text message.** Each copy reads the request's locale itself, and it is slower than one shared dispatcher: 49–103 ns against 19–25 ns a call (`server`). The engine keeps one hot function fast, and thousands of small copies slow. A message with inputs is another matter: through the shared dispatcher, its call of the locale's function goes megamorphic (`docs/followups.md`).
-- **Anything more for "only the keys a page uses".** Per-key modules already do it: on app A, the keys a page loads match the keys its code names, to within two (`bytes`).
+- **Anything more for "only the keys a page uses".** Per-key modules give each set of entries exactly its keys, and the build pools the small sets on purpose (`docs/design.md`): on app A a page loads 56% more keys than it uses, in 17 message chunks rather than 49 (median), and its JS is 1.5% smaller.
 
 ## Compared with other libraries
 
