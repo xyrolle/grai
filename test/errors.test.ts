@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -76,6 +76,14 @@ describe("the config", () => {
 		]);
 		expect(await errorsOf(catalogs, { cookieName: "lang" })).toEqual([
 			'config-invalid: grai.config.json: "cookieName" is read only by the "cookie" strategy, which "strategy" does not list.',
+		]);
+	});
+
+	it("names a locale switch it does not know", async () => {
+		expect(
+			await errorsOf({ en: { title: "Title" } }, { switch: "instant" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place.',
 		]);
 	});
 });
