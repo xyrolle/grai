@@ -11,6 +11,7 @@ import {
 	localeDirectory,
 	messageDirectory,
 	messageOnly,
+	outputPrefix,
 	textModulePrefix,
 } from "./locale-chunks.ts";
 import { outputImports } from "./output-imports.ts";
@@ -22,12 +23,14 @@ export function keysModule(build: Build): string {
 		.join("\n");
 }
 
+/** An output file as a build's key and text modules import it. */
+const outputModule = (file: string) => `${outputPrefix}${file}`;
+
 /**
  * A key's module in a build, from the compiler's model, or nothing for an id that is no key's: the
  * key's code for the browser, or its code for a server.
  */
 export function keyModule(
-	outdir: string,
 	build: Build,
 	id: string,
 	consumer: "client" | "server",
@@ -35,22 +38,18 @@ export function keyModule(
 	const key = build.compilation.keys.get(id.slice(keyModulePrefix.length));
 	if (key === undefined) return undefined;
 	const code = consumer === "server" ? key.serverCode : key.code;
-	return `${outputImports(outdir, [key], key.uses)}\n${code}`;
+	return `${outputImports(outputModule, [key], key.uses)}\n${code}`;
 }
 
 /**
  * A text key's string module in a client build: its text in the page's locale, chosen once. Its
  * variants are the key's, so each locale's copy of its chunk keeps only that locale's words.
  */
-export function textModule(
-	outdir: string,
-	build: Build,
-	id: string,
-): string | undefined {
+export function textModule(build: Build, id: string): string | undefined {
 	const name = id.slice(textModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key?.kind !== "text") return undefined;
-	return `${outputImports(outdir, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
+	return `${outputImports(outputModule, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
 }
 
 /**

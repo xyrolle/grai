@@ -7,6 +7,7 @@ import { messagesOf } from "./error.ts";
 import {
 	isMessageModule,
 	keyPrefix,
+	outputPrefix,
 	textModulePrefix,
 	textPrefix,
 } from "./locale-chunks.ts";
@@ -63,10 +64,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		compiled: Build,
 		consumer: "client" | "server",
 	) => {
-		if (id.startsWith(textModulePrefix))
-			return textModule(files.outdir, compiled, id);
-		if (id !== files.keysFile)
-			return keyModule(files.outdir, compiled, id, consumer);
+		if (id.startsWith(textModulePrefix)) return textModule(compiled, id);
+		if (id !== files.keysFile) return keyModule(compiled, id, consumer);
 		return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
 	};
 
@@ -164,6 +163,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			// output, looks for it before it exists. A page whose import failed would stay broken.
 			order: "pre",
 			async handler(id, importer, options) {
+				if (id.startsWith(outputPrefix))
+					return join(files.outdir, id.slice(outputPrefix.length));
 				if (
 					id.startsWith(keyPrefix) ||
 					id.startsWith(textPrefix) ||

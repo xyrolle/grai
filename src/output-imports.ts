@@ -1,13 +1,12 @@
-import { join } from "node:path";
 import type { CompiledKey } from "./compilation.ts";
 
 /**
- * The imports a module of keys needs from the output: the runtime functions it names, the
- * `unmatched` the keys' code throws with, the functions of plurals.js they count with, and
- * the formatters they call.
+ * The imports a module of keys needs from the output, each file named by `specifier`: the runtime
+ * functions it names, the `unmatched` the keys' code throws with, the functions of plurals.js they
+ * count with, and the formatters they call.
  */
 export function outputImports(
-	outdir: string,
+	specifier: (file: string) => string,
 	keys: Iterable<CompiledKey>,
 	functions: Iterable<string>,
 ): string {
@@ -19,7 +18,7 @@ export function outputImports(
 		for (const name of key.plurals) plurals.add(name);
 		for (const name of key.formats.keys()) formats.add(name);
 	}
-	const from = (file: string) => JSON.stringify(join(outdir, file));
+	const from = (file: string) => JSON.stringify(specifier(file));
 	const lines = [
 		`import { ${[...uses].sort().join(", ")} } from ${from("runtime.js")};`,
 	];

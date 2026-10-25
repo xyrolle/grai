@@ -1,10 +1,14 @@
 import {
+	cpSync,
 	existsSync,
 	mkdirSync,
+	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
@@ -281,6 +285,33 @@ describe("the Vite plugin's message chunks", () => {
 				words(file.replace("grai/", "grai-de/"), "de"),
 			]).toEqual([true, false, false, true]);
 		}
+	});
+
+	it("chunks a project alike wherever it lives", async () => {
+		// Enough keys on one page, and a directory deep enough, that the directory's path in each key
+		// module's code would alone lift the page's keys past ownChunkBytes.
+		const deep = join(...Array.from({ length: 4 }, () => "d".repeat(200)));
+		const keys = Array.from(
+			{ length: Math.ceil(ownChunkBytes / deep.length) + 1 },
+			(_, index) => `key${index}`,
+		);
+		const catalog = Object.fromEntries(
+			[...keys, "other"].map((key) => [key, key]),
+		);
+		const near = project({ en: catalog, de: catalog }).dir;
+		const root = realpathSync(mkdtempSync(join(tmpdir(), "grai-")));
+		onTestFinished(() => rmSync(root, { recursive: true }));
+		const far = join(root, deep);
+		cpSync(near, far, { recursive: true });
+		const entries = {
+			page: `import { m } from "./out/messages.js";\nconsole.log(${keys.map((key) => `m.${key}()`).join(", ")});\n`,
+			other: `import { m } from "./out/messages.js";\nconsole.log(m.other());\n`,
+		};
+
+		const nearChunks = keysOf((await built(near, entries)).chunks);
+
+		expect(keysOf((await built(far, entries)).chunks)).toEqual(nearChunks);
+		expect(nearChunks.size).toBe(1);
 	});
 });
 
