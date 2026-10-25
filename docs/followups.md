@@ -14,6 +14,12 @@ The config accepts `"live"`, and `grai/svelte` then keeps every message a call, 
 
 Done when: under `"live"`, a page re-renders in the locale it switches to, and a browser test shows that a production build and dev switch the same way.
 
+## `setLocale(locale, { reload: false })` as its type says
+
+`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. The runtime still sets `<html lang>` and `dir` under both, renders the messages called next in the new locale, and returns nothing.
+
+Done when: under `"reload"`, `{ reload: false }` keeps the choice and leaves the page's messages as they are; under `"live"`, it returns that promise (the entry above); and a browser test shows each.
+
 ## A dispatcher per key for a message with inputs
 
 Every message with inputs or markup dispatches through the runtime's one `message()` closure. V8 gives every closure of that literal one feedback vector, so its call of the locale's function sees every key's function and goes megamorphic. A call with inputs then costs 18–19 ns in a page against 11.7–12.3 ns for Paraglide's given `{ locale }` (`client`), and 110–130 ns against 67–122 ns on the server (`server`). An experiment outside `bench/`, which rewrote each such key's dispatch on the compiled output as a function of its own, took app A's call to 10.2 ns from 19.7 in Chromium, and to 43 ns from 53 in a request. A text message calls nothing through the dispatcher and keeps it.
