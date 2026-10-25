@@ -148,7 +148,7 @@ describe("grai/svelte's client build", () => {
 		);
 
 		expect(placed).toEqual({
-			"out/runtime.js": ["runtime", "grai-runtime"],
+			"out/dispatch.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"\0grai:text/title": ["text", "grai~client"],
 			"\0grai:key/greeting": ["key", "grai~client"],
