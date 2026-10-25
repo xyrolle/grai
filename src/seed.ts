@@ -61,13 +61,40 @@ export function isSeed(
 	}
 }
 
+/**
+ * Why a base message cannot be seeded, if it cannot: it is invalid, or its seed would not compile
+ * in the locale. Either is an error, so that seeding never writes a catalog that fails.
+ */
+function seedProblem(
+	key: string,
+	value: unknown,
+	file: string,
+	baseLocale: string,
+	locale: string,
+): GraiError | undefined {
+	let checked = baseLocale;
+	try {
+		parseMessage(baseLocale, value);
+		checked = locale;
+		parseMessage(locale, seedValue(value, locale));
+		return undefined;
+	} catch (error) {
+		if (!(error instanceof MessageProblem)) throw error;
+		const detail =
+			checked === baseLocale
+				? error.message
+				: `its seed would not compile in ${locale}: ${error.message}`;
+		return new GraiError(error.code, { file, key, locale: checked }, detail);
+	}
+}
+
 /** What seeding wrote: the catalog, and how many keys it gave the base text. */
 export type Seeded = { file: string; keys: number; result: CompileResult };
 
 /**
  * Gives a locale's catalog the base text of every key it lacks, after the keys it has, creating
  * the catalog when there is none yet, then compiles. It writes nothing when the locale is not one
- * to seed, or a base message is invalid.
+ * to seed, a base message is invalid, or a seed would not compile in the locale.
  */
 export async function seed(
 	configFile: string,
@@ -80,14 +107,18 @@ export async function seed(
 	const problems: GraiError[] = [];
 	for (const [key, value] of base.messages) {
 		if (target?.messages.has(key)) continue;
-		try {
-			parseMessage(config.baseLocale, value);
-			seeded.push([base.paths.get(key) ?? [key], seedValue(value, locale)]);
-		} catch (error) {
-			if (!(error instanceof MessageProblem)) throw error;
-			const where = { file: base.file, key, locale: config.baseLocale };
-			problems.push(new GraiError(error.code, where, error.message));
+		const problem = seedProblem(
+			key,
+			value,
+			base.file,
+			config.baseLocale,
+			locale,
+		);
+		if (problem !== undefined) {
+			problems.push(problem);
+			continue;
 		}
+		seeded.push([base.paths.get(key) ?? [key], seedValue(value, locale)]);
 	}
 	if (problems.length > 0) return { errors: problems };
 	if (seeded.length > 0) {
