@@ -291,7 +291,7 @@ it("types a runtime GraiError's code as one of the codes the runtime throws", as
 		"use.ts",
 		`import type { GraiError } from "./out/runtime.js";
 declare const error: GraiError;
-const codes: ("locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid" | "locale-unbound")[] = [error.code];
+const codes: ("locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound")[] = [error.code];
 const unbound: GraiError["code"] = "locale-unbound";
 const compiling = error.code === "key-missing";
 console.log(codes, unbound, compiling);
