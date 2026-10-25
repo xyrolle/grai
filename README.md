@@ -82,9 +82,9 @@ It is `grai/vite`'s plugin, and in the client build a component's call of a mess
 
 `grai/next` is in review (#29).
 
-### A plain server or Workers
+### Workers, Bun, Deno and Node
 
-The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), and binds it for everything the handler calls:
+The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
 
 ```ts
 // src/worker.ts
@@ -97,7 +97,13 @@ export default {
 };
 ```
 
-It needs `node:async_hooks`, which Node, Deno, Bun and Workers with `nodejs_compat` have.
+Workers, Bun (`bun src/worker.ts`) and Deno (`deno serve src/worker.ts`) serve this module as it is. `examples/workers` is a complete Worker, and `test/workers.test.ts` serves it in all three. In Hono, which also runs on Node, the middleware is one line:
+
+```ts
+app.use((c, next) => middleware(c.req.raw, () => next().then(() => c.res)));
+```
+
+It needs `AsyncLocalStorage`, from `node:async_hooks`, which Node, Bun and Deno have. Workers have it by default from compatibility date 2026-08-04; on an earlier date, add the `nodejs_als` compatibility flag, which adds only that.
 
 ### Tests
 

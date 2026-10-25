@@ -1,6 +1,6 @@
 // The request middleware for servers. The compiler copies this file into the output as it is.
-// Client code never imports it: it needs node:async_hooks, which Node, Deno, Bun and Workers with
-// nodejs_compat have.
+// Client code never imports it: it needs node:async_hooks, which Node, Deno and Bun have, and
+// Workers too, by default from compatibility date 2026-08-04, else with the nodejs_als flag.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { baseLocale, cookieName, locales, strategy } from "./config.js";
 import { bindRequests, extractLocaleFromUrl } from "./runtime.js";

@@ -222,6 +222,13 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
+## Servers
+
+- **One middleware serves every runtime, with no adapter.** It takes a `Request` and a handler and gives back the handler's `Response`: the shape of a fetch handler on Workers, Bun and Deno, and of Hono's middleware in one line, `(c, next) => middleware(c.req.raw, () => next().then(() => c.res))`. An adapter would add a name and no behaviour.
+- **On Workers it needs only `AsyncLocalStorage`.** Workers have it by default from compatibility date 2026-08-04, with the rest of Node.js compatibility. On an earlier date the `nodejs_als` flag adds it alone, and without it the Worker does not start: `No such module "node:async_hooks"`. `test/workers.test.ts` runs the example under the default, and its interleaving Worker with `nodejs_als` alone.
+- **A request's locale holds across its awaits in workerd, Bun and Deno, as in Node.** In the test, 30 requests in three locales are all in flight at once in each runtime, and each renders again after an await in its own locale, or in the one its `setLocale` chose.
+- **The tests get Bun and Deno from pnpm's runtime protocol** (`"bun": "runtime:1.4.4"` in the devDependencies), as they get workerd from Wrangler: one `pnpm install` brings every runtime they serve the example in, at a pinned version, with nothing installed globally.
+
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
