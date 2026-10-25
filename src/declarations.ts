@@ -178,13 +178,13 @@ export declare function getLocale(): Locale;
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;
 /** The direction a locale's script is written in, the bound locale's by default. */
 export declare function getTextDirection(locale?: Locale): "ltr" | "rtl";
-/** The locale a URL's first path segment names, else the base locale. */
+/** The locale a URL's first path segment names under the \`url\` strategy, else the base locale. */
 export declare function extractLocaleFromUrl(url: string | URL): Locale;
-/** A URL without its locale prefix. */
+/** A URL without its locale prefix; without the \`url\` strategy, as it is. */
 export declare function deLocalizeUrl(url: string | URL): URL;
-/** A URL with a locale's prefix: the current locale's, unless \`options.locale\` names another. */
+/** A URL with a locale's prefix under the \`url\` strategy: the current locale's, unless \`options.locale\` names another. */
 export declare function localizeUrl(url: string | URL, options?: { locale?: Locale }): URL;
-/** A path such as \`/cart\` with a locale's prefix; any other href as it is. */
+/** A path such as \`/cart\` with a locale's prefix under the \`url\` strategy; any other href as it is. */
 export declare function localizeHref(href: string, options?: { locale?: Locale }): string;
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export declare class GraiError extends Error {

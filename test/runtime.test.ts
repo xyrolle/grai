@@ -325,8 +325,8 @@ document.body.textContent = before + " | " + seen();
 	});
 });
 
-it("localizes paths and URLs by their first segment, the base locale having none", async () => {
-	const { runtime } = await output();
+it("localizes paths and URLs by their first segment under the url strategy, the base locale having none", async () => {
+	const { runtime } = await output({ strategy: ["url"] });
 	runtime.setLocale("de", { reload: false });
 
 	expect(runtime.localizeHref("/cart?step=2#total")).toBe(
@@ -350,4 +350,22 @@ it("localizes paths and URLs by their first segment, the base locale having none
 		"rtl",
 		"ltr",
 	]);
+});
+
+it("leaves paths and URLs as they are without the url strategy, since no URL then names a locale", async () => {
+	const { runtime } = await output({
+		strategy: ["cookie"],
+		cookieName: "lang",
+	});
+	runtime.setLocale("de", { reload: false });
+
+	expect(runtime.localizeHref("/cart?step=2#total")).toBe("/cart?step=2#total");
+	expect(runtime.localizeHref("/ar/cart", { locale: "en" })).toBe("/ar/cart");
+	expect(String(runtime.deLocalizeUrl("https://shop.test/ar/cart"))).toBe(
+		"https://shop.test/ar/cart",
+	);
+	expect(
+		String(runtime.localizeUrl("https://shop.test/cart", { locale: "ar" })),
+	).toBe("https://shop.test/cart");
+	expect(runtime.extractLocaleFromUrl("https://shop.test/ar/x")).toBe("en");
 });

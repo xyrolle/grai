@@ -10,6 +10,9 @@ import {
 
 export { baseLocale, cookieName, locales };
 
+/** Whether a URL names its locale: only under the `url` strategy, else every path is the app's own. */
+const urlsNameLocales = strategy.includes("url");
+
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {
 	/** @override */
@@ -149,12 +152,13 @@ export function getTextDirection(locale) {
 
 /**
  * The locale a URL names: its first path segment when that is a locale other than the base
- * locale, which has no prefix.
+ * locale, which has no prefix. Without the `url` strategy no URL names one: the base locale.
  *
  * @param {string | URL} url
  * @returns {string}
  */
 export function extractLocaleFromUrl(url) {
+	if (!urlsNameLocales) return baseLocale;
 	const first = new URL(url).pathname.split("/")[1];
 	return first !== undefined && first !== baseLocale && isLocale(first)
 		? first
@@ -162,7 +166,7 @@ export function extractLocaleFromUrl(url) {
 }
 
 /**
- * A URL without its locale prefix.
+ * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is.
  *
  * @param {string | URL} url
  * @returns {URL}
@@ -170,7 +174,7 @@ export function extractLocaleFromUrl(url) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (first !== baseLocale && isLocale(first)) {
+	if (urlsNameLocales && first !== baseLocale && isLocale(first)) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -178,6 +182,7 @@ export function deLocalizeUrl(url) {
 
 /**
  * A URL with a locale's prefix: the current locale's, unless `options.locale` names another.
+ * Without the `url` strategy no URL takes one, and it stays as it is.
  *
  * @param {string | URL} url
  * @param {{ locale?: string }} [options]
@@ -186,12 +191,15 @@ export function deLocalizeUrl(url) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
-	if (locale !== baseLocale) copy.pathname = `/${locale}${copy.pathname}`;
+	if (urlsNameLocales && locale !== baseLocale) {
+		copy.pathname = `/${locale}${copy.pathname}`;
+	}
 	return copy;
 }
 
 /**
- * A path such as `/cart?step=2` with a locale's prefix. Any other href is given back as it is.
+ * A path such as `/cart?step=2` with a locale's prefix, under the `url` strategy. Any other href,
+ * and every href without that strategy, is given back as it is.
  *
  * @param {string} href
  * @param {{ locale?: string }} [options]
