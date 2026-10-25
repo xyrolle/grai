@@ -63,7 +63,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, tests, identicalToBase, fallbacks, pseudoLocale.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -152,6 +152,30 @@ describe("the config", () => {
 		).toEqual([]);
 	});
 
+	it("takes unlocalizedPaths only with the url strategy, as globs of paths", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { unlocalizedPaths: ["/app/**"] })).toEqual(
+			[
+				'config-invalid: grai.config.json: "unlocalizedPaths" is read only by the "url" strategy, which "strategy" does not list.',
+			],
+		);
+		expect(
+			await errorsOf(catalogs, {
+				strategy: ["url"],
+				unlocalizedPaths: ["app/**"],
+			}),
+		).toEqual([
+			'config-invalid: grai.config.json: "unlocalizedPaths" must list globs of paths, each starting with /, of *, **, ? and {a,b}, such as ["/api/**"].',
+		]);
+		expect(
+			await errorsOf(catalogs, {
+				strategy: ["url", "preferredLanguage"],
+				unlocalizedPaths: ["/app/**"],
+			}),
+		).toEqual([]);
+	});
+
 	it("is an error when a strategy follows url, which finds a locale in every path", async () => {
 		expect(
 			await errorsOf(
@@ -162,7 +186,7 @@ describe("the config", () => {
 				},
 			),
 		).toEqual([
-			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url", or prefix every locale\'s paths with "localePrefix": "always".',
+			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url", prefix every locale\'s paths with "localePrefix": "always", or name the paths "url" leaves to them in "unlocalizedPaths".',
 		]);
 	});
 

@@ -365,6 +365,62 @@ describe("with every locale's paths prefixed", () => {
 	});
 });
 
+describe("with paths the url strategy leaves alone", () => {
+	const answer = async (
+		middleware: Awaited<ReturnType<typeof output>>["middleware"],
+		path: string,
+		cookie = "",
+	) => {
+		const response = await middleware(
+			new Request(`https://shop.test${path}`, { headers: { cookie } }),
+			({ locale }) => new Response(locale),
+		);
+		return [
+			response.status,
+			response.headers.get("location") ?? (await response.text()),
+		];
+	};
+
+	it("finds an app page's locale by the strategies after url, and links to it without a prefix", async () => {
+		const { middleware, runtime } = await output({
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			unlocalizedPaths: ["/app", "/app/**"],
+		});
+
+		expect([
+			await answer(middleware, "/de/cart", "lang=ar"),
+			await answer(middleware, "/app/orders", "lang=ar"),
+			await answer(middleware, "/app"),
+			runtime.localizeHref("/app/orders", { locale: "de" }),
+			runtime.localizeHref("/cart", { locale: "de" }),
+		]).toEqual([
+			[200, "de"],
+			[200, "ar"],
+			[200, "en"],
+			"/app/orders",
+			"/de/cart",
+		]);
+	});
+
+	it("sends no app page to a prefixed path, with every locale's paths prefixed", async () => {
+		const { middleware } = await output({
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			localePrefix: "always",
+			unlocalizedPaths: ["/api/**"],
+		});
+
+		expect([
+			await answer(middleware, "/api/orders", "lang=de"),
+			await answer(middleware, "/cart", "lang=de"),
+		]).toEqual([
+			[200, "de"],
+			[307, "https://shop.test/de/cart"],
+		]);
+	});
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies and its reloads. */
 	function page(lang: string) {

@@ -26,6 +26,8 @@ export type Config = {
 	switch: LocaleSwitch;
 	/** Whether the `url` strategy's paths have a prefix for every locale, or for all but the base. */
 	localePrefix: LocalePrefix;
+	/** Globs of the paths the `url` strategy leaves alone, which the strategies after it localize. */
+	unlocalizedPaths: readonly string[];
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
 	tests: readonly string[];
 	/** Each locale's keys whose message is the base text on purpose, which are not untranslated. */
@@ -63,6 +65,7 @@ const fields = new Set([
 	"cookieName",
 	"switch",
 	"localePrefix",
+	"unlocalizedPaths",
 	"tests",
 	"identicalToBase",
 	"fallbacks",
@@ -106,6 +109,7 @@ export function readConfig(file: string): Config {
 		cookieName,
 		switch: localeSwitch = "reload",
 		localePrefix,
+		unlocalizedPaths = [],
 		tests = conventionalTests,
 		identicalToBase = {},
 		fallbacks = {},
@@ -156,12 +160,23 @@ export function readConfig(file: string): Config {
 			'"localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one',
 		);
 	}
+	if (!isPathPatternList(unlocalizedPaths)) {
+		throw invalid(
+			'"unlocalizedPaths" must list globs of paths, each starting with /, of *, **, ? and {a,b}, such as ["/api/**"]',
+		);
+	}
+	if (unlocalizedPaths.length > 0 && !strategy.includes("url")) {
+		throw invalid(
+			'"unlocalizedPaths" is read only by the "url" strategy, which "strategy" does not list',
+		);
+	}
 	const prefix: LocalePrefix = localePrefix ?? "as-needed";
-	const shadowed = prefix === "always" ? [] : afterUrl(strategy);
+	const urlFindsAll = prefix === "as-needed" && unlocalizedPaths.length === 0;
+	const shadowed = urlFindsAll ? afterUrl(strategy) : [];
 	if (shadowed.length > 0) {
 		const them = shadowed.length === 1 ? "it" : "them";
 		throw invalid(
-			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url", or prefix every locale's paths with "localePrefix": "always"`,
+			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url", prefix every locale's paths with "localePrefix": "always", or name the paths "url" leaves to ${them} in "unlocalizedPaths"`,
 		);
 	}
 	const readsCookie = strategy.includes("cookie");
@@ -217,6 +232,7 @@ export function readConfig(file: string): Config {
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 		switch: localeSwitch,
 		localePrefix: prefix,
+		unlocalizedPaths,
 		tests,
 		identicalToBase: readIdenticalToBase(
 			identicalToBase,
@@ -267,6 +283,13 @@ function isStrategy(value: unknown): value is Strategy[] {
 		Array.isArray(value) &&
 		value.every((item) => typeof item === "string" && strategies.has(item)) &&
 		new Set(value).size === value.length
+	);
+}
+
+/** Whether a value is a list of globs of URL paths, each starting with /. */
+function isPathPatternList(value: unknown): value is string[] {
+	return (
+		isPatternList(value) && value.every((pattern) => pattern.startsWith("/"))
 	);
 }
 

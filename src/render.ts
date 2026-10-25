@@ -7,6 +7,7 @@ import {
 } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import { formatModule } from "./formatters.ts";
+import { globPattern } from "./globs.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule } from "./plurals.ts";
 
@@ -213,6 +214,8 @@ function configModule(config: Config): string {
 		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
 		'/** @type {"as-needed" | "always"} */',
 		`export const localePrefix = ${JSON.stringify(config.localePrefix)};`,
+		"/** @type {readonly RegExp[]} */",
+		`export const unlocalizedPaths = [${config.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
 		"",
 	].join("\n");
 }

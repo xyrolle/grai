@@ -33,8 +33,13 @@ function hasPairedBraces(text: string): boolean {
 export function globMatcher(
 	globs: readonly string[],
 ): (path: string) => boolean {
-	const patterns = globs.map((glob) => new RegExp(`^${patternSource(glob)}$`));
+	const patterns = globs.map(globPattern);
 	return (path) => patterns.some((pattern) => pattern.test(path));
+}
+
+/** A glob, which `isGlob` accepts, as a regular expression that matches a whole path. */
+export function globPattern(glob: string): RegExp {
+	return new RegExp(`^${patternSource(glob)}$`);
 }
 
 /** A glob's regular expression, without its anchors. */
