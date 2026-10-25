@@ -10,12 +10,11 @@ const tsc = fileURLToPath(new URL("../node_modules/.bin/tsc", import.meta.url));
 const types = fileURLToPath(new URL("../node_modules/@types", import.meta.url));
 
 /**
- * What TypeScript reports on the output under an app's strict checkJs: every check
- * @tsconfig/strictest turns on but noPropertyAccessFromIndexSignature (docs/followups.md). Every
- * file is listed, as a checker that takes each JavaScript file on its own does: a listed file is
- * checked even beside a declaration file of its name.
+ * What TypeScript reports on the output under an app's strictest checkJs, every check
+ * @tsconfig/strictest turns on. Every file is listed, as a checker that takes each JavaScript file
+ * on its own does: a listed file is checked even beside a declaration file of its name.
  */
-async function strictCheckJs(dir: string, output: string): Promise<string> {
+async function strictestCheckJs(dir: string, output: string): Promise<string> {
 	const files = readdirSync(output, { recursive: true, encoding: "utf8" })
 		.filter((file) => /\.(js|d\.ts)$/.test(file))
 		.map((file) => join(output, file));
@@ -36,6 +35,7 @@ async function strictCheckJs(dir: string, output: string): Promise<string> {
 				noFallthroughCasesInSwitch: true,
 				allowUnreachableCode: false,
 				allowUnusedLabels: false,
+				noPropertyAccessFromIndexSignature: true,
 				verbatimModuleSyntax: true,
 				noEmit: true,
 				module: "esnext",
@@ -61,7 +61,7 @@ it.each([
 		{ strategy: ["cookie", "url"], cookieName: "lang" },
 	],
 ])(
-	"writes JavaScript that an app's strict checkJs takes, unused locals checked, with %s",
+	"writes JavaScript that an app's strictest checkJs takes, unused locals checked, with %s",
 	async (_, config) => {
 		const { dir, compile } = project(
 			{
@@ -94,6 +94,7 @@ it.each([
 					cart_shipped: "Shipped {when :date}",
 					cart_converted: "In {amount :currency currency=$code}",
 					cart_guests: "With {names :list}, {days :relativetime unit=day}",
+					cart_waited: "{n :relativetime unit=$unit numeric=auto}",
 					cart_place: [
 						{
 							declarations: [
@@ -148,6 +149,7 @@ it.each([
 					cart_shipped: "شحن {when :date}",
 					cart_converted: "بعملة {amount :currency currency=$code}",
 					cart_guests: "مع {names :list}، {days :relativetime unit=day}",
+					cart_waited: "{n :relativetime unit=$unit numeric=auto}",
 					cart_place: [
 						{
 							declarations: [
@@ -171,11 +173,13 @@ it.each([
 		);
 		expect((await compile()).errors).toEqual([]);
 
-		expect(await strictCheckJs(dir, join(dir, "src", "lib", "i18n"))).toBe("");
+		expect(await strictestCheckJs(dir, join(dir, "src", "lib", "i18n"))).toBe(
+			"",
+		);
 	},
 );
 
-it("writes plurals.js that an app's strict checkJs takes when no locale's rules read a count", async () => {
+it("writes plurals.js that an app's strictest checkJs takes when no locale's rules read a count", async () => {
 	const items = [
 		{
 			declarations: ["input count", "local countPlural = count: plural"],
@@ -186,5 +190,5 @@ it("writes plurals.js that an app's strict checkJs takes when no locale's rules 
 	const { dir, compile } = project({ ja: { items }, zh: { items } });
 	expect((await compile()).errors).toEqual([]);
 
-	expect(await strictCheckJs(dir, join(dir, "out"))).toBe("");
+	expect(await strictestCheckJs(dir, join(dir, "out"))).toBe("");
 });

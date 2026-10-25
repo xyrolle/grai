@@ -8,6 +8,11 @@ import {
 	readIdenticalToBase,
 } from "./identical-to-base.ts";
 import { categoriesOf, type PluralType } from "./plurals.ts";
+import {
+	readUrlRouting,
+	type UrlRouting,
+	urlRoutingFields,
+} from "./url-routing.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -24,6 +29,8 @@ export type Config = {
 	cookieName: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
+	/** Which locales' paths the `url` strategy prefixes, each one's prefix, and the paths it leaves alone. */
+	urlRouting: UrlRouting;
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
 	tests: readonly string[];
 	/** Each locale's keys whose message is the base text on purpose, which are not untranslated. */
@@ -57,6 +64,7 @@ const fields = new Set([
 	"strategy",
 	"cookieName",
 	"switch",
+	...urlRoutingFields,
 	"tests",
 	"identicalToBase",
 	"fallbacks",
@@ -135,13 +143,7 @@ export function readConfig(file: string): Config {
 			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
 		);
 	}
-	const shadowed = afterUrl(strategy);
-	if (shadowed.length > 0) {
-		const them = shadowed.length === 1 ? "it" : "them";
-		throw invalid(
-			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url"`,
-		);
-	}
+	const urlRouting = readUrlRouting(raw, strategy, locales, invalid);
 	const readsCookie = strategy.includes("cookie");
 	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
 		throw invalid(
@@ -194,6 +196,7 @@ export function readConfig(file: string): Config {
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 		switch: localeSwitch,
+		urlRouting,
 		tests,
 		identicalToBase: readIdenticalToBase(
 			identicalToBase,
@@ -204,12 +207,6 @@ export function readConfig(file: string): Config {
 		fallbacks: readFallbacks(fallbacks, locales, baseLocale, invalid),
 		pseudoLocale: typeof pseudoLocale === "string" ? pseudoLocale : undefined,
 	};
-}
-
-/** The strategies listed after `url`, which finds a locale in every path and so ends the search. */
-function afterUrl(strategy: readonly Strategy[]): readonly Strategy[] {
-	const url = strategy.indexOf("url");
-	return url === -1 ? [] : strategy.slice(url + 1);
 }
 
 /**

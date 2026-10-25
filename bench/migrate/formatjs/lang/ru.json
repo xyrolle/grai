@@ -1,0 +1,7 @@
+{
+	"shop.title": "Магазин",
+	"shop.greeting": "Привет, {name}!",
+	"cart.items": "{count, plural, =0 {Корзина пуста} one {# товар} few {# товара} many {# товаров} other {# товара}}",
+	"cart.total": "Итого: {sum, number}",
+	"order.status": "{status, select, shipped {В пути} delivered {Доставлен} other {Собирается}}"
+}

@@ -1,0 +1,12 @@
+{
+	"Home": {
+		"title": "Добро пожаловать",
+		"greeting": "Привет, {name}!",
+		"items": "{count, plural, =0 {Нет товаров} one {# товар} few {# товара} many {# товаров} other {# товара}}",
+		"ranked": "Вы заняли {place, selectordinal, other {#-е}} место"
+	},
+	"About": {
+		"title": "О нас",
+		"visits": "{count, number} посещений"
+	}
+}

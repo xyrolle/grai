@@ -6,11 +6,14 @@ import { devModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import {
 	isMessageModule,
+	keyModulePrefix,
 	keyPrefix,
 	textModulePrefix,
 	textPrefix,
 } from "./locale-chunks.ts";
 import { moduleOf } from "./message-imports.ts";
+import { shippedMissingKeyCalls } from "./missing-key-calls.ts";
+import { realPath } from "./real-path.ts";
 import {
 	chunkFileName,
 	keyModule,
@@ -21,8 +24,10 @@ import {
 } from "./vite-build.ts";
 import {
 	followedFile,
+	keyFromKeys,
 	type ProjectFiles,
 	patchPrefix,
+	pathKey,
 	serveMessages,
 } from "./vite-dev.ts";
 
@@ -42,6 +47,8 @@ export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
 export function graiPlugin(options: GraiOptions): GraiPlugin {
 	let files: ProjectFiles = { configFile: "", outdir: "", keysFile: "" };
 	let serving = false;
+	/** Whether Vite runs tests, as Vitest has it, where a module is what a test can mock. */
+	let testing = false;
 	let build: Build | undefined;
 	/** The first compile: its build, or the errors that kept it from one. */
 	let first: Promise<Build | readonly Error[]> | undefined;
@@ -50,6 +57,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		_key: string,
 		_importer: string,
 	): string | undefined => undefined;
+	/** The places the shipped sources name a key no catalog has, found once for every environment. */
+	let missingCalls: readonly Error[] | undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
@@ -65,21 +74,25 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	) => {
 		if (id.startsWith(textModulePrefix))
 			return textModule(files.outdir, compiled, id);
-		if (id !== files.keysFile)
-			return keyModule(files.outdir, compiled, id, consumer);
-		return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
+		if (id === files.keysFile)
+			return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
+		return serving
+			? keyFromKeys(files, id.slice(keyModulePrefix.length))
+			: keyModule(files.outdir, compiled, id, consumer);
 	};
 
 	const plugin: Plugin = {
 		name: "grai",
 		config(config, environment) {
-			const configFile = resolve(
-				config.root ?? "",
-				options.config ?? "grai.config.json",
+			// Real paths, as the bundler names modules: a project reached through a symlink would
+			// otherwise match none of its own module ids.
+			const configFile = realPath(
+				resolve(config.root ?? "", options.config ?? "grai.config.json"),
 			);
-			const { outdir } = readConfig(configFile);
+			const outdir = realPath(readConfig(configFile).outdir);
 			files = { configFile, outdir, keysFile: join(outdir, "keys.js") };
 			serving = environment.command === "serve";
+			testing = environment.mode === "test";
 		},
 		configEnvironment(name) {
 			return !serving && name === "client"
@@ -133,6 +146,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			);
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
+			missingCalls ??= shippedMissingKeyCalls(compiled);
+			if (missingCalls.length > 0) this.error(messagesOf(missingCalls));
 		},
 		configureServer(server) {
 			let ready: (compiled: Build | readonly Error[]) => void = () => {};
@@ -171,7 +186,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 				)
 					return `\0${id}`;
 				if (!serving) return null;
-				await first;
+				const compiled = build ?? (await first);
 				// Vite's resolver takes a per-key path to keys.js and to its exports alone, so a key no
 				// catalog has would fail the page; it gets a module of its own instead.
 				const module = moduleOf(id);
@@ -181,7 +196,16 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 					skipSelf: true,
 				});
 				if (resolved?.id !== files.keysFile) return resolved;
-				return missingKeyImport(module.key, importer) ?? resolved;
+				const missing = missingKeyImport(module.key, importer);
+				if (missing !== undefined) return missing;
+				// In a test run, a key's path that the app maps to keys.js resolves to that key's module
+				// alone, so a test that mocks the path mocks that key and no other. A page keeps keys.js
+				// as one module, since a module per key costs it a request each.
+				const key =
+					testing && compiled !== undefined && "compilation" in compiled
+						? pathKey(compiled, id)
+						: undefined;
+				return key === undefined ? resolved : `\0${keyPrefix}${key}`;
 			},
 		},
 		async load(id) {

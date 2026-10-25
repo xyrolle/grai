@@ -246,7 +246,9 @@ function basePositionsMoved(
 ): boolean {
 	if (base === previous) return false;
 	return (
-		base?.edit === undefined || base.edit.from !== previous || base.edit.moved
+		base?.edit === undefined ||
+		base.edit.from !== previous?.revision ||
+		base.edit.moved
 	);
 }
 
@@ -260,6 +262,7 @@ function inputsOf(config: Config, hashes: readonly string[]): string {
 			config.baseLocale,
 			config.strategy,
 			config.cookieName,
+			config.urlRouting,
 			[...config.fallbacks],
 			hashes,
 		]),

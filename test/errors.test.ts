@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { GraiError, sortErrors } from "../src/error.ts";
 import { compile } from "../src/index.ts";
 import { errorsOf, project } from "./project.ts";
 
@@ -63,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests, identicalToBase, fallbacks, pseudoLocale.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -133,6 +134,70 @@ describe("the config", () => {
 		]);
 	});
 
+	it("takes localePrefix only with the url strategy, and a strategy after url only with every locale prefixed", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { localePrefix: "always" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefix" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], localePrefix: "never" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one.',
+		]);
+		expect(
+			await errorsOf(catalogs, {
+				strategy: ["url", "preferredLanguage"],
+				localePrefix: "always",
+			}),
+		).toEqual([]);
+	});
+
+	it("takes unlocalizedPaths only with the url strategy, as globs of paths", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { unlocalizedPaths: ["/app/**"] })).toEqual(
+			[
+				'config-invalid: grai.config.json: "unlocalizedPaths" is read only by the "url" strategy, which "strategy" does not list.',
+			],
+		);
+		expect(
+			await errorsOf(catalogs, {
+				strategy: ["url"],
+				unlocalizedPaths: ["app/**"],
+			}),
+		).toEqual([
+			'config-invalid: grai.config.json: "unlocalizedPaths" must list globs of paths, each starting with /, of *, **, ? and {a,b}, such as ["/api/**"].',
+		]);
+		expect(
+			await errorsOf(catalogs, {
+				strategy: ["url", "preferredLanguage"],
+				unlocalizedPaths: ["/app/**"],
+			}),
+		).toEqual([]);
+	});
+
+	it("takes localePrefixes only as path segments of the url strategy's locales, each its own", async () => {
+		const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+		const errors = (localePrefixes: unknown) =>
+			errorsOf(catalogs, { strategy: ["url"], localePrefixes });
+
+		expect(await errors({ fr: "france" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" names "fr", which is not one of "locales": en, de.',
+		]);
+		expect(await errors({ de: "de/at" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" gives de "de/at", but a prefix is one path segment of lowercase letters, digits and hyphens, such as "us".',
+		]);
+		expect(await errors({ de: "en" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" gives de "en", which is en\'s prefix too. Give each locale a prefix of its own.',
+		]);
+		expect(
+			await errorsOf(catalogs, { localePrefixes: { de: "deutsch" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+	});
+
 	it("is an error when a strategy follows url, which finds a locale in every path", async () => {
 		expect(
 			await errorsOf(
@@ -143,7 +208,7 @@ describe("the config", () => {
 				},
 			),
 		).toEqual([
-			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url".',
+			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url", prefix every locale\'s paths with "localePrefix": "always", or name the paths "url" leaves to them in "unlocalizedPaths".',
 		]);
 	});
 
@@ -374,6 +439,52 @@ describe("a message", () => {
 		]);
 	});
 
+	it("is an error when no value suits every use of an input, in a locale or across them", async () => {
+		const closed = (match: Record<string, string>) => [
+			{ declarations: ["input n"], selectors: ["n"], match },
+		];
+		expect(
+			await errorsOf({
+				en: {
+					paid: "{x :currency currency=$x}",
+					listed: "{x :list}",
+					named: closed({ "n=a": "{n :number}", "n=b": "{n :number}" }),
+					picked: closed({ "n=a": "A", "n=b": "B" }),
+				},
+				de: {
+					paid: "{x :currency currency=$x}",
+					listed: "{x :number}",
+					named: closed({ "n=a": "{n :number}", "n=b": "{n :number}" }),
+					picked: closed({ "n=c": "C" }),
+				},
+			}),
+		).toEqual([
+			'message-invalid: messages/de.json: "listed" (de): x is formatted as a list in en and is formatted as a number in de, and no value suits both. Give each use its own input.',
+			'message-invalid: messages/de.json: "picked" (de): n is selected without * on a, b in en and is selected without * on c in de, and no value suits both. Give each use its own input.',
+			'message-invalid: messages/en.json: "named" (en): n is selected without * on a, b in en and is formatted as a number in en, and no value suits both. Give each use its own input.',
+			'message-invalid: messages/en.json: "paid" (en): x is formatted as a number in en and gives a value its currency in en, and no value suits both. Give each use its own input.',
+		]);
+	});
+
+	it("names the keys locales list together when no value is one of them all", async () => {
+		const closed = (keys: string[]) => [
+			{
+				declarations: ["input n"],
+				selectors: ["n"],
+				match: Object.fromEntries(keys.map((key) => [`n=${key}`, key])),
+			},
+		];
+		expect(
+			await errorsOf({
+				en: { picked: closed(["a", "b"]) },
+				de: { picked: closed(["a", "c"]) },
+				ru: { picked: closed(["b", "c"]) },
+			}),
+		).toEqual([
+			'message-invalid: messages/ru.json: "picked" (ru): n is selected without * on a in en, de and is selected without * on b, c in ru, and no value suits both. Give each use its own input.',
+		]);
+	});
+
 	it("is an error when a variant names a plural or ordinal category its locale does not have", async () => {
 		expect(
 			await errorsOf({
@@ -420,6 +531,16 @@ describe("a message", () => {
 			'selection-not-exhaustive: messages/pl.json: "items" (pl): no variant matches countPlural=many. Add one, or a variant with * for the selectors it does not care about.',
 		]);
 	});
+});
+
+it("sorts the places of one file by line and column, as numbers", () => {
+	const at = (file: string) => new GraiError("key-missing", { file }, "x");
+
+	expect(
+		sortErrors([at("a.ts:10:1"), at("a.ts:9:12"), at("a.ts:9:5")]).map(
+			({ file }) => file,
+		),
+	).toEqual(["a.ts:9:5", "a.ts:9:12", "a.ts:10:1"]);
 });
 
 it("reports every error of a compile at once, by file, key and locale", async () => {

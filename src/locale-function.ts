@@ -1,5 +1,5 @@
 import { type Formatter, formatterOf } from "./formatters.ts";
-import { globalCalled, localeReads } from "./locale-reads.ts";
+import { localeReads } from "./locale-reads.ts";
 import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
@@ -78,7 +78,7 @@ export function localeFunction(
 	};
 	const branches = variants.map((variant) => ({
 		condition: condition(variant.keys),
-		pattern: patternCode(variant.pattern, mode, placeholder, used.globals),
+		pattern: patternCode(variant.pattern, mode, placeholder),
 	}));
 	let body = closed
 		? unmatchedCode(key, message, value, used.uses)
@@ -115,10 +115,9 @@ function patternCode(
 	pattern: readonly Part[],
 	mode: Mode,
 	placeholder: Placeholder,
-	globals: Set<string>,
 ): string {
 	if (mode === "parts") {
-		return `[${pattern.map((part) => partCode(part, placeholder, globals)).join(", ")}]`;
+		return `[${pattern.map((part) => partCode(part, placeholder)).join(", ")}]`;
 	}
 	if (!pattern.some((part) => part.type === "variable")) {
 		return JSON.stringify(plainText(pattern));
@@ -131,16 +130,12 @@ function patternCode(
 	return `\`${template}\``;
 }
 
-function partCode(
-	part: Part,
-	placeholder: Placeholder,
-	globals: Set<string>,
-): string {
+function partCode(part: Part, placeholder: Placeholder): string {
 	switch (part.type) {
 		case "text":
 			return `{ type: "text", value: ${JSON.stringify(part.value)} }`;
 		case "variable":
-			return `{ type: "text", value: ${globalCalled("String", globals)}(${placeholder(part)}) }`;
+			return `{ type: "text", value: \`\${${placeholder(part)}}\` }`;
 		default:
 			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${JSON.stringify(Object.fromEntries(part.attributes))} }`;
 	}

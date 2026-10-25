@@ -1,10 +1,14 @@
 import {
 	existsSync,
 	mkdirSync,
+	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
@@ -17,6 +21,7 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
+import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { type Messages, project } from "./project.ts";
 
@@ -30,6 +35,13 @@ import { type Messages, project } from "./project.ts";
 const fixtures = {
 	ignored: ["**/index.html", "**/main.js", "**/package.json", "**/render.js"],
 };
+
+/**
+ * Where a test's dev server listens: 127.0.0.1 alone, at a port the system picks. On `localhost`
+ * it may listen on ::1 alone, and another process may hold 127.0.0.1 at that port, which a browser
+ * reaches as `localhost` too.
+ */
+const loopback = { host: "127.0.0.1", port: 0 };
 
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
@@ -55,6 +67,18 @@ function sentErrors(errors: string[]): Plugin {
 			};
 		},
 	};
+}
+
+/**
+ * A symlink to a project's directory, as a project is reached through macOS's `/tmp` or a linked
+ * workspace. The bundler names its modules by their real paths. It is removed after the test.
+ */
+function linked(dir: string): string {
+	const parent = realpathSync(mkdtempSync(join(tmpdir(), "grai-link-")));
+	onTestFinished(() => rmSync(parent, { recursive: true }));
+	const link = join(parent, "project");
+	symlinkSync(dir, link);
+	return link;
 }
 
 /**
@@ -153,7 +177,7 @@ describe("the Vite plugin's build", () => {
 
 		expect(browser.page).toMatch(/=>`Hallo \$\{/);
 		expect(server.server).toMatch(
-			/function ?\(i\) \{\s*return `Hallo \$\{i\.name\}`/,
+			/function ?\(i\) \{\s*return `Hallo \$\{i\["name"\]\}`/,
 		);
 		expect([
 			m.greeting?.({ name: "Ana" }, { locale: "en" }),
@@ -184,6 +208,21 @@ describe("the Vite plugin's build", () => {
 				a: `import { m } from "./out/messages.js";\nconsole.log(m.title());\n`,
 			}),
 		).rejects.toThrow(/catalog/);
+	});
+
+	it("fails the build where a source names a key no catalog has, as grai check does", async () => {
+		const { dir } = project(catalogs);
+
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\nconsole.log(m.title(), m.subtitle(), m["caption"]());\n`,
+			}),
+		).rejects.toThrow(
+			[
+				'a.js:2:26: "subtitle": m.subtitle names a key no catalog has. Add it with grai add subtitle --en "…" --de "…", or fix the name.',
+				'a.js:2:41: "caption": m["caption"] names a key no catalog has. Add it with grai add caption --en "…" --de "…", or fix the name.',
+			].join("\n"),
+		);
 	});
 });
 
@@ -228,10 +267,40 @@ describe("grai/vite's module kinds", () => {
 			"\0grai:key/items": ["key", "grai~page"],
 		});
 	});
+
+	it("names the output's modules by their real paths, for a project reached through a symlink", () => {
+		const { dir } = project(catalogs);
+		const kindOf = graiModules({
+			config: join(linked(dir), "grai.config.json"),
+		});
+
+		expect(kindOf(join(dir, "out", "runtime.js"))).toBe("runtime");
+	});
 });
 
 describe("the Vite plugin's locale copies", () => {
 	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
+
+	it("copies a chunk byte for byte, each call keeping only its locale's variants, at their position", () => {
+		const chunk = (calls: string) =>
+			`import { markup, message, text } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
+		const copies = localeCopies(
+			"chunk.js",
+			chunk(`var title = /*#__PURE__*/ text("Title", "Titel");
+var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`, (i) => \`Hallo \${i.name}\`);
+var terms = /*#__PURE__*/ markup([(i) => "Terms", (i) => "AGB"], [(i) => [], (i) => [{ type: "text", value: "AGB" }]]);`),
+			["en", "de"],
+		);
+
+		expect(Object.fromEntries(copies)).toEqual({
+			en: chunk(`var title = /*#__PURE__*/ text("Title");
+var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`);
+var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
+			de: chunk(`var title = /*#__PURE__*/ text(void 0, "Titel");
+var greeting = /*#__PURE__*/ message(void 0, (i) => \`Hallo \${i.name}\`);
+var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type: "text", value: "AGB" }]]);`),
+		});
+	});
 
 	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
 		const { dir } = project(catalogs);
@@ -240,6 +309,26 @@ describe("the Vite plugin's locale copies", () => {
 			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
 		);
 
+		expect([...directories].sort()).toEqual([
+			"assets",
+			"assets/grai",
+			"assets/grai-de",
+			"assets/grai-en",
+		]);
+	});
+
+	it("puts the runtime in a chunk of its own and the messages in chunks copied per locale, for a project reached through a symlink", async () => {
+		const { dir } = project(catalogs);
+		const { chunks, sources } = await built(linked(dir), { page });
+		const directories = new Set(
+			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
+		);
+
+		expect(chunks.map((chunk) => chunk.name).sort()).toEqual([
+			"grai-runtime",
+			"grai~page",
+			"page",
+		]);
 		expect([...directories].sort()).toEqual([
 			"assets",
 			"assets/grai",
@@ -538,7 +627,7 @@ export const render = () => {
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: fixtures },
+			server: { ...loopback, watch: fixtures },
 			plugins: [grai()],
 		});
 		await server.listen();
@@ -568,7 +657,7 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: fixtures },
+			server: { ...loopback, watch: fixtures },
 			plugins: [grai()],
 		});
 		onTestFinished(() => server.close());
@@ -644,6 +733,74 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		expect(sent).not.toContain("grai:update");
 	});
 
+	/**
+	 * A dev server of the project in a mode, with a server render of two keys imported by their
+	 * paths, which the app maps to keys.js, and what each key's path resolves to.
+	 */
+	async function keyPaths(dir: string, mode: string) {
+		writeFileSync(
+			join(dir, "package.json"),
+			JSON.stringify({ imports: { "#i18n/messages/*": "./out/keys.js" } }),
+		);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { footer } from "#i18n/messages/footer.js";
+import { title } from "#i18n/messages/title.js";
+export const render = () => \`\${title()} \${footer()}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			mode,
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const resolved = async (key: string) =>
+			(
+				await ssr.pluginContainer.resolveId(
+					`#i18n/messages/${key}.js`,
+					join(dir, "render.js"),
+				)
+			)?.id;
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		return { resolved, rendered };
+	}
+
+	it("resolves a page's key paths to keys.js, one module for every key", async () => {
+		const { dir } = project(catalogs);
+		const { resolved, rendered } = await keyPaths(dir, "development");
+		const keys = join(dir, "out", "keys.js");
+
+		expect(await rendered()).toBe("Title Footer");
+		expect([await resolved("title"), await resolved("footer")]).toEqual([
+			keys,
+			keys,
+		]);
+	});
+
+	it("gives each key's path a module of its own in a test run, which an edit still reaches", async () => {
+		const { dir } = project(catalogs);
+		const { resolved, rendered } = await keyPaths(dir, "test");
+
+		expect(await rendered()).toBe("Title Footer");
+		expect([await resolved("title"), await resolved("footer")]).toEqual([
+			"\0grai:key/title",
+			"\0grai:key/footer",
+		]);
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+		await expect.poll(rendered, devWait).toBe("Heading Footer");
+	});
+
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
 		const { dir } = project(catalogs);
 		const server = await createServer({
@@ -662,6 +819,30 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		const { dir } = project(catalogs);
 		const { page, title } = await devPage(
 			dir,
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.title(); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+window.loaded = performance.timeOrigin;
+`,
+		);
+		await title("Titel");
+		const loaded = await page.evaluate("window.loaded");
+
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Titel"', '"Überschrift"'),
+		);
+		await title("Überschrift");
+
+		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+
+	it("shows an edited message without reloading the page, for a project reached through a symlink", async () => {
+		const { dir } = project(catalogs);
+		const { page, title } = await devPage(
+			linked(dir),
 			`import { m } from "./out/messages.js";
 const render = () => { document.getElementById("title").textContent = m.title(); };
 render();
@@ -759,7 +940,7 @@ import.meta.hot.send("test:ping");
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: fixtures },
+			server: { ...loopback, watch: fixtures },
 			plugins: [
 				grai(),
 				{

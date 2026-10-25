@@ -42,18 +42,11 @@ Done when: such a server loads function expressions while the browser keeps arro
 
 These are compile errors today:
 - selecting on a `:number` local whose options change its digits (`maximumFractionDigits`, significant digits, rounding, `notation`, `style`), which MessageFormat 2 selects on by the number those digits show;
-- `:unit`'s `usage`, which converts the value into the locale's preferred units and which Intl cannot do;
-- `:relativetime`'s unit taken from an input, such as Paraglide's `unit=$unit`. Intl takes the unit with each value, so it needs no formatter per value, but a unit Intl refuses must still throw a `GraiError` that names it.
+- `:unit`'s `usage`, which converts the value into the locale's preferred units and which Intl cannot do.
 
 Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
 
 Done when: each compiles, with a test, and the design lists it among the constructs.
-
-## The output under `noPropertyAccessFromIndexSignature`
-
-The keys' code reads an input as `i.count`, and the inputs it is given are typed by an index signature, so an app whose checkJs sets `noPropertyAccessFromIndexSignature`, as @tsconfig/strictest does, gets an error at every read. `i["count"]` costs three bytes a read where a minifier does not run, as in a server build; taking the inputs apart in the parameter is shorter, but reads every input a locale's variants name on every call.
-
-Done when: the checkJs test sets it too and passes, with the startup and bytes numbers of the chosen form.
 
 ## Bind the locale in Next's server actions and route handlers
 
@@ -115,18 +108,6 @@ An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de
 
 Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
 
-## Paths the `url` strategy leaves alone
-
-With the base locale unprefixed, `url` answers every path, so a site cannot localize its public pages by URL and its app (`/dashboard`) by cookie.
-
-Done when: the config can name the paths `url` does not cover, the strategies after it then apply to those paths, and a test covers a covered and an uncovered path.
-
-## Custom locale prefixes
-
-A locale's prefix is its tag (`/en-US/…`). A site that wants `/us/…` cannot have it. Neither reference app needs it, so it waits for an adopter who does.
-
-Done when: the config maps a locale to its prefix, and the URL helpers and the middleware follow it, with a test.
-
 ## Rename what a module reads off a dynamic import
 
 `grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.
@@ -138,3 +119,21 @@ Done when: a rename changes them, with a test of each.
 `grai export en-GB --untranslated` lists every key en-GB takes from en as untranslated, so a translator is asked for all of en again; `grai seed en-GB` copies en's text into en-GB, which then no longer follows en. Both should treat a key a locale takes from its fallback as covered, and still let a translator give the locale its own text.
 
 Done when: `export --untranslated` leaves out a key the locale takes from its fallback, a full export offers it with the fallback's text as its source, `seed` refuses a locale that falls back or seeds nothing it takes from its fallback, and a test covers each.
+
+## Descriptors `defineMessages` names, in `grai migrate`
+
+react-intl apps often write their descriptors once, `const messages = defineMessages({ title: { id: "shop.title", defaultMessage: "Shop" } })`, and call `intl.formatMessage(messages.title)` or `<FormattedMessage {...messages.title} />`. `grai migrate` lists those calls, although a `const` that `defineMessages` initializes with the ids written in it names each message as plainly as a descriptor written in the call.
+
+Done when: `grai migrate` rewrites both calls of such a `const` in the module that declares it, and removes the `const` once nothing reads it.
+
+## Calls that render markup, in `grai migrate`
+
+`<Trans>`, next-intl's `t.rich` and `t.markup`, and a react-intl message with markup are listed for a person, who renders the message's `.parts()`. A framework's markup component, such as `grai/react`'s `Markup`, would take the tags' renderers the call passes.
+
+Done when: `grai migrate` rewrites a call whose tags each render one element of the call's own as that component's call, and a test renders it as the library did.
+
+## A component's script, in `grai migrate`
+
+`grai migrate` lists each Svelte, Vue, Astro or MDX component that imports the library, and rewrites none: its markup calls messages too, outside what an ES module parser reads.
+
+Done when: `grai migrate` rewrites the calls in a component's script, and lists each one its markup makes.

@@ -1,0 +1,7 @@
+{
+	"shop.title": "المتجر",
+	"shop.greeting": "مرحبا، {name}!",
+	"cart.items": "{count, plural, =0 {سلتك فارغة} zero {لا عناصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصرًا} other {# عنصر}}",
+	"cart.total": "المجموع: {sum, number}",
+	"order.status": "{status, select, shipped {في الطريق} delivered {تم التسليم} other {قيد التجهيز}}"
+}

@@ -14,3 +14,15 @@ export declare const strategy: readonly (
 export declare const directions: readonly ("ltr" | "rtl")[];
 /** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
 export declare const cookieName: string | undefined;
+/** Whether the strategy lists `url`. */
+export declare const readsUrl: boolean;
+/** Whether every locale's paths have a prefix, the base locale's too: `localePrefix: "always"`. */
+export declare const prefixesEveryLocale: boolean;
+/** Whether a locale has a prefix other than its tag: `localePrefixes`. */
+export declare const customPrefixes: boolean;
+/** Whether the config names paths the `url` strategy leaves alone: `unlocalizedPaths`. */
+export declare const leavesPathsAlone: boolean;
+/** Each locale's prefix in the `url` strategy's paths, in `locales` order. */
+export declare const prefixes: readonly string[];
+/** The paths the `url` strategy leaves alone, as regular expressions of a URL's path. */
+export declare const unlocalizedPaths: readonly RegExp[];

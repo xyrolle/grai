@@ -49,7 +49,7 @@ export function localeReads(
 		);
 	const value = (name: string) => {
 		reads.add(name);
-		return isLocal(name) ? `$${name}` : `i.${name}`;
+		return isLocal(name) ? `$${name}` : `i[${JSON.stringify(name)}]`;
 	};
 	const test = (key: string, index: number): string => {
 		const selector = selectors[index];

@@ -1,0 +1,7 @@
+{
+	"greeting": "Привет, {{name}}!",
+	"friend": "Друг",
+	"friend_male": "Парень",
+	"friend_female": "Девушка",
+	"place_ordinal_other": "{{count}}-е место"
+}

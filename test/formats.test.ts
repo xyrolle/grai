@@ -72,6 +72,24 @@ describe("a formatted placeholder", () => {
 		]);
 	});
 
+	it("takes a relative time's unit from an input, as Intl takes it with each value", async () => {
+		const catalog = { ago: "{n :relativetime unit=$unit numeric=auto}" };
+		const { m } = await project({ en: catalog, de: catalog }).load();
+
+		for (const locale of ["en", "de"]) {
+			const format = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+			expect(m.ago?.({ n: -1, unit: "day" }, { locale })).toBe(
+				format.format(-1, "day"),
+			);
+			expect(m.ago?.({ n: 2, unit: "weeks" }, { locale })).toBe(
+				format.format(2, "weeks"),
+			);
+		}
+		expect(() => m.ago?.({ n: 2, unit: "fortnight" })).toThrow(
+			'An input gave unit "fortnight", which is not a unit of time: year, quarter, month, week, day, hour, minute, second, or one of them plural.',
+		);
+	});
+
 	it("formats a date as Intl.DateTimeFormat does, with MessageFormat 2's defaults when no option shapes it", async () => {
 		const { m } = await project({
 			en: {
@@ -240,7 +258,7 @@ describe("a formatted placeholder's errors", () => {
 					fraction_digits:
 						"{amount :currency currency=EUR fractionDigits=some}",
 					no_unit: "{days :relativetime numeric=auto}",
-					an_input: "{days :relativetime unit=$unit}",
+					an_input: "{amount :number minimumFractionDigits=$digits}",
 					a_unit: "{days :relativetime unit=fortnight}",
 					an_option: "{amount :number minimumFractionDigit=2}",
 					a_value: "{amount :number minimumFractionDigits=two}",
@@ -253,13 +271,31 @@ describe("a formatted placeholder's errors", () => {
 			'message-invalid: messages/en.json: "a_unit" (en): {days :relativetime unit=fortnight}: "unit=fortnight" needs a unit of time: year, years, quarter, quarters, month, months, week, weeks, day, days, hour, hours, minute, minutes, second, seconds.',
 			'unsupported: messages/en.json: "a_usage" (en): {distance :unit unit=meter usage=road}: usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.',
 			'message-invalid: messages/en.json: "a_value" (en): {amount :number minimumFractionDigits=two}: "minimumFractionDigits=two" needs a whole number.',
-			'unsupported: messages/en.json: "an_input" (en): {days :relativetime unit=$unit}: "unit=$unit" takes its value from an input, which only a currency, a number\'s unit and a date\'s time zone can: how a value looks is the message\'s to write. Write the value itself.',
+			'unsupported: messages/en.json: "an_input" (en): {amount :number minimumFractionDigits=$digits}: "minimumFractionDigits=$digits" takes its value from an input, which only a currency, a unit and a time zone can: how a value looks is the message\'s to write. Write the value itself.',
 			`message-invalid: messages/en.json: "an_intl_value" (en): {amount :number style=currency}: Intl cannot format with these options: ${intlError(() => new Intl.NumberFormat(undefined, { style: "currency" }))}`,
 			'message-invalid: messages/en.json: "an_option" (en): {amount :number minimumFractionDigit=2}: "minimumFractionDigit=2" is not an option of :number, or is given twice. Its options are select, style, currency, currencyDisplay, currencySign, unit, unitDisplay, notation, compactDisplay, numberingSystem, signDisplay, useGrouping, minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, trailingZeroDisplay, roundingPriority, roundingIncrement, roundingMode.',
 			'message-invalid: messages/en.json: "fraction_digits" (en): {amount :currency currency=EUR fractionDigits=some}: "fractionDigits=some" needs a whole number or auto.',
 			'message-invalid: messages/en.json: "no_currency" (en): {amount :currency currencyDisplay=code}: :currency needs the option currency, such as currency=EUR.',
 			'message-invalid: messages/en.json: "no_unit" (en): {days :relativetime numeric=auto}: :relativetime needs the option unit, such as unit=day.',
 			'message-invalid: messages/en.json: "twice" (en): {amount :integer signDisplay=always signDisplay=never}: "signDisplay=never" is not an option of :integer, or is given twice. Its options are select, signDisplay, useGrouping, minimumIntegerDigits, maximumSignificantDigits.',
+		]);
+	});
+
+	it("is an error for options Intl refuses each time they come, whatever options the same formatter took before", async () => {
+		const refused = intlError(
+			() => new Intl.NumberFormat(undefined, { style: "currency" }),
+		);
+		expect(
+			await errorsOf({
+				en: {
+					a_percent: "{amount :number style=percent}",
+					b_currency: "{amount :number style=currency}",
+					c_currency: "{amount :number style=currency}",
+				},
+			}),
+		).toEqual([
+			`message-invalid: messages/en.json: "b_currency" (en): {amount :number style=currency}: Intl cannot format with these options: ${refused}`,
+			`message-invalid: messages/en.json: "c_currency" (en): {amount :number style=currency}: Intl cannot format with these options: ${refused}`,
 		]);
 	});
 

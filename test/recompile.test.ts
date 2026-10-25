@@ -1,9 +1,11 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import type { Catalog } from "../src/catalog.ts";
 import { catalogKeys } from "../src/catalog-keys.ts";
-import { recompile } from "../src/compile.ts";
+import { type Build, recompile } from "../src/compile.ts";
 import { editedMessages } from "../src/edit.ts";
 import { project } from "./project.ts";
 
@@ -11,6 +13,18 @@ const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
 };
+
+/** A full garbage collection, for a test that a value is no longer held. */
+setFlagsFromString("--expose-gc");
+const collect: () => void = runInNewContext("gc");
+
+/** Every file of a project's output but its state, by its path in the output. */
+const outputOf = (dir: string) =>
+	new Map(
+		readdirSync(join(dir, "out"), { recursive: true, encoding: "utf8" })
+			.filter((file) => !file.startsWith(".grai") && file.includes("."))
+			.map((file) => [file, readFileSync(join(dir, "out", file), "utf8")]),
+	);
 
 /** A catalog as editors write it: one entry per line, indented by a tab. */
 const laidOut = (messages: Record<string, unknown>) =>
@@ -22,6 +36,7 @@ const where = { file: "messages/en.json", locale: "en" };
 const parsed = (messages: Record<string, unknown>): Catalog => ({
 	...where,
 	...catalogKeys(messages, where),
+	revision: Symbol(where.locale),
 });
 
 describe("a recompile after an edit", () => {
@@ -50,7 +65,7 @@ describe("a recompile after an edit", () => {
 		// "$" and "{" apart, or Biome takes the strings for template literals written by mistake.
 		expect([key("greeting")?.kind, key("greeting")?.variants]).toEqual([
 			"message",
-			["(i) => `Hello $" + "{i.name}`", "(i) => `Hallo $" + "{i.name}`"],
+			["(i) => `Hello $" + '{i["name"]}`', "(i) => `Hallo $" + '{i["name"]}`'],
 		]);
 	});
 
@@ -81,6 +96,48 @@ describe("a recompile after an edit", () => {
 		expect(existsSync(join(dir, "out", "formats.js"))).toBe(false);
 	});
 
+	it("writes after a run of edits what a compile from nothing writes", async () => {
+		const { dir, config } = project(catalogs);
+		const edits = [
+			{ ...catalogs.de, title: "Überschrift" },
+			{ ...catalogs.de, title: "Überschrift", footer: "Fuß" },
+			{ ...catalogs.de, footer: "Fuß" },
+		];
+		let { build } = await recompile(config, undefined);
+		for (const edit of edits) {
+			writeFileSync(join(dir, "messages", "de.json"), laidOut(edit));
+			({ build } = await recompile(config, build));
+		}
+		const fresh = project({ en: catalogs.en, de: edits.at(-1) });
+		await recompile(fresh.config, undefined);
+
+		expect([...outputOf(dir).keys()]).toContain("keys/0.js");
+		expect(outputOf(dir)).toEqual(outputOf(fresh.dir));
+	});
+
+	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
+		const { dir, config } = project(catalogs);
+		const built = async (previous?: Build) => {
+			const { build, result } = await recompile(config, previous);
+			if (build === undefined) throw new Error(result.errors[0]?.message);
+			return build;
+		};
+		let build = await built();
+		const replaced = new WeakRef(build.catalogs[0] ?? {});
+		for (const title of ["Heading", "Header"]) {
+			writeFileSync(
+				join(dir, "messages", "en.json"),
+				laidOut({ ...catalogs.en, title }),
+			);
+			build = await built(build);
+		}
+		await new Promise((resolve) => setImmediate(resolve));
+		collect();
+
+		expect(build.catalogs[0]?.messages.get("title")).toBe("Header");
+		expect(replaced.deref()).toBeUndefined();
+	});
+
 	it("starts again from the last good build after a compile that failed", async () => {
 		const { dir, config } = project(catalogs);
 		const good = await recompile(config, undefined);
@@ -101,7 +158,7 @@ describe("a recompile after an edit", () => {
 		]);
 		expect(fixed.result.errors).toEqual([]);
 		expect(readFileSync(join(dir, "out", "keys", "0.js"), "utf8")).toContain(
-			"Servus $" + "{i.name}",
+			"Servus $" + '{i["name"]}',
 		);
 	});
 

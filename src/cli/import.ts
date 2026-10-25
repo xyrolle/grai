@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import {
 	importCatalogs,
 	importFormats,
+	mappingFile,
 	reportLines,
 	summaryLine,
 } from "../import.ts";
@@ -29,6 +30,9 @@ export const importCommand: Command = {
 		for (const line of reportLines(result)) console.log(line);
 		if (result.errors.length > 0) return failed(result.errors);
 		console.log(summaryLine(result));
+		console.log(
+			`grai: ${mappingFile} maps each key the source's calls name to its grai key, for grai migrate`,
+		);
 		return 0;
 	},
 };

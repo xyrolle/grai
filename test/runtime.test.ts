@@ -305,6 +305,154 @@ describe("the response's Vary", () => {
 	});
 });
 
+describe("with every locale's paths prefixed", () => {
+	const config = {
+		strategy: ["url", "cookie", "preferredLanguage"],
+		cookieName: "lang",
+		localePrefix: "always",
+	};
+	const answer = async (
+		middleware: Awaited<ReturnType<typeof output>>["middleware"],
+		path: string,
+		init: RequestInit = {},
+	) => {
+		const response = await middleware(
+			new Request(`https://shop.test${path}`, init),
+			({ locale }) => new Response(locale),
+		);
+		return [
+			response.status,
+			response.headers.get("location") ?? (await response.text()),
+		];
+	};
+
+	it("takes the locale a path names, and sends a page without one to the locale the request prefers", async () => {
+		const { middleware } = await output(config);
+
+		expect([
+			await answer(middleware, "/en/cart"),
+			await answer(middleware, "/de/cart"),
+			await answer(middleware, "/cart?step=2", {
+				headers: { cookie: "lang=ar" },
+			}),
+			await answer(middleware, "/cart", {
+				headers: { "accept-language": "de" },
+			}),
+			await answer(middleware, "/"),
+			await answer(middleware, "/cart", {
+				method: "POST",
+				headers: { cookie: "lang=de" },
+			}),
+		]).toEqual([
+			[200, "en"],
+			[200, "de"],
+			[307, "https://shop.test/ar/cart?step=2"],
+			[307, "https://shop.test/de/cart"],
+			[307, "https://shop.test/en"],
+			[200, "de"],
+		]);
+	});
+
+	it("gives the base locale's paths its prefix too", async () => {
+		const { runtime } = await output(config);
+
+		expect([
+			runtime.localizeHref("/cart", { locale: "en" }),
+			runtime.localizeHref("/de/cart", { locale: "en" }),
+			String(runtime.deLocalizeUrl("https://shop.test/en/cart")),
+			runtime.extractLocaleFromUrl("https://shop.test/en/x"),
+		]).toEqual(["/en/cart", "/en/cart", "https://shop.test/cart", "en"]);
+	});
+});
+
+describe("with paths the url strategy leaves alone", () => {
+	const answer = async (
+		middleware: Awaited<ReturnType<typeof output>>["middleware"],
+		path: string,
+		cookie = "",
+	) => {
+		const response = await middleware(
+			new Request(`https://shop.test${path}`, { headers: { cookie } }),
+			({ locale }) => new Response(locale),
+		);
+		return [
+			response.status,
+			response.headers.get("location") ?? (await response.text()),
+		];
+	};
+
+	it("finds an app page's locale by the strategies after url, and links to it without a prefix", async () => {
+		const { middleware, runtime } = await output({
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			unlocalizedPaths: ["/app", "/app/**"],
+		});
+
+		expect([
+			await answer(middleware, "/de/cart", "lang=ar"),
+			await answer(middleware, "/app/orders", "lang=ar"),
+			await answer(middleware, "/app"),
+			runtime.localizeHref("/app/orders", { locale: "de" }),
+			runtime.localizeHref("/cart", { locale: "de" }),
+		]).toEqual([
+			[200, "de"],
+			[200, "ar"],
+			[200, "en"],
+			"/app/orders",
+			"/de/cart",
+		]);
+	});
+
+	it("sends no app page to a prefixed path, with every locale's paths prefixed", async () => {
+		const { middleware } = await output({
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			localePrefix: "always",
+			unlocalizedPaths: ["/api/**"],
+		});
+
+		expect([
+			await answer(middleware, "/api/orders", "lang=de"),
+			await answer(middleware, "/cart", "lang=de"),
+		]).toEqual([
+			[200, "de"],
+			[307, "https://shop.test/de/cart"],
+		]);
+	});
+});
+
+it("reads and writes a locale's own prefix, where the config gives one", async () => {
+	const { runtime, middleware } = await output({
+		strategy: ["url"],
+		localePrefixes: { ar: "arabic" },
+	});
+	const localeAt = async (path: string) =>
+		(
+			await middleware(
+				new Request(`https://shop.test${path}`),
+				({ locale }) => new Response(locale),
+			)
+		).text();
+
+	expect([
+		await localeAt("/arabic/cart"),
+		await localeAt("/ar/cart"),
+		await localeAt("/de/cart"),
+		runtime.localizeHref("/cart", { locale: "ar" }),
+		runtime.localizeHref("/arabic/cart", { locale: "de" }),
+		String(runtime.deLocalizeUrl("https://shop.test/arabic/cart")),
+		runtime.extractLocaleFromUrl("https://shop.test/arabic/x"),
+	]).toEqual([
+		"ar",
+		"en",
+		"de",
+		"/arabic/cart",
+		"/de/cart",
+		"https://shop.test/cart",
+		"ar",
+	]);
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies and its reloads. */
 	function page(lang: string) {

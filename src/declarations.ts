@@ -1,9 +1,11 @@
 import type { Config } from "./config.ts";
-import type { Format } from "./format-options.ts";
+import { inputTypes } from "./input-types.ts";
 import type { LocaleMessage } from "./message.ts";
-import { catchAll } from "./selection.ts";
 
-/** A key's declaration in keys.d.ts, written as text: its type and the base locale's words. */
+/**
+ * A key's declaration in keys.d.ts, written as text: its type and the base locale's words. Throws
+ * an InputConflict for an input no value suits every use of.
+ */
 export function keyDeclaration(
 	key: string,
 	messages: readonly LocaleMessage[],
@@ -35,101 +37,14 @@ function tagsType(messages: readonly LocaleMessage[]): string {
 }
 
 /**
- * The inputs every locale accepts: a count or a value formatted as a number is a number, a value
- * formatted as a date is a Date or its time value, a closed select takes the values it lists, an
- * input that gives a formatter's option, such as its currency, is a string, and anything else
- * becomes text.
+ * The inputs every locale accepts, each typed by what every use of it takes; throws an
+ * InputConflict for one no value suits.
  */
 function inputsType(messages: readonly LocaleMessage[]): string {
-	const names = new Set(messages.flatMap((message) => [...message.inputs]));
-	if (names.size === 0) return "";
-	const fields = [...names]
-		.sort()
-		.map((name) => `${name}: ${inputType(name, messages)}`);
+	const types = inputTypes(messages);
+	if (types.size === 0) return "";
+	const fields = [...types].map(([name, type]) => `${name}: ${type}`);
 	return `{ ${fields.join("; ")} }`;
-}
-
-function inputType(name: string, messages: readonly LocaleMessage[]): string {
-	const formatters = new Set(
-		messages.flatMap((message) => formattersOf(name, message)),
-	);
-	if (
-		formatters.has("number") ||
-		messages.some((message) =>
-			[...message.plurals.values()].some((local) => local.input === name),
-		)
-	) {
-		return "number";
-	}
-	if (formatters.has("relativetime")) return "number";
-	if (formatters.has("datetime")) return "Date | number";
-	if (formatters.has("list")) return "readonly string[]";
-	let accepted: Set<string> | undefined;
-	for (const message of messages) {
-		const index = message.selectors.findIndex(
-			(selector) => selector.kind === "input" && selector.name === name,
-		);
-		if (index === -1) continue;
-		const keys = new Set(
-			message.variants.map((variant) => variant.keys[index] ?? catchAll),
-		);
-		if (keys.has(catchAll)) continue;
-		accepted =
-			accepted === undefined
-				? keys
-				: new Set([...accepted].filter((key) => keys.has(key)));
-	}
-	if (accepted === undefined) {
-		return messages.some((message) => givesOption(name, message))
-			? "string"
-			: "NonNullable<unknown>";
-	}
-	if (accepted.size === 0) return "never";
-	return [...accepted].sort(byValue).flatMap(literalTypes).join(" | ");
-}
-
-/** Each value a message formats, with its input and its format: in a placeholder, or through a local. */
-function formatsOf(
-	message: LocaleMessage,
-): { input: string; format: Format }[] {
-	return [
-		...message.formatted.values(),
-		...message.variants.flatMap(({ pattern }) =>
-			pattern.flatMap((part) =>
-				part.type === "variable" && part.format
-					? [{ input: part.name, format: part.format }]
-					: [],
-			),
-		),
-	];
-}
-
-/** The formatters a message shows an input through. */
-function formattersOf(
-	name: string,
-	message: LocaleMessage,
-): Format["formatter"][] {
-	return formatsOf(message)
-		.filter(({ input }) => input === name)
-		.map(({ format }) => format.formatter);
-}
-
-/** Whether an input gives one of a message's formatters an option, such as its currency. */
-function givesOption(name: string, message: LocaleMessage): boolean {
-	return formatsOf(message).some(({ format }) => format.input?.name === name);
-}
-
-/** A key matches the values whose text it is: `1` and `"1"` for the key 1, `"a"` for the key a. */
-function literalTypes(key: string): string[] {
-	const number = Number(key);
-	return Number.isFinite(number) && String(number) === key
-		? [key, JSON.stringify(key)]
-		: [JSON.stringify(key)];
-}
-
-function byValue(a: string, b: string): number {
-	const difference = Number(a) - Number(b);
-	return Number.isNaN(difference) ? (a < b ? -1 : a > b ? 1 : 0) : difference;
 }
 
 /** The base locale's words, as the catalog has them, for an editor to show at the call site. */
@@ -216,6 +131,8 @@ export type MarkupMessage<
 	parts: Call<Inputs, MessagePart<Tag>[]>;
 };
 // What the rest of the output calls; not for apps.
+/** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
+export declare function localeOfPath(pathname: string): Locale | undefined;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
 export declare function bindRequests(storage: {
 	getStore(): RequestLocale | undefined;
@@ -244,6 +161,8 @@ export declare function unmatched(
 	selector: string,
 	value: unknown,
 ): never;
+/** The unit of time an input gives a relative time; throws for a value that is not one. */
+export declare function timeUnit(unit: unknown): Intl.RelativeTimeFormatUnit;
 /** The formatter for a call with the value an input gives one of its options, kept by the value. */
 export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateTimeFormat>(
 	made: Map<unknown, Made>,

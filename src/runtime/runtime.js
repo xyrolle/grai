@@ -3,15 +3,39 @@
 import {
 	baseLocale,
 	cookieName,
+	customPrefixes,
 	directions,
+	leavesPathsAlone,
 	locales,
+	prefixes,
+	prefixesEveryLocale,
+	readsUrl,
 	strategy,
+	unlocalizedPaths,
 } from "./config.js";
 
 export { baseLocale, cookieName, locales };
 
-/** Whether a URL names its locale: only under the `url` strategy, else every path is the app's own. */
-const urlsNameLocales = strategy.includes("url");
+// Each of the url strategy's options is a constant in config.js, which a bundler folds, so the code
+// an option needs is checked by its constant where it runs, and a page carries none of it for an
+// option its config does not use.
+
+/**
+ * The locale a path segment is the prefix of, if it is one: a locale's tag, or the segment the
+ * config gives it, and never the base locale's unless every locale's paths are prefixed.
+ */
+const localeOfPrefix = (/** @type {string | undefined} */ segment) => {
+	const locale = customPrefixes
+		? locales[prefixes.indexOf(segment ?? "")]
+		: segment;
+	return isPrefixed(locale) ? locale : undefined;
+};
+/** Whether a value is a locale whose paths have a prefix. */
+const isPrefixed = (/** @type {unknown} */ locale) =>
+	isLocale(locale) && (prefixesEveryLocale || locale !== baseLocale);
+/** Whether a path is one the `url` strategy leaves alone, which never has a prefix. */
+const leftAlone = (/** @type {string} */ pathname) =>
+	unlocalizedPaths.some((pattern) => pattern.test(pathname));
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {
@@ -106,7 +130,7 @@ export function setLocale(locale, options) {
 		document.cookie = `${cookieName}=${locale}; path=/; max-age=34560000; samesite=lax`;
 	}
 	if (options?.reload === false) return;
-	if (strategy.includes("url")) {
+	if (readsUrl) {
 		location.href = localizeUrl(location.href, { locale }).href;
 	} else {
 		location.reload();
@@ -115,7 +139,7 @@ export function setLocale(locale, options) {
 
 /**
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {value is string}
  */
 export function isLocale(value) {
 	return typeof value === "string" && locales.includes(value);
@@ -151,18 +175,30 @@ export function getTextDirection(locale) {
 }
 
 /**
- * The locale a URL names: its first path segment when that is a locale other than the base
- * locale, which has no prefix. Without the `url` strategy no URL names one: the base locale.
+ * The locale a URL names: its first path segment when that is a locale's prefix, else the base
+ * locale, whose paths have no prefix unless every locale's do. Without the `url` strategy no URL
+ * names one: the base locale.
  *
  * @param {string | URL} url
  * @returns {string}
  */
 export function extractLocaleFromUrl(url) {
-	if (!urlsNameLocales) return baseLocale;
-	const first = new URL(url).pathname.split("/")[1];
-	return first !== undefined && first !== baseLocale && isLocale(first)
-		? first
-		: baseLocale;
+	return localeOfPath(new URL(url).pathname) ?? baseLocale;
+}
+
+/**
+ * The locale a URL's path names for the `url` strategy: its prefix's, else the base locale's,
+ * unless every locale's paths are prefixed, when a path without one names none. A path the strategy
+ * leaves alone names none either.
+ *
+ * @param {string} pathname
+ * @returns {string | undefined}
+ */
+export function localeOfPath(pathname) {
+	if (!readsUrl || (leavesPathsAlone && leftAlone(pathname))) return undefined;
+	const named = localeOfPrefix(pathname.split("/")[1]);
+	if (named !== undefined) return named;
+	return prefixesEveryLocale ? undefined : baseLocale;
 }
 
 /**
@@ -174,7 +210,7 @@ export function extractLocaleFromUrl(url) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (urlsNameLocales && first !== baseLocale && isLocale(first)) {
+	if (readsUrl && localeOfPrefix(first) !== undefined) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -191,11 +227,18 @@ export function deLocalizeUrl(url) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
-	if (urlsNameLocales && locale !== baseLocale) {
+	if (
+		readsUrl &&
+		(prefixesEveryLocale || locale !== baseLocale) &&
+		!(leavesPathsAlone && leftAlone(copy.pathname))
+	) {
 		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
 		// redirect to drop it.
 		const path = copy.pathname === "/" ? "" : copy.pathname;
-		copy.pathname = `/${locale}${path}`;
+		const prefix = customPrefixes
+			? (prefixes[locales.indexOf(locale)] ?? locale)
+			: locale;
+		copy.pathname = `/${prefix}${path}`;
 	}
 	return copy;
 }
@@ -311,6 +354,40 @@ export function unmatched(key, locale, selector, value) {
 	throw new GraiError(
 		"value-unmatched",
 		`"${key}" (${locale}) has no variant for ${selector}=${String(value)}. Pass one of the values its type lists.`,
+	);
+}
+
+/** Intl.RelativeTimeFormat's units of time, each of which it also takes plural. */
+const timeUnits = [
+	"year",
+	"quarter",
+	"month",
+	"week",
+	"day",
+	"hour",
+	"minute",
+	"second",
+];
+
+/**
+ * @param {unknown} unit
+ * @returns {unit is Intl.RelativeTimeFormatUnit}
+ */
+const isTimeUnit = (unit) =>
+	typeof unit === "string" && timeUnits.includes(unit.replace(/s$/, ""));
+
+/**
+ * The unit of time an input gives a relative time, which Intl.RelativeTimeFormat takes with each
+ * value. A value that is not one is the caller's mistake, and the error names it.
+ *
+ * @param {unknown} unit
+ * @returns {Intl.RelativeTimeFormatUnit}
+ */
+export function timeUnit(unit) {
+	if (isTimeUnit(unit)) return unit;
+	throw new GraiError(
+		"format-option-invalid",
+		`An input gave unit ${JSON.stringify(unit)}, which is not a unit of time: ${timeUnits.join(", ")}, or one of them plural.`,
 	);
 }
 
