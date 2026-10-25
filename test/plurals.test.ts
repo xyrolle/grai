@@ -86,3 +86,23 @@ it("gives a regional locale its language's rules, and one CLDR does not know onl
 	expect(categoriesOf("tlh", "cardinal")).toEqual(["other"]);
 	expect(categoriesOf("tlh", "ordinal")).toEqual(["other"]);
 });
+
+it("reads the whole percent Intl.NumberFormat shows a count as", async () => {
+	const { percent } = await import(
+		`data:text/javascript;base64,${Buffer.from(pluralModule(["en"])).toString("base64")}`
+	);
+	const shown = new Intl.NumberFormat("en", {
+		style: "percent",
+		useGrouping: false,
+	});
+	const counts = Array.from(
+		{ length: 40_001 },
+		(_, step) => (step - 20_000) / 10_000,
+	);
+
+	expect(
+		counts.filter(
+			(count) => percent(count) !== Number(shown.format(count).slice(0, -1)),
+		),
+	).toEqual([]);
+});

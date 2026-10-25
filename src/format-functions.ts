@@ -40,7 +40,7 @@ export const timeUnits: ReadonlySet<string> = new Set(
 
 /**
  * The number a selector on a function compares, from its input: the input as a number, rounded to
- * a whole one as `:integer` shows it, or the percent `:percent` shows.
+ * a whole one as `:integer` shows it, or the whole percent `:percent` shows.
  */
 export type SelectedNumber = "number" | "integer" | "percent";
 

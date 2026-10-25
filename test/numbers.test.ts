@@ -133,11 +133,15 @@ describe("selecting on a :number local", () => {
 			},
 		}).load();
 
-		expect([1, 0.29, 0.01, 0.5].map((count) => m.done?.({ count }))).toEqual([
+		expect(
+			[1, 0.29, 0.01, 0.5, 0.014, 0.995].map((count) => m.done?.({ count })),
+		).toEqual([
 			"all done",
 			"twenty-nine",
 			"1% done, one",
 			"50% done",
+			"1% done, one",
+			"all done",
 		]);
 	});
 
@@ -147,6 +151,7 @@ describe("selecting on a :number local", () => {
 				en: {
 					written: onNumber("number", { "n=1.0": "a", "n=*": "b" }),
 					fraction: onNumber("integer", { "n=1.5": "a", "n=*": "b" }),
+					percent_fraction: onNumber("percent", { "n=1.5": "a", "n=*": "b" }),
 					exact: onNumber("number select=exact", { "n=one": "a", "n=*": "b" }),
 					category: onNumber("number", { "n=few": "a", "n=*": "b" }),
 					uncovered: onNumber("number", { "n=0": "a", "n=one": "b" }),
@@ -162,6 +167,7 @@ describe("selecting on a :number local", () => {
 			'message-invalid: messages/en.json: "fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
 			'message-invalid: messages/en.json: "mode" (en): "local n = count: number select=cardinal": "select=cardinal" needs plural, ordinal or exact.',
 			'selection-not-exhaustive: messages/en.json: "open" (en): no variant matches n=(any other value). Add one, or a variant with * for the selectors it does not care about.',
+			'message-invalid: messages/en.json: "percent_fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
 			'message-invalid: messages/en.json: "percent_mode" (en): "local n = count: percent select=ordinal": "select=ordinal" is not an option of :percent, or is given twice. Its options are signDisplay, useGrouping, minimumFractionDigits, maximumFractionDigits, minimumSignificantDigits, maximumSignificantDigits, roundingPriority, roundingMode, trailingZeroDisplay.',
 			'unsupported: messages/en.json: "price" (en): it selects on n, a :currency value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
 			'selection-not-exhaustive: messages/en.json: "uncovered" (en): no variant matches n=other. Add one, or a variant with * for the selectors it does not care about.',
