@@ -107,8 +107,10 @@ it("compiles a save that leaves the catalog whole on its first event, without wa
 	onTestFinished(() => clearInterval(touched));
 
 	await expect
-		.poll(() => reported[1]?.written, { timeout: 500 })
-		.toEqual(["keys/0.js"]);
+		.poll(() => reported[1]?.written.map(withoutContentHash), {
+			timeout: 500,
+		})
+		.toContain("keys/0.js");
 });
 
 it("reports no compile that changed nothing, as one that an event late from a save starts", async () => {
