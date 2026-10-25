@@ -24,8 +24,9 @@ export const patchPrefix = "grai:patch/";
  * The dev server's side: compiles when the server starts and whenever the config or a catalog
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
  * failed or threw, which the page shows in Vite's overlay until a build succeeds. After an edit,
- * the page gets a patch of the changed keys, or with `reloadOnEdit` reloads; a key added or
- * removed, or a change of locales, reloads it. A server environment that runs its modules in
+ * the page gets a patch of the changed keys, or with `reloadOnEdit` reloads. An edit that adds or
+ * removes a key or its markup, or rewrites a module the table imports (`tableImports`), reloads it
+ * with those modules taken again. A server environment that runs its modules in
  * Vite's runner patches its table the same way, so the next server render has the new words
  * without the runner evaluating the program again; any other environment takes the messages
  * again. `close` stops following once the compile under way has finished.
@@ -45,21 +46,20 @@ export function serveMessages(
 
 	const update = async (before: Build, next: Build) => {
 		const changed = [...next.compilation.changed];
-		if (changed.length === 0) return;
 		const environments = Object.values(server.environments);
-		const sameExports = changed.every(
-			(key) =>
-				before.compilation.keys.has(key) && next.compilation.keys.has(key),
-		);
-		const sameLocales =
-			JSON.stringify(before.config.locales) ===
-			JSON.stringify(next.config.locales);
-		if (!sameExports || !sameLocales) {
-			for (const environment of environments)
-				await reload(environment, files.keysFile);
+		const rewritten = changedModules(before, next);
+		if (rewritten.length > 0 || !sameCalls(before, next, changed)) {
+			const ids = [
+				files.keysFile,
+				...rewritten.map((file) => join(files.outdir, file)),
+			];
+			for (const environment of environments) {
+				for (const id of ids) await reload(environment, id);
+			}
 			client.hot.send({ type: "full-reload" });
 			return;
 		}
+		if (changed.length === 0) return;
 		const id = `${patchPrefix}${patches.size}`;
 		patches.set(`\0${id}`, patchModule(files.outdir, next, changed));
 		const patch: HotPayload = {
@@ -169,6 +169,40 @@ export function followedFile(
 		file.startsWith(`${files.outdir}/`) ||
 		catalogs.includes(file)
 	);
+}
+
+/**
+ * The modules of the output that the dev table's keys import, or that the runtime reads as it
+ * loads: an edit that rewrites one changes what a loaded module exports or holds, which no patch of
+ * the table can bring.
+ */
+const tableImports = ["config.js", "plurals.js", "formats.js"];
+
+/** The modules of `tableImports` an edit rewrote. */
+function changedModules(before: Build, next: Build): string[] {
+	return tableImports.filter(
+		(file) => before.rendered.files.get(file) !== next.rendered.files.get(file),
+	);
+}
+
+/**
+ * Whether every changed key was there before, is there still and is called as before: markup has
+ * `.parts()` and any other message has not, and the table's exports keep the shape they loaded with.
+ */
+function sameCalls(
+	before: Build,
+	next: Build,
+	changed: readonly string[],
+): boolean {
+	return changed.every((key) => {
+		const was = before.compilation.keys.get(key);
+		const is = next.compilation.keys.get(key);
+		return (
+			was !== undefined &&
+			is !== undefined &&
+			(was.kind === "markup") === (is.kind === "markup")
+		);
+	});
 }
 
 /** Has an environment take a module again, if it holds it. */

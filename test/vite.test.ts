@@ -542,6 +542,86 @@ window.loaded = performance.timeOrigin;
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
 	});
 
+	it("reloads the page for an edit that changes a message's formatter, which a patch cannot bring", async () => {
+		const price = (digits: number) =>
+			`{n :number maximumFractionDigits=${digits}}`;
+		const { dir } = project({
+			en: { price: price(1) },
+			de: { price: price(1) },
+		});
+		const { title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.price({ n: 1.234 }); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+`,
+		);
+		await title("1,2");
+
+		writeFileSync(
+			join(dir, "messages", "de.json"),
+			JSON.stringify({ price: price(2) }),
+		);
+
+		await title("1,23");
+	});
+
+	it("reloads the page for an edit that adds or removes a message's markup, which changes how it is called", async () => {
+		const { dir } = project({
+			en: { title: "{#b}Title{/b}" },
+			de: { title: "{#b}Titel{/b}" },
+		});
+		const { title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = typeof m.title.parts; };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+`,
+		);
+		const titles = (en: string, de: string) => {
+			writeFileSync(
+				join(dir, "messages", "en.json"),
+				JSON.stringify({ title: en }),
+			);
+			writeFileSync(
+				join(dir, "messages", "de.json"),
+				JSON.stringify({ title: de }),
+			);
+		};
+		await title("function");
+
+		titles("Title", "Titel");
+		await title("undefined");
+		titles("{#b}Title{/b}", "{#b}Titel{/b}");
+		await title("function");
+	});
+
+	it("reloads the page for an edit of the config, which the runtime read as it loaded", async () => {
+		const { dir, config } = project(catalogs);
+		const { title } = await devPage(
+			dir,
+			`import { setLocale } from "./out/runtime.js";
+const render = () => {
+	setLocale("de", { reload: false });
+	document.getElementById("title").textContent = document.cookie === "" ? "no cookie" : "cookie";
+};
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+`,
+		);
+		await title("no cookie");
+
+		const settings = JSON.parse(readFileSync(config, "utf8"));
+		writeFileSync(
+			config,
+			JSON.stringify({ ...settings, strategy: ["cookie"], cookieName: "lang" }),
+		);
+
+		await title("cookie");
+	});
+
 	it("throws for a call in another locale than the page's, as a build does, naming the key", async () => {
 		const { dir } = project(catalogs);
 		const { title } = await devPage(
