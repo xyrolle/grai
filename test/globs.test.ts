@@ -1,29 +1,30 @@
 import { describe, expect, it } from "vitest";
+import { readConfig } from "../src/config.ts";
 import { globMatcher, isGlob } from "../src/globs.ts";
-
-const conventionalTests = globMatcher([
-	"**/*.{test,spec}.*",
-	"**/{test,tests,__tests__}/**",
-]);
+import { project } from "./project.ts";
 
 describe("a glob", () => {
-	it("matches test files by name and by folder, at any depth, and nothing else", () => {
+	it("matches, by default, test files by name, __tests__ folders and the root's test folders, and no shipped file", () => {
+		const { config } = project({ en: { title: "Title" } });
+		const isTest = globMatcher(readConfig(config).tests);
 		const matched = [
 			"page.test.ts",
 			"src/routes/page.svelte.test.ts",
 			"src/lib/Cart.spec.tsx",
-			"tests/helpers.ts",
 			"src/lib/__tests__/deep/cart.ts",
+			"test/setup.ts",
+			"tests/helpers.ts",
 		];
 		const unmatched = [
 			"src/latest.ts",
 			"src/contest/page.ts",
 			"src/test.ts",
-			"src/routes/+page.svelte",
+			"src/routes/tests/+page.svelte",
+			"src/lib/test/fixture-free.ts",
 		];
 
-		expect(matched.filter(conventionalTests)).toEqual(matched);
-		expect(unmatched.filter(conventionalTests)).toEqual([]);
+		expect(matched.filter(isTest)).toEqual(matched);
+		expect(unmatched.filter(isTest)).toEqual([]);
 	});
 
 	it("reads only *, **, ? and {a,b}, with each { closed before the next", () => {
