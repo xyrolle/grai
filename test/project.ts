@@ -9,7 +9,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, onTestFinished } from "vitest";
+import { withoutContentHash } from "../src/content-names.ts";
 import { type CompileResult, compile } from "../src/index.ts";
+import { readManifest } from "../src/manifest.ts";
 
 /**
  * A temporary project of catalogs by locale, the first locale its base, each laid out one entry
@@ -113,4 +115,18 @@ export function thrown(call: () => unknown): unknown {
 		return error;
 	}
 	throw new Error("expected the call to throw");
+}
+
+/**
+ * The path of a file of a project's output whose name carries the hash of its content, by its
+ * name without it: `formats.js` for the output's `formats-1f0c….js`, `keys/0.js` for a shard's.
+ */
+export async function outputFile(dir: string, name: string): Promise<string> {
+	const manifest = await readManifest(join(dir, "out", ".grai"));
+	const file = [
+		...(manifest?.immutable ?? []),
+		...Object.keys(manifest?.mutable ?? {}),
+	].find((file) => file !== name && withoutContentHash(file) === name);
+	if (file === undefined) throw new Error(`the output has no ${name}`);
+	return join(dir, "out", file);
 }

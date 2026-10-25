@@ -39,20 +39,26 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 
 ```
 <outdir>/
-  config.js                      the project's locales and strategy, which the runtime reads
-  plurals.js                     each locale's plural rules, compiled from CLDR
-  formats.js                     the Intl formatters messages call, when any does
-  runtime.js    runtime.d.ts     the runtime, the same for every project
-  server.js     server.d.ts      the request middleware; client code never imports it
-  keys.js       keys.d.ts        every message, as the re-exports of its shards
-  keys/<n>.js   keys/<n>.d.ts    a shard: about 512 keys
-  keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
   messages.js   messages.d.ts    `m`, the namespace of keys.js
+  keys.js       keys.d.ts        every message, as the re-exports of the shards
+  runtime.js    runtime.d.ts     the runtime apps import: a re-export of runtime-<hash>.js
+  server.js     server.d.ts      the request middleware; client code never imports it
+  config.js                      the project's locales and strategy: a re-export of config-<hash>.js
+
+  keys/<n>-<hash>.js  .d.ts      a shard: about 512 keys
+  keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
+  runtime-<hash>.js   .d.ts      the runtime, the same for every project, but for its config's name
+  config-<hash>.js               the project's locales and strategy, which the runtime reads
+  plurals-<hash>.js              each locale's plural rules, compiled from CLDR
+  formats-<hash>.js              the Intl formatters messages call, when any does
+
   .grai/manifest.json            what the output was compiled from, and its files
 ```
 
+The first five are the entries, which apps import by name. Every other file is named by a hash of its content, so a compile never replaces one (see "Incremental compiles and atomic output").
+
 - **On disk, a few modules hold every message.** Node, scripts and tests load them as they are, and the output is a few dozen files whatever the key count. Per-key files would cost every install, editor index and file watcher, two files a key: 26.7k for app B.
-- **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then rewrites one shard of about 512 keys, and its declarations only when they change, not the whole catalog's output. TypeScript and editors re-read that shard alone.
+- **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then writes one shard of about 512 keys, under its new name, not the whole catalog's output. TypeScript and editors read that shard alone.
 - **Per-key import paths map to keys.js with one line, never a file per key.** An app that imports `import { key } from "…/messages/key.js"` maps the pattern in its package.json `imports` (`"#i18n/messages/*": "./src/lib/i18n/keys.js"`). Node and TypeScript resolve every key's path to keys.js and its declarations, and a key that does not exist is a type error at the import. The Vite adapter resolves the same paths itself.
   - **A file per key was measured and rejected.** A `.js` and a `.d.ts` per key, each re-exporting the key from keys.js, made app B's output 26,762 files instead of 109. Its compile went from 194 ms to 2,758 ms cold, from 2.9 to 37.9 ms with nothing to do, and from 38.6 to 102.9 ms for one edited message (medians of three, load 13–21).
   - **So Node and TypeScript see one module for every key's path.** A test runner that loads the paths without the Vite plugin mocks every key when a test mocks one key's path. An editor's auto-import offers keys.js rather than the key's path, since TypeScript cannot turn a pattern that maps to one file back into a key's path.
@@ -69,7 +75,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   - A key the build has still resolves to keys.js outside a test run, so a page that imports hundreds of keys by path loads no module more for them (app B has 23,379 such imports in 1,924 files). The plugin resolves these paths before Vite does, since Vite's resolver would take them straight to keys.js.
   - It keeps each per-key import's importer, so that a build that adds or removes the key has the importer resolve it again: an added key reaches keys.js, and a removed one the module that throws.
 - **The per-locale variants of the message modules exist only in memory too.** They have the same exports, with one locale's function each, and the bundler adapters build them from the compiler's model.
-- **The output brings its own runtime.** `runtime.js` is the package's runtime module, as it is, beside the `config.js` it reads. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies.
+- **The output brings its own runtime.** `runtime-<hash>.js` is the package's runtime module, with its import of the config naming the output's `config-<hash>.js`. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies.
 
 ### The browser's locale
 
@@ -217,9 +223,19 @@ These are MessageFormat 2's rules, restricted to the constructs above:
   - Each file is watched as a file, not through its directory, whose events macOS reports late.
   - The watches are set up again before each compile, so a file an editor saves by renaming another over it is seen, and so is a change during the compile.
   - A catalog that does not exist yet is watched for through its directory.
-- **Each file is written to a temporary file of the writer's own in `.grai/` and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. A file whose content is already there is not written, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
-- **What is in the outdir is learned from the outdir.** The manifest records a hash of what each file of the output holds, and a compile writes a file that a listing of its directory lacks, or whose new text the manifest does not record. Nothing is taken from the last compile's memory of what it wrote, which another writer or a file deleted by hand makes wrong. A compile that writes removes the manifest first and writes it last, so one that stops halfway leaves no manifest to trust.
-- **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime first, then the shards, then `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
+- **Each file is written to a temporary file of the writer's own in `.grai/` and renamed into place**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. The texts go to their temporary files all at once; then the files named by their content are renamed into place, then the entries.
+- **A compile publishes the output whole, and a reader sees one compile's output, never two mixed.** Whole files are not enough. When an edit changes a formatter's options, `formats.js` and a shard change together, and a reader that loads between the two renames gets the new `formats.js` beside the old shard, which imports a formatter it no longer exports. No order of the writes avoids it: the opposite order fails the opposite way. Nor does a `formats.js` that keeps both formatters until the shards are written, since a reader whose load spans the compile still reads one shard before and the other after, and a doubling of the shard count, which moves keys from shard to shard, has no such order at all.
+  - **Every file that only the output imports is named by a hash of its content** (`keys/3-1f0c2b7a9e4d.js`, `formats-….js`, `runtime-….js`), so it is written once and never replaced. A shard's module and declarations share their name, so TypeScript reads the declarations and not the module, as it does for any `.js` beside its `.d.ts`.
+  - **The entries keep their names:** `messages.js`, `keys.js`, `runtime.js`, `server.js` and `config.js`, with their declarations, which apps, package.json `imports` and adapters name. Each imports its output's files by their names, and is renamed into place once they are all there. A module loader reads a module before the modules it imports, so whichever entry it read, every file it then reads is of that entry's compile.
+  - **Content that does not change keeps its name,** so an edit writes one shard under its new name, its map, and the two entries that name it, `keys.js` and `keys.d.ts`, and every other file stays as it is, with file watchers', Vite's and TypeScript's state of it. A compile also skips any file that the last one left in place, which makes undoing an edit cost no more than the edit.
+  - **A file the output no longer names stays for ten seconds,** for a reader that read an entry of the compile before and has the rest still to load, and the next compile after that removes it. A module loader takes milliseconds to read an output.
+  - **A declaration map is named by its shard's index, `keys/<n>.d.ts.map`, and replaced in place.** TypeScript follows a map only when the map names its declarations, so a shard's is written again with the shard. A key added near the top of the base catalog moves the lines of every key after it, in every shard: the maps are then written again, and no shard is renamed, which would have TypeScript read every declaration again. Only go to definition reads a map, after its declarations.
+  - **A shard names the modules it imports, so a new one renames every shard that imports it.** The formatters' module changes only when a message adds or drops a formatter's options, and the runtime's only with the config or grai: neither app A's catalogs nor app B's format a value yet.
+- **What is in the outdir is learned from the outdir.** The manifest names each file of the output, with a hash of what each entry and map holds, and a compile writes a file that is missing from a listing of its directory, or whose hash the manifest does not record. Nothing is taken from the last compile's memory of what it wrote, which another writer or a file deleted by hand makes wrong. A compile that replaces a file removes the manifest first and writes it last, so one that stops halfway leaves no manifest to trust.
+- **Two entries are read at two moments.** A process that imports both `runtime.js` and `messages.js` loads each one's output. A catalog edit changes `keys.js` alone among the entries' imports, so the two always agree. A change of config or of grai renames the runtime, and with it every entry, and a process that loads during those renames can hold two runtimes.
+- **The other designs, weighed and set aside:**
+  - **A directory per compile, swapped in by one rename of a symlink.** Node, Vite and TypeScript resolve a symlink to the real path, so a reader stays in the compile it started in. But every edit then moves every file to a new path: TypeScript reads every declaration again, and Vite takes every module for a new one, so an open page that imports one more module loads a second runtime.
+  - **A versioned import map**, which the entries would resolve through. Node and TypeScript read no import map, and the package.json `imports` an app maps its keys with are read once per process.
 - **One writer per outdir.** The writer takes a lock: a file holding its pid, linked into place from its process's claim, a file of its own made once (`lock.<pid>.<uuid>`), so that the lock never exists empty and no two writers share a claim, two threads of a process among them. A process's compiles take the lock in turn, a live writer's lock is waited for, and making a claim removes the claims of processes no longer running. The CLI's `watch` and the Vite plugin can then share an outdir.
   - **A lock whose writer is gone is not taken over: the compile fails and names the file to delete.** Writers that each found the lock stale could each remove it, the later removing the lock the earlier had just taken, and then both write. A lock that is sound to take over is one the operating system releases when its process ends, such as `flock`'s, which Node does not offer. The lock is held only while a compile writes, so it is left behind only when a grai stops during those few milliseconds.
 - **In dev, the Vite plugin serves from memory and sends HMR itself.** It watches the config and the catalogs with `fs.watch` (3–10 ms to see a save, against 48–114 ms for Vite's watcher: `hmr`) and ignores every other file, and the output directory's changes are its own, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
