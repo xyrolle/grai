@@ -1,7 +1,7 @@
 /**
  * The environment an example's own commands run in, as a developer's shell gives it: without the
  * markers Vitest sets, which tools read as running inside a test. Under them Vite builds Vue for
- * development rather than production.
+ * development rather than production, and `nuxt dev` runs unforked and never prints its address.
  */
 export function outsideTests(
 	extra: Readonly<Record<string, string>> = {},
