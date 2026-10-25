@@ -8,10 +8,15 @@ import type { OutputFile } from "./render.ts";
 import {
 	runtimeDeclarations,
 	serverDeclarations,
+	testingDeclarations,
 } from "./runtime-declarations.ts";
 
 /** The runtime's modules as the package has them, which every output carries. */
-export type RuntimeSources = { runtime: string; server: string };
+export type RuntimeSources = {
+	runtime: string;
+	server: string;
+	testing: string;
+};
 
 /** The files of the modules the keys import, in one output: the runtime, plurals and formats. */
 export type OutputModules = {
@@ -80,13 +85,10 @@ export function renderModules(
 	const reexport = (file: string) => `export * from "./${file}";\n`;
 	const api = (names: readonly string[]) =>
 		`export {\n${names.map((name) => `\t${name},\n`).join("")}} from "./${runtime}.js";\n`;
-	const server = pinImports(
-		sources.server,
-		new Map([
-			["./config.js", configFile],
-			["./runtime.js", `${runtime}.js`],
-		]),
-	);
+	const pinned = new Map([
+		["./config.js", configFile],
+		["./runtime.js", `${runtime}.js`],
+	]);
 	return {
 		modules: { runtime: `${runtime}.js`, plurals, formats: formats?.[0] },
 		immutable: [
@@ -105,8 +107,10 @@ export function renderModules(
 			],
 			["internal.js", reexport(`${runtime}.js`)],
 			["internal.d.ts", reexport(`${runtime}.js`)],
-			["server.js", server],
+			["server.js", pinImports(sources.server, pinned)],
 			["server.d.ts", serverDeclarations],
+			["testing.js", pinImports(sources.testing, pinned)],
+			["testing.d.ts", testingDeclarations],
 		],
 	};
 }

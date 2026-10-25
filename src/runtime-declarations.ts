@@ -63,6 +63,8 @@ export type MarkupMessage<
 // What the rest of the output calls; not for apps.
 /** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
 export declare function localeOfPath(pathname: string): Locale | undefined;
+/** Binds a locale outside a request, by its position in \`locales\`: testing.js binds a test's with it. */
+export declare function bindLocale(index: number): void;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
 export declare function bindRequests(storage: {
 	getStore(): RequestLocale | undefined;
@@ -127,6 +129,17 @@ export declare function setLocale(locale: Locale, options?: { reload?: boolean }
  */
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;`;
 }
+
+/** testing.d.ts: the test helper, typed with the project's locales. */
+export const testingDeclarations = `import type { Locale } from "./runtime.js";
+
+/**
+ * Binds a locale for the test, as if the page had loaded in it: the messages called next render in
+ * it, and so does a call that names it, which a page in another locale refuses. A build refuses
+ * this module.
+ */
+export declare function useLocale(locale: Locale): void;
+`;
 
 /** server.d.ts: the middleware, typed with the project's locales. */
 export const serverDeclarations = `import type { Locale } from "./runtime.js";
