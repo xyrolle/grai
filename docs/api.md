@@ -46,6 +46,17 @@ It exports nothing: an app imports it once, from `src/hooks.client.ts`, for what
 
 - `Markup<Tag>({ parts, markup }: { parts: readonly MessagePart<Tag>[]; markup: Record<Tag, (children?: ReactNode) => ReactNode> }): ReactNode`: draws a markup message's `.parts()` with the app's function for each of its tags, in server and client components alike. A tag the message writes and `markup` lacks is a type error, and throws, naming it.
 
+## `grai/astro`
+
+- `grai(options?: { config?: string }): AstroIntegration`: the Astro integration. It adds `grai/vite`, compiles for `astro sync`, checks that the two configs agree on where a page's locale comes from, and adds the middleware that renders each request in its locale, ahead of the app's own. `config` is the path of `grai.config.json` from Astro's root.
+- `type GraiAstroOptions`: its options.
+
+## `grai/astro/middleware`
+
+What the middleware the integration writes imports; apps never do.
+- `localeMiddleware(project: LocaleProject): (context: LocaleContext, next: () => Promise<Response>) => Promise<Response>`: Astro's middleware, from the output's `server.js` and the integration's reading of the two configs.
+- `type LocaleProject`, `type LocaleContext` and `type ImportMap`: what it takes and reads.
+
 ## The `grai` command
 
 Every command takes `--config <file>`, `grai.config.json` in the current directory by default. It exits with 0, with 1 when it reports errors, and with 2 on a usage error.

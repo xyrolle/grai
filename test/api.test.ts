@@ -120,3 +120,22 @@ it("exports from grai/sveltekit, grai/next, grai/next/config, grai/next/proxy an
 	expect(await importableNames(dir, "grai/next/proxy")).toEqual(["proxy"]);
 	expect(await importableNames(dir, "grai/react")).toEqual(["Markup"]);
 });
+
+it("exports from grai/astro and grai/astro/middleware only their API", async () => {
+	const { dir } = project(catalogs);
+
+	expect(Object.keys(await import("../src/astro.ts"))).toEqual(["grai"]);
+	expect(await importableNames(dir, "grai/astro")).toEqual([
+		"GraiAstroOptions",
+		"grai",
+	]);
+	expect(Object.keys(await import("../src/astro/middleware.ts"))).toEqual([
+		"localeMiddleware",
+	]);
+	expect(await importableNames(dir, "grai/astro/middleware")).toEqual([
+		"ImportMap",
+		"LocaleContext",
+		"LocaleProject",
+		"localeMiddleware",
+	]);
+});
