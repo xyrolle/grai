@@ -83,15 +83,32 @@ function unprefixedPage(request, pathname) {
  */
 function localeOf(request, pathname) {
 	for (const source of strategy) {
-		const locale =
-			source === "cookie"
-				? fromCookie(request.headers.get("cookie") ?? "")
-				: source === "url"
-					? localeOfPath(pathname)
-					: fromAcceptLanguage(request.headers.get("accept-language") ?? "");
+		const locale = fromSource(source, request, pathname);
 		if (locale !== undefined) return locale;
 	}
 	return baseLocale;
+}
+
+/**
+ * The locale one place of the strategy names in the request. `localStorage` is the page's alone,
+ * and a request does not carry it.
+ *
+ * @param {(typeof strategy)[number]} source
+ * @param {Request} request
+ * @param {string} pathname
+ * @returns {string | undefined}
+ */
+function fromSource(source, request, pathname) {
+	switch (source) {
+		case "cookie":
+			return fromCookie(request.headers.get("cookie") ?? "");
+		case "preferredLanguage":
+			return fromAcceptLanguage(request.headers.get("accept-language") ?? "");
+		case "url":
+			return localeOfPath(pathname);
+		case "localStorage":
+			return undefined;
+	}
 }
 
 /** @param {string} header */
@@ -199,11 +216,19 @@ function covers(range, locale) {
 	return tag === range || tag.startsWith(`${range}-`);
 }
 
-/** The headers `localeOf` reads: each strategy's but `url`'s, which the config keeps last. */
+/**
+ * The headers `localeOf` reads, in the strategy's order: `url` reads the URL, which a cache keys on
+ * already, and a request does not carry `localStorage`.
+ */
 function headersRead() {
-	return strategy
-		.filter((source) => source !== "url")
-		.map((source) => (source === "cookie" ? "Cookie" : "Accept-Language"));
+	/** @type {Record<(typeof strategy)[number], string[]>} */
+	const headersOf = {
+		cookie: ["Cookie"],
+		localStorage: [],
+		preferredLanguage: ["Accept-Language"],
+		url: [],
+	};
+	return strategy.flatMap((source) => headersOf[source]);
 }
 
 /**

@@ -209,6 +209,17 @@ describe("the middleware", () => {
 		);
 	};
 
+	it("passes over localStorage, which a request does not carry, to the strategy's next place", async () => {
+		const { m, middleware } = await output({
+			strategy: ["localStorage", "preferredLanguage"],
+			localStorageKey: "locale",
+		});
+
+		expect(
+			await localeOf(m, middleware, "/", { "accept-language": "de" }),
+		).toEqual(["de", "Ihr Warenkorb"]);
+	});
+
 	it("keeps each request's locale while requests interleave", async () => {
 		const rendered = await interleaved(await output(config), [
 			{ cookie: "lang=de" },
@@ -262,6 +273,7 @@ describe("the response's Vary", () => {
 		const { middleware } = await output({
 			strategy,
 			...(strategy.includes("cookie") ? { cookieName: "lang" } : {}),
+			...(strategy.includes("localStorage") ? { localStorageKey: "lang" } : {}),
 		});
 		return (
 			await middleware(new Request("https://shop.test/cart"), response)
@@ -278,6 +290,7 @@ describe("the response's Vary", () => {
 		[["cookie", "url"], "Cookie"],
 		[["preferredLanguage", "url"], "Accept-Language"],
 		[["cookie", "preferredLanguage", "url"], "Cookie, Accept-Language"],
+		[["localStorage", "preferredLanguage"], "Accept-Language"],
 	])("with the strategy %j, lists %j", async (strategy, vary) => {
 		expect(await varyOf(strategy)).toBe(vary);
 	});
@@ -454,14 +467,18 @@ it("reads and writes a locale's own prefix, where the config gives one", async (
 });
 
 describe("in a browser", () => {
-	/** A page drawn in a locale: its `<html lang>`, its cookies and its reloads. */
+	/** A page drawn in a locale: its `<html lang>`, its cookies, its storage and its reloads. */
 	function page(lang: string) {
 		const visited = {
 			cookie: "",
+			stored: new Map<string, string>(),
 			reloads: 0,
 			href: "https://shop.test/de/cart?step=2",
 		};
 		Object.assign(globalThis, {
+			localStorage: {
+				setItem: (key: string, value: string) => visited.stored.set(key, value),
+			},
 			document: {
 				documentElement: { lang },
 				set cookie(value: string) {
@@ -482,6 +499,7 @@ describe("in a browser", () => {
 			},
 		});
 		onTestFinished(() => {
+			Reflect.deleteProperty(globalThis, "localStorage");
 			Reflect.deleteProperty(globalThis, "document");
 			Reflect.deleteProperty(globalThis, "location");
 		});
@@ -499,9 +517,25 @@ describe("in a browser", () => {
 		runtime.setLocale("ar");
 		expect(visited).toEqual({
 			cookie: "lang=ar; path=/; max-age=34560000; samesite=lax; secure",
+			stored: new Map(),
 			reloads: 1,
 			href: "https://shop.test/de/cart?step=2",
 		});
+	});
+
+	it("keeps a new locale in localStorage with the localStorage strategy, then reloads", async () => {
+		const visited = page("de");
+		const { runtime } = await output({
+			strategy: ["localStorage"],
+			localStorageKey: "locale",
+		});
+		runtime.setLocale("ar");
+
+		expect([visited.cookie, visited.stored, visited.reloads]).toEqual([
+			"",
+			new Map([["locale", "ar"]]),
+			1,
+		]);
 	});
 
 	it("writes the cookie by the config's policy, Secure on https and wherever the policy needs it", async () => {

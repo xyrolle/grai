@@ -6,9 +6,10 @@ export declare const localeCopies: boolean;
 export declare const locales: readonly string[];
 /** The locale a call renders in when it names none. */
 export declare const baseLocale: string;
-/** Where the server's middleware looks for a request's locale, in order, before the base locale. */
+/** Where the server's middleware and a page look for the locale, in order, before the base locale. */
 export declare const strategy: readonly (
 	| "cookie"
+	| "localStorage"
 	| "preferredLanguage"
 	| "url"
 )[];
@@ -20,6 +21,8 @@ export declare const cookieName: string | undefined;
 export declare const cookieAttributes: string;
 /** Whether the cookie is Secure always, as its policy needs, or on https alone. */
 export declare const cookieSecure: "always" | "https";
+/** The key in `localStorage` the `localStorage` strategy reads and `setLocale` writes, if it has it. */
+export declare const localStorageKey: string | undefined;
 /** Whether the strategy lists `url`. */
 export declare const readsUrl: boolean;
 /** Whether every locale's paths have a prefix, the base locale's too: `localePrefix: "always"`. */
