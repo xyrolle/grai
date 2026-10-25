@@ -121,9 +121,7 @@ The compiler writes these modules, with their declarations, into `outdir`.
 - `locales`: the project's locales, in the config's order, typed as a tuple of their literals.
 - `baseLocale`: the config's base locale, typed as its literal.
 - `getLocale(): Locale`: the locale messages render in: the request's on the server, the page's in a browser.
-- `setLocale(locale: Locale, options?: { reload?: boolean })`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it keeps the locale in the cookie or the URL, and reloads. With `{ reload: false }` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words, and a test picks its locale with `testing.js`'s `useLocale`. Under `"live"`, which the config refuses until grai switches a page in place, it would return `Promise<void>`, resolving once the locale's message chunks are in.
-
-  The runtime does not keep only the choice yet: today `{ reload: false }` sets `<html lang>` and `dir`, and the messages called next are in the new locale (`docs/followups.md`).
+- `setLocale(locale: Locale, options?: { reload?: boolean })`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it keeps the locale where the strategy reads it, and reloads, or goes to the URL that names it; it throws `locale-unkept` where the strategy keeps a choice nowhere. With `{ reload: false }` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words, and a test picks its locale with `testing.js`'s `useLocale`. Under `"live"`, which the config refuses until grai switches a page in place, it would return `Promise<void>`, resolving once the locale's message chunks are in.
 - `isLocale(value: unknown): value is Locale`: whether a value is one of the project's locales.
 - `assertIsLocale(value: unknown): Locale`: the value, if it is one of the project's locales; otherwise throws a `GraiError`.
 - `getTextDirection(locale?: Locale): "ltr" | "rtl"`: the direction a locale's script is written in, the bound locale's by default.
@@ -139,6 +137,7 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 - `class GraiError extends Error`: what a message or a locale function throws, with `code`:
   - `"locale-unknown"`: a value that is not one of the project's locales;
   - `"locale-not-loaded"`: a call, in a browser, in a locale other than the page's;
+  - `"locale-unkept"`: `setLocale` in a page whose `strategy` keeps a choice nowhere;
   - `"value-unmatched"`: a value a closed select does not list;
   - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency;
   - `"locale-unbound"`: in Next.js, a server component that renders a message before its page or layout bound the locale.
