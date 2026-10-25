@@ -251,6 +251,29 @@ describe("the Vite plugin's build", () => {
 		).toEqual(["\0grai:key/title"]);
 	});
 
+	it("copies per locale the chunks of keys pages import later by their paths, with the namespaces the bundler makes for them", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		const later = (key: string) =>
+			`import("#i18n/messages/${key}.js").then((module) => console.log(module.${key}()));\n`;
+		const { sources } = await built(dir, {
+			a: later("title"),
+			b: later("footer"),
+		});
+		const words = (locale: string) =>
+			[...sources]
+				.filter(([file]) => file.startsWith(`assets/grai-${locale}/`))
+				.map(([, code]) => code)
+				.join("");
+
+		expect([
+			words("en").includes("Title"),
+			words("en").includes("Titel"),
+			words("de").includes("Fußzeile"),
+			words("de").includes("Footer"),
+		]).toEqual([true, false, true, false]);
+	});
+
 	it("fails the build with the compiler's errors", async () => {
 		const { dir } = project({ en: { title: "Title" }, de: {} });
 		await expect(
@@ -458,6 +481,17 @@ var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
 var greeting = /*#__PURE__*/ message(void 0, (i) => \`Hallo \${i.name}\`);
 var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type: "text", value: "AGB" }]]);`),
 		});
+	});
+
+	it("leaves as rendered a call that holds no variants, such as the namespace object of a key a page imports later", () => {
+		const chunk = (title: string) =>
+			`import { text } from "../grai-runtime.js";\nimport { t as __exportAll } from "../helpers.js";\nvar title_exports = /* @__PURE__ */ __exportAll({ title: () => title });\nvar title = /*#__PURE__*/ text(${title});\nexport { title_exports as t };\n`;
+
+		expect(
+			localeCopies("chunk.js", chunk(`"Title", "Titel"`), ["en", "de"]).get(
+				"de",
+			),
+		).toBe(chunk(`void 0, "Titel"`));
 	});
 
 	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
