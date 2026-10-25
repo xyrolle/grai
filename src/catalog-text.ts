@@ -193,16 +193,21 @@ function isObject(text: string, entry: CatalogEntry): boolean {
 function objectOf(
 	messages: readonly (readonly [KeyPath, unknown])[],
 ): Record<string, unknown> {
-	const object: Record<string, unknown> = {};
+	const object = namesOnly();
 	for (const [path, value] of messages) {
 		let at = object;
 		for (const name of path.slice(0, -1)) {
 			const next = at[name];
-			const inner = isRecord(next) ? next : {};
+			const inner = isRecord(next) ? next : namesOnly();
 			at[name] = inner;
 			at = inner;
 		}
 		at[path.at(-1) ?? ""] = value;
 	}
 	return object;
+}
+
+/** An object without a prototype, whose every name, `__proto__` too, is an entry of its own. */
+function namesOnly(): Record<string, unknown> {
+	return Object.create(null);
 }
