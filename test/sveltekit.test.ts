@@ -204,7 +204,8 @@ describe("handleLocale, by the cookie and Accept-Language", {
 	const origin = "http://localhost:4752";
 	let server: ChildProcess;
 	beforeAll(async () => {
-		// The same app, with another strategy: the cookie, else the browser's languages.
+		// The same app, with another strategy, the cookie, else the browser's languages, and a CSP
+		// whose scripts need Kit's nonce.
 		server = await served(4752, "cookie");
 	}, 60_000);
 	afterAll(() => stopped(server));
@@ -217,6 +218,20 @@ describe("handleLocale, by the cookie and Accept-Language", {
 		await page.goto(`${origin}/`);
 		expect(await html(page, "lang")).toBe("ro");
 		await page.getByText("Desenat în browser").waitFor();
+		await page.context().close();
+	});
+
+	it("downloads only its locale's copies under a CSP whose scripts need a nonce", async () => {
+		const page = await (await browser.newContext()).newPage();
+		await page
+			.context()
+			.addCookies([{ name: "lang", value: "ro", url: origin }]);
+		const messages = messageChunks(page);
+		await page.goto(`${origin}/`);
+		await page.getByText("Desenat în browser").waitFor();
+
+		expect(messages.length).toBeGreaterThan(0);
+		expect(notRomanian(messages)).toEqual([]);
 		await page.context().close();
 	});
 

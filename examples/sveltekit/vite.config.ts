@@ -5,8 +5,9 @@ import { grai } from "grai/sveltekit/vite";
 import { defineConfig } from "vite";
 
 // `vite build --mode cookie` builds the same app with grai.cookie.json's strategy, the cookie,
-// else the browser's languages, instead of the URL prefix. `vite build --mode svelte` builds it
-// with grai/svelte's plugin, which writes no locale copies.
+// else the browser's languages, instead of the URL prefix, and with a CSP whose scripts need
+// Kit's nonce. `vite build --mode svelte` builds it with grai/svelte's plugin, which writes no
+// locale copies.
 export default defineConfig(({ mode }) => ({
 	plugins: [
 		mode === "svelte"
@@ -14,6 +15,12 @@ export default defineConfig(({ mode }) => ({
 			: grai({
 					config: mode === "cookie" ? "grai.cookie.json" : "grai.config.json",
 				}),
-		sveltekit({ adapter: adapter() }),
+		sveltekit({
+			adapter: adapter(),
+			csp:
+				mode === "cookie"
+					? { mode: "nonce", directives: { "script-src": ["self"] } }
+					: {},
+		}),
 	],
 }));
