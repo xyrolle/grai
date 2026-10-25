@@ -38,6 +38,7 @@ import {
 	pathKey,
 	serveMessages,
 } from "./vite-dev.ts";
+import { withPageLocale } from "./vite-html.ts";
 
 /**
  * The plugin's options:
@@ -146,6 +147,14 @@ export function graiPlugin(
 			return !serving && name === "client"
 				? messageChunking(files.outdir, pageChunkOf)
 				: undefined;
+		},
+		transformIndexHtml: {
+			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
+			order: "post",
+			handler(html, context) {
+				const config = build?.config ?? readConfig(files.configFile);
+				return withPageLocale(html, context, config);
+			},
 		},
 		outputOptions(output) {
 			if (!building(this.environment)) return null;
