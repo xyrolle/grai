@@ -13,6 +13,7 @@ import {
 	readProject,
 } from "./compile.ts";
 import { withListedKeysChanged } from "./config-file.ts";
+import { descriptionsRenamed } from "./descriptions.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
 import { occurrencesOf, positionOf, sourceFiles } from "./sources.ts";
@@ -23,11 +24,11 @@ export type RenameResult = CompileResult & { changed: string[] };
 
 /**
  * Renames a key in every catalog, at every call site under the roots (the project's root by
- * default) and in the config's lists, all of them or none, then compiles. In an object of
- * messages, the key keeps its place while its new name still starts with the object's key. It
- * changes nothing when no catalog has the key, when the new name is no key name or is taken, or
- * when a source writes the key's name where it cannot tell that it means the key; each is an error
- * that names the place.
+ * default), in the config's lists and in the descriptions file, all of them or none, then
+ * compiles. In an object of messages, the key keeps its place while its new name still starts with
+ * the object's key. It changes nothing when no catalog has the key, when the new name is no key
+ * name or is taken, or when a source writes the key's name where it cannot tell that it means the
+ * key; each is an error that names the place.
  */
 export async function rename(
 	configFile: string,
@@ -65,6 +66,8 @@ export async function rename(
 		(key) => (key === from ? to : key),
 	);
 	if (configText !== undefined) texts.set(resolve(configFile), configText);
+	const described = descriptionsRenamed(config, from, to);
+	if (described !== undefined) texts.set(described.file, described.text);
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
 	return { ...(await compile(configFile)), changed };

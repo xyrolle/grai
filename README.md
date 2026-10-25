@@ -134,6 +134,7 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `tests` | Optional. Globs, of `*`, `**`, `?` and `{a,b}`, of the source files that are tests, which `grai check` does not count as using a key. By default `**/*.{test,spec}.*`, `**/__tests__/**`, and the root's `test/**` and `tests/**`, since a folder named `tests` deeper down may ship, as a route does; `[]` makes no file a test. |
 | `identicalToBase` | Optional. Per locale, the keys whose message rightly reads as the base locale's, such as a unit: `{ "de": ["unit_km"] }`. `grai check` and `grai export` take them as translated, and `grai check` reports one whose message is no longer the base text. |
 | `fallbacks` | Optional. Each locale that takes the messages it lacks from another locale of its language: `{ "en-GB": "en" }`. Its catalog may then hold only the messages that differ. |
+| `descriptions` | Optional. A JSON file of each key's description for translators, such as `{ "open": "A verb: the button opens the menu" }`. `grai export` writes each as a note of the key's units, and `grai rename` and `grai check --fix` keep it in step. |
 
 ## Measured
 
@@ -192,6 +193,7 @@ Paraglide's inlang message-format catalogs compile unchanged, and its calls stay
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
 - **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
 - **Left out:** anything else, from every locale, and named in the report.
+
 
 A key becomes its path joined by `_`, so `t("cart.title")` becomes `m.cart_title()`.
 

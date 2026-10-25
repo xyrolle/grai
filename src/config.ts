@@ -29,6 +29,8 @@ export type Config = {
 	identicalToBase: IdenticalToBase;
 	/** Each locale that takes the messages it lacks from another of its language, and that locale. */
 	fallbacks: ReadonlyMap<string, string>;
+	/** The file of each key's description for translators, if the project keeps them. */
+	descriptions: string | undefined;
 };
 
 /**
@@ -57,6 +59,7 @@ const fields = new Set([
 	"tests",
 	"identicalToBase",
 	"fallbacks",
+	"descriptions",
 ]);
 const localePlaceholder = "{locale}";
 /** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
@@ -98,6 +101,7 @@ export function readConfig(file: string): Config {
 		tests = conventionalTests,
 		identicalToBase = {},
 		fallbacks = {},
+		descriptions,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -170,6 +174,14 @@ export function readConfig(file: string): Config {
 			'"fallbacks" must map a locale to the locale of its language it takes the messages it lacks from, such as { "en-GB": "en" }',
 		);
 	}
+	if (
+		descriptions !== undefined &&
+		(typeof descriptions !== "string" || !descriptions.endsWith(".json"))
+	) {
+		throw invalid(
+			'"descriptions" must be the path of a JSON file of each key\'s description for translators, such as "messages/descriptions.json"',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -193,6 +205,8 @@ export function readConfig(file: string): Config {
 			invalid,
 		),
 		fallbacks: readFallbacks(fallbacks, locales, baseLocale, invalid),
+		descriptions:
+			descriptions === undefined ? undefined : resolve(root, descriptions),
 	};
 }
 

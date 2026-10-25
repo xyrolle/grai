@@ -3,6 +3,7 @@ import type { Catalog } from "./catalog.ts";
 import { compileCatalogs } from "./compilation.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import type { Config } from "./config.ts";
+import { descriptionProblems } from "./descriptions.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
@@ -23,12 +24,12 @@ export type Checked = {
 
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
- * key no shipped source file names, each input one locale reads and another never does, and each
- * key `identicalToBase` lists that the catalogs no longer bear out. Source files are those under
- * the project's root, or under `sources` when given, outside the outdir, dependencies, build
- * output and dot-directories; those the config's `tests` match ship nothing. Beside them, the keys
- * each locale has not translated yet, which are not problems: a message can rightly read as the
- * base locale's.
+ * key no shipped source file names, each input one locale reads and another never does, each key
+ * `identicalToBase` lists that the catalogs no longer bear out, and each description of a key no
+ * catalog has. Source files are those under the project's root, or under `sources` when given,
+ * outside the outdir, dependencies, build output and dot-directories; those the config's `tests`
+ * match ship nothing. Beside them, the keys each locale has not translated yet, which are not
+ * problems: a message can rightly read as the base locale's.
  */
 export async function check(
 	configFile: string,
@@ -53,6 +54,9 @@ export async function check(
 		problems.push(...differingInputs(key, catalogs));
 	}
 	problems.push(...staleIdentical(config, configFile, catalogs));
+	problems.push(
+		...descriptionProblems(config, new Set(compilation.keys.keys())),
+	);
 	return {
 		problems: sortErrors(problems),
 		untranslated: untranslatedKeys(

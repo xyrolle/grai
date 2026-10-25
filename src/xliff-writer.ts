@@ -1,20 +1,23 @@
 /**
  * Writing translation units as XLIFF 2.0, the OASIS standard translation tools exchange. A
  * placeholder is a `<ph>`, a pair of tags a `<pc>` around its words, so a tool keeps a translator
- * from breaking either. A plural form's unit has a note of the counts it is for.
+ * from breaking either. A unit has a note of its key's description for translators, and a plural
+ * form's another of the counts it is for.
  */
 
+import type { Descriptions } from "./descriptions.ts";
 import type { Piece } from "./pattern-pieces.ts";
 import type { Unit } from "./translation-units.ts";
 import { escapeAttribute, escapeText } from "./xml-text.ts";
 
 export const xliffNamespace = "urn:oasis:names:tc:xliff:document:2.0";
 
-/** A locale's units as an XLIFF 2.0 document. */
+/** A locale's units as an XLIFF 2.0 document, each with its key's description, if it has one. */
 export function writeXliff(
 	srcLang: string,
 	trgLang: string,
 	units: readonly Unit[],
+	descriptions: Descriptions,
 ): string {
 	const lines = [
 		'<?xml version="1.0" encoding="UTF-8"?>',
@@ -29,11 +32,15 @@ export function writeXliff(
 		lines.push(
 			`\t\t<unit id="${escapeAttribute(unit.id)}" name="${escapeAttribute(name)}">`,
 		);
-		if (unit.note !== undefined) {
-			lines.push(
-				`\t\t\t<notes><note category="variant">${escapeText(unit.note)}</note></notes>`,
-			);
-		}
+		const notes = [
+			["description", descriptions.get(unit.key)],
+			["variant", unit.note],
+		].flatMap(([category, note]) =>
+			note === undefined
+				? []
+				: [`<note category="${category}">${escapeText(note)}</note>`],
+		);
+		if (notes.length > 0) lines.push(`\t\t\t<notes>${notes.join("")}</notes>`);
 		const state = unit.target === undefined ? "initial" : "translated";
 		lines.push(`\t\t\t<segment state="${state}">`);
 		lines.push(`\t\t\t\t<source>${inline(unit.source)}</source>`);

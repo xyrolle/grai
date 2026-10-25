@@ -3,6 +3,7 @@ import { join, relative, resolve } from "node:path";
 import { withoutKeys } from "./catalog-text.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { withListedKeysChanged } from "./config-file.ts";
+import { descriptionsWithout } from "./descriptions.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
@@ -33,8 +34,8 @@ export type FixResult = {
 };
 
 /**
- * Removes from every catalog and from the config's lists each key that no shipped source file
- * under the roots names, as `check` counts a key named, and that no read by a computed name
+ * Removes from every catalog, the config's lists and the descriptions file each key that no
+ * shipped source file under the roots names, as `check` counts a key named, and that no read by a computed name
  * (`m[name]`, `m` used whole) in one may reach. The tests that still name a removed key are
  * reported, to change with it. A key that is no key name stays, since the scan finds only names
  * and so cannot tell whether a source writes it (`m["sign-in"]`); check reports it as invalid. It
@@ -113,6 +114,8 @@ export async function removeUnusedKeys(
 		(key) => (removed.has(key) ? undefined : key),
 	);
 	if (configText !== undefined) texts.set(resolve(configFile), configText);
+	const described = descriptionsWithout(config, removed);
+	if (described !== undefined) texts.set(described.file, described.text);
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
 	return { ...result, changed };

@@ -14,6 +14,8 @@ export type GraiErrorCode =
 	| "key-unused"
 	| "inputs-differ"
 	| "identical-stale"
+	| "descriptions-invalid"
+	| "description-stale"
 	| "call-site-ambiguous"
 	| "message-invalid"
 	| "unsupported"

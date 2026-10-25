@@ -8,6 +8,7 @@ import { dirname, extname, relative } from "node:path";
 import { catalogWithMessages } from "./catalog-file.ts";
 import type { KeyPath } from "./catalog-keys.ts";
 import { type CompileResult, compile } from "./compile.ts";
+import { readDescriptions } from "./descriptions.ts";
 import { GraiError } from "./error.ts";
 import { readLocaleCatalogs } from "./locale-catalogs.ts";
 import { MessageProblem } from "./problem.ts";
@@ -28,7 +29,7 @@ export async function exportLocale(
 ): Promise<{ document: string; units: number } | { errors: GraiError[] }> {
 	const project = await readLocaleCatalogs(configFile, locale, "translate");
 	if ("errors" in project) return project;
-	const { base, target, identical } = project;
+	const { config, base, target, identical } = project;
 	try {
 		const units = exportUnits(
 			base,
@@ -38,8 +39,13 @@ export async function exportLocale(
 			options.untranslated,
 		);
 		const write = options.json ? writeUnitsJson : writeXliff;
-		return { document: write(base.locale, locale, units), units: units.length };
+		const descriptions = readDescriptions(config);
+		return {
+			document: write(base.locale, locale, units, descriptions),
+			units: units.length,
+		};
 	} catch (error) {
+		if (error instanceof GraiError) return { errors: [error] };
 		if (!(error instanceof MessageProblem)) throw error;
 		return {
 			errors: [
