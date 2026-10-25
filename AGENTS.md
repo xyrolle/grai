@@ -45,6 +45,7 @@ The code is small, readable and maintainable by a stranger. Every line earns its
 - The smallest change at the cause. Weigh the alternatives and pick the simplest one that fully solves the problem.
 - No `as any`, no casts, no `@ts-ignore`/`@ts-expect-error` and no avoidable `!`. Model the type instead.
 - Code reads at a glance. A chain that needs a comment becomes a named constant or a small named function. Comments say why, never what.
+- A name that comes from outside, from a catalog, a file or the command line, is looked up in a `Map` or with `ownEntry` (`src/own-entry.ts`), and written to a `Map` or an object without a prototype. `table[name]` alone also finds what every object inherits, such as `constructor`, and `object[name] = value` with `__proto__` sets a prototype.
 - No legacy or compatibility code. Delete what you replace in the same change; no fallbacks "for old callers", no aliases.
 - Public API changes are deliberate. Every exported name is documented and tested.
 
