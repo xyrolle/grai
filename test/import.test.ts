@@ -556,6 +556,7 @@ describe("grai import --from icu", () => {
 					inherited_stem: "{value, number, ::constructor}",
 					scaled: "{value, number, ::scale/100}",
 					week: "{d, date, ::yw}",
+					spaced: "{value, number, percent 'x}'}",
 					others: "{n, plural, offset:1 other {# others}}",
 				},
 			},
@@ -570,7 +571,39 @@ describe("grai import --from icu", () => {
 			"inherited_stem: {value, number, ::constructor} uses the skeleton stem constructor, which grai import does not convert. Write the call with the Intl options it needs.",
 			"scaled: {value, number, ::scale/100} uses the skeleton stem scale/100, which grai import does not convert. Write the call with the Intl options it needs.",
 			"week: {d, date, ::yw} uses the date field w, which grai import does not convert. Write the call with the Intl options it needs.",
+			"spaced: {value, number, percent 'x}'} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
 			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
+		]);
+	});
+
+	it("leaves out a message intl-messageformat rejects, saying what is wrong with it", () => {
+		const { result } = imported(
+			"icu",
+			{
+				"en.json": {
+					fine: "Fine",
+					dollar: "{$n}",
+					dotted: "{g, select, a.b {x} other {y}}",
+					offset: "{n, plural, offset {x} other {y}}",
+					decimal: "{n, plural, =1.0 {one} other {other}}",
+					huge: "{n, plural, =9007199254740993 {one} other {other}}",
+					unstyled: "{n, number,}",
+					quoted: "{n, number, 'x}",
+				},
+			},
+			["en"],
+		);
+
+		expect(
+			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
+		).toEqual([
+			"dollar: it is not a valid ICU message: { must be followed by a name, which holds no space, punctuation or symbol.",
+			"dotted: it is not a valid ICU message: the key a of {g, select} must be followed by its message in braces, and a key holds no space, punctuation or symbol.",
+			"offset: it is not a valid ICU message: offset in {n, plural} must be followed by : and a whole number that JavaScript holds exactly, as in offset:1.",
+			"decimal: it is not a valid ICU message: the key =1 of {n, plural} must be followed by its message in braces, and a key holds no space, punctuation or symbol.",
+			"huge: it is not a valid ICU message: an = in {n, plural} must be followed by a whole number that JavaScript holds exactly, as in =0.",
+			"unstyled: it is not a valid ICU message: {n, number,} must name a style after its comma, or have no comma.",
+			"quoted: it is not a valid ICU message: the style of {n, number} has a ' that no other ' closes.",
 		]);
 	});
 });
