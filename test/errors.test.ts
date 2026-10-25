@@ -99,6 +99,20 @@ describe("the config", () => {
 		]);
 	});
 
+	it("is an error when a strategy follows url, which finds a locale in every path", async () => {
+		expect(
+			await errorsOf(
+				{ en: { title: "Title" } },
+				{
+					strategy: ["url", "cookie", "preferredLanguage"],
+					cookieName: "lang",
+				},
+			),
+		).toEqual([
+			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url".',
+		]);
+	});
+
 	it("names a locale switch it does not know", async () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { switch: "instant" }),

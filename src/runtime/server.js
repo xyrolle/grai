@@ -87,15 +87,11 @@ function fromAcceptLanguage(header) {
 	return undefined;
 }
 
-/** The headers `localeOf` reads: each strategy's, up to `url`, which always finds a locale. */
+/** The headers `localeOf` reads: each strategy's but `url`'s, which the config keeps last. */
 function headersRead() {
-	/** @type {string[]} */
-	const headers = [];
-	for (const source of strategy) {
-		if (source === "url") break;
-		headers.push(source === "cookie" ? "Cookie" : "Accept-Language");
-	}
-	return headers;
+	return strategy
+		.filter((source) => source !== "url")
+		.map((source) => (source === "cookie" ? "Cookie" : "Accept-Language"));
 }
 
 /**

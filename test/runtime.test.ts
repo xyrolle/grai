@@ -43,7 +43,7 @@ describe("outside a request", () => {
 
 describe("the middleware", () => {
 	const config = {
-		strategy: ["cookie", "url", "preferredLanguage"],
+		strategy: ["cookie", "url"],
 		cookieName: "lang",
 	};
 	const localeOf = async (
@@ -189,8 +189,6 @@ describe("the response's Vary", () => {
 		[["cookie", "url"], "Cookie"],
 		[["preferredLanguage", "url"], "Accept-Language"],
 		[["cookie", "preferredLanguage", "url"], "Cookie, Accept-Language"],
-		// url always finds a locale, so the strategies after it are never read.
-		[["url", "cookie", "preferredLanguage"], null],
 	])("with the strategy %j, lists %j", async (strategy, vary) => {
 		expect(await varyOf(strategy)).toBe(vary);
 	});

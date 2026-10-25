@@ -125,6 +125,13 @@ export function readConfig(file: string): Config {
 			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
 		);
 	}
+	const shadowed = afterUrl(strategy);
+	if (shadowed.length > 0) {
+		const them = shadowed.length === 1 ? "it" : "them";
+		throw invalid(
+			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url"`,
+		);
+	}
 	const readsCookie = strategy.includes("cookie");
 	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
 		throw invalid(
@@ -176,6 +183,12 @@ export function readConfig(file: string): Config {
 			invalid,
 		),
 	};
+}
+
+/** The strategies listed after `url`, which finds a locale in every path and so ends the search. */
+function afterUrl(strategy: readonly Strategy[]): readonly Strategy[] {
+	const url = strategy.indexOf("url");
+	return url === -1 ? [] : strategy.slice(url + 1);
 }
 
 function isStrategy(value: unknown): value is Strategy[] {
