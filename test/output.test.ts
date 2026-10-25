@@ -14,7 +14,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
 import { recompile } from "../src/compile.ts";
-import { project } from "./project.ts";
+import { withoutContentHash } from "../src/content-names.ts";
+import { outputFile, project } from "./project.ts";
 import { messagesOf } from "./reader.ts";
 
 const catalogs = {
@@ -41,29 +42,43 @@ function modified(dir: string): Record<string, number> {
 	);
 }
 
+/** What a compile wrote, each file by its name without the hash of its content. */
+async function writtenBy(compiled: Promise<{ written: string[] }>) {
+	return (await compiled).written.map(withoutContentHash);
+}
+
 it("writes the whole output once, then only the files an edit changes", async () => {
 	const { dir, compile } = project(catalogs);
-	expect((await compile()).written).toEqual([
+	expect(await writtenBy(compile())).toEqual([
 		"config.js",
-		"runtime.d.ts",
-		"server.d.ts",
-		"plurals.js",
 		"runtime.js",
+		"runtime.d.ts",
+		"plurals.js",
+		"keys/0.js",
 		"keys/0.d.ts",
 		"keys/0.d.ts.map",
+		"config.js",
+		"runtime.js",
+		"runtime.d.ts",
 		"server.js",
-		"keys/0.js",
-		"keys.d.ts",
+		"server.d.ts",
 		"keys.js",
-		"messages.d.ts",
+		"keys.d.ts",
 		"messages.js",
+		"messages.d.ts",
 	]);
 
 	writeFileSync(
 		join(dir, "messages", "de.json"),
 		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
 	);
-	expect((await compile()).written).toEqual(["keys/0.js"]);
+	expect(await writtenBy(compile())).toEqual([
+		"keys/0.js",
+		"keys/0.d.ts",
+		"keys/0.d.ts.map",
+		"keys.js",
+		"keys.d.ts",
+	]);
 });
 
 it("touches nothing when the catalogs and config are those of the output", async () => {
@@ -75,7 +90,7 @@ it("touches nothing when the catalogs and config are those of the output", async
 	expect(modified(dir)).toEqual(before);
 });
 
-it("writes the output again when grai itself changes, as an upgrade or a local build changes it", () => {
+it("writes the output again when grai itself changes, as an upgrade or a local build changes it", async () => {
 	const { dir, config } = project(catalogs);
 	// A copy of the compiler, in a process of its own as a new version would run.
 	const compiler = join(dir, "grai");
@@ -94,7 +109,8 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 			],
 			{ encoding: "utf8" },
 		);
-		return JSON.parse(run.stdout);
+		const written: string[] = JSON.parse(run.stdout);
+		return written.map(withoutContentHash);
 	};
 	expect(compile()).toContain("runtime.d.ts");
 	expect(compile()).toEqual([]);
@@ -108,8 +124,8 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 		),
 	);
 
-	expect(compile()).toEqual(["runtime.d.ts"]);
-	expect(readFileSync(join(dir, "out", "runtime.d.ts"), "utf8")).toContain(
+	expect(compile()).toContain("runtime.d.ts");
+	expect(readFileSync(await outputFile(dir, "runtime.d.ts"), "utf8")).toContain(
 		"A locale of the project.",
 	);
 });
@@ -132,7 +148,7 @@ it("writes the declaration maps again when the config moves the catalog they poi
 		}),
 	);
 
-	expect((await compile()).written).toEqual(["keys/0.d.ts.map"]);
+	expect(await writtenBy(compile())).toEqual(["keys/0.d.ts.map"]);
 	const map = readFileSync(join(dir, "out", "keys", "0.d.ts.map"), "utf8");
 	expect(JSON.parse(map).sources).toEqual(["../../moved/en.json"]);
 });

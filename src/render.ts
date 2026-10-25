@@ -1,42 +1,83 @@
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
+import { contentName } from "./content-names.ts";
 import {
 	type BaseCatalog,
 	type DeclarationLine,
 	shardMap,
 } from "./declaration-maps.ts";
-import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
-import { formatModule } from "./formatters.ts";
 import type { RuntimeFunction } from "./modules.ts";
-import { pluralModule } from "./plurals.ts";
+import {
+	type OutputModules,
+	type RuntimeSources,
+	renderModules,
+} from "./output-modules.ts";
 
-/** The output's files, level by level: a file imports only files of earlier levels. */
-export type Output = readonly (readonly (readonly [string, string])[])[];
+/** A file of the output: its path in the outdir, and its text. */
+export type OutputFile = readonly [path: string, text: string];
 
-/** The output's files by name, in write order, and each shard's keys, sorted. */
+/**
+ * The output, as a compile publishes it. The immutable files are named by their content, so a
+ * compile writes each once and never replaces it. The mutable ones keep their names and are
+ * replaced when their text changes: the entries apps import, which name the immutable files, and
+ * each shard's declaration map.
+ */
+export type Output = {
+	immutable: readonly OutputFile[];
+	mutable: readonly OutputFile[];
+};
+
+/**
+ * A shard's files as rendered: the name of its module and declarations, `<index>-<hash>` within
+ * `keys/`, the module, the declarations and their map, `<index>.d.ts.map`, and the line of the
+ * declarations each key is on.
+ */
+type ShardFiles = {
+	name: string;
+	module: string;
+	declarations: string;
+	map: string;
+	lines: readonly DeclarationLine[];
+};
+
+/** The output's files by path, the modules the keys import, and each shard's keys and files. */
 export type Rendered = {
 	files: ReadonlyMap<string, string>;
+	modules: OutputModules;
+	/** Each shard's keys, sorted. */
 	shards: readonly (readonly string[])[];
-	/** Each shard's keys, with the line of the shard's declarations each one is on. */
-	lines: readonly (readonly DeclarationLine[])[];
+	/** The files of each shard that holds keys, by its index. */
+	shardFiles: ReadonlyMap<number, ShardFiles>;
 };
 
 /** About how many keys a shard holds, so an edit rewrites one small module and its declarations. */
 const keysPerShard = 512;
 
+/** `m`, the namespace of keys.js, as messages.js and its declarations export it. */
+const messagesModule = `export * as m from "./keys.js";\n`;
+
 /**
  * Renders the output. The keys are split into shards by a hash of their name, so a key stays in
- * its shard while others come and go; only the shards whose keys changed are rendered again.
+ * its shard while others come and go; only the shards whose keys changed are rendered again, and
+ * every shard when a module they import is renamed.
  */
 export function renderOutput(
 	config: Config,
-	runtime: { runtime: string; server: string },
+	runtime: RuntimeSources,
 	compilation: Compilation,
 	base: BaseCatalog,
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
+	const { modules, immutable, entries } = renderModules(
+		config,
+		runtime,
+		compilation,
+	);
 	const count = shardCount(compilation.keys.size);
-	const before = previous?.shards.length === count ? previous : undefined;
+	const before =
+		previous?.shards.length === count && sameModules(previous.modules, modules)
+			? previous
+			: undefined;
 	const dirty = new Set<number>();
 	for (const key of compilation.changed) dirty.add(shardOf(key, count));
 	const shards =
@@ -45,62 +86,65 @@ export function renderOutput(
 			: before.shards.map((keys, index) =>
 					dirty.has(index) ? regroup(keys, index, count, compilation) : keys,
 				);
-	const declarations: [string, string][] = [];
-	const modules: [string, string][] = [];
-	const lines: (readonly DeclarationLine[])[] = [];
+	const shardFiles = new Map<number, ShardFiles>();
 	shards.forEach((keys, index) => {
-		lines[index] = [];
 		if (keys.length === 0) return;
-		const js = `keys/${index}.js`;
-		const dts = `keys/${index}.d.ts`;
-		const module = dirty.has(index) ? undefined : before?.files.get(js);
-		const declaration = dirty.has(index) ? undefined : before?.files.get(dts);
-		const kept = before?.lines[index];
+		const previousFiles = before?.shardFiles.get(index);
 		const shard =
-			module !== undefined && declaration !== undefined && kept !== undefined
-				? { module, declarations: declaration, lines: kept }
-				: renderShard(index, keys, compilation);
-		const map = shardMap(index, shard.lines, base, config.outdir, {
-			map: before?.files.get(`${dts}.map`),
-			lines: kept,
-		});
-		lines[index] = shard.lines;
-		modules.push([js, shard.module]);
-		declarations.push([dts, shard.declarations], [`${dts}.map`, map]);
+			dirty.has(index) || previousFiles === undefined
+				? renderShard(index, keys, compilation, modules)
+				: previousFiles;
+		const map = shardMap(
+			`${shard.name}.d.ts`,
+			shard.lines,
+			base,
+			config.outdir,
+			previousFiles === undefined
+				? undefined
+				: { ...previousFiles, file: `${previousFiles.name}.d.ts` },
+		);
+		shardFiles.set(index, { ...shard, map });
 	});
-	const keysIndex = modules
-		.map(([file]) => `export * from "./${file}";\n`)
+	const files = [...shardFiles.values()];
+	const keysIndex = files
+		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
 		.join("");
-	const output: Output = [
-		[
-			["config.js", configModule(config)],
-			["runtime.d.ts", runtimeDeclarations(config)],
-			["server.d.ts", serverDeclarations],
-			["plurals.js", pluralModule(config.locales)],
-			...formatsFile(compilation),
+	const output: Output = {
+		immutable: [
+			...immutable,
+			...files.flatMap(({ name, module, declarations }): OutputFile[] => [
+				[`keys/${name}.js`, module],
+				[`keys/${name}.d.ts`, declarations],
+			]),
 		],
-		[["runtime.js", runtime.runtime], ...declarations],
-		[["server.js", runtime.server]],
-		[...modules, ["keys.d.ts", keysIndex]],
-		[
+		mutable: [
+			...[...shardFiles].map(
+				([index, { map }]): OutputFile => [`keys/${index}.d.ts.map`, map],
+			),
+			...entries,
 			["keys.js", keysIndex],
-			["messages.d.ts", `export * as m from "./keys.js";\n`],
+			["keys.d.ts", keysIndex],
+			["messages.js", messagesModule],
+			["messages.d.ts", messagesModule],
 		],
-		[["messages.js", `export * as m from "./keys.js";\n`]],
-	];
+	};
 	return {
 		output,
-		rendered: { files: new Map(output.flat()), shards, lines },
+		rendered: {
+			files: new Map([...output.immutable, ...output.mutable]),
+			modules,
+			shards,
+			shardFiles,
+		},
 	};
 }
 
-/** formats.js, when a message calls a formatter. */
-function formatsFile(compilation: Compilation): [string, string][] {
-	if (compilation.formatted.size === 0) return [];
-	const formatters = [...compilation.formatted].flatMap((key) => [
-		...(compilation.keys.get(key)?.formats.values() ?? []),
-	]);
-	return [["formats.js", formatModule(formatters)]];
+function sameModules(a: OutputModules, b: OutputModules): boolean {
+	return (
+		a.runtime === b.runtime &&
+		a.plurals === b.plurals &&
+		a.formats === b.formats
+	);
 }
 
 /** Every key in its shard, each shard's keys sorted. */
@@ -127,7 +171,33 @@ function regroup(
 	return [...next].sort();
 }
 
-function shardModule(keys: readonly CompiledKey[]): string {
+/**
+ * A shard's module and declarations, named by their content. They share the name so that
+ * TypeScript reads the declarations rather than the module, as it does any `.js` beside its
+ * `.d.ts`; the declarations name their map by the shard's index.
+ */
+function renderShard(
+	index: number,
+	keys: readonly string[],
+	compilation: Compilation,
+	modules: OutputModules,
+): Omit<ShardFiles, "map"> {
+	const compiled = new Map<string, CompiledKey>();
+	for (const key of keys) {
+		const compiledKey = compilation.keys.get(key);
+		if (compiledKey !== undefined) compiled.set(key, compiledKey);
+	}
+	const module = shardModule([...compiled.values()], modules);
+	const { body, lines } = shardDeclarations(compiled, modules);
+	const declarations = `${body}//# sourceMappingURL=${index}.d.ts.map\n`;
+	const name = contentName(String(index), module, declarations);
+	return { name, module, declarations, lines };
+}
+
+function shardModule(
+	keys: readonly CompiledKey[],
+	modules: OutputModules,
+): string {
 	const uses = new Set<RuntimeFunction>();
 	const plurals = new Set<string>();
 	const formats = new Set<string>();
@@ -137,51 +207,39 @@ function shardModule(keys: readonly CompiledKey[]): string {
 		for (const name of key.formats.keys()) formats.add(name);
 	}
 	const imports = [
-		`import { ${[...uses].sort().join(", ")} } from "../runtime.js";\n`,
+		`import { ${[...uses].sort().join(", ")} } from "../${modules.runtime}";\n`,
 	];
 	if (plurals.size > 0) {
 		imports.push(
-			`import { ${[...plurals].sort().join(", ")} } from "../plurals.js";\n`,
+			`import { ${[...plurals].sort().join(", ")} } from "../${modules.plurals}";\n`,
 		);
 	}
-	if (formats.size > 0) {
+	if (formats.size > 0 && modules.formats !== undefined) {
 		imports.push(
-			`import { ${[...formats].sort().join(", ")} } from "../formats.js";\n`,
+			`import { ${[...formats].sort().join(", ")} } from "../${modules.formats}";\n`,
 		);
 	}
 	const code = keys.map((key) => key.code).join("");
 	return `${imports.join("")}\n${code}`;
 }
 
-/** A shard's module and declarations, and the line each declaration is on. */
-type Shard = {
-	module: string;
-	declarations: string;
-	lines: readonly DeclarationLine[];
-};
-
-function renderShard(
-	index: number,
-	keys: readonly string[],
-	compilation: Compilation,
-): Shard {
-	const compiled: CompiledKey[] = [];
-	const types = keys.some((key) => compilation.keys.get(key)?.markup)
+/** A shard's declarations, but the line naming their map, and the line each key's is on. */
+function shardDeclarations(
+	keys: ReadonlyMap<string, CompiledKey>,
+	modules: OutputModules,
+): { body: string; lines: DeclarationLine[] } {
+	const types = [...keys.values()].some((key) => key.markup)
 		? "MarkupMessage, Message"
 		: "Message";
-	const parts = [`import type { ${types} } from "../runtime.js";\n\n`];
+	const parts = [`import type { ${types} } from "../${modules.runtime}";\n\n`];
 	const lines: DeclarationLine[] = [];
 	let line = 2;
-	for (const name of keys) {
-		const key = compilation.keys.get(name);
-		if (key === undefined) continue;
-		compiled.push(key);
+	for (const [name, key] of keys) {
 		line += key.declarationLines;
 		lines.push([name, line - 1]);
 		parts.push(key.declaration);
 	}
-	parts.push(`//# sourceMappingURL=${index}.d.ts.map\n`);
-	return { module: shardModule(compiled), declarations: parts.join(""), lines };
+	return { body: parts.join(""), lines };
 }
 
 /** A power of two, so a key changes shard only when the key count doubles. */
@@ -198,39 +256,4 @@ function shardOf(key: string, shards: number): number {
 		hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193);
 	}
 	return (hash >>> 0) % shards;
-}
-
-/** config.js: the project's config, as the runtime reads it. */
-function configModule(config: Config): string {
-	return [
-		`export const locales = ${JSON.stringify(config.locales)};`,
-		`export const baseLocale = ${JSON.stringify(config.baseLocale)};`,
-		`/** @type {readonly ("ltr" | "rtl")[]} */`,
-		`export const directions = ${JSON.stringify(config.locales.map(directionOf))};`,
-		`/** @type {readonly ("cookie" | "preferredLanguage" | "url")[]} */`,
-		`export const strategy = ${JSON.stringify(config.strategy)};`,
-		"/** @type {string | undefined} */",
-		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
-		"",
-	].join("\n");
-}
-
-/** Scripts written right to left. */
-const rightToLeft = new Set([
-	"Adlm",
-	"Arab",
-	"Hebr",
-	"Mand",
-	"Nkoo",
-	"Rohg",
-	"Samr",
-	"Syrc",
-	"Thaa",
-	"Yezi",
-]);
-
-/** The direction a locale's script is written in, from its likely script. */
-function directionOf(locale: string): "ltr" | "rtl" {
-	const script = new Intl.Locale(locale).maximize().script;
-	return script !== undefined && rightToLeft.has(script) ? "rtl" : "ltr";
 }

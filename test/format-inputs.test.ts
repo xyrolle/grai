@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { errorsOf, project, thrown } from "./project.ts";
+import { errorsOf, outputFile, project, thrown } from "./project.ts";
 
 const when = new Date(Date.UTC(2026, 9, 24, 15, 5, 30));
 
@@ -84,7 +84,7 @@ describe("a formatter's options that inputs give", () => {
 		});
 		expect((await compile()).errors).toEqual([]);
 
-		const formats = readFileSync(join(dir, "out", "formats.js"), "utf8");
+		const formats = readFileSync(await outputFile(dir, "formats.js"), "utf8");
 		expect([...formats.matchAll(/export const (\w+)/g)]).toHaveLength(2);
 	});
 
