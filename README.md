@@ -305,7 +305,7 @@ export default defineNuxtConfig({ modules: ["grai/nuxt"] });
 
 The module compiles the catalogs before Nuxt builds anything, and again on each edit in dev, where the open page renders the edit again in place. Its server middleware resolves each request's locale by `grai.config.json`'s `strategy`, the render binds it, and the page's `<html lang>` and `dir` take it. Templates call messages, and `grai/vue`'s `Markup` draws markup, as in any Vue app.
 
-- With the `url` strategy, every page is also routed under each other locale's prefix (`/ro/about`), and links name their locale with `localizeHref("/about")`. A link into another locale loads that page anew, since a page holds its own locale's words alone.
+- With the `url` strategy, every page is also routed under each other locale's prefix (`/ro/about`), the base locale's too with `localePrefix: "always"`, and links name their locale with `localizeHref("/about")`. A locale's prefix is the one `localePrefixes` gives it, a page at a path `unlocalizedPaths` names has no copies, and a page asked for without the prefix it needs is sent to its locale's path, as the output's middleware sends it. A link into another locale loads that page anew, since a page holds its own locale's words alone.
 - A page downloads only its locale's copies of its message chunks.
 - A server route renders messages through the output's `middleware`, as any server does (below), and its `Vary` names the headers the strategy read.
 
