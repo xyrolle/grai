@@ -13,8 +13,13 @@ export const categoryOrder: readonly string[] = [
 	"other",
 ];
 
-/** A rule's value at compile time: JavaScript that computes it, or a boolean it always is. */
-type Code = string | boolean;
+/** JavaScript that computes a rule, and the operands it reads. */
+export type Expression = { js: string; reads: ReadonlySet<string> };
+
+/** A rule's value at compile time: an expression that computes it, or a boolean it always is. */
+type Code = Expression | boolean;
+
+const noReads: ReadonlySet<string> = new Set();
 
 /**
  * CLDR's operands, each as the code a function reads it from or the value it always has, and
@@ -40,15 +45,17 @@ export const decimalOperands: Operands = {
 export function chain(
 	rules: Readonly<Record<string, string>>,
 	operands: Operands,
-): string {
-	let code = '"other"';
+): Expression {
+	let code: Expression = { js: '"other"', reads: noReads };
 	for (const category of categoryOrder.toReversed()) {
 		const rule = rules[category];
 		if (rule === undefined) continue;
 		const condition = compileRule(rule, operands);
-		if (condition === true) code = JSON.stringify(category);
-		else if (condition !== false)
-			code = `${condition} ? ${JSON.stringify(category)} : ${code}`;
+		const chosen = JSON.stringify(category);
+		if (condition === true) code = { js: chosen, reads: noReads };
+		else if (condition !== false) {
+			code = joined(condition, ` ? ${chosen} : `, code);
+		}
 	}
 	return code;
 }
@@ -100,19 +107,29 @@ function compileRelation(text: string, operands: Operands): Code {
 			: `(${whole}${value} >= ${low} && ${value} <= ${high})`,
 	);
 	const any = tests.length === 1 ? (tests[0] ?? "") : `(${tests.join(" || ")})`;
-	return negated ? `!${any.startsWith("(") ? any : `(${any})`}` : any;
+	const js = negated ? `!${any.startsWith("(") ? any : `(${any})`}` : any;
+	return { js, reads: new Set([operand]) };
 }
 
 function and(a: Code, b: Code): Code {
 	if (a === false || b === false) return false;
 	if (a === true) return b;
 	if (b === true) return a;
-	return `${a} && ${b}`;
+	return joined(a, " && ", b);
 }
 
 function or(a: Code, b: Code): Code {
 	if (a === true || b === true) return true;
 	if (a === false) return b;
 	if (b === false) return a;
-	return `(${a} || ${b})`;
+	const either = joined(a, " || ", b);
+	return { ...either, js: `(${either.js})` };
+}
+
+/** Two expressions written one after the other, reading what both read. */
+function joined(a: Expression, between: string, b: Expression): Expression {
+	return {
+		js: `${a.js}${between}${b.js}`,
+		reads: new Set([...a.reads, ...b.reads]),
+	};
 }

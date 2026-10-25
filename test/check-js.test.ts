@@ -9,6 +9,51 @@ import { project } from "./project.ts";
 const tsc = fileURLToPath(new URL("../node_modules/.bin/tsc", import.meta.url));
 const types = fileURLToPath(new URL("../node_modules/@types", import.meta.url));
 
+/**
+ * What TypeScript reports on the output under an app's strict checkJs: every check
+ * @tsconfig/strictest turns on but noPropertyAccessFromIndexSignature (docs/followups.md). Every
+ * file is listed, as a checker that takes each JavaScript file on its own does: a listed file is
+ * checked even beside a declaration file of its name.
+ */
+async function strictCheckJs(dir: string, output: string): Promise<string> {
+	const files = readdirSync(output, { recursive: true, encoding: "utf8" })
+		.filter((file) => /\.(js|d\.ts)$/.test(file))
+		.map((file) => join(output, file));
+	writeFileSync(join(dir, "package.json"), '{ "type": "module" }');
+	writeFileSync(
+		join(dir, "tsconfig.json"),
+		JSON.stringify({
+			compilerOptions: {
+				allowJs: true,
+				checkJs: true,
+				strict: true,
+				noUncheckedIndexedAccess: true,
+				exactOptionalPropertyTypes: true,
+				noUnusedLocals: true,
+				noUnusedParameters: true,
+				noImplicitReturns: true,
+				noImplicitOverride: true,
+				noFallthroughCasesInSwitch: true,
+				allowUnreachableCode: false,
+				allowUnusedLabels: false,
+				verbatimModuleSyntax: true,
+				noEmit: true,
+				module: "esnext",
+				moduleResolution: "bundler",
+				target: "esnext",
+				lib: ["esnext", "dom"],
+				typeRoots: [types],
+				types: ["node"],
+			},
+			files,
+		}),
+	);
+	return await promisify(execFile)(tsc, ["-p", dir]).then(
+		({ stdout }) => stdout,
+		(error: { stdout: string }) => error.stdout,
+	);
+}
+
 it.each([
 	["the base locale only", {}],
 	[
@@ -16,7 +61,7 @@ it.each([
 		{ strategy: ["cookie", "url"], cookieName: "lang" },
 	],
 ])(
-	"writes JavaScript that TypeScript checks under checkJs and strict, with %s",
+	"writes JavaScript that an app's strict checkJs takes, unused locals checked, with %s",
 	async (_, config) => {
 		const { dir, compile } = project(
 			{
@@ -123,40 +168,21 @@ it.each([
 			{ outdir: "src/lib/i18n", ...config },
 		);
 		expect((await compile()).errors).toEqual([]);
-		const output = join(dir, "src", "lib", "i18n");
-		// Every file listed, as a checker that takes each JavaScript file on its own does: a listed
-		// file is checked even beside a declaration file of its name.
-		const files = readdirSync(output, { recursive: true, encoding: "utf8" })
-			.filter((file) => /\.(js|d\.ts)$/.test(file))
-			.map((file) => join(output, file));
-		writeFileSync(join(dir, "package.json"), '{ "type": "module" }');
-		writeFileSync(
-			join(dir, "tsconfig.json"),
-			JSON.stringify({
-				compilerOptions: {
-					allowJs: true,
-					checkJs: true,
-					strict: true,
-					noUncheckedIndexedAccess: true,
-					exactOptionalPropertyTypes: true,
-					verbatimModuleSyntax: true,
-					noEmit: true,
-					module: "esnext",
-					moduleResolution: "bundler",
-					target: "esnext",
-					lib: ["esnext", "dom"],
-					typeRoots: [types],
-					types: ["node"],
-				},
-				files,
-			}),
-		);
 
-		const checked = await promisify(execFile)(tsc, ["-p", dir]).then(
-			({ stdout }) => stdout,
-			(error: { stdout: string }) => error.stdout,
-		);
-
-		expect(checked).toBe("");
+		expect(await strictCheckJs(dir, join(dir, "src", "lib", "i18n"))).toBe("");
 	},
 );
+
+it("writes plurals.js that an app's strict checkJs takes when no locale's rules read a count", async () => {
+	const items = [
+		{
+			declarations: ["input count", "local countPlural = count: plural"],
+			selectors: ["countPlural"],
+			match: { "countPlural=*": "{count}" },
+		},
+	];
+	const { dir, compile } = project({ ja: { items }, zh: { items } });
+	expect((await compile()).errors).toEqual([]);
+
+	expect(await strictCheckJs(dir, join(dir, "out"))).toBe("");
+});
