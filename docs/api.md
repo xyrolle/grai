@@ -122,7 +122,7 @@ The compiler writes these modules, with their declarations, into `outdir`.
 - `baseLocale`: the config's base locale, typed as its literal.
 - `getLocale(): Locale`: the locale messages render in: the request's on the server, the page's in a browser.
 - `setLocale(locale: Locale, options?: { reload?: boolean })`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it keeps the locale in the cookie or the URL, and reloads. With `{ reload: false }`, its type follows the config's `switch`:
-  - under `"reload"` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words;
+  - under `"reload"` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words, and a test picks its locale with `testing.js`'s `useLocale`;
   - under `"live"` it returns `Promise<void>`, which resolves once the locale's message chunks are in, and the page switches in place.
 
   The runtime does neither yet: today `{ reload: false }` sets `<html lang>` and `dir`, and the messages called next are in the new locale (`docs/followups.md`).
@@ -144,6 +144,10 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
   - `"value-unmatched"`: a value a closed select does not list;
   - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency;
   - `"locale-unbound"`: in Next.js, a server component that renders a message before its page or layout bound the locale.
+
+### `testing.js`
+
+- `useLocale(locale: Locale): void`: binds a locale for a test, as if the page had loaded in it: the messages called next render in it, and so does a call that names it, which a page in another locale refuses. In a page it also sets `<html lang>` and `dir`. `grai/vite` refuses the module in a build.
 
 ### `server.js`
 
