@@ -27,12 +27,12 @@ const missingKeyPrefix = "\0grai:missing-key/";
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
  * failed or threw, which the page shows in Vite's overlay until a build succeeds. After an edit,
  * the page gets a patch of the changed keys, or with `reloadOnEdit` reloads; a key added or
- * removed, or a change of locales, reloads it. A server environment that runs its modules in
- * Vite's runner patches its table the same way, so the next server render has the new words
- * without the runner evaluating the program again; any other environment takes the messages
- * again. A per-key import of a key no catalog has gets a module whose export throws when called
- * (`missingKeyImport`), so the page still loads. `close` stops following once the compile under
- * way has finished.
+ * removed, or a new runtime (another config for it to read, or another grai), reloads it. A
+ * server environment that runs its modules in Vite's runner patches its table the same way, so
+ * the next server render has the new words without the runner evaluating the program again; any
+ * other environment takes the messages again. A per-key import of a key no catalog has gets a
+ * module whose export throws when called (`missingKeyImport`), so the page still loads. `close`
+ * stops following once the compile under way has finished.
  */
 export function serveMessages(
 	server: ViteDevServer,
@@ -52,16 +52,17 @@ export function serveMessages(
 
 	const update = async (before: Build, next: Build) => {
 		const changed = [...next.compilation.changed];
-		if (changed.length === 0) return;
+		// A change of config or of grai renames the runtime: a page that took the new one beside the
+		// old would hold two, each with its own locale.
+		const sameRuntime =
+			before.rendered.modules.runtime === next.rendered.modules.runtime;
+		if (changed.length === 0 && sameRuntime) return;
 		const environments = Object.values(server.environments);
 		const sameExports = changed.every(
 			(key) =>
 				before.compilation.keys.has(key) && next.compilation.keys.has(key),
 		);
-		const sameLocales =
-			JSON.stringify(before.config.locales) ===
-			JSON.stringify(next.config.locales);
-		if (!sameExports || !sameLocales) {
+		if (!sameExports || !sameRuntime) {
 			const reimporting = [...importers]
 				.filter(
 					([key]) =>

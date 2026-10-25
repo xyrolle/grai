@@ -703,6 +703,32 @@ try {
 		);
 	});
 
+	it("reloads the open page when the config changes what the runtime reads, so that no page holds two runtimes", async () => {
+		const { dir, config } = project(catalogs);
+		const { page, title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+document.getElementById("title").textContent = m.title();
+window.loaded = performance.timeOrigin;
+`,
+		);
+		await title("Titel");
+		const loaded = await page.evaluate("window.loaded");
+
+		writeFileSync(
+			config,
+			JSON.stringify({
+				...JSON.parse(readFileSync(config, "utf8")),
+				strategy: ["cookie"],
+				cookieName: "locale",
+			}),
+		);
+
+		await expect
+			.poll(() => page.evaluate("window.loaded").catch(() => loaded), devWait)
+			.not.toBe(loaded);
+	});
+
 	it("throws for a call in another locale than the page's, as a build does, naming the key", async () => {
 		const { dir } = project(catalogs);
 		const { title } = await devPage(
