@@ -63,7 +63,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests, identicalToBase, fallbacks, pseudoLocale.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, switch, tests, identicalToBase, fallbacks, pseudoLocale.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -144,6 +144,36 @@ describe("the config", () => {
 			),
 		).toEqual([
 			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url".',
+		]);
+	});
+
+	it("takes the cookie's options only as a cookie can have them, and only with its strategy", async () => {
+		const catalogs = { en: { title: "Title" } };
+		const errors = (config: Record<string, unknown>) =>
+			errorsOf(catalogs, {
+				strategy: ["cookie"],
+				cookieName: "lang",
+				...config,
+			});
+
+		expect(await errors({ cookieMaxAge: 0 })).toEqual([
+			'config-invalid: grai.config.json: "cookieMaxAge" must be the seconds the cookie lasts, a whole number from 1 to 34560000, as browsers keep a cookie 400 days at most.',
+		]);
+		expect(await errors({ cookieDomain: "https://shop.test" })).toEqual([
+			'config-invalid: grai.config.json: "cookieDomain" must be a host name, such as "example.com", without a scheme, a port, a path or a leading dot.',
+		]);
+		expect(await errors({ cookieSameSite: "None" })).toEqual([
+			'config-invalid: grai.config.json: "cookieSameSite" must be "lax", "strict" or "none".',
+		]);
+		expect(
+			await errors({ cookieName: "__Host-lang", cookieDomain: "shop.test" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "cookieDomain" cannot go with "__Host-lang": a browser keeps a __Host- cookie only for the host that set it, with no Domain.',
+		]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], cookieSameSite: "lax" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "cookieSameSite" is read only by the "cookie" strategy, which "strategy" does not list.',
 		]);
 	});
 

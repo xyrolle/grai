@@ -1,5 +1,6 @@
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
+import { cookieAttributes } from "./cookie.ts";
 import {
 	type BaseCatalog,
 	type DeclarationLine,
@@ -210,7 +211,10 @@ function configModule(config: Config): string {
 		`/** @type {readonly ("cookie" | "preferredLanguage" | "url")[]} */`,
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		"/** @type {string | undefined} */",
-		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
+		`export const cookieName = ${config.cookie === undefined ? "undefined" : JSON.stringify(config.cookie.name)};`,
+		`export const cookieAttributes = ${JSON.stringify(config.cookie === undefined ? "" : cookieAttributes(config.cookie))};`,
+		'/** @type {"always" | "https"} */',
+		`export const cookieSecure = ${JSON.stringify(config.cookie?.secure ?? "https")};`,
 		"",
 	].join("\n");
 }
