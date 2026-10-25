@@ -281,7 +281,7 @@ describe("a formatted placeholder's errors", () => {
 		]);
 	});
 
-	it("is an error to select on a date or on a number its options round, or to format a local", async () => {
+	it("is an error to select on a date or on a number in another notation, or to format a local", async () => {
 		expect(
 			await errorsOf({
 				en: {
@@ -296,7 +296,7 @@ describe("a formatted placeholder's errors", () => {
 						{
 							declarations: [
 								"input amount",
-								"local price = amount: number maximumFractionDigits=0 signDisplay=always",
+								"local price = amount: number notation=compact signDisplay=always",
 							],
 							selectors: ["price"],
 							match: { "price=*": "{price}" },
@@ -314,7 +314,7 @@ describe("a formatted placeholder's errors", () => {
 		).toEqual([
 			'unsupported: messages/en.json: "a_date" (en): it selects on day, a :date value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
 			'unsupported: messages/en.json: "reformatted" (en): it formats price, a local, which grai does not support. Format the input it is made from.',
-			'unsupported: messages/en.json: "rounded" (en): it selects on price, a :number with maximumFractionDigits, whose category would depend on the digits shown, which grai does not support yet. Select on a local without it, and format with it in the pattern.',
+			'unsupported: messages/en.json: "rounded" (en): it selects on price, a :number with notation, which shows more than digits, and Intl.PluralRules has no category for that. Select on a local without it, and format with it in the pattern.',
 		]);
 	});
 });

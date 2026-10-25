@@ -230,7 +230,6 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
-  - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, other than a currency, a number's unit and a date's time zone (`currency=$code` works), such as `:relativetime`'s `unit=$unit`.
 

@@ -40,6 +40,11 @@ export const decimalOperands: Operands = {
 	values: { n: "x", i: "i", v: "v", w: "v", f: "f", t: "f", e: 0, c: 0 },
 	whole: false,
 };
+/** Any count, or the digits a rounding number shows, split by `operands()`, trailing zeros and all. */
+export const shownOperands: Operands = {
+	values: { n: "x", i: "i", v: "v", w: "w", f: "f", t: "t", e: 0, c: 0 },
+	whole: false,
+};
 
 /** The categories' conditions as one expression, choosing the first that holds, else other. */
 export function chain(
