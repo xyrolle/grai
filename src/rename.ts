@@ -15,7 +15,11 @@ import {
 import { withListedKeysChanged } from "./config-file.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
-import { reachProblems, siteProblems } from "./rename-checks.ts";
+import {
+	ownershipProblems,
+	reachProblems,
+	siteProblems,
+} from "./rename-checks.ts";
 import { sourceFiles } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
@@ -50,6 +54,7 @@ export async function rename(
 	const problems = [
 		...sites.flatMap((site) => siteProblems(site, from, to)),
 		...reachProblems(files, from),
+		...ownershipProblems(sites, from),
 	];
 	if (problems.length > 0) return unchanged(sortErrors(problems));
 	const texts = new Map<string, string>();

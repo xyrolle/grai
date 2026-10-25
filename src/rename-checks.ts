@@ -1,12 +1,14 @@
 /**
  * Why a rename cannot change a key's uses safely, each an error naming the place: a source names
- * the key where it may mean something else, or a read by a computed name may reach it.
+ * the key where it may mean something else, a read by a computed name may reach it, or a file
+ * declares the name its use goes through again, so the text cannot tell which is meant.
  */
 
 import type { FileUses } from "./call-sites.ts";
 import { dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
 import { messageBindings, namespaceNames } from "./message-imports.ts";
+import { redeclarations } from "./redeclarations.ts";
 import { occurrencesOf, positionOf, type SourceFile } from "./sources.ts";
 
 /** A file's places the rename cannot change safely: mentions, and a binding the new name would shadow. */
@@ -55,6 +57,41 @@ export function reachProblems(
 				),
 			),
 	);
+}
+
+/**
+ * An error for each file that reaches the key through a name it also declares again, such as a
+ * parameter `m`: which of the file's uses read the key is then a matter of scope, which the text
+ * does not show.
+ */
+export function ownershipProblems(
+	sites: readonly FileUses[],
+	from: string,
+): GraiError[] {
+	const namespaces = namespaceNames(sites.map(({ source }) => source.text));
+	return sites.flatMap(({ source }) => {
+		const bindings = messageBindings(source.text, namespaces);
+		const keyNames = [...bindings.keys]
+			.filter(([, key]) => key === from)
+			.map(([local]) => [local, local] as const);
+		const names = [
+			...[...bindings.namespaces].map(
+				(name) => [name, `${name}.${from}`] as const,
+			),
+			...keyNames,
+		];
+		return names.flatMap(([name, use]) => {
+			const [again] = redeclarations(source.text, name, bindings);
+			if (again === undefined) return [];
+			return [
+				placed(
+					source,
+					again,
+					`the file declares ${name} again, so the rename cannot tell which of its ${use} read the key. Rename that ${name}, or rename the key by hand.`,
+				),
+			];
+		});
+	});
 }
 
 function placed(source: SourceFile, at: number, detail: string): GraiError {
