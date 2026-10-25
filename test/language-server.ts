@@ -59,7 +59,7 @@ export async function definitionOf(
 
 /**
  * The names an editor offers in `import {  } from "<specifier>"`, sorted: every value and type
- * the module's declarations export. `grai`, `grai/vite` and `grai/svelte` name the package's own entries.
+ * the module's declarations export. `grai` and `grai/…` name the package's own entries.
  */
 export async function importableNames(
 	dir: string,
@@ -100,6 +100,10 @@ async function askEditor(
 					grai: [source("index.ts")],
 					"grai/vite": [source("vite.ts")],
 					"grai/svelte": [source("svelte.ts")],
+					"grai/next": [source("next/render.ts")],
+					"grai/next/config": [source("next/config.ts")],
+					"grai/next/proxy": [source("next/proxy.ts")],
+					"grai/react": [source("react/markup.ts")],
 				},
 			},
 			files: ["use.ts"],
