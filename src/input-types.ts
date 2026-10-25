@@ -10,11 +10,15 @@ import type { LocaleMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
 import { catchAll } from "./selection.ts";
 
-/** What a use takes: any value; a date, which a number also gives; a number; a list of strings; or a string. */
-type Kind = "any" | "date" | "number" | "list" | "string";
+/**
+ * What a use takes: any value; one a template literal turns into text, which is any but a symbol;
+ * a date, which a number also gives; a number; a list of strings; or a string.
+ */
+type Kind = "any" | "text" | "date" | "number" | "list" | "string";
 
 const kindTypes: Readonly<Record<Kind, string>> = {
 	any: "NonNullable<unknown>",
+	text: "string | number | bigint | boolean | object",
 	date: "Date | number",
 	number: "number",
 	list: "readonly string[]",
@@ -23,7 +27,8 @@ const kindTypes: Readonly<Record<Kind, string>> = {
 
 /** The kinds whose values a kind takes, itself among them. */
 const narrower: Readonly<Record<Kind, readonly Kind[]>> = {
-	any: ["any", "date", "number", "list", "string"],
+	any: ["any", "text", "date", "number", "list", "string"],
+	text: ["text", "date", "number", "list", "string"],
 	date: ["date", "number"],
 	number: ["number"],
 	list: ["list"],
@@ -132,6 +137,13 @@ function usesOf(name: string, message: LocaleMessage): Use[] {
 			take("string", `gives a value its ${format.input.option}`);
 		}
 	}
+	for (const { pattern } of message.variants) {
+		for (const part of pattern) {
+			if (part.type === "variable" && !part.format && part.name === name) {
+				take("text", "is shown as text");
+			}
+		}
+	}
 	return uses;
 }
 
@@ -180,6 +192,7 @@ const keyLiterals: Readonly<
 	Record<Kind, (key: string, numeric: boolean) => string[]>
 > = {
 	any: numberOrText,
+	text: numberOrText,
 	date: (key, numeric) => (numeric ? [key] : []),
 	number: (key, numeric) => (numeric ? [key] : []),
 	list: () => [],

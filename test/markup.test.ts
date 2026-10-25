@@ -35,6 +35,22 @@ describe("markup with options and attributes", () => {
 		]);
 	});
 
+	it("shows a value as a template literal does, in its text and in its parts, so a symbol in neither", async () => {
+		const { m } = await project({
+			en: { hello: "Hi {#b}{name}{/b}" },
+		}).load();
+
+		for (const name of ["Ana", 2, 10n, true, ["Ana", "Ion"]]) {
+			expect(m.hello?.({ name })).toBe(`Hi ${name}`);
+			expect(m.hello?.parts?.({ name })?.[2]).toEqual({
+				type: "text",
+				value: `${name}`,
+			});
+		}
+		expect(() => m.hello?.({ name: Symbol("Ana") })).toThrow(TypeError);
+		expect(() => m.hello?.parts?.({ name: Symbol("Ana") })).toThrow(TypeError);
+	});
+
 	it("reads a quoted value's escapes, and a formatted local as its text", async () => {
 		const { m } = await project({
 			en: {
