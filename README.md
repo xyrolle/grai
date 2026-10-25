@@ -174,7 +174,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **Not supported yet:**
   - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:unit`'s `usage`, which converts to the locale's units;
-  - an option's value taken from an input, such as `unit=$unit`;
+  - an option's value taken from an input, other than a currency, a number's unit and a date's time zone (`currency=$code` works), such as `:relativetime`'s `unit=$unit`;
   - nested keys in a catalog, which `grai import` flattens.
 
   Each is a compile error that names the construct, never an approximation. `docs/followups.md` tracks them.
