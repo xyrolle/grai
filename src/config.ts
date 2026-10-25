@@ -15,6 +15,7 @@ import {
 	type IdenticalToBase,
 	readIdenticalToBase,
 } from "./identical-to-base.ts";
+import { readPlaceName } from "./place-name.ts";
 import { categoriesOf, type PluralType } from "./plurals.ts";
 import {
 	readUrlRouting,
@@ -35,6 +36,8 @@ export type Config = {
 	strategy: readonly Strategy[];
 	/** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
 	cookie: Cookie | undefined;
+	/** The key in `localStorage` the `localStorage` strategy reads and `setLocale` writes, if it has it. */
+	localStorageKey: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
 	/** Which locales' paths the `url` strategy prefixes, each one's prefix, and the paths it leaves alone. */
@@ -57,12 +60,16 @@ export type Config = {
  */
 export type LocaleSwitch = "reload" | "live";
 
-/** A place a request can name its locale in. */
-export type Strategy = "cookie" | "preferredLanguage" | "url";
+/**
+ * A place a request or a page can name its locale in. `localStorage` is the page's alone, which a
+ * request does not carry.
+ */
+export type Strategy = "cookie" | "localStorage" | "preferredLanguage" | "url";
 
 /** The strategies, in the order the docs and config.schema.json list them. */
 export const strategies: ReadonlySet<string> = new Set([
 	"cookie",
+	"localStorage",
 	"preferredLanguage",
 	"url",
 ]);
@@ -75,6 +82,7 @@ export const configFields: ReadonlySet<string> = new Set([
 	"outdir",
 	"strategy",
 	...cookieFields,
+	"localStorageKey",
 	"switch",
 	...urlRoutingFields,
 	"tests",
@@ -154,11 +162,17 @@ export function readConfig(file: string): Config {
 	}
 	if (!isStrategy(strategy)) {
 		throw invalid(
-			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
+			'"strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage" or "url"',
 		);
 	}
 	const urlRouting = readUrlRouting(raw, strategy, locales, invalid);
 	const cookie = readCookie(raw, strategy.includes("cookie"), invalid);
+	const localStorageKey = readPlaceName(
+		raw,
+		strategy.includes("localStorage"),
+		{ field: "localStorageKey", source: "localStorage", place: "the key" },
+		invalid,
+	);
 	if (localeSwitch !== "reload" && localeSwitch !== "live") {
 		throw invalid(
 			'"switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place',
@@ -220,6 +234,7 @@ export function readConfig(file: string): Config {
 		outdir: out,
 		strategy,
 		cookie,
+		localStorageKey,
 		switch: localeSwitch,
 		urlRouting,
 		tests,

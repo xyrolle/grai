@@ -9,6 +9,7 @@ import {
 	directions,
 	leavesPathsAlone,
 	locales,
+	localStorageKey,
 	prefixes,
 	prefixesEveryLocale,
 	readsUrl,
@@ -123,9 +124,10 @@ export function getLocale() {
 /**
  * Sets the locale. In a request, for the rest of the request; in a script or a test, for the
  * process. In a browser, for the page: it sets the page's `<html lang>` and `dir`, so the document
- * and its messages never disagree, keeps the locale where the server reads it (its cookie, or its
- * URL) and reloads, unless `{ reload: false }`, after which only the messages called next are in
- * the new locale. The page's own locale is kept in the cookie, but loads nothing again.
+ * and its messages never disagree, keeps the locale where the strategy reads it (its cookie, its
+ * key in localStorage, or its URL) and reloads, unless `{ reload: false }`, after which only the
+ * messages called next are in the new locale. The page's own locale is kept, but loads nothing
+ * again.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
@@ -152,6 +154,9 @@ export function setLocale(locale, options) {
 		// biome-ignore lint/suspicious/noDocumentCookie: the reload that follows must see it, and the Cookie Store API is asynchronous and not in every browser.
 		document.cookie = `${cookieName}=${locale}${cookieAttributes}${secure}`;
 	}
+	// The config names the key exactly when its strategy lists `localStorage`.
+	if (localStorageKey !== undefined)
+		localStorage.setItem(localStorageKey, locale);
 	if (!changed || options?.reload === false) return;
 	if (readsUrl) {
 		location.href = localizeUrl(location.href, { locale }).href;

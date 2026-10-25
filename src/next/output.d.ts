@@ -22,7 +22,12 @@ declare module "grai/next/output/internal.js" {
 }
 
 declare module "grai/next/output/config.js" {
-	export const strategy: readonly ("cookie" | "preferredLanguage" | "url")[];
+	export const strategy: readonly (
+		| "cookie"
+		| "localStorage"
+		| "preferredLanguage"
+		| "url"
+	)[];
 }
 
 declare module "grai/next/output/server.js" {
