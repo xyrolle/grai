@@ -164,6 +164,11 @@ export function readConfig(file: string): Config {
 			'"switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place',
 		);
 	}
+	if (localeSwitch === "live") {
+		throw invalid(
+			'"switch" cannot be "live" in this version: no page switches to another locale\'s words in place yet (docs/followups.md). Leave "switch" out, or set it to "reload": setLocale then keeps the choice and loads the page again in the new locale',
+		);
+	}
 	if (!isPatternList(tests)) {
 		throw invalid(
 			'"tests" must list globs of the test files, of *, **, ? and {a,b}, such as ["**/*.test.*"], or be [] when no file is a test',

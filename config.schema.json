@@ -68,8 +68,8 @@
 			"default": "lax"
 		},
 		"switch": {
-			"description": "How a page changes locale: \"reload\", the default, reloads it, and \"live\" changes it in place.",
-			"enum": ["reload", "live"]
+			"description": "How a page changes locale: \"reload\", the default, reloads it. \"live\", where a page would change in place, is refused until grai does it.",
+			"enum": ["reload"]
 		},
 		"localePrefix": {
 			"description": "With the \"url\" strategy: \"as-needed\", the default, where the base locale's paths have no prefix, or \"always\", where every locale's have one.",

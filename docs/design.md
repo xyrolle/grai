@@ -125,7 +125,7 @@ They come through an import map, which keeps the framework's single client build
 Tests switch the locale within the page, and so do many apps, without a reload. A production page holds only its locale's words. The config's `"switch"` picks one of two designs, each the same in every build:
 
 - **`"reload"`, the default: no switch within the page.** `setLocale(locale)` reloads or navigates, so a page keeps its words while it lives. `setLocale(locale, { reload: false })` still sets the locale for a test and for code that draws nothing, and the messages called next are in it. A Svelte component already drawn keeps its words, as it always has: a message call reads no signal, so Svelte never runs it again.
-- **`"live"`: load, then switch.** `setLocale(locale, { reload: false })` imports the target locale's variants of the message modules the page holds, then switches, and the app re-renders. It is not built yet (`docs/followups.md`).
+- **`"live"`: load, then switch.** `setLocale(locale, { reload: false })` imports the target locale's variants of the message modules the page holds, then switches, and the app re-renders. It is not built yet, so the config refuses `"live"` (`docs/followups.md`).
   - In that mode it returns a promise that settles once the switch is done.
   - `setLocale(locale)` keeps reloading and returns nothing.
   - In dev and tests, where every locale is loaded, the promise settles at once.

@@ -253,11 +253,16 @@ describe("the config", () => {
 		]);
 	});
 
-	it("names a locale switch it does not know", async () => {
+	it("names a locale switch it does not know, and refuses the live one it does not do yet", async () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { switch: "instant" }),
 		).toEqual([
 			'config-invalid: grai.config.json: "switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place.',
+		]);
+		expect(
+			await errorsOf({ en: { title: "Title" } }, { switch: "live" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "switch" cannot be "live" in this version: no page switches to another locale\'s words in place yet (docs/followups.md). Leave "switch" out, or set it to "reload": setLocale then keeps the choice and loads the page again in the new locale.',
 		]);
 	});
 
