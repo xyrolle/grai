@@ -219,7 +219,7 @@ The locale is resolved once per request on the server, or once per page on the c
 
 The runtime's names are the ones existing Paraglide call sites use, so migrating changes imports, not calls. Only the middleware has a name of its own:
 - `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `cookieName`, `getTextDirection`, `MessagePart`;
-- for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`;
+- for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`. Without it they leave every URL as it is, since no URL then names a locale: in an app that keeps the locale in a cookie, `/de/…` is a path of its own, and a prefix would lead to a page it does not have;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
 ## Servers
