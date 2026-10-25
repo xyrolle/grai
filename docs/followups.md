@@ -138,3 +138,9 @@ Done when: a rename changes them, with a test of each.
 `grai export en-GB --untranslated` lists every key en-GB takes from en as untranslated, so a translator is asked for all of en again; `grai seed en-GB` copies en's text into en-GB, which then no longer follows en. Both should treat a key a locale takes from its fallback as covered, and still let a translator give the locale its own text.
 
 Done when: `export --untranslated` leaves out a key the locale takes from its fallback, a full export offers it with the fallback's text as its source, `seed` refuses a locale that falls back or seeds nothing it takes from its fallback, and a test covers each.
+
+## Remove what a compile that stopped halfway left
+
+A compile that stops while it writes, killed or crashed, leaves the output's lock (`docs/design.md`), its temporary files in `.grai/`, and the files named by their content that it wrote before any entry named them. The lock is refused, so a person sees it; the rest stays, as no manifest records it.
+
+Done when: a writer under the lock removes the temporary files in `.grai/`, which only a writer under the lock makes, and retires the files named by their content that neither the manifest nor the output names, with a test that kills a compile between its writes.
