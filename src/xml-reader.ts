@@ -4,6 +4,7 @@
  * instructions and CDATA are read past or as text.
  */
 
+import { ownEntry } from "./own-entry.ts";
 import { isXmlCharacter } from "./xml-text.ts";
 
 /** An element, with its attributes and its content in order. */
@@ -179,7 +180,7 @@ class XmlReader {
 						"an & must start a reference, such as &amp;.",
 					);
 				}
-				const named = entities[reference];
+				const named = ownEntry(entities, reference);
 				if (named !== undefined) return named;
 				const code = /^#x[0-9A-Fa-f]+$/.test(reference)
 					? Number.parseInt(reference.slice(2), 16)
