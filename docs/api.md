@@ -21,6 +21,23 @@ The compiler, for a build script or a bundler grai has no adapter for.
 
 - `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin[]`: `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. List it before `sveltekit()` or `svelte()`. It needs `svelte` and `magic-string`.
 
+## `grai/next`
+
+- `bindLocale(locale: string): void`: binds the locale for the rest of the request's render. A page, a layout or `generateMetadata` calls it before any message, with the locale its params name.
+- `LocaleProvider({ locale, children }: { locale: string; children?: ReactNode }): ReactNode`: gives client components the request's locale while the server renders them. In a browser, a client navigation into another locale switches to it with `setLocale`.
+
+## `grai/next/config`
+
+- `withGrai(nextConfig?: NextConfig): (phase: string) => Promise<NextConfig>`: wraps the Next config. `next dev` compiles the catalogs and recompiles on each change, `next build` compiles them and fails on any error, and both bundlers resolve `grai/next`'s imports of the output to the config's `outdir`.
+
+## `grai/next/proxy`
+
+- `proxy(request: NextRequest): Promise<Response>`: resolves the request's locale by the config's `strategy` and rewrites it to the same path under `/<locale>`, its `Vary` listing the headers the strategy reads.
+
+## `grai/react`
+
+- `Markup<Tag>({ parts, markup }: { parts: readonly MessagePart<Tag>[]; markup: Record<Tag, (children?: ReactNode) => ReactNode> }): ReactNode`: draws a markup message's `.parts()` with the app's function for each of its tags, in server and client components alike. A tag the message writes and `markup` lacks is a type error, and throws, naming it.
+
 ## The `grai` command
 
 Every command takes `--config <file>`, `grai.config.json` in the current directory by default. It exits with 0, with 1 when it reports errors, and with 2 on a usage error.
@@ -50,6 +67,7 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `tests?: string[]`: globs of the source files that are tests, which `grai check` does not count as using a key; `[]` makes no file a test.
 - `fallbacks?: Record<string, string>`: each locale that takes the messages it lacks from another locale of its language, such as `{ "en-GB": "en" }`.
 - `identicalToBase?: Record<string, string[]>`: per locale, the keys whose message rightly reads as the base locale's, which `grai check` and `grai export` take as translated.
+- `pseudoLocale?: string`: a locale, such as `"en-XA"`, made from the base's messages for development and tests, accented and about 35% longer; `grai watch` and the Vite dev server compile it, and no build does.
 
 Relative paths start from the config file's directory. The README's table says more about each field.
 
