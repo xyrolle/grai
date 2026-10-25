@@ -11,6 +11,13 @@ export const keyModulePrefix: string = `\0${keyPrefix}`;
 export const textPrefix = "grai:text/";
 export const textModulePrefix: string = `\0${textPrefix}`;
 
+/**
+ * How a build's key and text modules import the output's runtime, plurals and formats: by a prefix
+ * of grai's, not by the output's path, so that a module's code, by which the bundler weighs it, is
+ * the same wherever the project lives.
+ */
+export const outputPrefix = "grai:output/";
+
 /** The directory a page's message chunks go to, and the one of each locale's copies. */
 export const messageDirectory = "grai";
 export const localeDirectory = (locale: string): string => `grai-${locale}`;
