@@ -95,3 +95,21 @@ it("exports from grai, grai/vite and grai/svelte only their API", async () => {
 	]);
 	expect(await importableNames(dir, "grai/svelte")).toEqual(["grai"]);
 });
+
+it("exports from grai/next, grai/next/config, grai/next/proxy and grai/react only their API", async () => {
+	const { dir } = project(catalogs);
+
+	expect(Object.keys(await import("../src/next/config.ts"))).toEqual([
+		"withGrai",
+	]);
+	expect(Object.keys(await import("../src/react/markup.ts"))).toEqual([
+		"Markup",
+	]);
+	expect(await importableNames(dir, "grai/next")).toEqual([
+		"LocaleProvider",
+		"bindLocale",
+	]);
+	expect(await importableNames(dir, "grai/next/config")).toEqual(["withGrai"]);
+	expect(await importableNames(dir, "grai/next/proxy")).toEqual(["proxy"]);
+	expect(await importableNames(dir, "grai/react")).toEqual(["Markup"]);
+});
