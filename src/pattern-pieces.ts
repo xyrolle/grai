@@ -3,7 +3,7 @@
  * place but not edit.
  */
 
-import { type Part, parsePattern } from "./pattern.ts";
+import { type Part, parsePattern, placeholderEnd } from "./pattern.ts";
 
 /** A code a translator places but does not edit: a placeholder, or markup. */
 export type Code = {
@@ -43,7 +43,7 @@ export function patternPieces(source: string): Piece[] {
 			index++;
 			continue;
 		}
-		const close = character === "{" ? source.indexOf("}", index + 1) : -1;
+		const close = character === "{" ? placeholderEnd(source, index) : -1;
 		if (close === -1) {
 			text += character;
 			continue;

@@ -61,6 +61,25 @@ describe("markup with options and attributes", () => {
 		]);
 	});
 
+	it("reads braces in a quoted value as its text, escaped or not", async () => {
+		const { m } = await project({
+			en: { link: "See {#a title=|a}b| alt=|{c\\}|}this{/a}" },
+		}).load();
+
+		expect(m.link?.()).toBe("See this");
+		expect(m.link?.parts?.()).toEqual([
+			{ type: "text", value: "See " },
+			{
+				type: "markup-start",
+				name: "a",
+				options: { title: "a}b", alt: "{c}" },
+				attributes: {},
+			},
+			{ type: "text", value: "this" },
+			{ type: "markup-end", name: "a", options: {}, attributes: {} },
+		]);
+	});
+
 	it("is an error for an option without a value, one given twice, an input as an attribute, or an open quote", async () => {
 		expect(
 			await errorsOf({

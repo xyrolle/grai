@@ -18,7 +18,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   - The joined key must be a key name like any other, so `cart.item-count` is an error naming its path.
 - **The constructs are a deliberate subset:**
   - text and `{name}` placeholders;
-  - markup: `{#tag}…{/tag}` and `{#tag/}`, with options (`href=|/terms|`, `rel=$rel`) and attributes (`@translate=no`, `@hidden`);
+  - markup: `{#tag}…{/tag}` and `{#tag/}`, with options (`href=|/terms|`, `rel=$rel`) and attributes (`@translate=no`, `@hidden`), a quoted value holding any text, braces too, with `\` escaping the next character;
   - variants: `declarations` (`input x`, `local y = x: plural`, `local y = x: plural type=ordinal`, and a `:number` or `:integer` local to select on), `selectors` and `match`, with `*`, several selectors, and `""` for a message without selectors;
   - formatting: `:number`, `:integer`, `:percent`, `:currency`, `:unit`, `:relativetime`, `:list`, `:datetime`, `:date` and `:time` with their options, in a placeholder (`{x :number}`) or as a local (`local y = x: number`);
   - the escapes `\{`, `\}` and `\\`.

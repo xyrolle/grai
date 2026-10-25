@@ -35,7 +35,7 @@ export function parsePattern(source: string): Part[] {
 			index++;
 			continue;
 		}
-		const close = char === "{" ? source.indexOf("}", index + 1) : -1;
+		const close = char === "{" ? placeholderEnd(source, index) : -1;
 		if (close === -1) {
 			text += char;
 			continue;
@@ -47,6 +47,22 @@ export function parsePattern(source: string): Part[] {
 	}
 	if (text !== "") parts.push({ type: "text", value: text });
 	return parts;
+}
+
+/**
+ * The index of the `}` that closes the placeholder or markup a `{` opens, or -1 when none does. A
+ * `}` in a quoted value, `|a}b|`, where `\` escapes the next character, is the value's text. When
+ * a quote is never closed, the first `}` closes it, so the markup is read and its open quote named.
+ */
+export function placeholderEnd(source: string, open: number): number {
+	let quoted = false;
+	for (let index = open + 1; index < source.length; index++) {
+		const char = source.charAt(index);
+		if (quoted && char === "\\") index++;
+		else if (char === "|") quoted = !quoted;
+		else if (char === "}" && !quoted) return index;
+	}
+	return quoted ? source.indexOf("}", open + 1) : -1;
 }
 
 function placeholder(body: string): Part {
