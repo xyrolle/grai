@@ -229,6 +229,50 @@ describe("grai export", () => {
 		]);
 		expect(units[0]?.note).toBe("n: 0");
 	});
+
+	it("notes the counts each form of a rounding number is for, as its options show them", async () => {
+		const weights = [
+			{
+				declarations: [
+					"input kg",
+					"local n = kg: number minimumFractionDigits=1",
+				],
+				selectors: ["n"],
+				match: { "n=one": "{n} kilogram", "n=*": "{n} kilograms" },
+			},
+		];
+		const { config } = project({ en: { weights }, ru: { weights } });
+
+		const result = await exportLocale(config, "ru", {
+			json: true,
+			untranslated: false,
+		});
+		const units: { id: string; source: string; note: string }[] =
+			"document" in result ? JSON.parse(result.document).units : [];
+
+		expect(units.map(({ id, source, note }) => [id, source, note])).toEqual([
+			[
+				"weights.n.one",
+				"{n} kilograms",
+				"n: one, as for no count its options show",
+			],
+			[
+				"weights.n.few",
+				"{n} kilograms",
+				"n: few, as for no count its options show",
+			],
+			[
+				"weights.n.many",
+				"{n} kilograms",
+				"n: many, as for no count its options show",
+			],
+			[
+				"weights.n.other",
+				"{n} kilograms",
+				"n: other, as for 0, 1, 2, 3, 4, 5, 0.5, 1.5, 2.5, …",
+			],
+		]);
+	});
 });
 
 describe("grai merge", () => {
