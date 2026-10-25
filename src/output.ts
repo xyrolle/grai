@@ -1,5 +1,4 @@
 import {
-	link,
 	mkdir,
 	readdir,
 	readFile,
@@ -8,9 +7,8 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { isMissing } from "./config.ts";
-import { GraiError } from "./error.ts";
+import { lockOutput } from "./output-lock.ts";
 import type { Output } from "./render.ts";
 
 /** What the last compile wrote: a hash of what decided it, and its files. */
@@ -18,8 +16,6 @@ type Manifest = { inputs: string; files: string[] };
 
 /** grai's own directory in the outdir: the manifest, the writer's lock and files being written. */
 const stateDirectory = ".grai";
-const lockRetry = 10;
-const lockPatience = 30_000;
 
 /**
  * Whether the outdir holds the output of these inputs, every file of it in place. The files are
@@ -63,8 +59,7 @@ export async function writeOutput(
 	previous?: ReadonlyMap<string, string>,
 ): Promise<string[]> {
 	const state = join(outdir, stateDirectory);
-	await mkdir(state, { recursive: true });
-	const release = await lock(state);
+	const release = await lockOutput(state);
 	try {
 		const manifest = await readManifest(outdir);
 		const written: string[] = [];
@@ -147,64 +142,6 @@ function isManifest(value: unknown): value is Manifest {
 		Array.isArray(value.files) &&
 		value.files.every((file) => typeof file === "string")
 	);
-}
-
-/**
- * Takes the outdir's lock: a file holding this process's pid, linked into place so it exists only
- * with its pid in it. A lock whose process is gone is stale and taken over; a live one is waited for.
- */
-async function lock(state: string): Promise<() => Promise<void>> {
-	const path = join(state, "lock");
-	const claim = join(state, `lock.${process.pid}`);
-	await writeFile(claim, String(process.pid));
-	const started = Date.now();
-	try {
-		for (;;) {
-			if (await linked(claim, path)) return () => unlink(path);
-			const holder = Number(
-				await readFile(path, "utf8").catch((error: unknown) => {
-					ignoreMissing(error);
-					return "";
-				}),
-			);
-			if (!isAlive(holder)) {
-				await unlink(path).catch(ignoreMissing);
-				continue;
-			}
-			if (Date.now() - started > lockPatience) {
-				throw new GraiError(
-					"output-locked",
-					{ file: join(stateDirectory, "lock") },
-					`process ${holder} has held the output's lock for ${lockPatience / 1000} s. If no grai is running, delete ${path}.`,
-				);
-			}
-			await delay(lockRetry);
-		}
-	} finally {
-		await unlink(claim);
-	}
-}
-
-/** Links the claim to the lock's path, or false if a lock is already there. */
-async function linked(claim: string, path: string): Promise<boolean> {
-	try {
-		await link(claim, path);
-		return true;
-	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "EEXIST")
-			return false;
-		throw error;
-	}
-}
-
-function isAlive(pid: number): boolean {
-	if (!Number.isInteger(pid) || pid <= 0) return false;
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (error) {
-		return error instanceof Error && "code" in error && error.code === "EPERM";
-	}
 }
 
 function ignoreMissing(error: unknown): void {
