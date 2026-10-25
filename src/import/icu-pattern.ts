@@ -2,6 +2,8 @@ import type { IcuNode } from "./icu-parse.ts";
 import { IcuScanner, invalid } from "./icu-scanner.ts";
 
 const tagName = /^[A-Za-z][\w-]*$/;
+/** The characters before which an apostrophe starts quoted text; a plural's `#` is one too. */
+const quotable: ReadonlySet<string> = new Set(["{", "}", "<", ">"]);
 
 /**
  * Reads an ICU message's patterns: their text, apostrophes, `#` and tags, around the arguments in
@@ -62,14 +64,17 @@ export abstract class IcuPatternReader extends IcuScanner {
 		);
 	}
 
-	/** ICU's apostrophe: `''` is one, and one before a special character quotes text up to the next. */
+	/**
+	 * ICU's apostrophe, as ICU 4.8 and intl-messageformat read it: `''` is one, and one right before
+	 * a quotable character quotes text up to the next. Any other apostrophe is itself.
+	 */
 	private quoted(inPlural: boolean): string {
 		const next = this.source.charAt(this.index + 1);
 		if (next === "'") {
 			this.index += 2;
 			return "'";
 		}
-		if (!"{}<>|".includes(next) && !(inPlural && next === "#")) {
+		if (!quotable.has(next) && !(inPlural && next === "#")) {
 			this.index++;
 			return "'";
 		}
