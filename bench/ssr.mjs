@@ -12,7 +12,7 @@ import {
 	PAGE_CALLS,
 	pageProps,
 	pageSource,
-	visibleText,
+	pageText,
 	writePage,
 } from "./page.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
@@ -64,8 +64,8 @@ for (const app of selectedApps()) {
 				locale,
 				() => render(Page, { props }).body,
 			);
-			expected ??= visibleText(html);
-			if (visibleText(html) !== expected)
+			expected ??= pageText(html);
+			if (pageText(html) !== expected)
 				throw new Error(
 					`${name} renders other text than Paraglide in ${locale}`,
 				);
