@@ -72,6 +72,27 @@ const kindOf = graiModules(); // reads grai.config.json
 kindOf(id); // "runtime", "config", "plurals", "formats" (the grai-runtime chunk), "key" or "text" (a message chunk), or undefined
 ```
 
+### A static site, an Electron app or an extension
+
+Where no server picks the locale, each page the plugin builds picks it itself, before any module loads, from the places the config's `strategy` lists, in order:
+
+```json
+{
+	"strategy": ["query", "localStorage", "preferredLanguage"],
+	"queryParameter": "lng",
+	"localStorageKey": "locale"
+}
+```
+
+- `cookie` (with `cookieName`) and `localStorage` (with `localStorageKey`) hold the visitor's choice, which `setLocale` writes;
+- `query` (with `queryParameter`) is a link's `?lng=de`;
+- `preferredLanguage` is the browser's languages, matched as the server matches `Accept-Language`: `de-AT` finds `de`;
+- `url` is the path's first segment, `/de/cart`.
+
+A server reads the same list where it can, so a page it draws picks the same locale. Leave `lang` off the page's `<html>`: a page whose `<html lang>` is one of the locales keeps it, as a server drew it so.
+
+With `grai({ localeChunks: true })`, the page then loads only its locale's words: the build writes each message chunk's copy per locale, and the script points the page at its locale's. With a Content Security Policy that allows scripts by hash, add the hashes the build's log names to `script-src`; they change only with the config, Vite's `base` or grai. With Vite's `html.cspNonce`, nothing more is needed.
+
 ### Svelte
 
 In a Svelte app, take the plugin from `grai/svelte`, listed before Svelte's, and in a SvelteKit app from `grai/sveltekit/vite` (below):
@@ -226,7 +247,7 @@ On a static site whose page renders 400 messages and a Svelte island 100, `astro
 
 ### Workers, Bun, Deno and Node
 
-The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
+The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `query`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
 
 ```ts
 // src/worker.ts
