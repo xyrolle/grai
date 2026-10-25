@@ -423,6 +423,7 @@ Astro runs a request's middleware around the page's render, renders islands on t
   - `grai`: the compiler's API;
   - `grai/vite`: the Vite plugin; the SvelteKit adapter comes as `grai/sveltekit`, thin, taking the project's generated modules;
   - `grai/svelte`: the Vite plugin for a Svelte app, whose client build also reads a call without inputs as its string;
+  - `grai/sveltekit/client`: in dev, a catalog edit drawn again in place, imported for that alone;
   - `grai/next`, `grai/next/config` and `grai/next/proxy`: the Next adapter, also thin, which finds the project's generated modules through `withGrai`;
   - `grai/react`: the `Markup` component;
   - `grai/astro`: the Astro integration, and `grai/astro/middleware`, the middleware it adds;
