@@ -15,6 +15,7 @@ import { type Config, readConfig } from "./config.ts";
 import { keyPositions, type Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
+import type { RuntimeSources } from "./output-modules.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
 
@@ -33,8 +34,8 @@ export type Build = {
 	rendered: Rendered;
 };
 
-/** The runtime's modules, which every output carries as they are. */
-const runtime = {
+/** The runtime's modules, which every output carries, their imports of each other pinned. */
+const runtime: RuntimeSources = {
 	runtime: readFileSync(
 		new URL("./runtime/runtime.js", import.meta.url),
 		"utf8",

@@ -5,6 +5,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { chromium } from "playwright-core";
 import { build, createServer, type PluginOption } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
+import { withoutContentHash } from "../src/content-names.ts";
 import { grai } from "../src/svelte.ts";
 import { graiModules, grai as graiVite } from "../src/vite.ts";
 import { project } from "./project.ts";
@@ -143,7 +144,10 @@ describe("grai/svelte's client build", () => {
 			chunks.flatMap((chunk) =>
 				chunk.moduleIds
 					.filter((id) => kindOf(id) !== undefined)
-					.map((id) => [id.replace(`${dir}/`, ""), [kindOf(id), chunk.name]]),
+					.map((id) => [
+						withoutContentHash(id.replace(`${dir}/`, "")),
+						[kindOf(id), chunk.name],
+					]),
 			),
 		);
 

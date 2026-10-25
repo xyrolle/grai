@@ -2,6 +2,7 @@ import { existsSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
+import { withoutContentHash } from "../src/content-names.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -87,7 +88,8 @@ it("reads a catalog that a save truncates and then writes once the save has sett
 	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
 
 	await expect.poll(() => reported.length).toBe(2);
-	expect(reported[1]).toMatchObject({ errors: [], written: ["keys/0.js"] });
+	expect(reported[1]?.errors).toEqual([]);
+	expect(reported[1]?.written.map(withoutContentHash)).toContain("keys/0.js");
 });
 
 it("compiles a save that leaves the catalog whole on its first event, without waiting for the files to be quiet", async () => {

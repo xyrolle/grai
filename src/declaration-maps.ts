@@ -27,34 +27,33 @@ export type BaseCatalog = {
 const nameColumn = "export declare const ".length;
 
 /**
- * The map of a shard's declarations, `keys/<index>.d.ts`: the previous render's while the base
- * catalog's keys and the shard's declarations keep their lines, else a new one.
+ * The map of a shard's declarations, `file` in `keys/`: the previous render's while the
+ * declarations keep their file and their lines and the base catalog's keys keep theirs, else a new
+ * one. TypeScript follows a map only when it names the declarations it maps.
  */
 export function shardMap(
-	index: number,
+	file: string,
 	lines: readonly DeclarationLine[],
 	base: BaseCatalog,
 	outdir: string,
-	previous: {
-		map: string | undefined;
-		lines: readonly DeclarationLine[] | undefined;
-	},
+	previous:
+		| {
+				file: string;
+				map: string;
+				lines: readonly DeclarationLine[];
+		  }
+		| undefined,
 ): string {
 	if (
-		previous.map !== undefined &&
+		previous !== undefined &&
+		previous.file === file &&
 		!base.moved &&
 		sameLines(lines, previous.lines)
 	) {
 		return previous.map;
 	}
 	const catalog = relative(join(outdir, "keys"), base.path);
-	return declarationMap(
-		`${index}.d.ts`,
-		catalog,
-		lines,
-		base.positions,
-		nameColumn,
-	);
+	return declarationMap(file, catalog, lines, base.positions, nameColumn);
 }
 
 /** Whether a shard's declarations are on the lines they were on in the previous render. */
