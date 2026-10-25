@@ -89,6 +89,58 @@ describe("the middleware", () => {
 		).toEqual(["en", "Your cart"]);
 	});
 
+	/** The locale the middleware gives each Accept-Language header, for a project of `locales`. */
+	const acceptLanguage = async (locales: string[]) => {
+		const { dir, load } = project(
+			Object.fromEntries(locales.map((locale) => [locale, { title: locale }])),
+			{ strategy: ["preferredLanguage"] },
+		);
+		await load();
+		const { middleware } = await import(
+			pathToFileURL(join(dir, "out", "server.js")).href
+		);
+		return (headers: string[]) =>
+			Promise.all(
+				headers.map(async (header) =>
+					(
+						await middleware(
+							new Request("https://shop.test/", {
+								headers: { "accept-language": header },
+							}),
+							({ locale }: { locale: string }) => new Response(locale),
+						)
+					).text(),
+				),
+			);
+	};
+
+	it("keeps out a language the request refuses, and takes * as any language it names no other way", async () => {
+		const localesFor = await acceptLanguage(["en", "de", "fr"]);
+
+		expect(
+			await localesFor([
+				"en;q=0, *;q=1",
+				"en;q=0.5, *",
+				"de-AT;q=0, de;q=0.9, fr;q=0.8",
+				"ro, *;q=0.5",
+			]),
+		).toEqual(["de", "de", "de", "en"]);
+	});
+
+	it("leaves out an entry whose weight is not a q-value, or whose tag is not a language range", async () => {
+		const localesFor = await acceptLanguage(["en", "de"]);
+
+		expect(
+			await localesFor([
+				"de;q=2, en;q=0.5",
+				"de;q=.5, en;q=0.4",
+				"de_DE, en;q=0.1",
+				"de;Q=0, en;q=0.9",
+				"de;Q=0.9, en;q=0.5",
+			]),
+		).toEqual(["en", "en", "en", "en", "de"]);
+	});
+
 	/**
 	 * Each request's title before and after an await, every request started before any renders
 	 * again. A request with `switchTo` calls setLocale before it awaits.
