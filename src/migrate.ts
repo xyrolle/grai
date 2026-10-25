@@ -3,6 +3,7 @@ import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import type { ImportFormat } from "./import/convert.ts";
 import { type Mapping, readMapping } from "./import/mapping.ts";
+import { formatjsModules } from "./migrate/formatjs.ts";
 import { i18nextModules } from "./migrate/i18next.ts";
 import type { LibraryModule } from "./migrate/library.ts";
 import {
@@ -20,7 +21,7 @@ const librariesOf: Readonly<
 	Record<ImportFormat, Readonly<Record<string, LibraryModule>>>
 > = {
 	i18next: i18nextModules,
-	icu: nextIntlModules,
+	icu: { ...nextIntlModules, ...formatjsModules },
 };
 
 /** Components grai migrate reports but does not parse: their markup calls messages too. */
