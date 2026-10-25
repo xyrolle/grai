@@ -8,6 +8,12 @@ The Vite plugin writes each message chunk once per locale under `grai-<locale>/`
 
 Done when: `grai/sveltekit` does both, with a browser test that a page of the example loads no other locale's words and no shared message chunk.
 
+## Chunk messages by the entries a page loads together
+
+A SvelteKit page loads its layouts with it, but the bundler sees each layout and page as an entry of its own: a set of keys that a layout and a few of its pages use is a set apart from the layout's own, though every page under the layout loads both. On app B, whose 60 pages share one layout, the layout's first paint loads 8 message chunks, and the app's tuned setup on Paraglide, which grouped keys by the routes that reach them and the layout's keys in one chunk, loads 21 a page (median) against grai's 26, in 10% fewer bytes. Simulated on app B's build, sets by the pages that load them rather than by entries give 13% fewer requests and 6% fewer bytes. Rolldown's sets cannot say which entries load together, and its merge picks the nearest set by the count of entries apart, not by the bytes a page would load.
+
+Done when: the message chunking knows which entries a page loads together, from the framework's adapter or from the bundler, and both reference apps measure it.
+
 ## Switch locale in place: `"switch": "live"`
 
 The config accepts `"live"`, and `grai/svelte` then keeps every message a call, but no page switches in place yet. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
