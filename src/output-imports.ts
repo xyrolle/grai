@@ -28,9 +28,11 @@ export function calledNames(
 	for (const key of keys) {
 		if (functions === undefined) for (const name of key.uses) runtime.add(name);
 		else if (key.uses.has("unmatched")) runtime.add("unmatched");
-		for (const name of key.plurals) plurals.add(name);
-		for (const name of key.formats.keys()) formats.add(name);
-		for (const name of key.globals) globals.add(name);
+		// Most keys are text, which calls nothing else: an empty set is not iterated.
+		if (key.plurals.size > 0) for (const name of key.plurals) plurals.add(name);
+		if (key.formats.size > 0)
+			for (const name of key.formats.keys()) formats.add(name);
+		if (key.globals.size > 0) for (const name of key.globals) globals.add(name);
 	}
 	return { runtime, plurals, formats, globals };
 }

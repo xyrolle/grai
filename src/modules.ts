@@ -37,21 +37,19 @@ export type KeyModule = {
 	parts: readonly string[];
 };
 
+/** What every text key calls: the runtime's `text`, and nothing else, shared by them all. */
+const textUses: ReadonlySet<RuntimeFunction> = new Set(["text"]);
+const noNames: ReadonlySet<string> = new Set();
+const noFormats: ReadonlyMap<string, Formatter> = new Map();
+
 /** Compiles one key's messages, one per locale in the config's order, into the value its module exports. */
 export function keyModule(
 	key: string,
 	messages: readonly LocaleMessage[],
 ): KeyModule {
-	const used: Used = {
-		uses: new Set(),
-		plurals: new Set(),
-		formats: new Map(),
-		globals: new Set(),
-	};
 	const hasMarkup = messages.some((message) => message.markup);
 	const hasInputs = messages.some((message) => message.inputs.size > 0);
 	if (!hasInputs && !hasMarkup) {
-		used.uses.add("text");
 		const texts = messages.map((message) =>
 			JSON.stringify(plainText(message.variants[0]?.pattern ?? [])),
 		);
@@ -59,12 +57,21 @@ export function keyModule(
 		return {
 			value,
 			serverValue: value,
-			...used,
+			uses: textUses,
+			plurals: noNames,
+			formats: noFormats,
+			globals: noNames,
 			kind: "text",
 			variants: texts,
 			parts: [],
 		};
 	}
+	const used: Used = {
+		uses: new Set(),
+		plurals: new Set(),
+		formats: new Map(),
+		globals: new Set(),
+	};
 	const kind = hasMarkup ? "markup" : "message";
 	used.uses.add(kind);
 	const strings = messages.map((message) =>
