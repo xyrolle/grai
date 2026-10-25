@@ -37,11 +37,11 @@
 			"examples": ["src/lib/i18n"]
 		},
 		"strategy": {
-			"description": "Where the server looks for a request's locale, in order, before the base locale: its cookie, its Accept-Language, its URL's first path segment.",
+			"description": "Where the server and a page no server draws look for the locale, in order, before the base locale: the cookie, the page's localStorage, the request's Accept-Language or the browser's languages, the URL's first path segment.",
 			"type": "array",
 			"uniqueItems": true,
 			"items": {
-				"enum": ["cookie", "preferredLanguage", "url"]
+				"enum": ["cookie", "localStorage", "preferredLanguage", "url"]
 			}
 		},
 		"cookieName": {
@@ -66,6 +66,11 @@
 			"description": "The locale cookie's SameSite: \"lax\", the default, \"strict\", or \"none\" for a page embedded in another site's, which makes the cookie Secure.",
 			"enum": ["lax", "strict", "none"],
 			"default": "lax"
+		},
+		"localStorageKey": {
+			"description": "The key in localStorage the \"localStorage\" strategy reads and setLocale writes, when \"strategy\" lists \"localStorage\".",
+			"type": "string",
+			"minLength": 1
 		},
 		"switch": {
 			"description": "How a page changes locale: \"reload\", the default, reloads it, and \"live\" changes it in place.",
