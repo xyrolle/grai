@@ -8,6 +8,7 @@ import {
 	leavesPathsAlone,
 	locales,
 	prefixesEveryLocale,
+	queryParameter,
 	readsUrl,
 	strategy,
 	unlocalizedPaths,
@@ -104,11 +105,27 @@ function fromSource(source, request, pathname) {
 			return fromCookie(request.headers.get("cookie") ?? "");
 		case "preferredLanguage":
 			return fromAcceptLanguage(request.headers.get("accept-language") ?? "");
+		case "query":
+			return fromQuery(request.url);
 		case "url":
 			return localeOfPath(pathname);
 		case "localStorage":
 			return undefined;
 	}
+}
+
+/**
+ * The locale the URL's query parameter names, matched as a preferred language is, since a link may
+ * name `de-AT` where the project has `de`.
+ *
+ * @param {string} url
+ */
+function fromQuery(url) {
+	const tag =
+		queryParameter === undefined
+			? null
+			: new URL(url).searchParams.get(queryParameter);
+	return tag === null ? undefined : reachedBy(tag)[0];
 }
 
 /** @param {string} header */
@@ -217,8 +234,8 @@ function covers(range, locale) {
 }
 
 /**
- * The headers `localeOf` reads, in the strategy's order: `url` reads the URL, which a cache keys on
- * already, and a request does not carry `localStorage`.
+ * The headers `localeOf` reads, in the strategy's order: `query` and `url` read the URL, which a
+ * cache keys on already, and a request does not carry `localStorage`.
  */
 function headersRead() {
 	/** @type {Record<(typeof strategy)[number], string[]>} */
@@ -226,6 +243,7 @@ function headersRead() {
 		cookie: ["Cookie"],
 		localStorage: [],
 		preferredLanguage: ["Accept-Language"],
+		query: [],
 		url: [],
 	};
 	return strategy.flatMap((source) => headersOf[source]);
