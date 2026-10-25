@@ -4,7 +4,6 @@
 // with markup, how it is drawn from its parts, where the library has them.
 import { join } from "node:path";
 import { takesInputs } from "./calls.mjs";
-import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { formatNs } from "./measure.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
@@ -68,10 +67,13 @@ const forcedParts = (_, f, n) => `show(${f}.parts(d[${n}], d.options))`;
 const translate = (field) => (c, f, n) =>
 	`${f}(${JSON.stringify(c.key)}, ${field}[${n}])`;
 
-/** The libraries' variants in `locale`: grai's output and Paraglide's, as an app calls them, and i18next and use-intl. */
-export async function libraryVariants(app, locale) {
+/**
+ * The libraries' variants in `locale`: grai's output and Paraglide's, as an app calls them, and
+ * i18next and use-intl. `grai` is the module grai's messages come from: on a server, its server
+ * build, and in a page, the output its client build reads.
+ */
+export async function libraryVariants(app, locale, grai) {
 	const paraglide = join(await paraglideOutput(app), "messages.js");
-	const grai = join((await graiOutput(app)).outdir, "keys.js");
 	const { directory } = writeLibraryModules(app, locale);
 	const library = (name) => join(directory, `${locale}.${name}.js`);
 	return {

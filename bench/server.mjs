@@ -1,8 +1,9 @@
-// Server: what a message call costs inside a request, in Node: grai's compiled output, called as
-// an app calls it and with a forced locale, against Paraglide, i18next and use-intl, and against
-// the prototype's dispatchers that grai did not adopt. Each variant makes the same 2,000 calls
-// (render-calls.mjs), of each kind and in the page's mix, and its text is checked against
-// Paraglide's before it is timed. A message with markup is drawn from its parts; i18next has none.
+// Server: what a message call costs inside a request, in Node: grai's output as its Vite plugin
+// builds it for a server, called as an app calls it and with a forced locale, against Paraglide,
+// i18next and use-intl, and against the prototype's dispatchers that grai did not adopt. Each
+// variant makes the same 2,000 calls (render-calls.mjs), of each kind and in the page's mix, and
+// its text is checked against Paraglide's before it is timed. A message with markup is drawn from
+// its parts; i18next has none.
 //   node server.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -10,6 +11,7 @@ import { join } from "node:path";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { callValues } from "./call-values.mjs";
 import { kindsOf, sampleCalls } from "./calls.mjs";
+import { graiServerBuild } from "./grai.mjs";
 import { nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
@@ -29,8 +31,9 @@ import { inRequest, otherLocale } from "./request.mjs";
 /** The libraries' variants, then the floor of Paraglide's calls and the shapes grai did not adopt. */
 async function variants(app, locale) {
 	const prototype = writePrototype(app);
+	const grai = join(await graiServerBuild(app), "keys.js");
 	return {
-		...(await libraryVariants(app, locale)),
+		...(await libraryVariants(app, locale, grai)),
 		"Paraglide `getLocale()` alone": {
 			from: join(await paraglideOutput(app), "runtime.js"),
 			name: () => "getLocale",
