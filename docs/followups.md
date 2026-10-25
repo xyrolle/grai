@@ -211,3 +211,15 @@ Done when: the map's hash joins the page's `script-src`, in the `Content-Securit
 
 Done when: `grai/sveltekit/client` defers that refresh until Kit has started, with a test of the example that edits a load's text as soon as the page's markup is on screen and sees the edit.
 
+
+## The locale script outside Vite's pages
+
+Only a page that goes through Vite's HTML pipeline gets the locale script. A page another bundler or framework draws, such as Next's static export or a prerendered SvelteKit page, has none, so where no server picks its locale it renders in the one it was drawn in.
+
+Done when: each adapter that can draw a page no server serves writes the script into it, from `locale-script.ts`, with a browser test of a static build in each.
+
+## An app's own import map beside the locale script's
+
+The locale script writes the page's import map. A page that has one of its own then has two, which only browsers that merge import maps read both of; another takes the first and refuses the second.
+
+Done when: the plugin merges the page's own import map into the one the locale script writes, with a browser test of a page that has one.
