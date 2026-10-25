@@ -1,10 +1,11 @@
 /**
  * Writing translation units as XLIFF 2.0, the OASIS standard translation tools exchange. A
- * placeholder is a `<ph>`, a pair of tags a `<pc>` around its words, so a tool keeps a translator
- * from breaking either. A plural form's unit has a note of the counts it is for.
+ * placeholder is a `<ph>`, a pair of tags a `<pc>` around its words, or an `<sc>` and an `<ec>`
+ * where it crosses another, so a tool keeps a translator from breaking either. A plural form's
+ * unit has a note of the counts it is for.
  */
 
-import type { Piece } from "./pattern-pieces.ts";
+import type { Code, Piece } from "./pattern-pieces.ts";
 import type { Unit } from "./translation-units.ts";
 import { escapeAttribute, escapeText } from "./xml-text.ts";
 
@@ -47,8 +48,9 @@ export function writeXliff(
 }
 
 /**
- * Pieces as XLIFF inline content: a tag pair that nests properly as a `<pc>`, every other code as
- * a `<ph>`, and a character XML cannot hold as a `<cp>`.
+ * Pieces as XLIFF inline content: a tag pair that nests properly as a `<pc>`, one that crosses
+ * another as an `<sc>` and an `<ec>`, every other code as a `<ph>`, and a character XML cannot
+ * hold as a `<cp>`.
  */
 function inline(pieces: readonly Piece[]): string {
 	let content = "";
@@ -61,7 +63,7 @@ function inline(pieces: readonly Piece[]): string {
 		}
 		const end = piece.kind === "open" ? closingIndex(pieces, index) : -1;
 		if (end === -1) {
-			content += `<ph id="${escapeAttribute(piece.id)}" disp="${escapeAttribute(piece.source)}"/>`;
+			content += codeElement(piece, pieces);
 			continue;
 		}
 		const close = pieces[end];
@@ -70,6 +72,20 @@ function inline(pieces: readonly Piece[]): string {
 		index = end;
 	}
 	return content;
+}
+
+/** A code as an element of its own: a tag of a pair as an `<sc>` or its `<ec>`, any other as a `<ph>`. */
+function codeElement(code: Code, pieces: readonly Piece[]): string {
+	const id = escapeAttribute(code.id);
+	const disp = escapeAttribute(code.source);
+	const paired = pieces.some(
+		(piece) =>
+			"id" in piece && piece.id === code.id && piece.kind !== code.kind,
+	);
+	if (paired && code.kind === "open") return `<sc id="${id}" disp="${disp}"/>`;
+	if (paired && code.kind === "close")
+		return `<ec startRef="${id}" disp="${disp}"/>`;
+	return `<ph id="${id}" disp="${disp}"/>`;
 }
 
 /** Where the tag opened at `index` closes, if what lies between nests properly; else -1. */

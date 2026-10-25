@@ -283,6 +283,29 @@ describe("grai export", () => {
 
 		expect(ids).toEqual(["tag-dot", "tag-dot.2", "tag-dot-2e-2", "tag-a-26-b"]);
 	});
+
+	it("writes tags that cross as a start and an end code each, which a merge reads back", async () => {
+		const styles = "{#b}bold {#i}both{/b} italic{/i}";
+		const { dir, config, load } = project({ en: { styles }, de: { styles } });
+		const xliff = await exported(config, "de");
+		const file = join(dir, "de.xlf");
+		writeFileSync(
+			file,
+			translated(xliff, {
+				styles:
+					'<sc id="tag-b"/>fett <sc id="tag-i"/>beides<ec startRef="tag-b"/> kursiv<ec startRef="tag-i"/>',
+			}),
+		);
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(xliff).toContain(
+			'<source><sc id="tag-b" disp="{#b}"/>bold <sc id="tag-i" disp="{#i}"/>both<ec startRef="tag-b" disp="{/b}"/> italic<ec startRef="tag-i" disp="{/i}"/></source>',
+		);
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(m.styles?.({}, { locale: "de" })).toBe("fett beides kursiv");
+	});
 });
 
 describe("grai merge", () => {
