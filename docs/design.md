@@ -97,6 +97,7 @@ export const cart_items = /*#__PURE__*/ message(
   - One locale may use a plain pattern where another selects: the German above needs no plural.
 - **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options: {}, attributes: {} }`. The app then decides how markup looks, and translators decide where it stands.
 - **Inputs are read as `i.name`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B).
+- **A server build writes each locale's function as a function expression, `function (i) { return … }`.** V8 parses every arrow function of a module in full when it loads the module, but only pre-parses a function expression, until its first call. A server loads every locale's functions and a request calls few of them, so the Vite plugin's server build loads app A's messages about a fifth faster (`docs/runtime.md`). The browser's modules and `keys.js` keep arrows, which are shorter.
 - **Each locale's function is a pure arrow of its inputs, and that is what makes a message inlinable.** It reads nothing but its inputs and its locale's plural and format functions. An opt-in bundler transform, later, can then replace a call in a per-locale build (`docs/runtime.md`):
   - with the string, for a message without inputs;
   - with the body, when the argument is an object literal of side-effect-free values, each read once;

@@ -120,13 +120,13 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 | Hydrating that page | 7.6 ms | 10.7 ms | 16.1 ms | 22.3 ms | `hydrate` |
 | That page's JS, brotli | 22.7 KB | 38.6 KB | 125.2 KB | 122.6 KB | `hydrate` |
 | The runtime in the browser, brotli | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB | `library-bytes` |
-| A new server process: load, then first render | 24 + 3 ms | 56 + 2 ms | 14 + 12 ms | 13 + 27 ms | `startup` |
+| A new server process: load, then first render | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms | `startup` |
 | Type checking 500 calls with `tsc` 7 | 82 ms | 278 ms | 609 ms | 521 ms | `types` |
 | The editor's first completion of a key | 0.2 s | 1.0 s | 49 s | 21 s | `types` |
 
 ## Limitations
 
-- **A new server process loads grai's messages more slowly than i18next or use-intl:** 24 ms, against 13–14 ms on app A (`startup`), because V8 reads compiled functions more slowly than strings. grai's faster first render makes up most of it, but the gap is still open.
+- **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
   - ordinal plurals;
