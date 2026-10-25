@@ -68,6 +68,25 @@ const languageRange = /^(?:\*|[a-z]{1,8}(?:-[a-z0-9]{1,8})*)$/;
 const qvalue = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
 
 /**
+ * Each Accept-Language header read so far, with the locale it gives. Browsers send few distinct
+ * headers, and a range's likely form costs about 3 µs to work out, so each header is read once.
+ * The headers come from outside, so the map is emptied once it holds `headersKept`.
+ *
+ * @type {Map<string, string | undefined>}
+ */
+const negotiated = new Map();
+const headersKept = 1024;
+
+/** @param {string} header */
+function fromAcceptLanguage(header) {
+	if (negotiated.has(header)) return negotiated.get(header);
+	if (negotiated.size >= headersKept) negotiated.clear();
+	const locale = preferredLocale(header);
+	negotiated.set(header, locale);
+	return locale;
+}
+
+/**
  * The locale the request prefers most: its ranges by weight, each taking the first locale it
  * reaches that no range refuses with `q=0`. `*` reaches every locale no other range names, the
  * base locale first.
@@ -75,7 +94,7 @@ const qvalue = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
  * @param {string} header
  * @returns {string | undefined}
  */
-function fromAcceptLanguage(header) {
+function preferredLocale(header) {
 	const ranges = languageRanges(header);
 	const named = ranges.filter(({ range }) => range !== "*");
 	const refused = named.filter(({ weight }) => weight === 0);
