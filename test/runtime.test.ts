@@ -332,6 +332,38 @@ describe("with paths the url strategy leaves alone", () => {
 	});
 });
 
+it("reads and writes a locale's own prefix, where the config gives one", async () => {
+	const { runtime, middleware } = await output({
+		strategy: ["url"],
+		localePrefixes: { ar: "arabic" },
+	});
+	const localeAt = async (path: string) =>
+		(
+			await middleware(
+				new Request(`https://shop.test${path}`),
+				({ locale }) => new Response(locale),
+			)
+		).text();
+
+	expect([
+		await localeAt("/arabic/cart"),
+		await localeAt("/ar/cart"),
+		await localeAt("/de/cart"),
+		runtime.localizeHref("/cart", { locale: "ar" }),
+		runtime.localizeHref("/arabic/cart", { locale: "de" }),
+		String(runtime.deLocalizeUrl("https://shop.test/arabic/cart")),
+		runtime.extractLocaleFromUrl("https://shop.test/arabic/x"),
+	]).toEqual([
+		"ar",
+		"en",
+		"de",
+		"/arabic/cart",
+		"/de/cart",
+		"https://shop.test/cart",
+		"ar",
+	]);
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies and its reloads. */
 	function page(lang: string) {

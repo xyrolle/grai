@@ -131,6 +131,7 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `strategy` | Optional. Where the server looks for a request's locale, in order: `cookie`, `preferredLanguage` (its `Accept-Language`), `url` (its first path segment; the base locale has no prefix). |
 | `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. |
 | `localePrefix` | Optional, with the `url` strategy. `"as-needed"`, the default: the base locale's paths have no prefix, so `url` comes last. `"always"`: every locale's paths have one, an unprefixed page is sent to the locale the strategies after `url` find, and `url` may come first. |
+| `localePrefixes` | Optional, with the `url` strategy. A locale's prefix of its own, one lowercase path segment, such as `{ "en-US": "us" }`; a locale's prefix is otherwise its tag. |
 | `unlocalizedPaths` | Optional, with the `url` strategy. Globs of the paths `url` leaves alone, such as `["/api/**"]`: they have no prefix, and the strategies after `url` find their locale. |
 | `switch` | Optional. How a page changes locale: `"reload"`, the default, reloads it, and `"live"` changes it in place (`docs/design.md`). |
 | `tests` | Optional. Globs, of `*`, `**`, `?` and `{a,b}`, of the source files that are tests, which `grai check` does not count as using a key. By default `**/*.{test,spec}.*`, `**/__tests__/**`, and the root's `test/**` and `tests/**`, since a folder named `tests` deeper down may ship, as a route does; `[]` makes no file a test. |

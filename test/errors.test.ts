@@ -52,7 +52,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, unlocalizedPaths, tests, identicalToBase, fallbacks.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -163,6 +163,27 @@ describe("the config", () => {
 				unlocalizedPaths: ["/app/**"],
 			}),
 		).toEqual([]);
+	});
+
+	it("takes localePrefixes only as path segments of the url strategy's locales, each its own", async () => {
+		const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+		const errors = (localePrefixes: unknown) =>
+			errorsOf(catalogs, { strategy: ["url"], localePrefixes });
+
+		expect(await errors({ fr: "france" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" names "fr", which is not one of "locales": en, de.',
+		]);
+		expect(await errors({ de: "de/at" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" gives de "de/at", but a prefix is one path segment of lowercase letters, digits and hyphens, such as "us".',
+		]);
+		expect(await errors({ de: "en" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" gives de "en", which is en\'s prefix too. Give each locale a prefix of its own.',
+		]);
+		expect(
+			await errorsOf(catalogs, { localePrefixes: { de: "deutsch" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "localePrefixes" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
 	});
 
 	it("is an error when a strategy follows url, which finds a locale in every path", async () => {

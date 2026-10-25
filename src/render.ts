@@ -214,6 +214,8 @@ function configModule(config: Config): string {
 		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
 		'/** @type {"as-needed" | "always"} */',
 		`export const localePrefix = ${JSON.stringify(config.urlRouting.localePrefix)};`,
+		"/** @type {readonly string[]} */",
+		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,
 		"/** @type {readonly RegExp[]} */",
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
 		"",

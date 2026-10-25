@@ -97,12 +97,6 @@ An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de
 
 Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
 
-## Custom locale prefixes
-
-A locale's prefix is its tag (`/en-US/…`). A site that wants `/us/…` cannot have it. Neither reference app needs it, so it waits for an adopter who does.
-
-Done when: the config maps a locale to its prefix, and the URL helpers and the middleware follow it, with a test.
-
 ## Rename what a module reads off a dynamic import
 
 `grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.

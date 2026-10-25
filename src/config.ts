@@ -28,7 +28,7 @@ export type Config = {
 	cookieName: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
-	/** Which locales' paths the `url` strategy prefixes, and the paths it leaves alone. */
+	/** Which locales' paths the `url` strategy prefixes, each one's prefix, and the paths it leaves alone. */
 	urlRouting: UrlRouting;
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
 	tests: readonly string[];
@@ -138,7 +138,7 @@ export function readConfig(file: string): Config {
 			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
 		);
 	}
-	const urlRouting = readUrlRouting(raw, strategy, invalid);
+	const urlRouting = readUrlRouting(raw, strategy, locales, invalid);
 	const readsCookie = strategy.includes("cookie");
 	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
 		throw invalid(

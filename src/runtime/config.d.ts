@@ -16,5 +16,7 @@ export declare const directions: readonly ("ltr" | "rtl")[];
 export declare const cookieName: string | undefined;
 /** Which locales' paths the `url` strategy prefixes: all but the base locale's, or every one. */
 export declare const localePrefix: "as-needed" | "always";
+/** Each locale's prefix in the `url` strategy's paths, in `locales` order. */
+export declare const prefixes: readonly string[];
 /** The paths the `url` strategy leaves alone, as regular expressions of a URL's path. */
 export declare const unlocalizedPaths: readonly RegExp[];
