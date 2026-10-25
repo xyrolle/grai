@@ -80,18 +80,26 @@ export const numberReaders: Readonly<
 /**
  * plurals.js: a function per locale and type giving a count's category, compiled from CLDR's
  * rules, and the number readers: the whole number an `:integer` selector compares, and the
- * percent a `:percent` one does. A count is taken as a number, as Intl.PluralRules takes it. A whole, non-negative count, the usual one, takes a path
- * with the fraction and exponent operands folded away; any other is split into its operands
- * first. That path also tests the count's type, which Number.isInteger implies, as TypeScript
- * narrows by `typeof` and not by Number.isInteger, and an app's checkJs reads this file.
+ * percent a `:percent` one does. A count is taken as a number, as Intl.PluralRules takes it. A
+ * whole, non-negative count, the usual one, takes a path with the fraction and exponent operands
+ * folded away; any other is split into the operands its locale's rules read. That path also tests
+ * the count's type, which Number.isInteger implies, as TypeScript narrows by `typeof` and not by
+ * Number.isInteger, and an app's checkJs reads this file.
  */
 export function pluralModule(locales: readonly string[]): string {
 	const functions = pluralTypes.flatMap((type) =>
 		locales.map((locale) => pluralFunction(locale, type)),
 	);
-	return `// Plural rules from Unicode CLDR, © Unicode, Inc., under the Unicode License v3.
+	const splits = functions.some((plural) => plural.splits);
+	return [
+		"// Plural rules from Unicode CLDR, © Unicode, Inc., under the Unicode License v3.\n",
+		...(splits ? [operandsFunction] : []),
+		numberReadersCode,
+		...functions.map((plural) => plural.code),
+	].join("\n");
+}
 
-/**
+const operandsFunction = `/**
  * A count's operands: its absolute value, integer digits, number of fraction digits, and fraction
  * digits, once it is rounded as Intl.PluralRules rounds it, half away from zero to three digits.
  *
@@ -110,8 +118,9 @@ const operands = (n) => {
 	}
 	return [Number(\`\${whole}.\${fraction || 0}\`), Number(whole), fraction.length, Number(fraction || 0)];
 };
+`;
 
-/**
+const numberReadersCode = `/**
  * A count as the whole number :integer shows: rounded half away from zero, as Intl rounds it.
  *
  * @param {unknown} n
@@ -133,22 +142,41 @@ export const ${numberReaders.percent} = (n) => {
 	const [digits, exponent = "0"] = String(x).split("e");
 	return Number(\`\${digits}e\${Number(exponent) + 2}\`);
 };
+`;
 
-${functions.join("\n")}`;
-}
+/** The operands \`operands()\` gives, in its order, by the names a function reads them by. */
+const operandNames = ["x", "i", "v", "f"];
 
 /**
- * A locale's function of a type. A locale whose every count is other, such as ru's ordinals, reads
- * no count, so a bundle of it needs no operands; it still takes the count the keys' code passes,
- * as an app's checkJs counts the arguments.
+ * A locale's function of a type, and whether it splits a count into operands. A locale whose
+ * every count is other, such as ru's ordinals, reads no count, so a bundle of it needs no
+ * operands; it still takes the count the keys' code passes, as an app's checkJs counts the
+ * arguments. Any other takes the operands its rules read, and no other.
  */
-function pluralFunction(locale: string, type: PluralType): string {
+function pluralFunction(
+	locale: string,
+	type: PluralType,
+): { code: string; splits: boolean } {
 	const name = pluralName(locale, type);
 	const rules = rulesOf(locale, type);
 	if (Object.keys(rules).length === 0) {
-		return `/** @param {unknown} _n */\nexport const ${name} = (_n) => "other";\n`;
+		return {
+			code: `/** @param {unknown} _n */\nexport const ${name} = (_n) => "other";\n`,
+			splits: false,
+		};
 	}
 	const integer = chain(rules, integerOperands);
 	const decimal = chain(rules, decimalOperands);
-	return `/** @param {unknown} n */\nexport const ${name} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer};\n\tconst [x, i, v, f] = operands(Number(n));\n\treturn ${decimal};\n};\n`;
+	const last = operandNames.findLastIndex((operand) =>
+		decimal.reads.has(operand),
+	);
+	const read = operandNames
+		.slice(0, last + 1)
+		.map((operand) => (decimal.reads.has(operand) ? operand : ""));
+	const split =
+		last === -1 ? "" : `\tconst [${read.join(", ")}] = operands(Number(n));\n`;
+	return {
+		code: `/** @param {unknown} n */\nexport const ${name} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer.js};\n${split}\treturn ${decimal.js};\n};\n`,
+		splits: split !== "",
+	};
 }
