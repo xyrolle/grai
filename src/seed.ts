@@ -168,7 +168,7 @@ export async function seed(
 		if (target?.messages.has(key)) continue;
 		try {
 			parseMessage(config.baseLocale, value);
-			seeded.push([[key], seedValue(value, locale)]);
+			seeded.push([base.paths.get(key) ?? [key], seedValue(value, locale)]);
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
 			const where = { file: base.file, key, locale: config.baseLocale };
