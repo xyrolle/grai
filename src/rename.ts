@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { type FileUses, type Use, usesIn } from "./call-sites.ts";
+import { type Use, usesIn } from "./call-sites.ts";
 import type { Catalog } from "./catalog.ts";
 import { type MessageEntry, messageEntries } from "./catalog-entries.ts";
 import { keyOf, placedPath } from "./catalog-keys.ts";
@@ -15,7 +15,8 @@ import {
 import { withListedKeysChanged } from "./config-file.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
-import { occurrencesOf, positionOf, sourceFiles } from "./sources.ts";
+import { siteProblems } from "./rename-checks.ts";
+import { sourceFiles } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
 /** What a rename changed, relative to the project's root, and what the compile after it wrote. */
@@ -135,35 +136,6 @@ function nameProblems(
 			`the catalogs have "${taken}" already${collision}. Choose another name.`,
 		),
 	];
-}
-
-/** A file's places the rename cannot change safely: mentions, and a binding the new name would shadow. */
-function siteProblems(
-	{ source, uses, bindsKey }: FileUses,
-	from: string,
-	to: string,
-): GraiError[] {
-	const problems = uses
-		.filter(({ kind }) => kind === "mention")
-		.map(({ at }) => {
-			const { line, column } = positionOf(source.text, at);
-			return new GraiError(
-				"call-site-ambiguous",
-				{ file: `${source.file}:${line}:${column}` },
-				`it names ${from}, but not as m.${from}, m["${from}"] or a per-key import, so the rename cannot tell that it means the key. Write it as one of those, or rename it by hand.`,
-			);
-		});
-	const clashes = bindsKey && occurrencesOf(source.text, to).length > 0;
-	if (clashes) {
-		problems.push(
-			new GraiError(
-				"key-exists",
-				{ file: source.file, key: from },
-				`the file imports ${from} by its own name, and already names ${to}, which the renamed import would clash with. Rename that first.`,
-			),
-		);
-	}
-	return problems;
 }
 
 /** The text with the key's name replaced by the new one at each use. */
