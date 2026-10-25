@@ -405,3 +405,62 @@ describe("grai merge", () => {
 		]);
 	});
 });
+
+describe("a message with declarations and no selectors", () => {
+	const price = (pattern: string) => [
+		{
+			declarations: ["input amount", "local price = amount: number"],
+			selectors: [],
+			match: { "": pattern },
+		},
+	];
+
+	/** The locale's JSON units, as export writes them. */
+	async function units(config: string, untranslated: boolean) {
+		const result = await exportLocale(config, "de", {
+			json: true,
+			untranslated,
+		});
+		return "document" in result ? JSON.parse(result.document).units : [];
+	}
+
+	it("merges a translation into the message, keeping its declarations", async () => {
+		const { dir, config, load } = project({
+			en: { price: price("Price {price}") },
+			de: { price: price("Price {price}") },
+		});
+		const document = {
+			srcLang: "en",
+			trgLang: "de",
+			units: await units(config, false),
+		};
+		for (const unit of document.units) unit.target = "Preis {price}";
+		const file = join(dir, "de.json");
+		writeFileSync(file, JSON.stringify(document));
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(m.price?.({ amount: 1234.5 }, { locale: "de" })).toBe(
+			"Preis 1.234,5",
+		);
+	});
+
+	it("exports the translation it has as the unit's target, translated", async () => {
+		const { config } = project({
+			en: { price: price("Price {price}") },
+			de: { price: price("Preis {price}") },
+		});
+
+		expect(await units(config, false)).toEqual([
+			{
+				id: "price",
+				key: "price",
+				source: "Price {price}",
+				target: "Preis {price}",
+			},
+		]);
+		expect(await units(config, true)).toEqual([]);
+	});
+});
