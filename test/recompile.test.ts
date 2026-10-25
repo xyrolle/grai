@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
 import type { Catalog } from "../src/catalog.ts";
 import { catalogKeys } from "../src/catalog-keys.ts";
 import { type Build, recompile } from "../src/compile.ts";
+import { withoutContentHash } from "../src/content-names.ts";
 import { editedMessages } from "../src/edit.ts";
-import { project } from "./project.ts";
+import { readManifest } from "../src/manifest.ts";
+import { outputFile, project } from "./project.ts";
 
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
@@ -19,12 +21,20 @@ setFlagsFromString("--expose-gc");
 const collect: () => void = runInNewContext("gc");
 
 /** Every file of a project's output but its state, by its path in the output. */
-const outputOf = (dir: string) =>
-	new Map(
-		readdirSync(join(dir, "out"), { recursive: true, encoding: "utf8" })
-			.filter((file) => !file.startsWith(".grai") && file.includes("."))
-			.map((file) => [file, readFileSync(join(dir, "out", file), "utf8")]),
+/**
+ * The files a project's output names, as its manifest records them, with what each holds; not
+ * those a compile replaced, which stay a while for readers still loading them.
+ */
+const outputOf = async (dir: string) => {
+	const manifest = await readManifest(join(dir, "out", ".grai"));
+	const files = [
+		...(manifest?.immutable ?? []),
+		...Object.keys(manifest?.mutable ?? {}),
+	].sort();
+	return new Map(
+		files.map((file) => [file, readFileSync(join(dir, "out", file), "utf8")]),
 	);
+};
 
 /** A catalog as editors write it: one entry per line, indented by a tab. */
 const laidOut = (messages: Record<string, unknown>) =>
@@ -40,7 +50,7 @@ const parsed = (messages: Record<string, unknown>): Catalog => ({
 });
 
 describe("a recompile after an edit", () => {
-	it("compiles only the keys the edit touched, and writes only their shard", async () => {
+	it("compiles only the keys the edit touched, and writes only their shard and the entry naming it", async () => {
 		const { dir, config } = project(catalogs);
 		const first = await recompile(config, undefined);
 		writeFileSync(
@@ -49,7 +59,13 @@ describe("a recompile after an edit", () => {
 		);
 		const second = await recompile(config, first.build);
 
-		expect(second.result.written).toEqual(["keys/0.js"]);
+		expect(second.result.written.map(withoutContentHash)).toEqual([
+			"keys/0.js",
+			"keys/0.d.ts",
+			"keys/0.d.ts.map",
+			"keys.js",
+			"keys.d.ts",
+		]);
 		expect([...(second.build?.compilation.changed ?? [])]).toEqual(["title"]);
 	});
 
@@ -69,7 +85,7 @@ describe("a recompile after an edit", () => {
 		]);
 	});
 
-	it("writes formats.js when an edit formats a value, and removes it when no message formats one", async () => {
+	it("writes formats.js when an edit formats a value, and names none when no message formats one", async () => {
 		const { dir, config } = project(catalogs);
 		const first = await recompile(config, undefined);
 		const write = (en: string, de: string) => {
@@ -87,13 +103,16 @@ describe("a recompile after an edit", () => {
 			"Hallo {name}, {count :number} neu",
 		);
 		const formatted = await recompile(config, first.build);
-		const formats = readFileSync(join(dir, "out", "formats.js"), "utf8");
+		const formats = readFileSync(await outputFile(dir, "formats.js"), "utf8");
 		write("Hello {name}", "Hallo {name}");
-		await recompile(config, formatted.build);
+		const plain = await recompile(config, formatted.build);
 
-		expect(formatted.result.written).toContain("formats.js");
+		expect(formatted.result.written.map(withoutContentHash)).toContain(
+			"formats.js",
+		);
 		expect(formats).toContain("export const number_de = ");
-		expect(existsSync(join(dir, "out", "formats.js"))).toBe(false);
+		expect(plain.build?.rendered.modules.formats).toBeUndefined();
+		await expect(outputFile(dir, "formats.js")).rejects.toThrow();
 	});
 
 	it("writes after a run of edits what a compile from nothing writes", async () => {
@@ -111,8 +130,9 @@ describe("a recompile after an edit", () => {
 		const fresh = project({ en: catalogs.en, de: edits.at(-1) });
 		await recompile(fresh.config, undefined);
 
-		expect([...outputOf(dir).keys()]).toContain("keys/0.js");
-		expect(outputOf(dir)).toEqual(outputOf(fresh.dir));
+		const output = await outputOf(dir);
+		expect([...output.keys()].map(withoutContentHash)).toContain("keys/0.js");
+		expect(output).toEqual(await outputOf(fresh.dir));
 	});
 
 	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
@@ -192,7 +212,7 @@ describe("a recompile after an edit", () => {
 			"greeting",
 		]);
 		expect(fixed.result.errors).toEqual([]);
-		expect(readFileSync(join(dir, "out", "keys", "0.js"), "utf8")).toContain(
+		expect(readFileSync(await outputFile(dir, "keys/0.js"), "utf8")).toContain(
 			"Servus $" + '{i["name"]}',
 		);
 	});

@@ -6,7 +6,8 @@ import { add } from "../src/add.ts";
 import { check } from "../src/check.ts";
 import { recompile } from "../src/compile.ts";
 import { removeUnusedKeys } from "../src/fix.ts";
-import { errorsOf, type Messages, project } from "./project.ts";
+
+import { errorsOf, type Messages, outputFile, project } from "./project.ts";
 
 const fallbacks = { "en-GB": "en" };
 const catalogs = {
@@ -89,19 +90,19 @@ it("compiles again when a locale's fallback changes, from scratch and in watch",
 		"en-AU": {},
 	});
 	/** How many locales the shard writes "Colour" for: en-GB, and en-AU when it falls back to it. */
-	const colours = () =>
-		readFileSync(join(dir, "out", "keys", "0.js"), "utf8").split('"Colour"')
+	const colours = async () =>
+		readFileSync(await outputFile(dir, "keys/0.js"), "utf8").split('"Colour"')
 			.length - 1;
 	writeFileSync(config, fallingBack("en-GB"));
 	const first = await recompile(config, undefined);
-	const before = colours();
+	const before = await colours();
 	writeFileSync(config, fallingBack("en"));
 	await recompile(config, first.build);
-	const watched = colours();
+	const watched = await colours();
 	writeFileSync(config, fallingBack("en-GB"));
 	await compile();
 
-	expect([before, watched, colours()]).toEqual([2, 1, 2]);
+	expect([before, watched, await colours()]).toEqual([2, 1, 2]);
 });
 
 it("adds a key without a text for a locale that falls back", async () => {
