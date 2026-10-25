@@ -123,16 +123,27 @@ const unprefixed: Exclude<
 	fallbackType: "redirect",
 };
 
-const routing: AstroRouting = {
-	base: "/",
-	i18n: { locales: ["ro", "en"], defaultLocale: "en", routing: unprefixed },
-};
+/** Astro's i18n routing of `locales`, the default `en`, with `routing` and anything else given. */
+function astroRouting(
+	locales: NonNullable<AstroRouting["i18n"]>["locales"],
+	more: Partial<NonNullable<AstroRouting["i18n"]>> = {},
+): AstroRouting {
+	return {
+		base: "/",
+		i18n: { locales, defaultLocale: "en", routing: unprefixed, ...more },
+	};
+}
+
+const prefixed = { ...unprefixed, prefixDefaultLocale: true };
 
 describe("grai's config beside Astro's", () => {
-	it("agrees with Astro's i18n routing by the same locales and default, found in the URL", () => {
-		expect(disagreements(graiConfig({ strategy: ["url"] }), routing)).toEqual(
-			[],
-		);
+	it("agrees with Astro's i18n routing by the same locales and default, the URL read first", () => {
+		expect(
+			disagreements(
+				graiConfig({ strategy: ["url"] }),
+				astroRouting(["ro", "en"]),
+			),
+		).toEqual([]);
 	});
 
 	it("agrees with any base, and no i18n routing, when the locale is not in the URL", () => {
@@ -143,76 +154,116 @@ describe("grai's config beside Astro's", () => {
 		).toEqual([]);
 	});
 
-	it("finds the locale in the URL alone beside Astro's i18n routing", () => {
+	it('maps Astro\'s prefixed default locale to "localePrefix": "always", and says which to set', () => {
+		const always = graiConfig({ strategy: ["url"], localePrefix: "always" });
+		const asNeeded = graiConfig({ strategy: ["url"] });
+
+		expect(
+			disagreements(always, astroRouting(["en", "ro"], { routing: prefixed })),
+		).toEqual([]);
+		expect(
+			disagreements(
+				asNeeded,
+				astroRouting(["en", "ro"], { routing: prefixed }),
+			),
+		).toEqual([
+			`Astro prefixes the default locale's URLs too (i18n.routing.prefixDefaultLocale). Set "localePrefix": "always" in grai's config.`,
+		]);
+		expect(disagreements(always, astroRouting(["en", "ro"]))).toEqual([
+			`grai prefixes every locale's URLs ("localePrefix": "always"). Set Astro's i18n.routing.prefixDefaultLocale to true.`,
+		]);
+	});
+
+	it('maps Astro\'s { path, codes } locales to "localePrefixes", and says which to set', () => {
+		const romana = [
+			"en",
+			{ path: "romana", codes: ["ro", "ro-MD"] },
+		] satisfies NonNullable<AstroRouting["i18n"]>["locales"];
+		const withPrefix = graiConfig({
+			strategy: ["url"],
+			localePrefixes: { ro: "romana" },
+		});
+
+		expect(disagreements(withPrefix, astroRouting(romana))).toEqual([]);
+		expect(
+			disagreements(graiConfig({ strategy: ["url"] }), astroRouting(romana)),
+		).toEqual([
+			`Astro serves ro under /romana/, and grai under /ro/. Set "localePrefixes": { "ro": "romana" } in grai's config.`,
+		]);
+		expect(disagreements(withPrefix, astroRouting(["en", "ro"]))).toEqual([
+			`grai serves ro under /romana/ ("localePrefixes"), and Astro under /ro/. List it in Astro's i18n.locales as { path: "romana", codes: ["ro"] }.`,
+		]);
+	});
+
+	it('maps the paths outside Astro\'s routing to "unlocalizedPaths", whose locale the strategies after "url" find', () => {
+		expect(
+			disagreements(
+				graiConfig({
+					strategy: ["url", "cookie"],
+					cookieName: "lang",
+					unlocalizedPaths: ["/account/**"],
+				}),
+				astroRouting(["en", "ro"]),
+			),
+		).toEqual([]);
+	});
+
+	it('reads the URL first beside Astro\'s routing, and says how to order "strategy"', () => {
 		expect(
 			disagreements(
 				graiConfig({ strategy: ["cookie", "url"], cookieName: "lang" }),
-				routing,
+				astroRouting(["en", "ro"]),
 			),
 		).toEqual([
-			`Astro's i18n routing renders each page in the locale its URL names, so "strategy" must be ["url"], not ["cookie","url"].`,
+			`Astro's i18n routing renders each page in the locale its URL names, so "url" must come first in "strategy": ["url","cookie"], not ["cookie","url"].`,
 		]);
 	});
 
-	it("has Astro's i18n routing name grai's locales, by their tags", () => {
+	it("has Astro's i18n routing route grai's locales", () => {
+		expect(
+			disagreements(
+				graiConfig({ strategy: ["url"] }),
+				astroRouting(["en", "ru"]),
+			),
+		).toEqual([
+			`Astro's i18n.locales must route grai's "locales", ["en","ro"], not ["en","ru"].`,
+		]);
+	});
+
+	it("has Astro's default locale be grai's base locale, by its path when it has one", () => {
 		const config = graiConfig({ strategy: ["url"] });
 
 		expect(
-			disagreements(config, {
-				base: "/",
-				i18n: {
-					locales: ["en", "ru"],
-					defaultLocale: "en",
-					routing: unprefixed,
-				},
-			}),
+			disagreements(
+				config,
+				astroRouting(["en", "ro"], { defaultLocale: "ro" }),
+			),
 		).toEqual([
-			`Astro's i18n.locales must be grai's "locales": ["en","ro"], not ["en","ru"].`,
+			`Astro's i18n.defaultLocale must be "en", grai's "baseLocale", not "ro".`,
 		]);
 		expect(
-			disagreements(config, {
-				base: "/",
-				i18n: {
-					locales: ["en", { path: "romana", codes: ["ro"] }],
-					defaultLocale: "en",
-					routing: unprefixed,
-				},
-			}),
-		).toEqual([
-			`Astro's i18n.locales names "romana" by a path; the "url" strategy names a locale by its tag, so list the locales as their tags.`,
-		]);
-	});
-
-	it("has Astro's default locale be the base locale, without a prefix", () => {
-		expect(
-			disagreements(graiConfig({ strategy: ["url"] }), {
-				base: "/",
-				i18n: {
-					locales: ["en", "ro"],
+			disagreements(
+				config,
+				astroRouting([{ path: "english", codes: ["en"] }, "ro"], {
 					defaultLocale: "ro",
-					routing: { ...unprefixed, prefixDefaultLocale: true },
-				},
-			}),
+				}),
+			),
 		).toEqual([
-			`Astro's i18n.defaultLocale must be grai's "baseLocale", "en", not "ro".`,
-			`The base locale's URLs have no prefix in grai, so Astro's i18n.routing.prefixDefaultLocale must be false.`,
+			`Astro's i18n.defaultLocale must be "english", grai's "baseLocale", not "ro".`,
 		]);
 	});
 
-	it("serves every locale under its path, from no base and no domain of its own", () => {
+	it("refuses a base and domains, which the url strategy cannot read yet, saying what to set", () => {
 		expect(
 			disagreements(graiConfig({ strategy: ["url"] }), {
-				base: "/shop/",
-				i18n: {
-					locales: ["en", "ro"],
-					defaultLocale: "en",
+				...astroRouting(["en", "ro"], {
 					domains: { ro: "https://example.ro" },
-					routing: unprefixed,
-				},
+				}),
+				base: "/shop/",
 			}),
 		).toEqual([
-			`The "url" strategy reads the locale from the path's first segment, which Astro's base "/shop/" takes. Serve the site from "/", or find the locale another way.`,
-			`Astro's i18n.domains serves ro from domains of their own, where grai's "url" strategy finds the locale in the path. Serve every locale under its path prefix instead.`,
+			`The "url" strategy reads the locale from the path's first segment, which Astro's base "/shop/" takes. Serve the site from Astro's base "/" ("The framework's base path" in grai's docs/followups.md).`,
+			`Astro's i18n.domains serves ro from domains of their own, where grai's "url" strategy finds the locale in the path. Remove i18n.domains and serve each locale under its path prefix ("A domain per locale" in grai's docs/followups.md).`,
 		]);
 	});
 });
