@@ -357,6 +357,40 @@ export function unmatched(key, locale, selector, value) {
 	);
 }
 
+/** Intl.RelativeTimeFormat's units of time, each of which it also takes plural. */
+const timeUnits = [
+	"year",
+	"quarter",
+	"month",
+	"week",
+	"day",
+	"hour",
+	"minute",
+	"second",
+];
+
+/**
+ * @param {unknown} unit
+ * @returns {unit is Intl.RelativeTimeFormatUnit}
+ */
+const isTimeUnit = (unit) =>
+	typeof unit === "string" && timeUnits.includes(unit.replace(/s$/, ""));
+
+/**
+ * The unit of time an input gives a relative time, which Intl.RelativeTimeFormat takes with each
+ * value. A value that is not one is the caller's mistake, and the error names it.
+ *
+ * @param {unknown} unit
+ * @returns {Intl.RelativeTimeFormatUnit}
+ */
+export function timeUnit(unit) {
+	if (isTimeUnit(unit)) return unit;
+	throw new GraiError(
+		"format-option-invalid",
+		`An input gave unit ${JSON.stringify(unit)}, which is not a unit of time: ${timeUnits.join(", ")}, or one of them plural.`,
+	);
+}
+
 /**
  * The formatter for a call with the value an input gives one of its options, such as its
  * currency: made the first time that value formats, and kept by it. A value Intl refuses is the

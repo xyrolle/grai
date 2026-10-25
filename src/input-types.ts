@@ -12,9 +12,10 @@ import { catchAll } from "./selection.ts";
 
 /**
  * What a use takes: any value; one a template literal turns into text, which is any but a symbol;
- * a date, which a number also gives; a number; a list of strings; or a string.
+ * a date, which a number also gives; a number; a list of strings; a string; or one of Intl's units
+ * of time, which a string also names.
  */
-type Kind = "any" | "text" | "date" | "number" | "list" | "string";
+type Kind = "any" | "text" | "date" | "number" | "list" | "string" | "timeUnit";
 
 const kindTypes: Readonly<Record<Kind, string>> = {
 	any: "NonNullable<unknown>",
@@ -23,16 +24,18 @@ const kindTypes: Readonly<Record<Kind, string>> = {
 	number: "number",
 	list: "readonly string[]",
 	string: "string",
+	timeUnit: "Intl.RelativeTimeFormatUnit",
 };
 
 /** The kinds whose values a kind takes, itself among them. */
 const narrower: Readonly<Record<Kind, readonly Kind[]>> = {
-	any: ["any", "text", "date", "number", "list", "string"],
-	text: ["text", "date", "number", "list", "string"],
+	any: ["any", "text", "date", "number", "list", "string", "timeUnit"],
+	text: ["text", "date", "number", "list", "string", "timeUnit"],
 	date: ["date", "number"],
 	number: ["number"],
 	list: ["list"],
-	string: ["string"],
+	string: ["string", "timeUnit"],
+	timeUnit: ["timeUnit"],
 };
 
 /** The kind each formatter takes, and how an error names its use. */
@@ -134,7 +137,7 @@ function usesOf(name: string, message: LocaleMessage): Use[] {
 	for (const { input, format } of formatsOf(message)) {
 		if (input === name) take(...formatterUses[format.formatter]);
 		if (format.input?.name === name) {
-			take("string", `gives a value its ${format.input.option}`);
+			take(format.input.type, `gives a value its ${format.input.option}`);
 		}
 	}
 	for (const { pattern } of message.variants) {
@@ -197,6 +200,7 @@ const keyLiterals: Readonly<
 	number: (key, numeric) => (numeric ? [key] : []),
 	list: () => [],
 	string: (key) => [JSON.stringify(key)],
+	timeUnit: () => [],
 };
 
 /** The literal types a value of a kind can match the keys by. */
