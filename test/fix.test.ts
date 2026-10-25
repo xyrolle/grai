@@ -158,6 +158,19 @@ export const promo = (season: string) => m[\`promo_\${season}\`]();
 		]);
 	});
 
+	it("keeps every key a computed read through a namespace import of the messages module may reach", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.ts":
+				'import * as messages from "../out/messages.js";\nexport const promo = (season: string) => messages.m[season + "_spring"]();\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual([]);
+	});
+
 	it("keeps a key that only an Astro page or an MDX document names", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {

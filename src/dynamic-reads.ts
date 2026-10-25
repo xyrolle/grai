@@ -1,5 +1,9 @@
-import { type MessageBindings, statementAt } from "./message-imports.ts";
-import { after, before, occurrencesOf } from "./sources.ts";
+import {
+	type MessageBindings,
+	readsNamespace,
+	statementAt,
+} from "./message-imports.ts";
+import { after, occurrencesOf } from "./sources.ts";
 
 /** A read of the namespace by a name the source computes: it may reach the keys that start with `prefix`, any key for "". */
 export type DynamicRead = { at: number; written: string; prefix: string };
@@ -24,18 +28,29 @@ const longestIndex = 500;
 
 /**
  * Each place a file reads the namespace by a computed name, `m[name]`, or uses it whole, as in
- * `Object.keys(m)` or `typeof m`, and each load of per-key modules by a built path. Such a read may
- * name keys no source writes, so a key it may reach is never proven unused.
+ * `Object.keys(m)` or `typeof m`, also through a wrapper (`messages.m[name]`); each use of a
+ * namespace import of messages.js whole; and each load of per-key modules by a built path. Such a
+ * read may name keys no source writes, so a key it may reach is never proven unused.
  */
 export function dynamicReadsIn(
 	text: string,
 	bindings: MessageBindings,
 ): DynamicRead[] {
 	const reads: DynamicRead[] = [];
-	for (const name of bindings.namespaces) {
+	const wrapped = bindings.wrappers.size > 0 ? bindings.namespaceNames : [];
+	for (const name of new Set([...bindings.namespaces, ...wrapped])) {
 		for (const at of occurrencesOf(text, name)) {
 			const read = readAt(text, at, name, bindings);
 			if (read !== undefined) reads.push(read);
+		}
+	}
+	for (const [name, module] of bindings.wrappers) {
+		if (module !== "messages") continue;
+		for (const at of occurrencesOf(text, name)) {
+			const whole = statementAt(bindings, at) === undefined;
+			if (whole && text[after(text, at + name.length)] !== ".") {
+				reads.push({ at, written: name, prefix: "" });
+			}
 		}
 	}
 	for (const match of text.matchAll(builtPerKeyLoad)) {
@@ -54,7 +69,9 @@ function readAt(
 	const declared =
 		statementAt(bindings, at) !== undefined ||
 		bindings.reexports.some(({ start, end }) => start <= at && at < end);
-	if (declared || text[before(text, at)] === ".") return undefined;
+	if (declared || !readsNamespace(text, at, name, bindings, false)) {
+		return undefined;
+	}
 	const next = after(text, at + name.length);
 	const optional = text.startsWith("?.", next);
 	const open = optional ? after(text, next + 2) : next;
