@@ -56,7 +56,12 @@ export function formatterOf(locale: string, format: Format): Formatter {
  * do not depend on it.
  */
 export function digitsFormatter(options: IntlOptions): Formatter {
-	const format: Format = { formatter: "number", options, input: undefined };
+	const format: Format = {
+		formatter: "number",
+		options,
+		input: undefined,
+		shift: 0,
+	};
 	const digest = hash("sha1", JSON.stringify(identity(format))).slice(0, 8);
 	return { name: `digits_${digest}`, locale: "en", format, shows: "digits" };
 }

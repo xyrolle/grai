@@ -382,7 +382,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "formatted" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "formatted" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 		]);
 	});
 
@@ -396,7 +396,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			expect.stringContaining(
 				'"option" (en): {n :number constructor=1}: "constructor=1" is not an option of :number, or is given twice. Its options are select, style,',
 			),
