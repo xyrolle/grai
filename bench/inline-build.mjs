@@ -24,7 +24,15 @@ const { readProject, parseCatalogs } = await import(
 	join(graiSource, "compile.ts")
 );
 const { compileCatalogs } = await import(join(graiSource, "compilation.ts"));
-const { keyModulePrefix } = await import(join(graiSource, "locale-chunks.ts"));
+const { keyModulePrefix, textModulePrefix } = await import(
+	join(graiSource, "locale-chunks.ts")
+);
+/** The key a message module holds: a key's module, or grai/svelte's string of a text key. */
+function keyOf(id) {
+	for (const prefix of [keyModulePrefix, textModulePrefix])
+		if (id.startsWith(prefix)) return id.slice(prefix.length);
+	return undefined;
+}
 
 /** The app's messages without inputs, as their text in `locale`. */
 async function textsIn(locale) {
@@ -92,9 +100,7 @@ const measurer = {
 				file: output.fileName,
 				facade: output.facadeModuleId,
 				imports: output.imports,
-				keys: output.moduleIds
-					.filter((id) => id.startsWith(keyModulePrefix))
-					.map((id) => id.slice(keyModulePrefix.length)),
+				keys: output.moduleIds.map(keyOf).filter(Boolean),
 			});
 		}
 	},
