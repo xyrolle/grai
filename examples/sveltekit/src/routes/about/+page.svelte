@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { m } from "#lib/i18n/messages.js";
+	import type { PageProps } from "./$types";
+
+	let { data }: PageProps = $props();
 </script>
 
-<h1>{m.about_title()}</h1>
+<h1>{data.title}</h1>

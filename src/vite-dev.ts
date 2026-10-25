@@ -6,7 +6,8 @@ import {
 	type ViteDevServer,
 } from "vite";
 import type { Build } from "./compile.ts";
-import { missingKeyModule, patchModule, updateEvent } from "./dev-module.ts";
+import { patchedEvent, updateEvent } from "./dev-events.ts";
+import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import { watch } from "./watch.ts";
 
@@ -30,7 +31,7 @@ const missingKeyPrefix = "\0grai:missing-key/";
  * removed, or a change of locales, reloads it. A server environment that runs its modules in
  * Vite's runner patches its table the same way, so the next server render has the new words
  * without the runner evaluating the program again; any other environment takes the messages
- * again. A per-key import of a key no catalog has gets a module whose export throws when called
+ * again. Once a server has the edit, the page is told (`grai:patched`), so its loads can run again. A per-key import of a key no catalog has gets a module whose export throws when called
  * (`missingKeyImport`), so the page still loads. `close` stops following once the compile under
  * way has finished.
  */
@@ -49,6 +50,12 @@ export function serveMessages(
 	/** Each key imported by its path, with the modules that import it so. */
 	const importers = new Map<string, Set<string>>();
 	let previous: Build | undefined;
+	/** The page's word that a server has an edit, from its runner or once it takes the messages again. */
+	const patched: HotPayload = { type: "custom", event: patchedEvent };
+	for (const environment of Object.values(server.environments)) {
+		if (environment !== client)
+			environment.hot.on(patchedEvent, () => client.hot.send(patched));
+	}
 
 	const update = async (before: Build, next: Build) => {
 		const changed = [...next.compilation.changed];
@@ -86,6 +93,7 @@ export function serveMessages(
 			if (environment === client) continue;
 			if (!isRunnableDevEnvironment(environment)) {
 				await reload(environment, files.keysFile);
+				client.hot.send(patched);
 				continue;
 			}
 			// A runner keeps the module it evaluated, which the patch updates: dropping only the
