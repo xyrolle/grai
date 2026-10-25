@@ -14,6 +14,11 @@ The config accepts `"live"`, and `grai/svelte` then keeps every message a call, 
 
 Done when: under `"live"`, a page re-renders in the locale it switches to, and a browser test shows that a production build and dev switch the same way.
 
+## `setLocale(locale, { reload: false })` as its type says
+
+`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. The runtime still sets `<html lang>` and `dir` under both, renders the messages called next in the new locale, and returns nothing.
+
+Done when: under `"reload"`, `{ reload: false }` keeps the choice and leaves the page's messages as they are; under `"live"`, it returns that promise (the entry above); and a browser test shows each.
 ## Decide whether to inline text into Svelte's templates
 
 Text inlined into a template before Svelte compiles it is static to Svelte: on the page of 2,000 calls it hydrates in 12.5–12.9 ms against 15.9–16.2 ms for `grai/svelte`'s strings at a 4× CPU slowdown (`docs/runtime.md`). It needs a step before Svelte's compile, and a copy per locale of every component chunk with such a text, behind the import map. Svelte trims the whitespace at the edges of an element's text, so a text's own edge whitespace has to stay an expression, `{" "}`.
