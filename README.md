@@ -168,7 +168,13 @@ It needs `AsyncLocalStorage`, from `node:async_hooks`, which Node, Bun and Deno 
 
 ### Tests
 
-A browser test sets the locale it expects in `beforeEach`, with `setLocale(locale, { reload: false })`. That sets `<html lang>` and `dir`, and the locale the next messages render in. The runtime reads `<html lang>` only once, when it loads, so a test that changes `lang` itself leaves the locale as it was.
+A test picks the locale it renders in with `useLocale` from the output's `testing.js`, in `beforeEach`. Then the messages called next render in it, and so does a component given that locale, which a page in another locale refuses. It sets `<html lang>` and `dir` too. The runtime reads `<html lang>` only once, when it loads, so a test that changes `lang` itself leaves the locale as it was. A build refuses `testing.js`.
+
+```ts
+import { useLocale } from "./src/lib/i18n/testing.js";
+
+beforeEach(() => useLocale("de"));
+```
 
 ## Config
 
