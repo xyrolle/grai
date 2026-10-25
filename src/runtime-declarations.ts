@@ -33,7 +33,11 @@ export declare function localizeUrl(url: string | URL, options?: { locale?: Loca
 export declare function localizeHref(href: string, options?: { locale?: Locale }): string;
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export declare class GraiError extends Error {
-	readonly code: string;
+	readonly code:
+		| "locale-unknown"
+		| "locale-not-loaded"
+		| "value-unmatched"
+		| "format-option-invalid";
 }
 type MessageOptions = { locale?: Locale };
 /**
