@@ -6,6 +6,7 @@
 		"owner": "{g, select, male {He} female {She} other {They}} found {n, plural, one {# cat} other {# cats}}.",
 		"nested": "{g, select, male {{n, plural, =0 {none of his} one {his # cat} other {his # cats}}} other {their cats}}",
 		"quote": "It's {name}'s, a literal '{brace}' and '' quotes",
+		"grammar": "<b >{name}</b > } <br /> {n, plural, =+1 {never} =-1 {minus one} other {# left}}",
 		"apostrophes": "Select '|x', the cats' {n, plural, other {'#' is #}}",
 		"bold": "Hello <b>{name}</b>, you have <i>{n, plural, one {# cat} other {# cats}}</i>",
 		"price": "{value, number}",
