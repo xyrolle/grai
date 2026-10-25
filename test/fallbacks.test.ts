@@ -5,6 +5,7 @@ import { expect, it } from "vitest";
 import { add } from "../src/add.ts";
 import { check } from "../src/check.ts";
 import { recompile } from "../src/compile.ts";
+import { removeUnusedKeys } from "../src/fix.ts";
 import { errorsOf, type Messages, project } from "./project.ts";
 
 const fallbacks = { "en-GB": "en" };
@@ -140,4 +141,19 @@ it("checks the inputs of a key some locales take from their fallback", async () 
 	expect((await check(config)).problems.map((error) => error.code)).toContain(
 		"inputs-differ",
 	);
+});
+
+it("leaves check --fix nothing to refuse in a locale whose empty catalog takes its fallback's words", async () => {
+	const { dir, config } = project(
+		{ en: { color: "Color" }, "en-GB": {} },
+		{ fallbacks },
+	);
+	writeFileSync(
+		join(dir, "app.ts"),
+		'import { m } from "./out/messages.js";\nm.color();\n',
+	);
+
+	const fixed = await removeUnusedKeys(config);
+
+	expect([fixed.removed, fixed.errors]).toEqual([[], []]);
 });
