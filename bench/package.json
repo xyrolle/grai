@@ -33,6 +33,7 @@
 		"types": "node types.mjs",
 		"import-equivalence": "node import-equivalence.mjs",
 		"migrate-equivalence": "node migrate-equivalence.mjs",
+		"import-fuzz": "node import-fuzz.mjs",
 		"refactor": "node refactor.mjs",
 		"nextjs": "node nextjs.mjs"
 	},

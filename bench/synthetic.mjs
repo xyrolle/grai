@@ -35,7 +35,7 @@ const categories = {
 };
 
 /** mulberry32: a small seeded generator, so the catalog never changes between runs. */
-function generator(seed) {
+export function generator(seed) {
 	let state = seed;
 	return () => {
 		state = (state + 0x6d2b79f5) | 0;
