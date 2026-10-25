@@ -59,13 +59,17 @@ const constructors: Readonly<Record<Format["formatter"], string>> = {
 /**
  * A formatter as formats.js exports it: a function of the value, which makes its Intl formatter
  * the first time it formats. A number or a date is taken as a number, as Intl takes a date by its
- * time value, and a list as its items' text.
+ * time value, and a list as its items' text. With an option an input gives, it is a function of
+ * that option's value too, and makes a formatter for each value the first time it formats.
  */
 export function formatterCode(
 	name: string,
 	locale: string,
 	format: Format,
 ): string {
+	if (format.input !== undefined) {
+		return inputFormatterCode(name, locale, format, format.input.option);
+	}
 	const { options, unit } = splitUnit(format);
 	const made = `${name}_made`;
 	const intl = constructors[format.formatter];
@@ -81,5 +85,31 @@ let ${made};
 /** @param {unknown} value */
 export const ${name} = (value) =>
 	(${made} ??= new ${intl}(${JSON.stringify(locale)}${madeWith})).format(${value}${argument});
+`;
+}
+
+/**
+ * A formatter one of whose options an input gives, which only a number's or a date's can: an Intl
+ * formatter for each value of the option, kept by it (`formatterFor` in the runtime).
+ */
+function inputFormatterCode(
+	name: string,
+	locale: string,
+	format: Format,
+	option: string,
+): string {
+	const made = `${name}_made`;
+	const intl = constructors[format.formatter];
+	return `/** @type {Map<unknown, ${intl}>} */
+const ${made} = new Map();
+/**
+ * @param {unknown} value
+ * @param {unknown} ${option}
+ */
+export const ${name} = (value, ${option}) =>
+	(
+		${made}.get(${option}) ??
+		formatterFor(${made}, ${intl}, ${JSON.stringify(locale)}, ${JSON.stringify(format.options)}, "${option}", ${option})
+	).format(Number(value));
 `;
 }

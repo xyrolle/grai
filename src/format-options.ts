@@ -13,11 +13,23 @@ import {
 	shapesText,
 	timeUnits,
 } from "./format-functions.ts";
+import {
+	checkedOptions,
+	type OptionInput,
+	optionInput,
+} from "./format-inputs.ts";
 import { checkFormat } from "./intl-formatters.ts";
 import { MessageProblem } from "./problem.ts";
 
-/** How a value is shown: through an Intl formatter, with the options Intl takes. */
-export type Format = { formatter: IntlFormatter; options: IntlOptions };
+/**
+ * How a value is shown: through an Intl formatter, with the options Intl takes that the message
+ * writes, and the option an input gives, if one.
+ */
+export type Format = {
+	formatter: IntlFormatter;
+	options: IntlOptions;
+	input: OptionInput | undefined;
+};
 
 /**
  * MessageFormat 2's `select` option of `:number` and `:integer`: how a selector on the call
@@ -51,7 +63,8 @@ export function parseFormat(
 /**
  * A function call, such as `:number` with `minimumFractionDigits=2`: its format, checked by making
  * its formatter once, as whether Intl takes the options does not depend on the locale, and its
- * `select` mode. `source` is the call as written, for the errors.
+ * `select` mode. An option an input gives is checked with a value it takes. `source` is the call
+ * as written, for the errors.
  */
 export function parseCall(
 	name: string,
@@ -70,6 +83,7 @@ export function parseCall(
 		);
 	}
 	const given: Record<string, OptionValue> = {};
+	let input: OptionInput | undefined;
 	const takesSelect = spec.selects?.takesSelect === true;
 	let mode: SelectMode | undefined;
 	for (const token of optionsText.trim().split(/\s+/).filter(Boolean)) {
@@ -78,28 +92,36 @@ export function parseCall(
 			mode = selectModeOf(text, source, token);
 			continue;
 		}
-		if (text.startsWith("$")) {
-			throw new MessageProblem(
-				"unsupported",
-				`${source}: "${token}" takes its value from an input, which grai does not support. Write the value itself.`,
-			);
-		}
 		const refused = spec.refused?.[key];
 		if (refused !== undefined) {
 			throw new MessageProblem("unsupported", `${source}: ${refused}`);
 		}
 		const kind = spec.options[key];
-		if (kind === undefined || Object.hasOwn(given, key)) {
+		if (
+			kind === undefined ||
+			Object.hasOwn(given, key) ||
+			input?.option === key
+		) {
 			const known = Object.keys(spec.options);
 			throw new MessageProblem(
 				"message-invalid",
 				`${source}: "${token}" is not an option of :${name}, or is given twice. Its options are ${(takesSelect ? ["select", ...known] : known).join(", ")}.`,
 			);
 		}
-		given[key] = optionValue(kind, text, source, token);
+		const fromInput = optionInput(spec.formatter, key, text, input, {
+			source,
+			token,
+		});
+		if (fromInput === undefined) {
+			given[key] = optionValue(kind, text, source, token);
+		} else input = fromInput;
 	}
 	const { required } = spec;
-	if (required !== undefined && !Object.hasOwn(given, required.option)) {
+	if (
+		required !== undefined &&
+		!Object.hasOwn(given, required.option) &&
+		input?.option !== required.option
+	) {
 		throw new MessageProblem(
 			"message-invalid",
 			`${source}: :${name} needs the option ${required.option}, such as ${required.example}.`,
@@ -111,9 +133,10 @@ export function parseCall(
 		...intlOptions(given),
 		...spec.fixed,
 	};
-	const format: Format = { formatter: spec.formatter, options };
+	const format: Format = { formatter: spec.formatter, options, input };
+	const checked = checkedOptions(options, input, source);
 	try {
-		checkFormat(format);
+		checkFormat({ ...format, options: checked });
 	} catch (error) {
 		throw new MessageProblem(
 			"message-invalid",

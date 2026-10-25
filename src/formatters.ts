@@ -7,13 +7,29 @@ import { formatterCode } from "./intl-formatters.ts";
 /** A formatter of the output: a format in a locale, under the name formats.js exports it by. */
 export type Formatter = { name: string; locale: string; format: Format };
 
-/** A format's formatter in a locale. Its name is the same for the same locale and options. */
+/**
+ * What sets a format's formatter apart: its options, sorted, and the option an input gives, but
+ * not the name of that input.
+ */
+function identity(format: Format): unknown[] {
+	const options = Object.keys(format.options)
+		.sort()
+		.map((key) => [key, format.options[key]]);
+	return format.input === undefined
+		? options
+		: [...options, [format.input.option]];
+}
+
+/**
+ * A format's formatter in a locale. Its name is the same for the same locale, options and option
+ * an input gives, whatever the input is called.
+ */
 export function formatterOf(locale: string, format: Format): Formatter {
-	const options = Object.keys(format.options).sort();
+	const parts = identity(format);
 	const suffix =
-		options.length === 0
+		parts.length === 0
 			? ""
-			: `_${hash("sha1", JSON.stringify(options.map((key) => [key, format.options[key]]))).slice(0, 8)}`;
+			: `_${hash("sha1", JSON.stringify(parts)).slice(0, 8)}`;
 	return {
 		name: `${format.formatter}_${locale.replaceAll("-", "_")}${suffix}`,
 		locale,
@@ -31,14 +47,22 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 		const named = byName.get(formatter.name);
 		if (
 			named !== undefined &&
-			JSON.stringify(named.format) !== JSON.stringify(formatter.format)
+			(named.format.formatter !== formatter.format.formatter ||
+				JSON.stringify(identity(named.format)) !==
+					JSON.stringify(identity(formatter.format)))
 		) {
 			throw new Error(`grai gave two formats the name ${formatter.name}`);
 		}
 		byName.set(formatter.name, formatter);
 	}
-	const definitions = [...byName.values()]
-		.sort((a, b) => (a.name < b.name ? -1 : 1))
-		.map(({ name, locale, format }) => formatterCode(name, locale, format));
-	return `// The Intl formatters the messages call, each made the first time it formats.\n\n${definitions.join("\n")}`;
+	const sorted = [...byName.values()].sort((a, b) =>
+		a.name < b.name ? -1 : 1,
+	);
+	const imports = sorted.some(({ format }) => format.input !== undefined)
+		? 'import { formatterFor } from "./runtime.js";\n\n'
+		: "";
+	const definitions = sorted.map(({ name, locale, format }) =>
+		formatterCode(name, locale, format),
+	);
+	return `// The Intl formatters the messages call, each made the first time it formats.\n\n${imports}${definitions.join("\n")}`;
 }

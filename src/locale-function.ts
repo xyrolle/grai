@@ -63,7 +63,7 @@ export function localeFunction(
 ): LocaleFunction {
 	const { variants, closed } = message;
 	const { value, condition, prologue } = localeReads(message, used.plurals);
-	/** A placeholder's code: its value, through its formatter if it has one. */
+	/** A placeholder's code: its value, through its formatter if it has one, with the option an input gives. */
 	const placeholder = (part: VariablePart) => {
 		const local = message.formatted.get(part.name);
 		const format = part.format ?? local?.format;
@@ -71,7 +71,9 @@ export function localeFunction(
 		if (format === undefined) return operand;
 		const formatter = formatterOf(message.locale, format);
 		used.formats.set(formatter.name, formatter);
-		return `${formatter.name}(${operand})`;
+		const given =
+			format.input === undefined ? "" : `, ${value(format.input.name)}`;
+		return `${formatter.name}(${operand}${given})`;
 	};
 	const branches = variants.map((variant) => ({
 		condition: condition(variant.keys),

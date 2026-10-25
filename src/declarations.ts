@@ -36,8 +36,9 @@ function tagsType(messages: readonly LocaleMessage[]): string {
 
 /**
  * The inputs every locale accepts: a count or a value formatted as a number is a number, a value
- * formatted as a date is a Date or its time value, a closed select takes the values it lists, and
- * anything else becomes text.
+ * formatted as a date is a Date or its time value, a closed select takes the values it lists, an
+ * input that gives a formatter's option, such as its currency, is a string, and anything else
+ * becomes text.
  */
 function inputsType(messages: readonly LocaleMessage[]): string {
 	const names = new Set(messages.flatMap((message) => [...message.inputs]));
@@ -78,28 +79,44 @@ function inputType(name: string, messages: readonly LocaleMessage[]): string {
 				? keys
 				: new Set([...accepted].filter((key) => keys.has(key)));
 	}
-	if (accepted === undefined) return "NonNullable<unknown>";
+	if (accepted === undefined) {
+		return messages.some((message) => givesOption(name, message))
+			? "string"
+			: "NonNullable<unknown>";
+	}
 	if (accepted.size === 0) return "never";
 	return [...accepted].sort(byValue).flatMap(literalTypes).join(" | ");
 }
 
-/** The formatters a message shows an input through: in a placeholder, or through a local. */
+/** Each value a message formats, with its input and its format: in a placeholder, or through a local. */
+function formatsOf(
+	message: LocaleMessage,
+): { input: string; format: Format }[] {
+	return [
+		...message.formatted.values(),
+		...message.variants.flatMap(({ pattern }) =>
+			pattern.flatMap((part) =>
+				part.type === "variable" && part.format
+					? [{ input: part.name, format: part.format }]
+					: [],
+			),
+		),
+	];
+}
+
+/** The formatters a message shows an input through. */
 function formattersOf(
 	name: string,
 	message: LocaleMessage,
 ): Format["formatter"][] {
-	const formatters: Format["formatter"][] = [];
-	for (const local of message.formatted.values()) {
-		if (local.input === name) formatters.push(local.format.formatter);
-	}
-	for (const { pattern } of message.variants) {
-		for (const part of pattern) {
-			if (part.type === "variable" && part.name === name && part.format) {
-				formatters.push(part.format.formatter);
-			}
-		}
-	}
-	return formatters;
+	return formatsOf(message)
+		.filter(({ input }) => input === name)
+		.map(({ format }) => format.formatter);
+}
+
+/** Whether an input gives one of a message's formatters an option, such as its currency. */
+function givesOption(name: string, message: LocaleMessage): boolean {
+	return formatsOf(message).some(({ format }) => format.input?.name === name);
 }
 
 /** A key matches the values whose text it is: `1` and `"1"` for the key 1, `"a"` for the key a. */
@@ -227,6 +244,15 @@ export declare function unmatched(
 	selector: string,
 	value: unknown,
 ): never;
+/** The formatter for a call with the value an input gives one of its options, kept by the value. */
+export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateTimeFormat>(
+	made: Map<unknown, Made>,
+	IntlFormat: new (locale: string, options: object) => Made,
+	locale: string,
+	written: object,
+	option: string,
+	value: unknown,
+): Made;
 `;
 }
 
