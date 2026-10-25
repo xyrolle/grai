@@ -1,5 +1,6 @@
 import { ownEntry } from "../own-entry.ts";
 import { MessageProblem } from "../problem.ts";
+import { dateSkeletonCall, numberSkeletonCall } from "./icu-skeletons.ts";
 
 /**
  * An ICU MessageFormat message, parsed: text, `{name}`, `#`, a plural, ordinal or select choice,
@@ -170,9 +171,18 @@ class IcuParser {
 
 	/** The rest of a formatted argument, `{name, type` read: its style, if any, and its `}`. */
 	private formatted(name: string, kind: string): IcuNode {
-		const style = this.take(",") ? this.word() : "";
+		const style = this.take(",") ? this.styleText() : "";
 		if (!this.take("}"))
 			throw invalid(`{${name}, ${kind} must be closed by }.`);
+		if (style.startsWith("::")) {
+			const written = `{${name}, ${kind}, ${style}}`;
+			const skeleton = style.slice(2);
+			const format =
+				kind === "number"
+					? numberSkeletonCall(skeleton, written)
+					: dateSkeletonCall(skeleton, written);
+			return { type: "argument", name: inputOf(name), format };
+		}
 		const format = ownEntry(formats[kind] ?? {}, style);
 		if (format === undefined) {
 			throw new MessageProblem(
@@ -225,6 +235,14 @@ class IcuParser {
 	}
 
 	/** Skips spaces, then reads up to a space, `,`, `{` or `}`. */
+	/** A formatted argument's style, as written up to its closing brace: a name, or a skeleton. */
+	private styleText(): string {
+		const end = this.source.indexOf("}", this.index);
+		const style = this.source.slice(this.index, end === -1 ? undefined : end);
+		this.index += style.length;
+		return style.trim();
+	}
+
 	private word(): string {
 		this.space();
 		const start = this.index;
