@@ -442,6 +442,25 @@ describe("grai import --from icu", () => {
 		]);
 	});
 
+	it("quotes with an apostrophe only before {, }, <, > and a plural's #, as intl-messageformat does", async () => {
+		const m = await imported(
+			"icu",
+			{
+				"en.json": {
+					pipe: "Select '|x'",
+					end: "the cats'",
+					counted:
+						"{n, plural, other {'#' is #}} {g, select, other {'#' is #}}",
+				},
+			},
+			["en"],
+		).load();
+
+		expect(m.pipe?.()).toBe("Select '|x'");
+		expect(m.end?.()).toBe("the cats'");
+		expect(m.counted?.({ n: 2, g: "x" })).toBe("# is 2 '#' is #");
+	});
+
 	it("formats # and number, date and time arguments as intl-messageformat does", async () => {
 		const { result, load } = imported(
 			"icu",

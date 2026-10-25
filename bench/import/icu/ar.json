@@ -6,6 +6,7 @@
 		"owner": "{g, select, male {ar he} other {ar they}} {n, plural, one {ar # one} other {ar # other}}.",
 		"nested": "{g, select, male {{n, plural, one {ar his one} other {ar his #}}} other {ar their}}",
 		"quote": "ar '{x}' ''",
+		"apostrophes": "ar '|x' ' {n, plural, other {'#' #}}",
 		"bold": "ar <b>{name}</b> <i>{n, plural, other {#}}</i>",
 		"price": "{value, number}",
 		"rank": "{n, selectordinal, other {#}}",
