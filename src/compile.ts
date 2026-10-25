@@ -260,6 +260,7 @@ function inputsOf(config: Config, hashes: readonly string[]): string {
 			config.baseLocale,
 			config.strategy,
 			config.cookieName,
+			config.localePrefix,
 			[...config.fallbacks],
 			hashes,
 		]),

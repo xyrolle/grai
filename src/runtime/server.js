@@ -2,8 +2,19 @@
 // Client code never imports it: it needs node:async_hooks, which Node, Deno and Bun have, and
 // Workers too, by default from compatibility date 2026-08-04, else with the nodejs_als flag.
 import { AsyncLocalStorage } from "node:async_hooks";
-import { baseLocale, cookieName, locales, strategy } from "./config.js";
-import { bindRequests, extractLocaleFromUrl } from "./runtime.js";
+import {
+	baseLocale,
+	cookieName,
+	localePrefix,
+	locales,
+	strategy,
+} from "./config.js";
+import {
+	assertIsLocale,
+	bindRequests,
+	extractLocaleFromUrl,
+	localizeUrl,
+} from "./runtime.js";
 
 /** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
@@ -15,7 +26,8 @@ const vary = headersRead().join(", ");
 /**
  * Resolves the request's locale by the config's strategy and binds it for the handler and all it
  * calls, so each message called while it runs is in that locale. Returns the handler's response,
- * its `Vary` listing the request headers the strategy reads.
+ * its `Vary` listing the request headers the strategy reads. With every locale's paths prefixed, a
+ * page asked for without a prefix is sent to its locale's path instead.
  *
  * @param {Request} request
  * @param {(resolved: { request: Request, locale: string }) => Response | Promise<Response>} handler
@@ -23,10 +35,43 @@ const vary = headersRead().join(", ");
  */
 export async function middleware(request, handler) {
 	const locale = localeOf(request);
-	const response = await requests.run({ index: locales.indexOf(locale) }, () =>
-		handler({ request, locale }),
-	);
+	const response = unprefixedPage(request)
+		? Response.redirect(
+				localizeUrl(request.url, { locale: assertIsLocale(locale) }),
+				307,
+			)
+		: await requests.run({ index: locales.indexOf(locale) }, () =>
+				handler({ request, locale }),
+			);
 	return vary === "" ? response : withVary(response);
+}
+
+/**
+ * Whether the request asks for a page at a path without a locale prefix, which with every
+ * locale's paths prefixed is not a page's own: a GET or a HEAD, as a form's POST must not be
+ * answered with another address.
+ *
+ * @param {Request} request
+ */
+function unprefixedPage(request) {
+	return (
+		localePrefix === "always" &&
+		strategy.includes("url") &&
+		(request.method === "GET" || request.method === "HEAD") &&
+		fromUrl(request.url) === undefined
+	);
+}
+
+/**
+ * The locale the request's path names. With every locale's paths prefixed, a path without a prefix
+ * names none, and the strategies after `url` find the request's locale.
+ *
+ * @param {string} url
+ */
+function fromUrl(url) {
+	const locale = extractLocaleFromUrl(url);
+	const named = new URL(url).pathname.split("/")[1] === locale;
+	return localePrefix === "always" && !named ? undefined : locale;
 }
 
 /** The first locale the strategy finds in the request, else the base locale. */
@@ -36,7 +81,7 @@ function localeOf(/** @type {Request} */ request) {
 			source === "cookie"
 				? fromCookie(request.headers.get("cookie") ?? "")
 				: source === "url"
-					? extractLocaleFromUrl(request.url)
+					? fromUrl(request.url)
 					: fromAcceptLanguage(request.headers.get("accept-language") ?? "");
 		if (locale !== undefined) return locale;
 	}

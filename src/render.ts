@@ -211,6 +211,8 @@ function configModule(config: Config): string {
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		"/** @type {string | undefined} */",
 		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
+		'/** @type {"as-needed" | "always"} */',
+		`export const localePrefix = ${JSON.stringify(config.localePrefix)};`,
 		"",
 	].join("\n");
 }
