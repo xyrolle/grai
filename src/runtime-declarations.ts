@@ -94,6 +94,8 @@ export const dispatchDeclarations = `import type {
 } from "./runtime.js";
 
 export * from "./runtime.js";
+/** Binds a locale outside a request, by its position in \`locales\`: testing.js binds a test's with it. */
+export declare function bindLocale(index: number): void;
 /** Lets server.js bind each request's locale. */
 export declare function bindRequests(storage: {
 	getStore(): RequestLocale | undefined;
@@ -148,4 +150,15 @@ export declare function middleware(
 		locale: Locale;
 	}) => Response | Promise<Response>,
 ): Promise<Response>;
+`;
+
+/** testing.d.ts: the test helper, typed with the project's locales. */
+export const testingDeclarations = `import type { Locale } from "./runtime.js";
+
+/**
+ * Binds a locale for the test, as if the page had loaded in it: the messages called next render in
+ * it, and so does a call that names it, which a page in another locale refuses. A build refuses
+ * this module.
+ */
+export declare function useLocale(locale: Locale): void;
 `;
