@@ -558,12 +558,19 @@ import.meta.hot.send("test:ping");
 		return { server, sent, browser };
 	}
 
-	it("resolves the output for a page reloaded after the fix, before Vite's watcher has reported it", async () => {
+	it("resolves the output by a path or a package import for a page reloaded after the fix, before Vite's watcher has reported it", async () => {
 		const { dir } = project(catalogs);
 		broken(dir);
 		writeFileSync(
+			join(dir, "package.json"),
+			JSON.stringify({ imports: { "#i18n/*": "./out/*" } }),
+		);
+		writeFileSync(
 			join(dir, "main.js"),
-			`import { m } from "./out/messages.js";\nexport const title = m.title();\n`,
+			`import { m } from "#i18n/messages.js";
+import { getLocale } from "./out/runtime.js";
+export const title = \`\${getLocale()} \${m.title()}\`;
+`,
 		);
 		let reloaded = () => {};
 		const reload = new Promise<void>((resolve) => {
@@ -598,8 +605,12 @@ import.meta.hot.send("test:ping");
 
 		fixed(dir, "Überschrift");
 		await reload;
+		const { code = "" } = (await page()) ?? {};
 
-		expect((await page())?.code).toContain('"/out/messages.js"');
+		expect([
+			code.includes('"/out/messages.js"'),
+			code.includes('"/out/runtime.js"'),
+		]).toEqual([true, true]);
 	});
 
 	it("takes the error down for a page that connects after the fix", async () => {
