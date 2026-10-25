@@ -442,6 +442,38 @@ describe("grai import --from icu", () => {
 		]);
 	});
 
+	it("reads a tag as intl-messageformat does: spaces before its >, its name's dots, and <b/> as text", async () => {
+		const m = await imported(
+			"icu",
+			{
+				"en.json": {
+					spaced: "<b >{name}</b >",
+					dotted: "<x.link>{name}</x.link>",
+					alone: "a <br /> b",
+				},
+			},
+			["en"],
+		).load();
+		const markup = (type: string, name: string) => ({
+			type,
+			name,
+			options: {},
+			attributes: {},
+		});
+
+		expect(m.spaced?.parts?.({ name: "Ana" })).toEqual([
+			markup("markup-start", "b"),
+			{ type: "text", value: "Ana" },
+			markup("markup-end", "b"),
+		]);
+		expect(m.dotted?.parts?.({ name: "Ana" })).toEqual([
+			markup("markup-start", "x.link"),
+			{ type: "text", value: "Ana" },
+			markup("markup-end", "x.link"),
+		]);
+		expect(m.alone?.()).toBe("a <br/> b");
+	});
+
 	it("formats # and number, date and time arguments as intl-messageformat does", async () => {
 		const { result, load } = imported(
 			"icu",
@@ -590,6 +622,9 @@ describe("grai import --from icu", () => {
 					unstyled: "{n, number,}",
 					quoted: "{n, number, 'x}",
 					twice: "{n, plural, few {a} few {b} other {c}}",
+					attribute: "<b x>y</b>",
+					unopened: "a</b>",
+					crossed: "<b>{n, plural, other {</b>}}</b>",
 				},
 			},
 			["en"],
@@ -606,6 +641,9 @@ describe("grai import --from icu", () => {
 			"unstyled: it is not a valid ICU message: {n, number,} must name a style after its comma, or have no comma.",
 			"quoted: it is not a valid ICU message: the style of {n, number} has a ' that no other ' closes.",
 			"twice: it is not a valid ICU message: {n, plural} lists the key few twice.",
+			"attribute: it is not a valid ICU message: the tag <b must end with > or />.",
+			"unopened: it is not a valid ICU message: the </ at 1 closes no tag.",
+			"crossed: it is not a valid ICU message: the option other of {n} must be closed by }.",
 		]);
 	});
 });
