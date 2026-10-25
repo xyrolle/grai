@@ -21,8 +21,9 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
-import { localeCopies } from "../src/locale-chunks.ts";
+import { keyModulePrefix, localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
+import { keyModule } from "../src/vite-build.ts";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -185,6 +186,56 @@ describe("the Vite plugin's build", () => {
 		]).toEqual(["Hello Ana", "Hallo Ana"]);
 	});
 
+	it("gives each message with inputs a dispatch of its own for a browser, and keeps the shared one for a server", async () => {
+		const { dir, config } = project({
+			en: { greeting: "Hello {name}", terms: "Read {#b}this{/b}, {name}" },
+			de: { greeting: "Hallo {name}", terms: "Lies {#b}das{/b}, {name}" },
+		});
+		const { build: compiled } = await recompile(config, undefined);
+		if (compiled === undefined) throw new Error("the compile failed");
+		const outdir = join(dir, "out");
+		const module = (key: string, consumer: "client" | "server") =>
+			keyModule(outdir, compiled, `${keyModulePrefix}${key}`, consumer) ?? "";
+		const dispatch = "(v) => (i, o) => variantFor(v, o)(i)";
+
+		expect(module("greeting", "client")).toContain(
+			`dispatcher(${dispatch}, [(i) => \`Hello `,
+		);
+		expect(module("terms", "client")).toContain(
+			`markupDispatcher(${dispatch}, [`,
+		);
+		expect(module("terms", "client")).toContain(`], ${dispatch}, [`);
+		expect(module("greeting", "server")).toContain("message(function (i)");
+	});
+
+	it("copies a client build's own dispatches with one locale's variants, for messages with inputs and markup", async () => {
+		const { dir, config } = project({
+			en: { greeting: "Hello {name}", terms: "Read {#b}this{/b}" },
+			de: { greeting: "Hallo {name}", terms: "Lies {#b}das{/b}" },
+			fr: { greeting: "Bonjour {name}", terms: "Lisez {#b}ceci{/b}" },
+		});
+		const { build: compiled } = await recompile(config, undefined);
+		if (compiled === undefined) throw new Error("the compile failed");
+		const outdir = join(dir, "out");
+		const code = ["greeting", "terms"]
+			.map((key) =>
+				(
+					keyModule(outdir, compiled, `${keyModulePrefix}${key}`, "client") ??
+					""
+				)
+					// As a bundler renders the module in a chunk: no imports, and declarations it exports.
+					.replace(/^import .*\n/gm, "")
+					.replace(/^export const /gm, "const "),
+			)
+			.join("");
+		const fr = localeCopies("chunk.js", code, ["en", "de", "fr"]).get("fr");
+
+		expect(fr).toMatch(/, \[void 0, void 0, \(i\) => `Bonjour /);
+		expect(fr).toMatch(/, \[void 0, void 0, \(\) => "Lisez ceci"\], /);
+		expect(fr).toMatch(/, \[void 0, void 0, \(\) => \[\{/);
+		expect(fr).not.toMatch(/Hello|Hallo|Read|Lies/);
+	});
+
 	it("ships no pseudo-locale, even over the output of a dev server that compiled one", async () => {
 		const { dir, config } = project(catalogs, { pseudoLocale: "en-XA" });
 		await recompile(config, undefined, { pseudoLocale: true });
@@ -283,22 +334,41 @@ describe("the Vite plugin's locale copies", () => {
 
 	it("copies a chunk byte for byte, each call keeping only its locale's variants, at their position", () => {
 		const chunk = (calls: string) =>
-			`import { markup, message, text } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
+			`import { dispatcher, markupDispatcher, text, variantFor } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
+		const make = "(v) => (i, o) => variantFor(v, o)(i)";
+		const keys = (
+			title: string,
+			greeting: string,
+			terms: string,
+			parts: string,
+		) =>
+			chunk(`var title = /*#__PURE__*/ text(${title});
+var greeting = /*#__PURE__*/ dispatcher(${make}, [${greeting}]);
+var terms = /*#__PURE__*/ markupDispatcher(${make}, [${terms}], ${make}, [${parts}]);`);
 		const copies = localeCopies(
 			"chunk.js",
-			chunk(`var title = /*#__PURE__*/ text("Title", "Titel");
-var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`, (i) => \`Hallo \${i.name}\`);
-var terms = /*#__PURE__*/ markup([(i) => "Terms", (i) => "AGB"], [(i) => [], (i) => [{ type: "text", value: "AGB" }]]);`),
+			keys(
+				'"Title", "Titel"',
+				`(i) => \`Hello \${i.name}\`, (i) => \`Hallo \${i.name}\``,
+				'() => "Terms", () => "AGB"',
+				'() => [], () => [{ type: "text", value: "AGB" }]',
+			),
 			["en", "de"],
 		);
 
 		expect(Object.fromEntries(copies)).toEqual({
-			en: chunk(`var title = /*#__PURE__*/ text("Title");
-var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`);
-var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
-			de: chunk(`var title = /*#__PURE__*/ text(void 0, "Titel");
-var greeting = /*#__PURE__*/ message(void 0, (i) => \`Hallo \${i.name}\`);
-var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type: "text", value: "AGB" }]]);`),
+			en: keys(
+				'"Title"',
+				`(i) => \`Hello \${i.name}\``,
+				'() => "Terms"',
+				"() => []",
+			),
+			de: keys(
+				'void 0, "Titel"',
+				`void 0, (i) => \`Hallo \${i.name}\``,
+				'void 0, () => "AGB"',
+				'void 0, () => [{ type: "text", value: "AGB" }]',
+			),
 		});
 	});
 

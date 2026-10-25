@@ -267,7 +267,7 @@ export function localizeHref(href, options) {
  * @param {{ locale?: string } | undefined} options
  * @returns {Variant}
  */
-function variantFor(variants, options) {
+export function variantFor(variants, options) {
 	const locale = options?.locale;
 	const index = locale === undefined ? bound() : locales.indexOf(locale);
 	const variant = variants[index];
@@ -306,6 +306,34 @@ function noVariant(variants, locale, index) {
  */
 export function message(...variants) {
 	return (inputs, options) => variantFor(variants, options)(inputs);
+}
+
+/**
+ * A message with inputs in a client build: the dispatch its own code makes, `make`, of its
+ * variants, one function per locale in `locales` order.
+ *
+ * @template Variant, Dispatch
+ * @param {(variants: readonly Variant[]) => Dispatch} make
+ * @param {readonly Variant[]} variants
+ * @returns {Dispatch}
+ */
+export function dispatcher(make, variants) {
+	return make(variants);
+}
+
+/**
+ * A message with markup in a client build: the dispatch its own code makes of its text, and the
+ * one it makes of its parts, as `dispatcher` makes them.
+ *
+ * @template Variant, PartVariant, PartsDispatch
+ * @template {object} Dispatch
+ * @param {(variants: readonly Variant[]) => Dispatch} make
+ * @param {readonly Variant[]} variants
+ * @param {(variants: readonly PartVariant[]) => PartsDispatch} makeParts
+ * @param {readonly PartVariant[]} parts
+ */
+export function markupDispatcher(make, variants, makeParts, parts) {
+	return Object.assign(make(variants), { parts: makeParts(parts) });
 }
 
 /**

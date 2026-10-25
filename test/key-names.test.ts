@@ -67,6 +67,9 @@ const catalog = {
 	live: "Live",
 	location: "Location",
 	window: "Window",
+	variantFor: "Hello {name}",
+	dispatcher: "Hi {name}",
+	markupDispatcher: "Read {#b}this{/b}, {name}",
 };
 
 /** Each key's call, as its inputs, and what it should say. */
@@ -87,6 +90,9 @@ const calls: Record<string, [inputs: object | undefined, says: unknown]> = {
 	live: [undefined, "Live"],
 	location: [undefined, "Location"],
 	window: [undefined, "Window"],
+	variantFor: [{ name: "Ana" }, "Hello Ana"],
+	dispatcher: [{ name: "Ana" }, "Hi Ana"],
+	markupDispatcher: [{ name: "Ana" }, "Read this, Ana"],
 };
 
 const expected = Object.fromEntries(

@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { type EnvironmentOptions, minifySync } from "vite";
+import type { CompiledKey } from "./compilation.ts";
 import type { Build } from "./compile.ts";
 import { keyExports } from "./key-exports.ts";
 import {
@@ -41,9 +42,44 @@ export function keyModule(
 	const name = id.slice(keyModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
-	const names = calledNames([key]);
-	const value = consumer === "server" ? key.serverValue : key.value;
+	const { value, functions } =
+		consumer === "client"
+			? clientValue(key)
+			: { value: key.serverValue, functions: key.uses };
+	const names = calledNames([key], functions);
 	return `${outputImports(names, inOutdir(outdir))}\n${keyExports([{ name, value }], everyName(names))}`;
+}
+
+/** The dispatch a key's own code makes of its variants in a client build, for `dispatcher`. */
+const dispatch = "(v) => (i, o) => variantFor(v, o)(i)";
+
+/**
+ * A key's value in a client build, and the runtime functions it calls. A message with inputs or
+ * markup dispatches through its own code, `(v) => (i, o) => variantFor(v, o)(i)`, so where it
+ * calls a variant the engine sees that key's variants alone, and the call stays monomorphic;
+ * through `message`, which every key shares, it sees every key's and goes megamorphic. A text
+ * keeps `text`, which calls nothing. A server keeps `message`: it loads every key, and a function
+ * of its own per key would cost it load.
+ */
+function clientValue(key: CompiledKey): {
+	value: string;
+	functions: Iterable<string>;
+} {
+	const variants = `[${key.variants.join(", ")}]`;
+	switch (key.kind) {
+		case "text":
+			return { value: key.value, functions: key.uses };
+		case "message":
+			return {
+				value: `/*#__PURE__*/ dispatcher(${dispatch}, ${variants})`,
+				functions: ["dispatcher", "variantFor"],
+			};
+		case "markup":
+			return {
+				value: `/*#__PURE__*/ markupDispatcher(${dispatch}, ${variants}, ${dispatch}, [${key.parts.join(", ")}])`,
+				functions: ["markupDispatcher", "variantFor"],
+			};
+	}
 }
 
 /**
