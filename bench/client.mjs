@@ -11,6 +11,7 @@ import { cacheDir, selectedApps } from "./apps.mjs";
 import { browserBundle } from "./browser-bundle.mjs";
 import { kindsOf, sampleCalls } from "./calls.mjs";
 import { benchDocument, benchPage } from "./chromium.mjs";
+import { graiOutput } from "./grai.mjs";
 import { paraglideVersion } from "./paraglide.mjs";
 import {
 	CALLS,
@@ -42,7 +43,11 @@ async function variants(app, locale) {
 		"grai `m.key()`": grai,
 		"grai `m.key(i, { locale })`": forced,
 		...others
-	} = await libraryVariants(app, locale);
+	} = await libraryVariants(
+		app,
+		locale,
+		join((await graiOutput(app)).outdir, "keys.js"),
+	);
 	const copies = { app, locale };
 	return {
 		...others,

@@ -2,7 +2,7 @@
 // own resolve it from the request as the app's strategy says, and the prototype's server entries
 // bind the same locale.
 import { join } from "node:path";
-import { graiOutput } from "./grai.mjs";
+import { graiServerBuild } from "./grai.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 
@@ -18,7 +18,7 @@ export async function inRequest(app, locale, work) {
 		join(await paraglideOutput(app), "server.js")
 	);
 	const { middleware } = await import(
-		join((await graiOutput(app)).outdir, "server.js")
+		join(await graiServerBuild(app), "server.js")
 	);
 	const prototype = writePrototype(app);
 	const { withLocale } = await import(join(prototype, "server.js"));

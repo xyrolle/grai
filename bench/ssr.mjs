@@ -1,11 +1,12 @@
 // Server render: the message-heavy page (page.mjs) rendered by Svelte inside a request, with its
-// messages from Paraglide, from grai's compiled output, from i18next or use-intl, or inlined into
-// the template by the prototype. What inlining saves is what messages cost the render.
+// messages from Paraglide, from grai's output as its Vite plugin builds it for a server, from
+// i18next or use-intl, or inlined into the template by the prototype. What inlining saves is what
+// messages cost the render.
 //   node ssr.mjs [app...]
 import { join } from "node:path";
 import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
-import { graiOutput } from "./grai.mjs";
+import { graiServerBuild } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import {
@@ -25,7 +26,7 @@ async function serverVariants(app, locale) {
 	const { directory: libraries } = writeLibraryModules(app, locale);
 	return {
 		Paraglide: { from: join(await paraglideOutput(app), "messages.js") },
-		grai: { from: join((await graiOutput(app)).outdir, "keys.js") },
+		grai: { from: join(await graiServerBuild(app), "keys.js") },
 		[INLINED]: {
 			from: join(writePrototype(app), `${locale}.js`),
 			inline: app.messages[locale],
