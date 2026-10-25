@@ -8,6 +8,8 @@ export type GraiErrorCode =
 	| "catalog-invalid"
 	| "catalog-empty"
 	| "catalog-exists"
+	| "mapping-missing"
+	| "mapping-invalid"
 	| "key-invalid"
 	| "key-missing"
 	| "key-exists"

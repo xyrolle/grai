@@ -31,7 +31,7 @@ export const importCommand: Command = {
 		if (result.errors.length > 0) return failed(result.errors);
 		console.log(summaryLine(result));
 		console.log(
-			`grai: ${mappingFile} maps each key the source's calls name to its grai key`,
+			`grai: ${mappingFile} maps each key the source's calls name to its grai key, for grai migrate`,
 		);
 		return 0;
 	},
