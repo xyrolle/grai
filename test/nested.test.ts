@@ -3,6 +3,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { add } from "../src/add.ts";
 import { keyPositions } from "../src/declaration-maps.ts";
+import { find } from "../src/find.ts";
+import { removeUnusedKeys } from "../src/fix.ts";
+import { rename } from "../src/rename.ts";
 import { seed } from "../src/seed.ts";
 import { exportLocale, mergeDocument } from "../src/translations.ts";
 import { errorsOf, project } from "./project.ts";
@@ -133,5 +136,46 @@ describe("the commands in a catalog with objects of messages", () => {
 			[],
 		);
 		expect(JSON.parse(catalog(dir, "de")).cart.title).toBe("Ihr Warenkorb");
+	});
+
+	it("rename a key in its place while its object's key starts the new name, and move it where add would put it else", async () => {
+		const { dir, config } = project(catalogs);
+
+		const inPlace = await rename(config, "cart_title", "cart_heading");
+		const moved = await rename(config, "cart_summary_total", "footer_note");
+
+		expect([...inPlace.errors, ...moved.errors]).toEqual([]);
+		expect(catalog(dir, "en")).toBe(
+			JSON.stringify(
+				{
+					cart: { heading: "Your cart" },
+					footer: "Footer",
+					footer_note: "{count} items",
+				},
+				null,
+				"\t",
+			),
+		);
+	});
+
+	it("remove an unused key and the object it leaves empty, and find a key's line", async () => {
+		const { dir, config } = project(catalogs);
+		writeFileSync(
+			join(dir, "app.ts"),
+			'import { m } from "./out/messages.js";\nm.cart_title();\nm.footer();\n',
+		);
+
+		const fixed = await removeUnusedKeys(config);
+		const found = await find(config, "cart_title");
+
+		expect(fixed.removed).toEqual(["cart_summary_total"]);
+		expect(JSON.parse(catalog(dir, "en"))).toEqual({
+			cart: { title: "Your cart" },
+			footer: "Footer",
+		});
+		expect(found.catalogs.map(({ file, line }) => `${file}:${line}`)).toEqual([
+			"messages/en.json:3",
+			"messages/de.json:3",
+		]);
 	});
 });

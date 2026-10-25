@@ -1,5 +1,6 @@
 import { usesIn } from "./call-sites.ts";
-import { catalogEntries } from "./catalog-entries.ts";
+import { messageEntries } from "./catalog-entries.ts";
+import { keyOf } from "./catalog-keys.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { lineAt, positionOf, sourceFiles } from "./sources.ts";
@@ -43,7 +44,7 @@ export async function find(
 	if (errors.length > 0) return { ...found, errors };
 	for (const { file, bytes } of read.sources) {
 		const text = bytes.toString("utf8");
-		const entry = catalogEntries(text).find((other) => other.key === key);
+		const entry = messageEntries(text).find(({ path }) => keyOf(path) === key);
 		if (entry !== undefined) {
 			found.catalogs.push(foundLine(file, text, entry.keyStart));
 		}
