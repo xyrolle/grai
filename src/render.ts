@@ -7,7 +7,7 @@ import {
 	shardMap,
 } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
-import { formatModule } from "./formatters.ts";
+import { type Formatter, formatModule } from "./formatters.ts";
 import { globPattern } from "./globs.ts";
 import type { RuntimeFunction } from "./modules.ts";
 import { pluralModule } from "./plurals.ts";
@@ -73,13 +73,17 @@ export function renderOutput(
 	const keysIndex = modules
 		.map(([file]) => `export * from "./${file}";\n`)
 		.join("");
+	const formatters = usedFormatters(compilation);
+	const digits = formatters.some(({ shows }) => shows === "digits");
+	const formats: [string, string][] =
+		formatters.length === 0 ? [] : [["formats.js", formatModule(formatters)]];
 	const output: Output = [
 		[
 			["config.js", configModule(config)],
 			["runtime.d.ts", runtimeDeclarations(config)],
 			["server.d.ts", serverDeclarations],
-			["plurals.js", pluralModule(config.locales)],
-			...formatsFile(compilation),
+			["plurals.js", pluralModule(config.locales, { digits })],
+			...formats,
 		],
 		[["runtime.js", runtime.runtime], ...declarations],
 		[["server.js", runtime.server]],
@@ -96,13 +100,11 @@ export function renderOutput(
 	};
 }
 
-/** formats.js, when a message calls a formatter. */
-function formatsFile(compilation: Compilation): [string, string][] {
-	if (compilation.formatted.size === 0) return [];
-	const formatters = [...compilation.formatted].flatMap((key) => [
+/** The formatters the messages call, for formats.js, from the keys that call one. */
+function usedFormatters(compilation: Compilation): Formatter[] {
+	return [...compilation.formatted].flatMap((key) => [
 		...(compilation.keys.get(key)?.formats.values() ?? []),
 	]);
-	return [["formats.js", formatModule(formatters)]];
 }
 
 /** Every key in its shard, each shard's keys sorted. */

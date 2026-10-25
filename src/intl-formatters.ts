@@ -34,6 +34,28 @@ function splitUnit(format: Format): {
 }
 
 /**
+ * The digits a rounding number selector reads a value as, with the options Intl shows them with:
+ * in Latin digits, so plural rules can read them, without a percent's sign. The compile checks a
+ * key with it, and `digitsCode` writes the same for formats.js.
+ */
+export function shownDigits(options: IntlOptions, value: number): string {
+	const text = new Intl.NumberFormat("en", options).format(value);
+	return options.style === "percent" ? text.replace("%", "") : text;
+}
+
+/** formats.js's function that gives a value's digits as `shownDigits` does. */
+export function digitsCode(name: string, options: IntlOptions): string {
+	const made = `${name}_made`;
+	const percent = options.style === "percent" ? '.replace("%", "")' : "";
+	return `/** @type {Intl.NumberFormat | undefined} */
+let ${made};
+/** @param {unknown} value */
+export const ${name} = (value) =>
+	(${made} ??= new Intl.NumberFormat("en", ${JSON.stringify(options)})).format(Number(value))${percent};
+`;
+}
+
+/**
  * The options each formatter was last made with, which Intl took. A catalog repeats the same few
  * formats over and over, and each locale's message repeats its base's, so most checks are of the
  * options just checked. Only options Intl took are kept: refused ones are checked, and refused,
