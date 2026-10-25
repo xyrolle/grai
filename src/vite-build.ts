@@ -1,6 +1,7 @@
-import { join } from "node:path";
+import { basename, dirname } from "node:path";
 import { type EnvironmentOptions, minifySync } from "vite";
 import type { Build } from "./compile.ts";
+import { withoutContentHash } from "./content-names.ts";
 import {
 	besideDirectory,
 	inDirectory,
@@ -38,7 +39,7 @@ export function keyModule(
 	const key = build.compilation.keys.get(id.slice(keyModulePrefix.length));
 	if (key === undefined) return undefined;
 	const code = consumer === "server" ? key.serverCode : key.code;
-	return `${outputImports(outputModule, [key], key.uses)}\n${code}`;
+	return `${outputImports(outputModule, build.rendered.modules, [key], key.uses)}\n${code}`;
 }
 
 /**
@@ -49,7 +50,7 @@ export function textModule(build: Build, id: string): string | undefined {
 	const name = id.slice(textModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key?.kind !== "text") return undefined;
-	return `${outputImports(outputModule, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
+	return `${outputImports(outputModule, build.rendered.modules, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
 }
 
 /**
@@ -65,7 +66,10 @@ export type GraiModuleKind =
 	| "key"
 	| "text";
 
-/** The output's files that go to the `grai-runtime` chunk, with their kinds. */
+/**
+ * The output's files that go to the `grai-runtime` chunk, with their kinds, by their names without
+ * the hash of their content: the entries apps import and the modules they re-export alike.
+ */
 const runtimeFiles = new Map<string, GraiModuleKind>([
 	["runtime.js", "runtime"],
 	["config.js", "config"],
@@ -73,22 +77,25 @@ const runtimeFiles = new Map<string, GraiModuleKind>([
 	["formats.js", "formats"],
 ]);
 
-/** The `grai-runtime` chunk's modules in a project whose output is `outdir`, by id. */
-function runtimeModules(outdir: string): Map<string, GraiModuleKind> {
-	return new Map(
-		[...runtimeFiles].map(([file, kind]) => [join(outdir, file), kind]),
-	);
+/** The kind of the `grai-runtime` chunk's module an id is, in a project whose output is `outdir`. */
+function runtimeKindIn(
+	outdir: string,
+): (id: string) => GraiModuleKind | undefined {
+	return (id) =>
+		dirname(id) === outdir
+			? runtimeFiles.get(withoutContentHash(basename(id)))
+			: undefined;
 }
 
 /** Which module of grai's an id is, in a project whose output is `outdir`; nothing for any other. */
 export function moduleKindIn(
 	outdir: string,
 ): (id: string) => GraiModuleKind | undefined {
-	const runtime = runtimeModules(outdir);
+	const runtimeKind = runtimeKindIn(outdir);
 	return (id) => {
 		if (id.startsWith(keyModulePrefix)) return "key";
 		if (id.startsWith(textModulePrefix)) return "text";
-		return runtime.get(id);
+		return runtimeKind(id);
 	};
 }
 
@@ -108,7 +115,7 @@ export const ownChunkBytes = 4096;
  * under `ownChunkBytes`.
  */
 export function messageChunking(outdir: string): EnvironmentOptions {
-	const runtime = runtimeModules(outdir);
+	const runtimeKind = runtimeKindIn(outdir);
 	const keyChunks = (modules: { tags?: "$initial"[] }) => {
 		const keys = {
 			name: messageDirectory,
@@ -122,7 +129,10 @@ export function messageChunking(outdir: string): EnvironmentOptions {
 		];
 	};
 	const groups = [
-		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
+		{
+			name: "grai-runtime",
+			test: (id: string) => runtimeKind(id) !== undefined,
+		},
 		...keyChunks({ tags: ["$initial"] }),
 		...keyChunks({}),
 	];

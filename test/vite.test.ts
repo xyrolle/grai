@@ -22,6 +22,7 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
+import { withoutContentHash } from "../src/content-names.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { ownChunkBytes } from "../src/vite-build.ts";
@@ -375,7 +376,7 @@ describe("grai/vite's module kinds", () => {
 		const placed = Object.fromEntries(
 			chunks.flatMap((chunk) =>
 				chunk.moduleIds.map((id) => [
-					id.replace(`${dir}/`, ""),
+					withoutContentHash(id.replace(`${dir}/`, "")),
 					[kindOf(id), chunk.name],
 				]),
 			),
