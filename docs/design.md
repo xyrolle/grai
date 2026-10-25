@@ -260,10 +260,11 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
     - Each starts from the base text for the same counts. For `ru`'s `one` (1, 21, 31…), English gives both `one` and `other`, so the unit starts from `other`, which shows the count.
     - A translation may place any code of its message.
     - A row that does not tell counts apart, such as `count=0`, stays one unit.
+  - **Once a locale has a message of its own, its units follow its selection,** which may tell apart what the base's does not, such as the gender French agrees `invitée` with, or nothing the base's does, as in a language without plurals. Each still starts from the base text for the same keys. A row the locale writes and the base lacks, such as German's `count=1`, is a unit too, so a merge never drops it.
   - **`merge` refuses a unit, never the file.** A unit made from a base text that has changed since is stale, and one that places a code its message lacks is invalid.
-    - A message must still compile and read the base's inputs. A plural needs every form, from the file or from its current translation.
+    - A message must still compile and show the base's inputs; one it only chooses by is the locale's grammar. A plural needs every form, from the file or from its current translation.
     - A message no unit changes is left as it is written, and the rest go to the catalog in one write.
-    - A merged message keeps the base's shape: a pattern stays a pattern, and a message with declarations keeps them, with selectors or without.
+    - A merged message keeps the shape of the locale's own message, or of the base's when it has none: a pattern stays a pattern, and a message with declarations keeps them, with selectors or without.
     - **Its declarations are the translation's,** which the forms no unit changes read, such as a price the locale formats in its own currency, **then each of the base's it lacks,** which a code a unit takes from the base may read. Taking the base's alone would reformat the locale's own forms, and the translation's alone would refuse a unit whose source reads a local the base has added since.
   - **Machine translation is not grai's.** grai fetches nothing, and a provider, its key, its prompts and a glossary are each app's choice. A script exports `--json`, translates, and merges, and the merge's checks refuse an answer that breaks a placeholder or a plural.
   - The XML reader reads only what this XLIFF needs, and strictly: no DTD, no entities beyond XML's five and numeric references. A tool's comments, CDATA, groups, segments, notes and metadata are read past or joined.

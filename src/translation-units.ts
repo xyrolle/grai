@@ -14,7 +14,8 @@ import {
 	alignedVariants,
 	chosen,
 	combinations,
-	translatedVariants,
+	onto,
+	ownMessage,
 } from "./unit-variants.ts";
 
 export type Unit = {
@@ -61,6 +62,11 @@ export function exportUnits(
 	return units;
 }
 
+/**
+ * A message's units. Once the locale has a message of its own, they follow its selection, which may
+ * tell apart what the base's does not, such as a gender French agrees a word with, or nothing the
+ * base's does; each starts from the base text for the same keys.
+ */
 function messageUnits(
 	key: string,
 	value: unknown,
@@ -68,18 +74,26 @@ function messageUnits(
 	baseLocale: string,
 	locale: string,
 ): Unit[] {
-	const message = parseMessage(baseLocale, value);
-	const sources = alignedVariants(value, message.selectors);
-	const targets = translatedVariants(translation, locale, message.selectors);
-	return combinations(message.selectors, sources, locale).map((combination) => {
-		const variant = message.selectors.map(
-			(selector, index): [string, string] => [
-				selector.name,
-				combination[index] ?? catchAll,
-			],
-		);
-		const inBase = combination.map((key, index) => {
-			const rules = countingRules(message.selectors[index], key);
+	const base = parseMessage(baseLocale, value);
+	const own = ownMessage(translation, locale);
+	const selectors = own?.selectors ?? base.selectors;
+	const sources = alignedVariants(value, base.selectors);
+	const targets =
+		own === undefined ? undefined : alignedVariants(translation, own.selectors);
+	// The locale's own variants first, in its order, then the rows of the base's it lacks.
+	const rows = [
+		...(targets ?? []),
+		...onto(sources, base.selectors, selectors),
+	];
+	return combinations(selectors, rows, locale).map((combination) => {
+		const variant = selectors.map((selector, index): [string, string] => [
+			selector.name,
+			combination[index] ?? catchAll,
+		]);
+		const inBase = base.selectors.map((selector) => {
+			const at = selectors.findIndex(({ name }) => name === selector.name);
+			const key = at === -1 ? catchAll : (combination[at] ?? catchAll);
+			const rules = countingRules(selector, key);
 			return rules === undefined || key === catchAll
 				? key
 				: baseCategoryOf(key, baseLocale, locale, rules);
@@ -92,7 +106,7 @@ function messageUnits(
 			variant,
 			source,
 			target,
-			noteOf(variant, message.selectors, locale),
+			noteOf(variant, selectors, locale),
 		);
 	});
 }

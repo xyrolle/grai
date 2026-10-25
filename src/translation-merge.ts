@@ -16,6 +16,7 @@ import {
 	type ReturnedUnit,
 	resolved,
 } from "./returned-units.ts";
+import { shownInputs } from "./shown-inputs.ts";
 import { exportUnits, type Unit } from "./translation-units.ts";
 
 /** A unit, or a message, the merge leaves out, and why. */
@@ -153,7 +154,10 @@ function incomplete(
 	};
 }
 
-/** Why a merged message cannot be the locale's: it does not compile, or reads other inputs than the base. */
+/**
+ * Why a merged message cannot be the locale's: it does not compile, or shows other inputs than the
+ * base, a placeholder lost or invented. An input it only chooses by is the locale's grammar.
+ */
 function invalid(
 	value: unknown,
 	key: string,
@@ -161,14 +165,14 @@ function invalid(
 	locale: string,
 ): Pick<Refusal, "code" | "detail"> | undefined {
 	try {
-		const inputs = [...parseMessage(locale, value).inputs].sort();
+		const inputs = [...shownInputs(parseMessage(locale, value))].sort();
 		const expected = [
-			...parseMessage(base.locale, base.messages.get(key)).inputs,
+			...shownInputs(parseMessage(base.locale, base.messages.get(key))),
 		].sort();
 		if (inputs.join() === expected.join()) return undefined;
 		return {
 			code: "translation-invalid",
-			detail: `the translation reads ${inputs.map((name) => `{${name}}`).join(", ") || "no input"}, where the base reads ${expected.map((name) => `{${name}}`).join(", ") || "none"}.`,
+			detail: `the translation shows ${inputs.map((name) => `{${name}}`).join(", ") || "no input"}, where the base shows ${expected.map((name) => `{${name}}`).join(", ") || "none"}.`,
 		};
 	} catch (error) {
 		if (!(error instanceof MessageProblem)) throw error;
