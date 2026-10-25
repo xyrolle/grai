@@ -14,9 +14,9 @@ import {
 } from "vitest";
 import { outsideTests } from "./app-environment.ts";
 
-// The Nuxt example (examples/nuxt), built by `nuxt build` and served by its Node server, by the
-// URL prefix and then by the cookie and Accept-Language, then under `nuxt dev`; its pages in
-// Chromium. One file, so that the dev suite's edits never reach a build.
+// The Nuxt example (examples/nuxt), built by `nuxt build`, checked by `nuxt typecheck` against the
+// package's built declarations and served by its Node server, by the URL prefix and then by the
+// cookie and Accept-Language, then under `nuxt dev`; its pages in Chromium. One file, so that the dev suite's edits never reach a build.
 const example = fileURLToPath(new URL("../examples/nuxt/", import.meta.url));
 const nuxt = join(example, "node_modules/.bin/nuxt");
 /** No telemetry, which would phone home and outlive the test in a process of its own. */
@@ -104,6 +104,15 @@ describe("the Nuxt example, built, by the URL prefix", {
 }, () => {
 	const origin = "http://localhost:4822";
 	built(4822);
+
+	it("typechecks against the package's built declarations, as an app's nuxt typecheck sees them", () => {
+		const checked = spawnSync(nuxt, ["typecheck"], {
+			cwd: example,
+			env: outsideTests(telemetry),
+			encoding: "utf8",
+		});
+		expect(checked.status, checked.stdout + checked.stderr).toBe(0);
+	}, 120_000);
 
 	it("renders the base locale unprefixed, and hydrates in it without an error", async () => {
 		await page.goto(`${origin}/`);
