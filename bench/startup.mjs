@@ -2,12 +2,12 @@
 // loads every locale's messages (each library's modules and catalogs bundled into one file, as a
 // server build holds them, and the instances made from them), renders the 2,000-call
 // sample once cold, which is where use-intl parses each message it meets, and once warm, and
-// reports the heap it all holds. Each measurement is a new Node process, then a new workerd
-// (startup-workerd.mjs); medians of five.
+// reports the heap it all holds. Each measurement is a new Node process, then a new Node process
+// with Node's compile cache warm, then a new workerd (startup-workerd.mjs); medians of five.
 //   node startup.mjs [app...]
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { rolldown } from "rolldown";
 import { build } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
@@ -168,25 +168,26 @@ async function benchApp(app) {
 		"| library | load messages | first render, 2,000 calls | warm render | heap held |",
 	);
 	console.log("|---|---|---|---|---|");
-	for (const { name, mode, file, module } of modules) {
-		const runs = Array.from({ length: RUNS }, () => {
-			const args = [
-				"--expose-gc",
-				new URL(import.meta.url).pathname,
-				"--child",
-				module,
-				mode,
-				file,
-				locale,
-			];
-			return JSON.parse(
-				execFileSync(process.execPath, args, { encoding: "utf8" }),
-			);
-		});
+	for (const row of modules) {
+		const runs = Array.from({ length: RUNS }, () => inNode(row, locale));
 		const heap = median(runs.map((run) => run.heap)) / 1024 / 1024;
 		console.log(
-			`| ${name} | ${times(runs).join(" | ")} | ${heap.toFixed(1)} MB |`,
+			`| ${row.name} | ${times(runs).join(" | ")} | ${heap.toFixed(1)} MB |`,
 		);
+	}
+	console.log(
+		`\n### ${app.name}, ${locale}: a new Node process, Node's compile cache warm, median of ${RUNS}\n`,
+	);
+	console.log(
+		"| library | load messages | first render, 2,000 calls | warm render |",
+	);
+	console.log("|---|---|---|---|");
+	for (const row of modules) {
+		const cache = join(cacheDir, "compile-cache", basename(row.module, ".mjs"));
+		rmSync(cache, { recursive: true, force: true });
+		inNode(row, locale, cache);
+		const runs = Array.from({ length: RUNS }, () => inNode(row, locale, cache));
+		console.log(`| ${row.name} | ${times(runs).join(" | ")} |`);
 	}
 	console.log(
 		`\n### ${app.name}, ${locale}: a new workerd, median of ${RUNS}, to the millisecond its timer gives\n`,
@@ -201,6 +202,26 @@ async function benchApp(app) {
 		for (let run = 0; run < RUNS; run++) runs.push(await inWorkerd(worker));
 		console.log(`| ${name} | ${times(runs, 0).join(" | ")} |`);
 	}
+}
+
+/**
+ * Loads a row's module in a new Node process and renders the sample there: the times and heap it
+ * reports. With `compileCache`, the process reads and writes Node's compile cache in it.
+ */
+function inNode({ module, mode, file }, locale, compileCache) {
+	const args = [
+		"--expose-gc",
+		new URL(import.meta.url).pathname,
+		"--child",
+		module,
+		mode,
+		file,
+		locale,
+	];
+	const env = { ...process.env, NODE_COMPILE_CACHE: compileCache };
+	return JSON.parse(
+		execFileSync(process.execPath, args, { encoding: "utf8", env }),
+	);
 }
 
 /** The median load, first render and warm render of some runs, to `digits` decimals. */
