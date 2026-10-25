@@ -105,6 +105,16 @@ function bound() {
 	return requests?.getStore()?.index ?? current;
 }
 
+/**
+ * Binds a locale outside a request, by its position in `locales`: for the process, or the page.
+ * testing.js binds a test's locale with it.
+ *
+ * @param {number} index
+ */
+export function bindLocale(index) {
+	current = index;
+}
+
 /** @returns {string} */
 export function getLocale() {
 	return locales[bound()] ?? baseLocale;
