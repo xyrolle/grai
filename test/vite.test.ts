@@ -1,10 +1,14 @@
 import {
 	existsSync,
 	mkdirSync,
+	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
@@ -56,6 +60,18 @@ function sentErrors(errors: string[]): Plugin {
 			};
 		},
 	};
+}
+
+/**
+ * A symlink to a project's directory, as a project is reached through macOS's `/tmp` or a linked
+ * workspace. The bundler names its modules by their real paths. It is removed after the test.
+ */
+function linked(dir: string): string {
+	const parent = realpathSync(mkdtempSync(join(tmpdir(), "grai-link-")));
+	onTestFinished(() => rmSync(parent, { recursive: true }));
+	const link = join(parent, "project");
+	symlinkSync(dir, link);
+	return link;
 }
 
 /**
@@ -244,6 +260,15 @@ describe("grai/vite's module kinds", () => {
 			"\0grai:key/items": ["key", "grai~page"],
 		});
 	});
+
+	it("names the output's modules by their real paths, for a project reached through a symlink", () => {
+		const { dir } = project(catalogs);
+		const kindOf = graiModules({
+			config: join(linked(dir), "grai.config.json"),
+		});
+
+		expect(kindOf(join(dir, "out", "runtime.js"))).toBe("runtime");
+	});
 });
 
 describe("the Vite plugin's locale copies", () => {
@@ -277,6 +302,26 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
 		);
 
+		expect([...directories].sort()).toEqual([
+			"assets",
+			"assets/grai",
+			"assets/grai-de",
+			"assets/grai-en",
+		]);
+	});
+
+	it("puts the runtime in a chunk of its own and the messages in chunks copied per locale, for a project reached through a symlink", async () => {
+		const { dir } = project(catalogs);
+		const { chunks, sources } = await built(linked(dir), { page });
+		const directories = new Set(
+			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
+		);
+
+		expect(chunks.map((chunk) => chunk.name).sort()).toEqual([
+			"grai-runtime",
+			"grai~page",
+			"page",
+		]);
 		expect([...directories].sort()).toEqual([
 			"assets",
 			"assets/grai",
@@ -767,6 +812,30 @@ export const render = () => \`\${title()} \${footer()}\`;
 		const { dir } = project(catalogs);
 		const { page, title } = await devPage(
 			dir,
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.title(); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+window.loaded = performance.timeOrigin;
+`,
+		);
+		await title("Titel");
+		const loaded = await page.evaluate("window.loaded");
+
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Titel"', '"Überschrift"'),
+		);
+		await title("Überschrift");
+
+		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+
+	it("shows an edited message without reloading the page, for a project reached through a symlink", async () => {
+		const { dir } = project(catalogs);
+		const { page, title } = await devPage(
+			linked(dir),
 			`import { m } from "./out/messages.js";
 const render = () => { document.getElementById("title").textContent = m.title(); };
 render();

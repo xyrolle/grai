@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { readConfig } from "./config.ts";
+import { realPath } from "./real-path.ts";
 import { type GraiModuleKind, moduleKindIn } from "./vite-build.ts";
 import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
 
@@ -31,6 +32,6 @@ export function graiModules(
 	options: GraiOptions = {},
 ): (id: string) => GraiModuleKind | undefined {
 	return moduleKindIn(
-		readConfig(resolve(options.config ?? "grai.config.json")).outdir,
+		realPath(readConfig(resolve(options.config ?? "grai.config.json")).outdir),
 	);
 }
