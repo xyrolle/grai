@@ -14,11 +14,11 @@ The config accepts `"live"`, and `grai/svelte` then keeps every message a call, 
 
 Done when: under `"live"`, a page re-renders in the locale it switches to, and a browser test shows that a production build and dev switch the same way.
 
-## Show a server text call at 20 ns or less
+## A dispatcher per key for a message with inputs
 
-A text message called in a request reads the request's locale from `AsyncLocalStorage`. `bench/server.mjs` times a prototype of the output's dispatcher at 14–23 ns, not grai's own output.
+Every message with inputs or markup dispatches through the runtime's one `message()` closure. V8 gives every closure of that literal one feedback vector, so its call of the locale's function sees every key's function and goes megamorphic. A call with inputs then costs 18–19 ns in a page against 11.7–12.3 ns for Paraglide's given `{ locale }` (`client`), and 110–130 ns against 67–122 ns on the server (`server`). An experiment outside `bench/`, which rewrote each such key's dispatch on the compiled output as a function of its own, took app A's call to 10.2 ns from 19.7 in Chromium, and to 43 ns from 53 in a request. A text message calls nothing through the dispatcher and keeps it.
 
-Done when: `bench/` runs grai's own output on a quiet machine and shows a text call in a request at 20 ns or less, or the design records why the floor is higher.
+Done when: each message with inputs or markup has a dispatcher of its own, on the server inside the server build's shape, and the server's load, a page's bytes, hydration and the call are measured on both reference apps against the shared dispatcher, the calls winning without the load or the bytes losing more.
 
 ## Function expressions on a server without Vite
 

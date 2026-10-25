@@ -151,14 +151,16 @@ They were taken on an M-series Mac; `docs/runtime.md` explains how to run the be
 
 App A's Paraglide compile includes the TypeScript declarations that its `sync` writes; app B's does not.
 
-At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-intl 4.14. The server rows time a prototype of grai's dispatcher (`bench/prototype.mjs`) until `bench/` runs grai's own output:
+At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-intl 4.14. grai's rows run its own output: on the server as its Vite plugin builds it, and in a page as its client build ships it, with the page's locale copies. Paraglide's call in a page runs its strategy each time; given `{ locale }`, it takes the second figure:
 
 | | grai | Paraglide | i18next | use-intl | `bench/` |
 | --- | --- | --- | --- | --- | --- |
-| A text message on the server | 16 ns | 17–33 ns | 1.2–1.9 µs | 2.4–3.1 µs | `server` |
-| Server render of 2,000 messages | 0.15–0.16 ms | 0.18–0.21 ms | 4.2 ms | 5.7–6.2 ms | `ssr` |
-| Hydrating that page | 7.6 ms | 10.7 ms | 16.1 ms | 22.3 ms | `hydrate` |
-| That page's JS, brotli | 22.7 KB | 38.6 KB | 125.2 KB | 122.6 KB | `hydrate` |
+| A text message on the server | 19–25 ns | 46–50 ns | 1.4–1.8 µs | 2.7–3.2 µs | `server` |
+| A text message in a page | 4.4–4.8 ns | 361–394 ns; 4.5–5.9 ns | 1.0–1.1 µs | 1.3–1.5 µs | `client` |
+| A message with inputs in a page | 18–19 ns | 366–392 ns; 11.7–12.3 ns | 2.1–2.2 µs | 1.4–1.5 µs | `client` |
+| Server render of 2,000 messages | 0.13 ms | 0.20–0.23 ms | 3.9 ms | 4.8–5.0 ms | `ssr` |
+| Hydrating that page | 5.4–6.9 ms | 7.9–10.4 ms | 12.2–15.6 ms | 16.7–21.6 ms | `hydrate` |
+| That page's JS, brotli | 22.9–24.9 KB | 38.0–40.5 KB | 125–133 KB | 125–133 KB | `hydrate` |
 | The runtime in the browser, brotli | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB | `library-bytes` |
 | A new server process: load, then first render | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms | `startup` |
 | Type checking 500 calls with `tsc` 7 | 82 ms | 278 ms | 609 ms | 521 ms | `types` |
@@ -167,6 +169,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 ## Limitations
 
 - **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
+- **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
   - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
