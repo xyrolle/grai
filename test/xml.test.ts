@@ -41,6 +41,19 @@ describe("the XML reader", () => {
 		}
 	});
 
+	it("refuses a reference named as something every object inherits, such as &toString;", () => {
+		for (const name of [
+			"toString",
+			"constructor",
+			"__proto__",
+			"hasOwnProperty",
+		]) {
+			expect(() => readXml(`<a>&${name};</a>`), name).toThrow(
+				`&${name}; is not a reference grai reads.`,
+			);
+		}
+	});
+
 	it("reads back the text and attributes it writes, whitespace and all", () => {
 		const text = "a & <b> ]]> \"c\" 'd'\r\n\te";
 		const root: XmlElement = readXml(
