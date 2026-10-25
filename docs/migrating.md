@@ -35,6 +35,6 @@ grai follows MessageFormat 2 and Intl where Paraglide does otherwise. Each of th
 | a selector key `flag=true`, given `true` | `*` | matches, as `String(true)` is `true` | pass the value the variant is for, or drop the variant |
 | selecting on `local f = n :number`, given `1000` | compares the formatted text, `1,000` | matches `f=1000`, then the plural category, then `*` | key the variants by the number, or its category: `f=one` |
 | a date in a locale that falls back, `en-GB` to `en` | formats as `en` does, month first | formats as `en-GB` does: `02/01/2026` for 2 January | none: formatting and plurals follow the locale a message renders in |
-| `localizeHref("/en/about", { locale: "de" })`, `en` the base locale | `/de/about` | `/de/en/about`: the base locale has no prefix, so `/en/…` is a path of its own | pass the path without it: `/about` |
+| `localizeHref("/en/about", { locale: "de" })`, `en` the base locale | `/de/about` | `/de/en/about`: by default the base locale has no prefix, so `/en/…` is a path of its own | pass the path without it, `/about`; or, for a site whose base locale has a prefix too, `"localePrefix": "always"`, under which this gives `/de/about` |
 | `localizeHref("https://…")` or `localizeHref("//…")` | localizes it | gives it back as it is, so no external link is rewritten | `localizeUrl(url, { locale })` for a URL meant to be localized |
 | `de-at` against the locale `de-AT`, in a cookie or `assertIsLocale` | matches, ignoring case | refuses: locales compare exactly | `Intl.getCanonicalLocales(value)[0]` before it reaches grai |
