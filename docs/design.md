@@ -250,7 +250,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
     - The list is in the config, not in a file beside the catalogs or as markers in them, so the catalogs stay the inlang format and every exception is in one reviewed place.
     - `check` and `export` take a listed key as translated, and `check` reports one that no catalog has or whose message is no longer the base text. A stale entry would otherwise hide a key that needs translating.
     - `rename` and `check --fix` change the list with the key, through the catalogs' one writer: only the list is written again, in the config's layout, and every other byte of the config stays.
-  - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` when it has no `*`. It then compiles in a locale with more categories, such as `few` in `ru`.
+  - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` unless a `*` already covers the same branch of the other selectors: a `*` for one gender says nothing of another's counts. It then compiles in a locale with more categories, such as `few` in `ru`. Each seed is compiled in the locale before anything is written, so a seed never leaves a catalog that fails.
 - `grai export <locale>` prints a locale's messages for translators, or only the untranslated ones. `grai merge <file>` writes the translations back into the locale's catalog.
   - **The file is XLIFF 2.0**, the OASIS standard translation tools exchange, and both Weblate and Phrase read it.
     - A placeholder is a `<ph>`, and a pair of tags is a `<pc>` around its words, so a tool keeps a translator from breaking either.
