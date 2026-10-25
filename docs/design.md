@@ -432,4 +432,5 @@ Astro runs a request's middleware around the page's render, renders islands on t
   - `grai/react`: the `Markup` component;
   - `grai/astro`: the Astro integration, and `grai/astro/middleware`, the middleware it adds;
   - the `grai` binary: the CLI.
+- **Node 22.18 or later.** The compiler needs 22.12, Vite 8's floor, but the floor is the oldest Node the tests run on, and they start Node on the TypeScript sources, which 22.x runs without a flag from 22.18. CI runs them there, on the LTS and on the current release, on Linux, macOS and Windows.
 - **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next, React and Astro are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
