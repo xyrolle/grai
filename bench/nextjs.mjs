@@ -5,7 +5,8 @@
 //   what the page costs more than the same page with its words written in.
 // - Start: `next dev` until it is ready, then until the page's first response, from an empty .next
 //   and from the one the last run left. grai's share is withGrai's work when `next dev` asks for
-//   its config, in a process of its own, from an empty outdir and from one already up to date.
+//   its config, in a process of its own, from an empty outdir and from one already up to date:
+//   how long it holds Next back, and its CPU until the watch's first compile is done.
 // - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
@@ -120,7 +121,17 @@ async function pageBytes(browser, root, path) {
 	return sizes;
 }
 
-/** withGrai's work for `next dev`, in a fresh process: from an empty outdir, then from a current one. */
+/**
+ * How long the watch's first compile, which runs after withGrai returns when the outdir is current,
+ * is given to finish before the CPU is read: it takes about 100 ms on the synthetic catalog.
+ */
+const WATCH_SETTLE_MS = 1000;
+
+/**
+ * withGrai's work for `next dev`, in a fresh process, from an empty outdir and then from a current
+ * one: how long it holds Next back, its import included, and the CPU it uses until the watch's
+ * first compile is done.
+ */
 function graiShare(root) {
 	const once = () => {
 		const run = spawnSync(
@@ -129,19 +140,31 @@ function graiShare(root) {
 				"--input-type=module",
 				"-e",
 				`const start = performance.now();
+const before = process.cpuUsage();
 const { withGrai } = await import("grai/next/config");
 await withGrai({})("phase-development-server");
-console.log(performance.now() - start);
-process.exit(0);`,
+const call = performance.now() - start;
+setTimeout(() => {
+	const { user, system } = process.cpuUsage(before);
+	console.log(JSON.stringify({ call, cpu: (user + system) / 1000 }));
+	process.exit(0);
+}, ${WATCH_SETTLE_MS});`,
 			],
 			{ cwd: root, encoding: "utf8" },
 		);
 		if (run.status !== 0) throw new Error(run.stderr);
-		return Number(run.stdout.trim());
+		return JSON.parse(run.stdout.trim());
 	};
 	rmSync(join(root, "src/i18n"), { recursive: true, force: true });
 	const cold = once();
-	return { cold, warm: median([once(), once(), once()]) };
+	const warm = [once(), once(), once()];
+	return {
+		cold,
+		warm: {
+			call: median(warm.map(({ call }) => call)),
+			cpu: median(warm.map(({ cpu }) => cpu)),
+		},
+	};
 }
 
 /** `next dev` until it is ready, then until the page's first response: from an empty .next, or not. */
@@ -241,7 +264,7 @@ for (const app of selectedApps()) {
 
 	const share = graiShare(apps.grai);
 	console.log(
-		`\ngrai's share of \`next dev\`'s start: ${share.cold.toFixed(0)} ms from an empty outdir, ${share.warm.toFixed(0)} ms with the outdir up to date (withGrai in a fresh process, its import included).\n`,
+		`\ngrai's share of \`next dev\`'s start (withGrai in a fresh process, its import included): it holds Next back ${share.cold.call.toFixed(0)} ms from an empty outdir and ${share.warm.call.toFixed(0)} ms with the outdir up to date, and uses ${share.cold.cpu.toFixed(0)} and ${share.warm.cpu.toFixed(0)} ms of CPU until the watch's first compile is done.\n`,
 	);
 
 	console.log(
