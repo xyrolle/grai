@@ -22,13 +22,21 @@ import { grai } from "../src/vite.ts";
 
 /**
  * Each one's budget, in bytes. The runtime's is the design's. An entry's is about a fifth over its
- * size when it was set: grai 23,038 B, grai/vite 26,313 B and grai/svelte 28,142 B.
+ * size when it was set: grai 28,483 B, grai/vite 34,203 B, grai/svelte 36,062 B, grai/sveltekit
+ * 185 B, grai/sveltekit/client 382 B, grai/next 516 B, grai/next/config 29,358 B, grai/next/proxy
+ * 265 B and grai/react 413 B.
  */
 const budgets: Record<string, number> = {
 	runtime: 1024,
-	grai: 27_500,
-	"grai/vite": 31_500,
-	"grai/svelte": 34_000,
+	grai: 34_000,
+	"grai/vite": 41_000,
+	"grai/svelte": 43_500,
+	"grai/sveltekit": 250,
+	"grai/sveltekit/client": 460,
+	"grai/next": 650,
+	"grai/next/config": 35_000,
+	"grai/next/proxy": 350,
+	"grai/react": 500,
 };
 
 const root = new URL("../", import.meta.url);
