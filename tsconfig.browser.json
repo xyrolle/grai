@@ -1,0 +1,11 @@
+// The adapters' modules that run in the page, checked on their own: they see the DOM's types and
+// the framework's own modules ($app/env, $app/navigation).
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["es2024", "dom"],
+		"types": ["@sveltejs/kit", "vite/client"]
+	},
+	"include": ["src/sveltekit-client.ts"],
+	"exclude": []
+}

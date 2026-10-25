@@ -1,19 +1,23 @@
 import { join } from "node:path";
 import type { CompiledKey } from "./compilation.ts";
 import type { Build } from "./compile.ts";
+import {
+	changeEvent,
+	patchedEvent,
+	readHook,
+	updateEvent,
+} from "./dev-events.ts";
 import { outputImports } from "./output-imports.ts";
-
-/** The custom HMR event that carries an edit's patch, and the event the page dispatches after it. */
-export const updateEvent = "grai:update";
-export const changeEvent = "grai:change";
 
 /**
  * keys.js in dev: every key, with its locales in a table, and the handler that writes an edit's
  * patch into the table, in the page and in a server's module runner alike. After a patch the page
- * dispatches a cancelable `grai:change` on `window`: a framework adapter that renders again
- * cancels it, and otherwise the page reloads. Each key passes its name after its variants, for
- * the runtime's errors to name. A build leaves names out: they would add about a third to a page's
- * gzipped message bytes.
+ * dispatches a cancelable `grai:change` on `window`, its `detail.keys` the edited keys: a
+ * framework adapter that renders them again cancels it, and otherwise the page reloads. Each call
+ * first passes its key to `globalThis[Symbol.for("grai.read")]`, if an adapter set it, so the
+ * adapter knows which renders read which keys. A server's runner sends `grai:patched` once it has
+ * written the patch. Each key passes its name after its variants, for the runtime's errors to
+ * name. A build leaves names out: they would add about a third to a page's gzipped message bytes.
  */
 export function devModule(outdir: string, build: Build): string {
 	const keys = [...build.compilation.keys];
@@ -29,7 +33,9 @@ export function devModule(outdir: string, build: Build): string {
 const T = Object.assign(JSON.parse(${JSON.stringify(`{${textRows}}`)}), {
 ${calls.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
 });
+const read = Symbol.for(${JSON.stringify(readHook)});
 const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
+	globalThis[read]?.(key);
 	const variant = T[key][field][n];
 	return typeof variant === "function" ? variant(inputs) : variant;
 }), key];
@@ -40,7 +46,9 @@ if (import.meta.hot) {
 	import.meta.hot.on(${JSON.stringify(updateEvent)}, async ({ url }) => {
 		const { rows } = await import(/* @vite-ignore */ url);
 		for (const [key, row] of Object.entries(rows)) Object.assign(T[key], row);
-		if (typeof window !== "undefined" && window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true }))) location.reload();
+		if (typeof window === "undefined") return import.meta.hot.send(${JSON.stringify(patchedEvent)});
+		const detail = { keys: Object.keys(rows) };
+		if (window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true, detail }))) location.reload();
 	});
 }
 `;

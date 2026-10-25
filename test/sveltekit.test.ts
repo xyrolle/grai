@@ -1,8 +1,16 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	describe,
+	expect,
+	it,
+	onTestFinished,
+} from "vitest";
 
 // The SvelteKit example (examples/sveltekit), built as an app builds it, with grai/svelte's plugin,
 // served by adapter-node, and its pages in a real browser.
@@ -136,6 +144,75 @@ describe("handleLocale, by the cookie and Accept-Language", {
 		const page = await open(origin, "/", { locale: "ar-EG" });
 		expect(await html(page, "lang")).toBe("ar");
 		expect(await page.locator("h1").textContent()).toBe("مرحبا");
+		await page.context().close();
+	});
+});
+
+describe("grai/sveltekit/client under vite dev", { timeout: 30_000 }, () => {
+	const origin = "http://localhost:4750";
+	let server: ChildProcess;
+	beforeAll(async () => {
+		const started = spawn(
+			bin("vite"),
+			["dev", "--port", "4750", "--strictPort"],
+			{
+				cwd: example,
+			},
+		);
+		server = started;
+		await new Promise<void>((resolve, reject) => {
+			started.stdout.on("data", (chunk) => {
+				if (String(chunk).includes("localhost:4750")) resolve();
+			});
+			started.on("exit", (code) =>
+				reject(new Error(`vite dev exited: ${code}`)),
+			);
+		});
+	}, 60_000);
+	afterAll(() => server?.kill());
+
+	/** Gives a Romanian message new text, as an editor saves it, and puts the catalog back after. */
+	function edit(key: string, text: string): void {
+		const file = join(example, "messages/ro.json");
+		const catalog = readFileSync(file, "utf8");
+		onTestFinished(() => writeFileSync(file, catalog));
+		writeFileSync(
+			file,
+			`${JSON.stringify({ ...JSON.parse(catalog), [key]: text }, null, "\t")}\n`,
+		);
+	}
+
+	/**
+	 * Waits until the page's grai/sveltekit/client has loaded, which a server-rendered heading does
+	 * not show, and marks the page, so a reload, which would lose the mark, shows.
+	 */
+	const mark = async (page: Page) => {
+		await page.waitForFunction(`Symbol.for("grai.read") in globalThis`);
+		await page.evaluate("window.unreloaded = true");
+	};
+	const marked = (page: Page) => page.evaluate("window.unreloaded");
+
+	it("draws an edited message again in place, without a reload", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByText("Desenat în browser").waitFor();
+		await mark(page);
+
+		edit("greeting", "Salut");
+		await page.getByRole("heading", { name: "Salut" }).waitFor();
+
+		expect(await marked(page)).toBe(true);
+		await page.context().close();
+	});
+
+	it("draws again the text a server load returns", async () => {
+		const page = await open(origin, "/ro/about");
+		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
+		await mark(page);
+
+		edit("about_title", "Despre exemplu");
+		await page.getByRole("heading", { name: "Despre exemplu" }).waitFor();
+
+		expect(await marked(page)).toBe(true);
 		await page.context().close();
 	});
 });

@@ -117,6 +117,13 @@ export const reroute: Reroute = ({ url }) => deLocalizeUrl(url).pathname;
 
 Links then name their locale with `localizeHref("/about")`.
 
+In dev, an edited message shows in the open page without a reload once `src/hooks.client.ts` imports `grai/sveltekit/client`. Svelte draws again only what read the edited keys, and the page's loads and remote functions run again for the text they return. A build leaves the module out.
+
+```ts
+// src/hooks.client.ts
+import "grai/sveltekit/client";
+```
+
 ### Next.js
 
 `grai/next` binds the locale in Next's App Router: the proxy resolves it, server components bind it, and client components get it on the server from `LocaleProvider` and in the browser from `<html lang>`. A message call stays a plain function. `examples/next` is a complete app.
