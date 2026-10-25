@@ -1,7 +1,7 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Markup, type MarkupPart } from "../src/react/markup.ts";
+import { Markup } from "../src/react/markup.ts";
 import { project, thrown } from "./project.ts";
 
 const markup = {
@@ -10,7 +10,10 @@ const markup = {
 	b: (children?: ReactNode) => createElement("b", null, children),
 	br: () => createElement("br"),
 };
-const html = (parts: readonly MarkupPart[]) =>
+/** Parts as a message's `.parts()` gives them, for a test to build sequences no catalog writes. */
+type Part = Parameters<typeof Markup<string>>[0]["parts"][number];
+
+const html = (parts: readonly Part[]) =>
 	renderToStaticMarkup(createElement(Markup, { parts, markup }));
 
 describe("Markup", () => {
@@ -26,12 +29,11 @@ describe("Markup", () => {
 	});
 
 	it("closes an end's innermost element of its name, draws a stray end as nothing, and closes what is open at the end", () => {
-		const start = (name: string): MarkupPart => ({
-			type: "markup-start",
-			name,
-		});
-		const end = (name: string): MarkupPart => ({ type: "markup-end", name });
-		const text = (value: string): MarkupPart => ({ type: "text", value });
+		const markupPart = (type: "markup-start" | "markup-end", name: string) =>
+			({ type, name, options: {}, attributes: {} }) satisfies Part;
+		const start = (name: string) => markupPart("markup-start", name);
+		const end = (name: string) => markupPart("markup-end", name);
+		const text = (value: string): Part => ({ type: "text", value });
 
 		expect(
 			html([start("link"), start("b"), text("a"), end("link"), text("b")]),
@@ -43,7 +45,16 @@ describe("Markup", () => {
 
 	it("throws for an element the app does not draw, naming it", () => {
 		expect(
-			thrown(() => html([{ type: "markup-standalone", name: "icon" }])),
+			thrown(() =>
+				html([
+					{
+						type: "markup-standalone",
+						name: "icon",
+						options: {},
+						attributes: {},
+					},
+				]),
+			),
 		).toMatchObject({
 			message:
 				'Markup has no function for the message\'s element "icon". Add icon to its markup.',
