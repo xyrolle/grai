@@ -86,17 +86,12 @@ it("exports from grai, grai/vite and grai/svelte only their API", async () => {
 		"CompileResult",
 		"GraiError",
 		"GraiErrorCode",
-		"GraiErrorWhere",
 		"compile",
 	]);
 	expect(await importableNames(dir, "grai/vite")).toEqual([
 		"GraiModuleKind",
-		"GraiOptions",
 		"grai",
 		"graiModules",
 	]);
-	expect(await importableNames(dir, "grai/svelte")).toEqual([
-		"GraiOptions",
-		"grai",
-	]);
+	expect(await importableNames(dir, "grai/svelte")).toEqual(["grai"]);
 });
