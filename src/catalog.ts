@@ -22,11 +22,14 @@ export type Catalog = {
 	file: string;
 	messages: ReadonlyMap<string, unknown>;
 	paths: ReadonlyMap<string, KeyPath>;
+	/** This parse of the catalog, by which a later edit names the catalog it edited. */
+	revision: symbol;
 	/**
-	 * For a catalog parsed from an edit: the catalog edited, the keys the edit touched, and whether
-	 * a key now starts on another line.
+	 * For a catalog parsed from an edit: the revision of the catalog edited, the keys the edit
+	 * touched, and whether a key now starts on another line. A revision, not the catalog: each edit
+	 * would otherwise hold on to every catalog before it.
 	 */
-	edit?: { from: Catalog; keys: ReadonlySet<string>; moved: boolean };
+	edit?: { from: symbol; keys: ReadonlySet<string>; moved: boolean };
 };
 
 /** Reads every locale's catalog file at once. A file that cannot be read is an error naming it. */
@@ -116,7 +119,7 @@ export function parseEditedCatalog(
 	if (edited === undefined) return parseCatalog(source);
 	return {
 		...withKeys(source, edited),
-		edit: { from: previous, keys: edited.keys, moved: edited.moved },
+		edit: { from: previous.revision, keys: edited.keys, moved: edited.moved },
 	};
 }
 
@@ -131,5 +134,5 @@ function withKeys(
 			`the catalog has no messages, so ${locale} would render nothing. Add its messages, or remove ${locale} from "locales".`,
 		);
 	}
-	return { locale, file, messages, paths };
+	return { locale, file, messages, paths, revision: Symbol(locale) };
 }

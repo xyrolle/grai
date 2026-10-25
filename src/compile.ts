@@ -246,7 +246,9 @@ function basePositionsMoved(
 ): boolean {
 	if (base === previous) return false;
 	return (
-		base?.edit === undefined || base.edit.from !== previous || base.edit.moved
+		base?.edit === undefined ||
+		base.edit.from !== previous?.revision ||
+		base.edit.moved
 	);
 }
 
