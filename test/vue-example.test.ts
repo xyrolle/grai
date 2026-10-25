@@ -14,10 +14,12 @@ import {
 } from "vitest";
 import { outsideTests } from "./app-environment.ts";
 
-// The Vue example (examples/vue): built by Vite and served by its own server, then under Vite's
-// dev server, its pages in Chromium. One file, so that the dev suite's edits never reach a build.
+// The Vue example (examples/vue): built by Vite, checked by vue-tsc against the package's built
+// declarations and served by its own server, then under Vite's dev server, its pages in Chromium.
+// One file, so that the dev suite's edits never reach a build.
 const example = fileURLToPath(new URL("../examples/vue/", import.meta.url));
 const vite = join(example, "node_modules/.bin/vite");
+const vueTsc = join(example, "node_modules/.bin/vue-tsc");
 
 /** Starts the example's server, `node server.ts` with `args`, until the suite ends. */
 function served(port: number, args: string[] = []): void {
@@ -91,6 +93,16 @@ describe("the Vue example, built", { timeout: 30_000 }, () => {
 		}
 	}, 120_000);
 	served(4820);
+
+	it("typechecks against the package's built declarations, as an app's vue-tsc sees them", () => {
+		const checked = spawnSync(vueTsc, ["--noEmit", "--pretty", "false"], {
+			cwd: example,
+			env: outsideTests(),
+			encoding: "utf8",
+		});
+		expect(checked.stdout + checked.stderr).toBe("");
+		expect(checked.status).toBe(0);
+	}, 60_000);
 
 	it("renders in the browser's language, writes it to <html lang>, and hydrates in it", async () => {
 		const ro = await browser.newPage({ locale: "ro-MD" });
