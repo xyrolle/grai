@@ -333,6 +333,27 @@ describe("a message", () => {
 		]);
 	});
 
+	it("is an error when a name is declared twice", async () => {
+		expect(
+			await errorsOf({
+				en: {
+					local: selecting(
+						[
+							"input count",
+							"local n = count: plural",
+							"local n = count: plural type=ordinal",
+						],
+						["n"],
+					),
+					input: selecting(["input count", "input count"], ["count"]),
+				},
+			}),
+		).toEqual([
+			'message-invalid: messages/en.json: "input" (en): count is declared twice, by "input count" and "input count". Declare it once.',
+			'message-invalid: messages/en.json: "local" (en): n is declared twice, by "local n = count: plural" and "local n = count: plural type=ordinal". Declare it once.',
+		]);
+	});
+
 	it("is an error when a variant names a plural or ordinal category its locale does not have", async () => {
 		expect(
 			await errorsOf({

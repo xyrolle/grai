@@ -24,12 +24,22 @@ const inputDeclaration = /^input\s+([A-Za-z_$][\w$]*)$/;
 const functionDeclaration =
 	/^local\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*:\s*(\S+)(.*)$/;
 
+/** A message's declarations; a name declared twice is an error, as in MessageFormat 2. */
 export function parseDeclarations(texts: readonly string[]): Declarations {
 	const declared: string[] = [];
 	const plurals = new Map<string, PluralLocal>();
 	const formatted = new Map<string, FormattedLocal>();
+	const declarers = new Map<string, string>();
 	for (const text of texts) {
 		const declaration = parseDeclaration(text);
+		const first = declarers.get(declaration.name);
+		if (first !== undefined) {
+			throw new MessageProblem(
+				"message-invalid",
+				`${declaration.name} is declared twice, by "${first}" and "${text}". Declare it once.`,
+			);
+		}
+		declarers.set(declaration.name, text);
 		if (declaration.kind === "input") declared.push(declaration.name);
 		else if (declaration.kind === "plural")
 			plurals.set(declaration.name, declaration);
