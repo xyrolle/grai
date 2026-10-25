@@ -1,20 +1,25 @@
 // Server pages: what a server pays to load its pages' messages as grai's Vite plugin lays them
 // out. Every key of the catalog is spread over 64 pages, as a real app's are: most keys on one
 // page, the rest on 2 to 16. Each page renders every key it names, through `m`. The pages are built
-// for a server, and each measurement is a new Node process that imports the built output as it is,
-// a module per chunk: one page, then every page, then renders each page once. Medians of nine.
+// for a server, and each measurement is a new Node process, then a new workerd
+// (server-pages-worker.js), that imports the built output as it is, a module per chunk: one page,
+// then every page, then renders each page once. Medians of nine.
 //   node server-pages.mjs [app...]
 import { execFileSync } from "node:child_process";
-import { readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "vite";
 import { selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
+import { inWorkerd } from "./startup-workerd.mjs";
 
 const PAGES = 64;
 const RUNS = 9;
+const here = new URL(".", import.meta.url).pathname;
+/** The worker that times the same in workerd, copied beside the built pages. */
+const worker = "server-pages-worker.js";
 
 /** A seeded random number in [0, 1), so every run and every tree builds the same pages. */
 function random(seed) {
@@ -102,30 +107,46 @@ async function child(outDir, ...pages) {
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
+/** The median of each time over some runs, to `digits` decimals. */
+const times = (runs, digits) =>
+	["one", "every", "render"].map(
+		(field) => `${median(runs.map((run) => run[field])).toFixed(digits)} ms`,
+	);
+
+/** The runs in new Node processes, then in new workerds, each importing the built output as it is. */
 async function benchApp(app) {
 	const { outDir, pages } = await builtPages(app);
 	const modules = readdirSync(outDir, { recursive: true }).filter((file) =>
 		String(file).endsWith(".js"),
 	).length;
 	const self = new URL(import.meta.url).pathname;
-	const runs = Array.from({ length: RUNS }, () =>
+	const node = Array.from({ length: RUNS }, () =>
 		JSON.parse(
 			execFileSync(process.execPath, [self, "--child", outDir, ...pages], {
 				encoding: "utf8",
 			}),
 		),
 	);
-	const ms = (field) =>
-		`${median(runs.map((run) => run[field])).toFixed(1)} ms`;
+	copyFileSync(join(here, worker), join(outDir, worker));
+	writeFileSync(
+		join(outDir, "pages.js"),
+		`export const pages = ${JSON.stringify(pages)};\n`,
+	);
+	const workerd = [];
+	for (let run = 0; run < RUNS; run++)
+		workerd.push(await inWorkerd(outDir, worker));
 	console.log(
-		`| ${app.name} | ${modules} | ${ms("one")} | ${ms("every")} | ${ms("render")} |`,
+		`| ${app.name}, Node | ${modules} | ${times(node, 1).join(" | ")} |`,
+	);
+	console.log(
+		`| ${app.name}, workerd | ${modules} | ${times(workerd, 0).join(" | ")} |`,
 	);
 }
 
 if (process.argv[2] === "--child") await child(...process.argv.slice(3));
 else {
 	console.log(
-		`\n### ${PAGES} pages built for a server, a new Node ${process.versions.node} process, median of ${RUNS}\n`,
+		`\n### ${PAGES} pages built for a server, a new Node ${process.versions.node} process or a new workerd (to the millisecond its timer gives), median of ${RUNS}\n`,
 	);
 	console.log(
 		"| catalog | modules in the build | load one page | load every page | render each once |",
