@@ -281,6 +281,17 @@ app.use((c, next) => middleware(c.req.raw, () => next().then(() => c.res)));
 
 It needs `AsyncLocalStorage`, from `node:async_hooks`, which Node, Bun and Deno have. Workers have it by default from compatibility date 2026-08-04; on an earlier date, add the `nodejs_als` compatibility flag, which adds only that.
 
+### Changing locale
+
+`setLocale(locale)` keeps the visitor's choice in each place the strategy lists that holds one, its cookie, its key in `localStorage`, its query parameter or its path, and loads the page again in it. A page keeps its words while it lives, so `setLocale(locale, { reload: false })` only keeps the choice, for the page's next load. The browser's languages hold no choice, so a strategy must list one of those places for `setLocale` to change a page's locale; without one, a page would load in its old locale again, and `setLocale` throws a `GraiError` (`locale-unkept`) instead. A static app keeps the choice in `localStorage`, and an app a server draws in a cookie, which the server reads too:
+
+```json
+{
+	"strategy": ["cookie", "preferredLanguage"],
+	"cookieName": "lang"
+}
+```
+
 ### Tests
 
 A test picks the locale it renders in with `useLocale` from the output's `testing.js`, in `beforeEach`. Then the messages called next render in it, and so does a component given that locale, which a page in another locale refuses. It sets `<html lang>` and `dir` too. The runtime reads `<html lang>` only once, when it loads, so a test that changes `lang` itself leaves the locale as it was. A build refuses `testing.js`.

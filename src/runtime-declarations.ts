@@ -31,6 +31,7 @@ export declare class GraiError extends Error {
 	readonly code:
 		| "locale-unknown"
 		| "locale-not-loaded"
+		| "locale-unkept"
 		| "value-unmatched"
 		| "format-option-invalid"
 		| "locale-unbound";
@@ -125,7 +126,8 @@ export declare function setLocale(locale: Locale, options?: { reload?: boolean }
 		: `/**
  * Sets the locale: for the rest of the request on the server, for the process in a script. In a
  * browser it keeps the locale in the cookie or the URL and reloads, or with \`{ reload: false }\`
- * only keeps it, for the page's next load: the page keeps its words.
+ * only keeps it, for the page's next load: the page keeps its words. It throws in a page whose
+ * strategy keeps a choice nowhere.
  */
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;`;
 }

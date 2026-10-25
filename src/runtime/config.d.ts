@@ -28,6 +28,8 @@ export declare const localStorageKey: string | undefined;
 export declare const queryParameter: string | undefined;
 /** Whether the strategy lists `url`. */
 export declare const readsUrl: boolean;
+/** Whether the strategy lists a place that keeps a visitor's choice: any but `preferredLanguage`. */
+export declare const keepsChoice: boolean;
 /** Whether every locale's paths have a prefix, the base locale's too: `localePrefix: "always"`. */
 export declare const prefixesEveryLocale: boolean;
 /** Whether a locale has a prefix other than its tag: `localePrefixes`. */

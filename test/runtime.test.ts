@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium } from "playwright-core";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { type Messages, project, thrown } from "./project.ts";
 
@@ -625,37 +623,39 @@ describe("in a browser", () => {
 		});
 	});
 
-	it("sets <html lang> and dir with setLocale, which without a reload renders the next messages in it", async () => {
-		const { dir, load } = project(catalogs);
-		await load();
-		const browser = await chromium.launch();
-		onTestFinished(() => browser.close());
-		const tab = await browser.newPage();
-		await tab.route("http://grai.test/**", (route) => {
-			const path = new URL(route.request().url()).pathname;
-			return path === "/"
-				? route.fulfill({
-						contentType: "text/html",
-						body: `<!doctype html><html lang="de" dir="ltr"><script type="module">
-import { m } from "/out/messages.js";
-import { getLocale, setLocale } from "/out/runtime.js";
-const seen = () => [document.documentElement.lang, document.documentElement.dir, getLocale(), m.title()].join(" ");
-const before = seen();
-setLocale("ar", { reload: false });
-document.body.textContent = before + " | " + seen();
-</script>`,
-					})
-				: route.fulfill({
-						contentType: "text/javascript",
-						body: readFileSync(join(dir, path)),
-					});
+	it("keeps the choice with setLocale and { reload: false }, and leaves the page in its locale", async () => {
+		const visited = page("de");
+		const { m, runtime } = await output({
+			strategy: ["cookie"],
+			cookieName: "lang",
 		});
-		await tab.goto("http://grai.test/");
-		await tab.waitForFunction(`document.body.textContent !== ""`);
+		runtime.setLocale("ar", { reload: false });
 
-		expect(await tab.textContent("body")).toBe(
-			"de ltr de Ihr Warenkorb | ar rtl ar سلتك",
+		expect([runtime.getLocale(), m.title?.(), visited.reloads]).toEqual([
+			"de",
+			"Ihr Warenkorb",
+			0,
+		]);
+		expect(visited.cookie).toBe(
+			"lang=ar; path=/; max-age=34560000; samesite=lax; secure",
 		);
+	});
+
+	it("refuses setLocale where the strategy keeps the choice nowhere, which the reload would lose, but for the page's own locale", async () => {
+		const visited = page("de");
+		const { runtime } = await output({ strategy: ["preferredLanguage"] });
+
+		expect(thrown(() => runtime.setLocale("ar"))).toMatchObject({
+			name: "GraiError",
+			code: "locale-unkept",
+		});
+		expect(
+			thrown(() => runtime.setLocale("ar", { reload: false })),
+		).toMatchObject({
+			code: "locale-unkept",
+		});
+		runtime.setLocale("de");
+		expect([runtime.getLocale(), visited.reloads]).toEqual(["de", 0]);
 	});
 
 	it("names the new locale in the URL's query parameter with the query strategy", async () => {

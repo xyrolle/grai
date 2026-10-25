@@ -7,6 +7,7 @@ import {
 	cookieSecure,
 	customPrefixes,
 	directions,
+	keepsChoice,
 	leavesPathsAlone,
 	locales,
 	localStorageKey,
@@ -42,7 +43,7 @@ const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
 
 /**
- * @typedef {"locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid" | "locale-unbound"} GraiErrorCode
+ * @typedef {"locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound"} GraiErrorCode
  */
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
@@ -124,11 +125,12 @@ export function getLocale() {
 
 /**
  * Sets the locale. In a request, for the rest of the request; in a script or a test, for the
- * process. In a browser, for the page: it sets the page's `<html lang>` and `dir`, so the document
- * and its messages never disagree, keeps the locale where the strategy reads it (its cookie, its
- * key in localStorage, its URL's prefix or query parameter) and reloads, unless
- * `{ reload: false }`, after which only the messages called next are in the new locale. The page's
- * own locale is kept, but loads nothing again.
+ * process. A page renders in its locale for as long as it lives, so in a page it keeps the choice
+ * where the strategy reads it: its cookie, its key in localStorage, its URL's prefix or query
+ * parameter. Then it loads the page again in it, at the URL that names it, unless
+ * `{ reload: false }`, which only keeps the choice, for the page's next load. A page whose
+ * strategy keeps the choice nowhere would load in its old locale again, so there it throws. The
+ * page's own locale is kept too, but loads nothing again.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
@@ -140,11 +142,14 @@ export function setLocale(locale, options) {
 		request.index = index;
 		return;
 	}
+	if (!page) {
+		current = index;
+		return;
+	}
+	// The page's own locale loads nothing again: a picker that chooses its current value, or a
+	// preference written again at start, keeps the page and its state.
 	const changed = index !== current;
-	current = index;
-	if (!page) return;
-	document.documentElement.lang = locale;
-	document.documentElement.dir = directions[index] ?? "ltr";
+	if (changed && !keepsChoice) throw unkept(locale);
 	if (strategy.includes("cookie")) {
 		// A browser drops a Secure cookie an http page sets, so it is Secure on https, and always
 		// where its policy needs it.
@@ -169,6 +174,14 @@ export function setLocale(locale, options) {
 	}
 	if (next.href === location.href) location.reload();
 	else location.href = next.href;
+}
+
+/** @param {string} locale */
+function unkept(locale) {
+	return new GraiError(
+		"locale-unkept",
+		`setLocale(${JSON.stringify(locale)}) would load the page in its old locale again: "strategy" lists no place that keeps a choice, such as "cookie" or "localStorage".`,
+	);
 }
 
 /**
