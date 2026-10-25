@@ -71,7 +71,11 @@ The compiler writes these modules, with their declarations, into `outdir`.
 - `locales`: the project's locales, in the config's order, typed as a tuple of their literals.
 - `baseLocale`: the config's base locale, typed as its literal.
 - `getLocale(): Locale`: the locale messages render in: the request's on the server, the page's in a browser.
-- `setLocale(locale: Locale, options?: { reload?: boolean }): void`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it sets `<html lang>` and `dir`, keeps the locale in the cookie or the URL, and reloads, unless `{ reload: false }`.
+- `setLocale(locale: Locale, options?: { reload?: boolean })`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it keeps the locale in the cookie or the URL, and reloads. With `{ reload: false }`, its type follows the config's `switch`:
+  - under `"reload"` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words;
+  - under `"live"` it returns `Promise<void>`, which resolves once the locale's message chunks are in, and the page switches in place.
+
+  The runtime does neither yet: today `{ reload: false }` sets `<html lang>` and `dir`, and the messages called next are in the new locale (`docs/followups.md`).
 - `isLocale(value: unknown): value is Locale`: whether a value is one of the project's locales.
 - `assertIsLocale(value: unknown): Locale`: the value, if it is one of the project's locales; otherwise throws a `GraiError`.
 - `getTextDirection(locale?: Locale): "ltr" | "rtl"`: the direction a locale's script is written in, the bound locale's by default.
