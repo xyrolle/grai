@@ -71,7 +71,7 @@ export function mergeUnits(
 			);
 			continue;
 		}
-		const source = resolved(unit.source, codesOf(now));
+		const source = resolved(unit.source, codesOf(now.source));
 		if (
 			source === undefined ||
 			piecesPattern(source) !== piecesPattern(now.source)

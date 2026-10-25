@@ -314,6 +314,69 @@ describe("grai merge", () => {
 		expect(m.cart_title?.({}, { locale: "ru" })).toBe("Корзина & <ещё>");
 	});
 
+	it("keeps each variant's own formatter where two placeholders of a message share a name", async () => {
+		const price = [
+			{
+				declarations: ["input precision", "input amount"],
+				selectors: ["precision"],
+				match: {
+					"precision=whole":
+						"Rounded: {amount :number maximumFractionDigits=0}",
+					"precision=*":
+						"Exact: {amount :number minimumFractionDigits=2 maximumFractionDigits=2}",
+				},
+			},
+		];
+		const { dir, config, load } = project({ en: { price }, de: { price } });
+		const file = join(dir, "de.xlf");
+		const xliff = await exported(config, "de");
+		const [whole, exact] = [...xliff.matchAll(/<ph id="([^"]+)"/g)].map(
+			([, id]) => id,
+		);
+		writeFileSync(
+			file,
+			translated(xliff, {
+				"price.precision.whole": `Gerundet: <ph id="${whole}"/>`,
+				"price.precision.-2a-": `Genau: <ph id="${exact}"/>`,
+			}),
+		);
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(
+			["whole", "exact"].map((precision) =>
+				m.price?.({ precision, amount: 1.234 }, { locale: "de" }),
+			),
+		).toEqual(["Gerundet: 1", "Genau: 1,23"]);
+	});
+
+	it("gives back a translation's own formatter unchanged, where the base formats its placeholder otherwise", async () => {
+		const { dir, config } = project({
+			en: { cart_total: "Total {amount}", cart_title: "Your cart" },
+			de: {
+				cart_total: "Summe {amount :number minimumFractionDigits=2}",
+				cart_title: "Your cart",
+			},
+		});
+		const file = join(dir, "de.xlf");
+		writeFileSync(
+			file,
+			translated(await exported(config, "de"), {
+				cart_title: "Ihr Warenkorb",
+			}),
+		);
+		const catalog = join(dir, "messages", "de.json");
+
+		const merged = await mergeDocument(config, file);
+
+		expect(merged).toMatchObject({ messages: 1, units: 1, refused: [] });
+		expect(JSON.parse(readFileSync(catalog, "utf8")).cart_total).toBe(
+			"Summe {amount :number minimumFractionDigits=2}",
+		);
+	});
+
 	it("refuses a stale unit, an invalid one and an incomplete plural, merges the rest, and skips units without a target", async () => {
 		const { dir, config } = project({ en: english, ru: english });
 		const xliff = await exported(config, "ru");

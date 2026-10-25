@@ -6,7 +6,7 @@
 
 import type { Catalog } from "./catalog.ts";
 import { parseMessage } from "./message.ts";
-import { type Piece, patternPieces } from "./pattern-pieces.ts";
+import { CodeIds, type Piece, patternPieces } from "./pattern-pieces.ts";
 import { baseCategoryOf, digitsOf, noteOf } from "./plural-forms.ts";
 import { isSeed } from "./seed.ts";
 import { catchAll, countingRules } from "./selection.ts";
@@ -62,6 +62,12 @@ export function exportUnits(
 	return units;
 }
 
+/** A unit's texts as the catalogs write them, before their codes have ids. */
+type UnitText = Omit<Unit, "source" | "target"> & {
+	source: string;
+	target: string | undefined;
+};
+
 /**
  * A message's units. Once the locale has a message of its own, they follow its selection, which may
  * tell apart what the base's does not, such as a gender French agrees a word with, or nothing the
@@ -85,7 +91,7 @@ function messageUnits(
 		...(targets ?? []),
 		...onto(sources, base.selectors, selectors),
 	];
-	return combinations(selectors, rows, locale).map((combination) => {
+	const texts = combinations(selectors, rows, locale).map((combination) => {
 		const variant = selectors.map((selector, index): [string, string] => [
 			selector.name,
 			combination[index] ?? catchAll,
@@ -101,7 +107,7 @@ function messageUnits(
 		const source = chosen(sources, inBase) ?? "";
 		const target =
 			targets === undefined ? undefined : chosen(targets, combination);
-		return unit(
+		return unitText(
 			key,
 			variant,
 			source,
@@ -109,24 +115,35 @@ function messageUnits(
 			noteOf(variant, selectors, locale),
 		);
 	});
+	return withCodes(texts);
 }
 
-function unit(
+function unitText(
 	key: string,
 	variant: readonly (readonly [string, string])[],
 	source: string,
 	target: string | undefined,
 	note: string | undefined,
-): Unit {
+): UnitText {
 	const id = [key, ...variant.flat()].map(idPart).join(".");
-	return {
-		id,
-		key,
-		variant,
-		source: patternPieces(source),
-		target: target === undefined ? undefined : patternPieces(target),
-		note,
-	};
+	return { id, key, variant, source, target, note };
+}
+
+/**
+ * A message's units, their texts read into pieces with the message's code ids. The base's codes
+ * take theirs first, so a code a translation alone writes never moves them.
+ */
+function withCodes(texts: readonly UnitText[]): Unit[] {
+	const ids = new CodeIds();
+	const read = texts.map((text) => ({
+		...text,
+		source: patternPieces(text.source, ids),
+	}));
+	return read.map((text) => ({
+		...text,
+		target:
+			text.target === undefined ? undefined : patternPieces(text.target, ids),
+	}));
 }
 
 /** Text as a unit id may hold it: letters, digits and _ as they are, any other character as -hex-. */

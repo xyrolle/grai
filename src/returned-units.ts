@@ -21,18 +21,20 @@ export type ReturnedUnit = {
 	problem: string | undefined;
 };
 
-export function codesOf(unit: Unit): Code[] {
-	return unit.source.filter((piece): piece is Code => "id" in piece);
+export function codesOf(pieces: readonly Piece[]): Code[] {
+	return pieces.filter((piece): piece is Code => "id" in piece);
 }
 
-/** The codes of each message, from all its units, one of each id. */
+/**
+ * The codes of each message, from all its units' sources and translations, one of each id and
+ * kind: an id names one code across the message.
+ */
 export function codesByKey(units: readonly Unit[]): Map<string, Code[]> {
 	const keys = new Map<string, Map<string, Code>>();
 	for (const unit of units) {
 		const codes = keys.get(unit.key) ?? new Map<string, Code>();
-		for (const code of codesOf(unit)) {
-			if (!codes.has(`${code.id} ${code.kind}`))
-				codes.set(`${code.id} ${code.kind}`, code);
+		for (const code of codesOf([...unit.source, ...(unit.target ?? [])])) {
+			codes.set(`${code.id} ${code.kind}`, code);
 		}
 		keys.set(unit.key, codes);
 	}
