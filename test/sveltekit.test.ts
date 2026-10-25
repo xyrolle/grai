@@ -48,6 +48,14 @@ async function served(port: number, mode = "production") {
 	return server;
 }
 
+/** Stops a server and waits for it to exit, so the next one finds its port free. */
+async function stopped(server: ChildProcess | undefined): Promise<void> {
+	if (server === undefined || server.exitCode !== null) return;
+	const exited = new Promise((resolve) => server.once("exit", resolve));
+	server.kill();
+	await exited;
+}
+
 let browser: Browser;
 beforeAll(async () => {
 	browser = await chromium.launch();
@@ -75,7 +83,7 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 	beforeAll(async () => {
 		server = await served(4751);
 	}, 60_000);
-	afterAll(() => server?.kill());
+	afterAll(() => stopped(server));
 
 	// As an app's checker sees it: the example's code and output against grai's built declarations.
 	it("type-checks, under Kit's own checkJs", () => {
@@ -127,7 +135,7 @@ describe("handleLocale, by the cookie and Accept-Language", {
 		// The same app, with another strategy: the cookie, else the browser's languages.
 		server = await served(4752, "cookie");
 	}, 60_000);
-	afterAll(() => server?.kill());
+	afterAll(() => stopped(server));
 
 	it("renders in the cookie's locale", async () => {
 		const page = await (await browser.newContext()).newPage();
@@ -169,7 +177,7 @@ describe("grai/sveltekit/client under vite dev", { timeout: 30_000 }, () => {
 			);
 		});
 	}, 60_000);
-	afterAll(() => server?.kill());
+	afterAll(() => stopped(server));
 
 	/** Gives a Romanian message new text, as an editor saves it, and puts the catalog back after. */
 	function edit(key: string, text: string): void {
