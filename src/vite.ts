@@ -16,7 +16,8 @@ export type { GraiModuleKind };
  * own, under a `grai/` within the chunks' directory. With `localeChunks`, each locale gets a copy
  * of each under `grai-<locale>/` beside it, with the same names and only its own words
  * (`vite-build.ts`, `locale-chunks.ts`). Each page it builds or serves gets a locale script, which
- * picks the page's locale where no server did (`vite-html.ts`, `runtime/page-locale.js`).
+ * picks the page's locale where no server did, and with `localeChunks` points the page at its
+ * locale's copies (`vite-html.ts`, `runtime/page-locale.js`).
  */
 export function grai(options: GraiOptions = {}): Plugin {
 	return graiPlugin(options).plugin;

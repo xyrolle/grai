@@ -22,11 +22,22 @@
  */
 
 /**
+ * A page's message chunks and their copies, `{locale}` standing for the page's locale: the import
+ * map's entries, and the copies the page's entry imports, to preload.
+ *
+ * @typedef {{ imports: Record<string, string>, preload: string[] }} PageChunks
+ */
+
+/**
  * Picks the page's locale, once, and sets `<html lang>` and `dir`, which the runtime reads when it
  * loads. A page whose `<html lang>` is one of the project's locales keeps it: a server drew it in
  * that locale. Otherwise the strategy's places are read in order: the choice the visitor stored
  * (`cookie`, `localStorage`), the URL (`query`, `url`) and the browser's languages
  * (`preferredLanguage`), each matched as the server matches it, else the base locale.
+ *
+ * In a build that copies each message chunk per locale, the script's `data-grai-chunks` names the
+ * page's chunks, and it maps them to the locale's copies with an import map, before any module
+ * loads, then preloads the copies the page's entry imports.
  *
  * @param {PageSettings} settings
  * @param {(locales: readonly string[]) => (range: string) => string[]} localeReach
@@ -34,6 +45,7 @@
 export function pickPageLocale(settings, localeReach) {
 	const { locales, baseLocale, strategy } = settings;
 	const root = document.documentElement;
+	const script = document.currentScript;
 	const reach = localeReach(locales);
 	/** @param {string} tag the nearest locale a tag reaches */
 	const match = (tag) => reach(tag)[0];
@@ -121,5 +133,21 @@ export function pickPageLocale(settings, localeReach) {
 		}
 		root.lang = locale;
 		root.dir = settings.directions[locales.indexOf(locale)] ?? "ltr";
+	}
+
+	const chunks = script?.dataset.graiChunks;
+	if (script === null || chunks === undefined) return;
+	/** @type {PageChunks} */
+	const copies = JSON.parse(chunks.replaceAll("{locale}", root.lang));
+	const map = document.createElement("script");
+	map.type = "importmap";
+	map.textContent = JSON.stringify({ imports: copies.imports });
+	document.head.append(map);
+	for (const href of copies.preload) {
+		const link = document.createElement("link");
+		link.rel = "modulepreload";
+		link.crossOrigin = "";
+		link.href = href;
+		document.head.append(link);
 	}
 }

@@ -4,10 +4,19 @@ import type { Config } from "./config.ts";
 import { directionOf } from "./config-module.ts";
 import { globPattern } from "./globs.ts";
 
+/** A page's message chunks and their copies, `{locale}` standing for the page's locale. */
+export type PageChunks = {
+	/** The import map's entries: each directory of message chunks, and its copies' directory. */
+	imports: Record<string, string>;
+	/** The copies of the message chunks the page's entry imports. */
+	preload: string[];
+};
+
 /**
  * The page's locale script (`runtime/page-locale.js`), as an inline classic script's text: the
  * function called with the project's settings and the server's language matching (`localeReach`
- * in `runtime/server.js`), the same for every page.
+ * in `runtime/server.js`). It is the same for every page; each page's chunks go in its
+ * `data-grai-chunks`.
  */
 export function localeScript(config: Config, minify: boolean): string {
 	const settings = {
