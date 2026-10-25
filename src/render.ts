@@ -212,8 +212,7 @@ function configModule(config: Config): string {
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		"/** @type {string | undefined} */",
 		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
-		'/** @type {"as-needed" | "always"} */',
-		`export const localePrefix = ${JSON.stringify(config.urlRouting.localePrefix)};`,
+		...routingConstants(config),
 		"/** @type {readonly string[]} */",
 		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,
 		"/** @type {readonly RegExp[]} */",
@@ -240,4 +239,23 @@ const rightToLeft = new Set([
 function directionOf(locale: string): "ltr" | "rtl" {
 	const script = new Intl.Locale(locale).maximize().script;
 	return script !== undefined && rightToLeft.has(script) ? "rtl" : "ltr";
+}
+
+/**
+ * Which of the url strategy's options the config uses, each a constant that a bundler folds, so a
+ * page carries the code of only the options its config uses.
+ */
+function routingConstants(config: Config): string[] {
+	const { localePrefix, prefixes, unlocalizedPaths } = config.urlRouting;
+	const constants = {
+		readsUrl: config.strategy.includes("url"),
+		prefixesEveryLocale: localePrefix === "always",
+		customPrefixes: prefixes.some(
+			(prefix, index) => prefix !== config.locales[index],
+		),
+		leavesPathsAlone: unlocalizedPaths.length > 0,
+	};
+	return Object.entries(constants).map(
+		([name, value]) => `export const ${name} = ${value};`,
+	);
 }

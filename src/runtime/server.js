@@ -5,8 +5,10 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import {
 	baseLocale,
 	cookieName,
-	localePrefix,
+	leavesPathsAlone,
 	locales,
+	prefixesEveryLocale,
+	readsUrl,
 	strategy,
 	unlocalizedPaths,
 } from "./config.js";
@@ -58,11 +60,14 @@ export async function middleware(request, handler) {
  */
 function unprefixedPage(request, pathname) {
 	return (
-		localePrefix === "always" &&
-		strategy.includes("url") &&
+		prefixesEveryLocale &&
+		readsUrl &&
 		(request.method === "GET" || request.method === "HEAD") &&
 		localeOfPath(pathname) === undefined &&
-		!unlocalizedPaths.some((pattern) => pattern.test(pathname))
+		!(
+			leavesPathsAlone &&
+			unlocalizedPaths.some((pattern) => pattern.test(pathname))
+		)
 	);
 }
 
