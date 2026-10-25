@@ -1,11 +1,12 @@
 import type { ESTree } from "vite";
 import type { Mapping } from "../import/mapping.ts";
-import { applyEdits, covers, declarationWithout, type Edit } from "./edits.ts";
+import { applyEdits, covers } from "./edits.ts";
 import {
 	type LibraryImport,
 	libraryImports,
 	messagesImport,
 	messagesInsertion,
+	type StayingUse,
 	unusedImports,
 } from "./imports.ts";
 import {
@@ -17,6 +18,13 @@ import {
 } from "./library.ts";
 import { type Binding, Scopes } from "./scopes.ts";
 import { type Node, parseModule, type Span } from "./syntax.ts";
+import {
+	type Dependency,
+	declarationEdits,
+	dependencyEdits,
+	dependencyList,
+	doneTranslators,
+} from "./translators.ts";
 
 /** What modules are migrated with: the mapping, the modules of its library, its default namespace. */
 export type Migration = {
@@ -64,32 +72,29 @@ export function migrateModule(
 	const scopes = new Scopes(program);
 	const module = { ...migration, text, scopes };
 	const imports = libraryImports(program, scopes, migration.libraries);
-	const { results, translators } = resultsOf(imports, module);
-	const settled = settle(results, scopes, messagesImport(program, scopes));
+	const { results, translators, dependencies } = resultsOf(imports, module);
+	const messagesBinding = messagesImport(program, scopes);
+	const settled = settle(results, scopes, messagesBinding);
 	const rewrites = settled.flatMap(({ outcome }) =>
 		"left" in outcome ? [] : [{ ...outcome.replace, text: outcome.text }],
 	);
-	const declarations = declarationEdits(translators, settled, module);
-	const edits = [...rewrites, ...declarations.edits];
+	const done = doneTranslators(translators, settled);
+	const declarations = declarationEdits(translators, done, module);
+	const edits = [
+		...rewrites,
+		...declarations.edits,
+		...dependencyEdits(dependencies, done, text),
+	];
 	const unused = unusedImports(imports, edits, module);
 	edits.push(...unused.edits);
-	if (rewrites.length > 0 && messagesImport(program, scopes) === undefined) {
+	if (rewrites.length > 0 && messagesBinding === undefined) {
 		edits.push(messagesInsertion(program, messages));
 	}
-	const reported = new Set(settled.flatMap(({ uses }) => uses));
-	const own = unused.staying.filter(
-		({ use }) =>
-			!reported.has(use) &&
-			!declarations.kept.some((span) => covers(span, use)),
-	);
 	const left = [
 		...settled.flatMap(({ at, outcome }) =>
 			"left" in outcome ? [{ at, detail: outcome.left }] : [],
 		),
-		...own.map(({ use, library }) => ({
-			at: use.start,
-			detail: ownApi(use.name, library).left,
-		})),
+		...ownUses(unused.staying, settled, declarations.kept),
 	];
 	return {
 		text: edits.length === 0 ? undefined : applyEdits(text, edits),
@@ -98,13 +103,42 @@ export function migrateModule(
 	};
 }
 
-/** What each use of a library's translators, hooks and components becomes. */
+/**
+ * The uses of the library's imports that stay and nothing reported yet, but those in a declaration
+ * that stays for the uses left: each is the library's own API, for a person to replace.
+ */
+function ownUses(
+	staying: readonly StayingUse[],
+	settled: readonly Result[],
+	kept: readonly Span[],
+): LeftUse[] {
+	const reported = new Set(settled.flatMap(({ uses }) => uses));
+	return staying
+		.filter(
+			({ use }) =>
+				!reported.has(use) && !kept.some((span) => covers(span, use)),
+		)
+		.map(({ use, library }) => ({
+			at: use.start,
+			detail: ownApi(use.name, library).left,
+		}));
+}
+
+/**
+ * What each use of a library's translators, hooks and components becomes, and each translator in a
+ * list of React's hook dependencies, which goes once the translator's every call is rewritten.
+ */
 function resultsOf(
 	imports: readonly LibraryImport[],
 	module: ModuleView,
-): { results: Result[]; translators: Translator[] } {
+): {
+	results: Result[];
+	translators: Translator[];
+	dependencies: Dependency[];
+} {
 	const results: Result[] = [];
 	const translators: Translator[] = [];
+	const dependencies: Dependency[] = [];
 	for (const { binding, role } of imports) {
 		if (role?.kind === "translator") {
 			translators.push(role.translator(binding, module));
@@ -129,11 +163,16 @@ function resultsOf(
 	}
 	for (const translator of translators) {
 		for (const use of module.scopes.usesOf(translator.binding)) {
+			const list = dependencyList(use, module.scopes);
+			if (list !== undefined) {
+				dependencies.push({ translator, use, list });
+				continue;
+			}
 			const outcome = translator.translate(use);
 			results.push({ at: use.start, uses: [use], outcome, translator });
 		}
 	}
-	return { results, translators };
+	return { results, translators, dependencies };
 }
 
 /** The elements a component's binding names: `<Name …>`, by the use in its opening tag. */
@@ -185,44 +224,4 @@ function settle(
 			"it holds another message call: run grai migrate again once that one is rewritten.",
 		);
 	});
-}
-
-/**
- * The edits that cut each translator whose every use is rewritten out of its declaration, and the
- * declarations that stay for the uses left, whose hook calls are then no use of their own. An
- * exported declaration stays as it is.
- */
-function declarationEdits(
-	translators: readonly Translator[],
-	results: readonly Result[],
-	{ text, scopes }: ModuleView,
-): { edits: Edit[]; kept: Span[] } {
-	const removed = new Set<Node>();
-	const kept: Span[] = [];
-	const declarators = new Set<ESTree.VariableDeclarator>();
-	for (const translator of translators) {
-		const { declarator } = translator;
-		if (declarator === undefined) continue;
-		const done = results.every(
-			({ translator: of, outcome }) =>
-				of !== translator || !("left" in outcome),
-		);
-		if (done) {
-			removed.add(translator.binding.node);
-			declarators.add(declarator);
-		} else {
-			kept.push(declarator);
-		}
-	}
-	const edits = [...declarators].flatMap((declarator) => {
-		const declaration = scopes.parent(declarator);
-		const exported =
-			declaration !== undefined &&
-			scopes.parent(declaration)?.type === "ExportNamedDeclaration";
-		const edit = exported
-			? undefined
-			: declarationWithout(text, declarator, declaration, removed);
-		return edit === undefined ? [] : [edit];
-	});
-	return { edits, kept };
 }

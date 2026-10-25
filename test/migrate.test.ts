@@ -133,6 +133,47 @@ export function Total({ sum }: { sum: string }) {
 `);
 	});
 
+	it("drops a t it rewrote every call of from React's hook dependencies, and keeps one it did not", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/title.tsx": `import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+
+export function Title({ count }: { count: number }) {
+	const { t } = useTranslation("cart");
+	const title = useMemo(() => t("title"), [t]);
+	const items = useMemo(() => t("items", { count }), [count, t]);
+	return <h1 title={items}>{title}</h1>;
+}
+
+export function Note({ keyName }: { keyName: string }) {
+	const { t } = useTranslation("cart");
+	return useMemo(() => t(keyName), [t, keyName]);
+}
+`,
+		});
+
+		expect(
+			project.text("src/title.tsx"),
+		).toBe(`import { m } from "../out/messages.js";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+
+export function Title({ count }: { count: number }) {
+	const title = useMemo(() => m.cart_title(), []);
+	const items = useMemo(() => m.cart_items({ count }), [count]);
+	return <h1 title={items}>{title}</h1>;
+}
+
+export function Note({ keyName }: { keyName: string }) {
+	const { t } = useTranslation("cart");
+	return useMemo(() => t(keyName), [t, keyName]);
+}
+`);
+		expect(project.left()).toEqual([
+			"src/title.tsx:13:23: its key is an expression: call the message by name, as m.<key>().",
+		]);
+	});
+
 	it("rewrites i18next's own t, with ns, ordinal and lng, into calls that render as i18next did", async () => {
 		const project = migrated("i18next", i18nextCatalogs, {
 			"src/server.ts": `import i18next, { t } from "i18next";

@@ -9,7 +9,7 @@ grai compile
 ```
 
 - **`grai import`** writes the grai catalogs, and `grai.import.json` beside the config. That file maps each key as the app's calls name it to its grai key and the inputs it takes, so any tool can migrate a call by looking it up.
-- **`grai migrate`** rewrites each call that names its message plainly as a call of the grai message, removes the hooks and imports that leaves unused, and imports `m` from the outdir's `messages.js`. Every other call is listed with its file, line and the reason, and stays as it is: a call it cannot read for certain is never guessed. It writes every file or none, and a second run changes nothing it has done. `--source <dir>` limits it to some directories.
+- **`grai migrate`** rewrites each call that names its message plainly as a call of the grai message, and imports `m` from the outdir's `messages.js`. Once every call of a `t` or an `intl` is rewritten, it removes the hook call that gave it, its place in React's hook dependencies, and the imports nothing uses. Every other call is listed with its file, line and the reason, and stays as it is: a call it cannot read for certain is never guessed. It writes every file or none, and a second run changes nothing it has done. `--source <dir>` limits it to some directories.
 - **What is left** is the list it prints: the calls to migrate by hand, then the library's own API, such as its provider, its setup and its locale switch, which grai's runtime and middleware replace.
 
 `grai migrate` reads JavaScript and TypeScript modules, JSX included, with Vite's parser. A project without Vite adds `vite` as a dev dependency while it migrates. It lists each Svelte, Vue, Astro or MDX component that imports the library, for a person to migrate.
