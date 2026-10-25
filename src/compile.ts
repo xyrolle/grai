@@ -185,7 +185,6 @@ async function build(
 			config.outdir,
 			output,
 			inputsOf(config, hashes),
-			previous?.rendered.files,
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;

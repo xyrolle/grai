@@ -13,7 +13,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
+import { recompile } from "../src/compile.ts";
 import { project } from "./project.ts";
+import { messagesOf } from "./reader.ts";
 
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}" },
@@ -141,6 +143,34 @@ it("writes a file of the output again when it is missing", async () => {
 	rmSync(join(dir, "out", "keys.js"));
 
 	expect((await compile()).written).toEqual(["keys.js"]);
+});
+
+it("writes what an edit needs, though another writer changed the output after this build was made", async () => {
+	const { dir, config, compile } = project(catalogs);
+	const catalog = join(dir, "messages", "en.json");
+	const first = await recompile(config, undefined);
+	writeFileSync(catalog, JSON.stringify({ ...catalogs.en, title: "New" }));
+	await compile();
+	writeFileSync(catalog, JSON.stringify(catalogs.en));
+	await recompile(config, first.build);
+
+	expect((await messagesOf(dir)).title?.()).toBe("Title");
+	expect((await compile()).written).toEqual([]);
+});
+
+it("writes again the files of the output deleted by hand, though the edit does not change them", async () => {
+	const { dir, config } = project(catalogs);
+	const out = join(dir, "out");
+	const first = await recompile(config, undefined);
+	for (const file of readdirSync(out))
+		if (file.startsWith("runtime") || file === "keys.d.ts")
+			rmSync(join(out, file));
+	const catalog = join(dir, "messages", "de.json");
+	writeFileSync(catalog, JSON.stringify({ ...catalogs.de, title: "Kopf" }));
+	await recompile(config, first.build);
+
+	expect((await messagesOf(dir)).title?.({}, { locale: "de" })).toBe("Kopf");
+	expect(readdirSync(out)).toContain("keys.d.ts");
 });
 
 it("lets two compiles in one process write one outdir, one after the other", async () => {
