@@ -24,12 +24,16 @@ export function existingCatalogs(
 		);
 }
 
-/** Writes every catalog or none, an entry per line indented by a tab; returns the files, relative to the root. */
+/**
+ * Writes every catalog, an entry per line indented by a tab, and the other files, or none of
+ * them; returns the catalogs, relative to the root.
+ */
 export function writeCatalogs(
 	files: readonly CatalogFile[],
+	others: ReadonlyMap<string, string>,
 	root: string,
 ): string[] {
-	const texts = new Map<string, string>();
+	const texts = new Map(others);
 	for (const { path, catalog } of files) {
 		mkdirSync(dirname(path), { recursive: true });
 		texts.set(
