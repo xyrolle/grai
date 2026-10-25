@@ -448,6 +448,26 @@ describe("a message", () => {
 		]);
 	});
 
+	it("is an error, naming both, when a local is made from another local", async () => {
+		expect(
+			await errorsOf({
+				en: {
+					rounded: selecting(
+						["input n", "local a = n: number", "local b = a: integer"],
+						["b"],
+					),
+					counted: selecting(
+						["input n", "local a = n: number", "local p = a: plural"],
+						["p"],
+					),
+				},
+			}),
+		).toEqual([
+			'unsupported: messages/en.json: "counted" (en): p is made from a, a local, which grai does not support yet. Make it from the input a is made from.',
+			'unsupported: messages/en.json: "rounded" (en): b is made from a, a local, which grai does not support yet. Make it from the input a is made from.',
+		]);
+	});
+
 	it("is an error when a name is declared twice", async () => {
 		expect(
 			await errorsOf({

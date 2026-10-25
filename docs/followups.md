@@ -47,6 +47,12 @@ Neither reference app uses them, but they are common in MessageFormat 2 catalogs
 
 Done when: each compiles, with a test, and the design lists it among the constructs.
 
+## Locals made from other locals
+
+MessageFormat 2 lets a local be made from another, as in `local a = n: number` then `local b = a: integer`, and its functions compose: `b` takes `a`'s value and options, then its own. grai refuses such a local with an error naming both, and its message says to make it from the input instead.
+
+Done when: a plural, formatted or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
+
 ## Bind the locale in Next's server actions and route handlers
 
 React keeps no `cache` in a server action or a route handler, so there a message names its locale (`docs/design.md`). A form's error messages are the common case.
