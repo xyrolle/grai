@@ -3,6 +3,7 @@ import { basename, dirname, resolve } from "node:path";
 import { type Build, type CompileResult, recompile } from "./compile.ts";
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
+import { firstBuildSaver, savedBuild } from "./saved-build.ts";
 
 /**
  * How long the followed files must be quiet before a catalog that did not parse is read again. A
@@ -27,9 +28,13 @@ const settleMilliseconds = 20;
  * read starts, is not reported either. Changes that come during a compile are taken together by
  * the next one. Each result is reported with
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
- * the outdir cannot be written, goes to `failed`, and the next change compiles again. It watches
- * until the process ends or `close` is called, whose promise settles once the compile under way,
- * if any, has finished, so the project can then be removed.
+ * the outdir cannot be written, goes to `failed`, and the next change compiles again.
+ *
+ * The first compile starts from the build the project's last watcher saved, if this grai saved it
+ * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
+ * as an edit does. Its first build is saved for the next start (`firstBuildSaver`). It watches until the process ends or `close` is called, whose promise settles once the
+ * compile under way, if any, has finished and the build is saved, so the project can then be
+ * removed.
  */
 export function watch(
 	configFile: string,
@@ -54,6 +59,9 @@ export function watch(
 	 * has nothing to tell. A compile that throws clears it, so the next one is reported.
 	 */
 	let reportedBuild = false;
+	/** Whether the next compile is the first, which starts from the saved build. */
+	let first = true;
+	const saver = firstBuildSaver();
 
 	/**
 	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
@@ -93,6 +101,10 @@ export function watch(
 			const started = performance.now();
 			try {
 				follow();
+				if (first) {
+					first = false;
+					build = await savedBuild(configFile, { pseudoLocale: true });
+				}
 				const next = await recompile(configFile, build, {
 					pseudoLocale: true,
 				});
@@ -102,6 +114,7 @@ export function watch(
 					return;
 				}
 				build = next.build ?? build;
+				if (next.build !== undefined) saver.took(next.build);
 				if (closed || (reportedBuild && unchanged(next))) continue;
 				report(next.result, performance.now() - started, next.build);
 				reportedBuild = next.build !== undefined;
@@ -129,6 +142,7 @@ export function watch(
 			clearTimeout(settling);
 			for (const watcher of watchers) watcher.close();
 			await running;
+			await saver.flush();
 		},
 	};
 }
