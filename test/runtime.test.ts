@@ -253,6 +253,28 @@ describe("the middleware", () => {
 	});
 });
 
+describe("the middleware's lookup, for a framework that renders apart from it", () => {
+	it("finds the locale the middleware would bind, and the headers it would vary by", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["cookie", "preferredLanguage"],
+			cookieName: "lang",
+		});
+		await load();
+		const server = await import(
+			pathToFileURL(join(dir, "out", "server.js")).href
+		);
+		const localeOf = (headers: Record<string, string>): unknown =>
+			server.localeOf(new Request("https://shop.test/", { headers }));
+
+		expect([
+			localeOf({ cookie: "lang=ar", "accept-language": "de" }),
+			localeOf({ "accept-language": "de-AT, en;q=0.5" }),
+			localeOf({}),
+			server.vary,
+		]).toEqual(["ar", "de", "en", "Cookie, Accept-Language"]);
+	});
+});
+
 describe("the response's Vary", () => {
 	/** The `Vary` of the response the middleware gives for `response`, by `strategy`. */
 	const varyOf = async (

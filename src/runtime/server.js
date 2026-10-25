@@ -23,8 +23,11 @@ import {
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
-/** The request headers the strategy reads, which a shared cache must key each response by. */
-const vary = headersRead().join(", ");
+/**
+ * The request headers the strategy reads, which a shared cache must key each response by: the
+ * `Vary` the middleware adds, for a framework that sends its response apart from the middleware.
+ */
+export const vary = headersRead().join(", ");
 
 /**
  * Resolves the request's locale by the config's strategy and binds it for the handler and all it
@@ -38,7 +41,7 @@ const vary = headersRead().join(", ");
  */
 export async function middleware(request, handler) {
 	const { pathname } = new URL(request.url);
-	const locale = localeOf(request, pathname);
+	const locale = findLocale(request, pathname);
 	const response = unprefixedPage(request, pathname)
 		? Response.redirect(
 				localizeUrl(request.url, { locale: assertIsLocale(locale) }),
@@ -72,12 +75,23 @@ function unprefixedPage(request, pathname) {
 }
 
 /**
- * The first locale the strategy finds in the request, else the base locale.
+ * The locale the middleware binds for a request: the first the strategy finds in it, else the base
+ * locale. For a framework that renders apart from the middleware.
+ *
+ * @param {Request} request
+ * @returns {string}
+ */
+export function localeOf(request) {
+	return findLocale(request, new URL(request.url).pathname);
+}
+
+/**
+ * The first locale the strategy finds in the request, at its path, else the base locale.
  *
  * @param {Request} request
  * @param {string} pathname
  */
-function localeOf(request, pathname) {
+function findLocale(request, pathname) {
 	for (const source of strategy) {
 		const locale =
 			source === "cookie"
@@ -242,7 +256,7 @@ function likelyTag(tag) {
 	}
 }
 
-/** The headers `localeOf` reads: each strategy's but `url`'s, which the config keeps last. */
+/** The headers `findLocale` reads: each strategy's but `url`'s, which the config keeps last. */
 function headersRead() {
 	return strategy
 		.filter((source) => source !== "url")

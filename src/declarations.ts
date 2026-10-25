@@ -190,4 +190,11 @@ export declare function middleware(
 		locale: Locale;
 	}) => Response | Promise<Response>,
 ): Promise<Response>;
+/**
+ * The locale the middleware binds for a request: the first the strategy finds in it, else the
+ * base locale. For a framework that renders apart from the middleware.
+ */
+export declare function localeOf(request: Request): Locale;
+/** The request headers the strategy reads, as the \`Vary\` the middleware adds: "" for none. */
+export declare const vary: string;
 `;
