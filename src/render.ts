@@ -213,9 +213,9 @@ function configModule(config: Config): string {
 		"/** @type {string | undefined} */",
 		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
 		'/** @type {"as-needed" | "always"} */',
-		`export const localePrefix = ${JSON.stringify(config.localePrefix)};`,
+		`export const localePrefix = ${JSON.stringify(config.urlRouting.localePrefix)};`,
 		"/** @type {readonly RegExp[]} */",
-		`export const unlocalizedPaths = [${config.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
+		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
 		"",
 	].join("\n");
 }
