@@ -14,6 +14,10 @@ export declare const strategy: readonly (
 export declare const directions: readonly ("ltr" | "rtl")[];
 /** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
 export declare const cookieName: string | undefined;
+/** What `setLocale` writes after the cookie's value, but `; secure`. */
+export declare const cookieAttributes: string;
+/** Whether the cookie is Secure always, as its policy needs, or on https alone. */
+export declare const cookieSecure: "always" | "https";
 /** Whether the strategy lists `url`. */
 export declare const readsUrl: boolean;
 /** Whether every locale's paths have a prefix, the base locale's too: `localePrefix: "always"`. */

@@ -82,7 +82,7 @@ export declare function isLocale(value: unknown): value is Locale;
 /** The value, if it is one of the project's locales; otherwise throws a GraiError. */
 export declare function assertIsLocale(value: unknown): Locale;
 /** The cookie the server's "cookie" strategy reads, and \`setLocale\` writes. */
-export declare const cookieName: ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};
+export declare const cookieName: ${config.cookie === undefined ? "undefined" : JSON.stringify(config.cookie.name)};
 /** The locale messages render in: the request's on the server, the page's in a browser. */
 export declare function getLocale(): Locale;
 /**
