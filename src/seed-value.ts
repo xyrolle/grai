@@ -9,8 +9,9 @@ import { catchAll } from "./selection.ts";
 
 /**
  * A base message as it is seeded into a locale: the same text. A plural, or a number selector's
- * categories, keeps the variants the locale can choose, and its `other` becomes `*` where there
- * is no `*`, so it covers the locale's categories the base locale lacks, such as `few`. Throws a
+ * categories, keeps the variants the locale can choose, and its `other` becomes `*` where no `*`
+ * covers the same branch of the other selectors, so it covers the locale's categories the base
+ * locale lacks, such as `few`. Throws a
  * MessageProblem for an invalid declaration; the rest of the message is taken as it is.
  */
 export function seedValue(value: unknown, locale: string): unknown {
@@ -43,18 +44,19 @@ export function seedValue(value: unknown, locale: string): unknown {
 			pattern,
 		],
 	);
-	const open = new Set(
-		plurals.flatMap(([name]) =>
-			variants.some(([keys]) => keys.get(name) === catchAll) ? [name] : [],
-		),
-	);
+	const keysOf = variants.map(([keys]) => keys);
+	const selectors = (
+		Array.isArray(fields.selectors) ? fields.selectors : []
+	).filter((name) => typeof name === "string");
 	const match: Record<string, unknown> = {};
 	for (const [keys, written, pattern] of variants) {
 		const seeded = new Map(keys);
 		let chosen = true;
 		for (const [name, categories] of plurals) {
 			const key = keys.get(name) ?? catchAll;
-			if (key === "other" && !open.has(name)) seeded.set(name, catchAll);
+			const open =
+				key === "other" && !hasCatchAll(keysOf, selectors, keys, name);
+			if (open) seeded.set(name, catchAll);
 			else if (!isPluralKey(key, categories)) chosen = false;
 		}
 		if (!chosen) continue;
@@ -62,6 +64,31 @@ export function seedValue(value: unknown, locale: string): unknown {
 		match[same ? written : variantKey(seeded)] = pattern;
 	}
 	return sameJson(match, fields.match) ? value : [{ ...fields, match }];
+}
+
+/**
+ * Whether a variant with `*` for the selector covers the counts of a variant's branch: its keys for
+ * every other selector match that variant's, or are `*`. Only then can an `other` there stay, since
+ * a `*` in another branch, such as another gender's, never matches this one.
+ */
+function hasCatchAll(
+	variants: readonly ReadonlyMap<string, string>[],
+	selectors: readonly string[],
+	keys: ReadonlyMap<string, string>,
+	name: string,
+): boolean {
+	const keyOf = (of: ReadonlyMap<string, string>, selector: string) =>
+		of.get(selector) ?? catchAll;
+	return variants.some(
+		(other) =>
+			keyOf(other, name) === catchAll &&
+			selectors.every(
+				(selector) =>
+					selector === name ||
+					keyOf(other, selector) === catchAll ||
+					keyOf(other, selector) === keyOf(keys, selector),
+			),
+	);
 }
 
 /** Whether a variant key can be chosen for a count in a locale: a category it has, a number or `*`. */
