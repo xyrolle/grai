@@ -7,6 +7,11 @@ import {
 	type IdenticalToBase,
 	readIdenticalToBase,
 } from "./identical-to-base.ts";
+import {
+	readUrlRouting,
+	type UrlRouting,
+	urlRoutingFields,
+} from "./url-routing.ts";
 
 /** A project's `grai.config.json`, read and checked. Paths are absolute. */
 export type Config = {
@@ -23,10 +28,8 @@ export type Config = {
 	cookieName: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
-	/** Whether the `url` strategy's paths have a prefix for every locale, or for all but the base. */
-	localePrefix: LocalePrefix;
-	/** Globs of the paths the `url` strategy leaves alone, which the strategies after it localize. */
-	unlocalizedPaths: readonly string[];
+	/** Which locales' paths the `url` strategy prefixes, and the paths it leaves alone. */
+	urlRouting: UrlRouting;
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
 	tests: readonly string[];
 	/** Each locale's keys whose message is the base text on purpose, which are not untranslated. */
@@ -40,9 +43,6 @@ export type Config = {
  * in place, live.
  */
 export type LocaleSwitch = "reload" | "live";
-
-/** Which locales' paths the `url` strategy prefixes: all but the base locale's, or every one. */
-export type LocalePrefix = "as-needed" | "always";
 
 /** A place a request can name its locale in. */
 export type Strategy = "cookie" | "preferredLanguage" | "url";
@@ -61,8 +61,7 @@ const fields = new Set([
 	"strategy",
 	"cookieName",
 	"switch",
-	"localePrefix",
-	"unlocalizedPaths",
+	...urlRoutingFields,
 	"tests",
 	"identicalToBase",
 	"fallbacks",
@@ -104,8 +103,6 @@ export function readConfig(file: string): Config {
 		strategy = [],
 		cookieName,
 		switch: localeSwitch = "reload",
-		localePrefix,
-		unlocalizedPaths = [],
 		tests = conventionalTests,
 		identicalToBase = {},
 		fallbacks = {},
@@ -141,39 +138,7 @@ export function readConfig(file: string): Config {
 			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
 		);
 	}
-	if (localePrefix !== undefined && !strategy.includes("url")) {
-		throw invalid(
-			'"localePrefix" is read only by the "url" strategy, which "strategy" does not list',
-		);
-	}
-	if (
-		localePrefix !== undefined &&
-		localePrefix !== "as-needed" &&
-		localePrefix !== "always"
-	) {
-		throw invalid(
-			'"localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one',
-		);
-	}
-	if (!isPathPatternList(unlocalizedPaths)) {
-		throw invalid(
-			'"unlocalizedPaths" must list globs of paths, each starting with /, of *, **, ? and {a,b}, such as ["/api/**"]',
-		);
-	}
-	if (unlocalizedPaths.length > 0 && !strategy.includes("url")) {
-		throw invalid(
-			'"unlocalizedPaths" is read only by the "url" strategy, which "strategy" does not list',
-		);
-	}
-	const prefix: LocalePrefix = localePrefix ?? "as-needed";
-	const urlFindsAll = prefix === "as-needed" && unlocalizedPaths.length === 0;
-	const shadowed = urlFindsAll ? afterUrl(strategy) : [];
-	if (shadowed.length > 0) {
-		const them = shadowed.length === 1 ? "it" : "them";
-		throw invalid(
-			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url", prefix every locale's paths with "localePrefix": "always", or name the paths "url" leaves to ${them} in "unlocalizedPaths"`,
-		);
-	}
+	const urlRouting = readUrlRouting(raw, strategy, invalid);
 	const readsCookie = strategy.includes("cookie");
 	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
 		throw invalid(
@@ -222,8 +187,7 @@ export function readConfig(file: string): Config {
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 		switch: localeSwitch,
-		localePrefix: prefix,
-		unlocalizedPaths,
+		urlRouting,
 		tests,
 		identicalToBase: readIdenticalToBase(
 			identicalToBase,
@@ -235,24 +199,11 @@ export function readConfig(file: string): Config {
 	};
 }
 
-/** The strategies listed after `url`, which finds a locale in every path and so ends the search. */
-function afterUrl(strategy: readonly Strategy[]): readonly Strategy[] {
-	const url = strategy.indexOf("url");
-	return url === -1 ? [] : strategy.slice(url + 1);
-}
-
 function isStrategy(value: unknown): value is Strategy[] {
 	return (
 		Array.isArray(value) &&
 		value.every((item) => typeof item === "string" && strategies.has(item)) &&
 		new Set(value).size === value.length
-	);
-}
-
-/** Whether a value is a list of globs of URL paths, each starting with /. */
-function isPathPatternList(value: unknown): value is string[] {
-	return (
-		isPatternList(value) && value.every((pattern) => pattern.startsWith("/"))
 	);
 }
 
