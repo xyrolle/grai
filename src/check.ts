@@ -6,7 +6,7 @@ import type { Config } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
-import { untranslatedKeys } from "./seed.ts";
+import { isSeed, untranslatedKeys } from "./seed.ts";
 import {
 	namesIn,
 	sourceFiles,
@@ -23,11 +23,12 @@ export type Checked = {
 
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
- * key no shipped source file names, and each input one locale reads and another never does. Source
- * files are those under the project's root, or under `sources` when given, outside the outdir,
- * dependencies, build output and dot-directories; those the config's `tests` match ship nothing.
- * Beside them, the keys each locale has not translated yet, which are not problems: a message can
- * rightly read as the base locale's.
+ * key no shipped source file names, each input one locale reads and another never does, and each
+ * key `identicalToBase` lists that the catalogs no longer bear out. Source files are those under
+ * the project's root, or under `sources` when given, outside the outdir, dependencies, build
+ * output and dot-directories; those the config's `tests` match ship nothing. Beside them, the keys
+ * each locale has not translated yet, which are not problems: a message can rightly read as the
+ * base locale's.
  */
 export async function check(
 	configFile: string,
@@ -51,6 +52,7 @@ export async function check(
 		}
 		problems.push(...differingInputs(key, catalogs));
 	}
+	problems.push(...staleIdentical(config, configFile, catalogs));
 	return {
 		problems: sortErrors(problems),
 		untranslated: untranslatedKeys(
@@ -82,6 +84,51 @@ function unused(
 function shownFrom(root: string, directory: string): string {
 	const path = relative(root, directory);
 	return path === "" ? "." : path.startsWith("..") ? directory : path;
+}
+
+/** An error for each key `identicalToBase` lists that the catalogs no longer bear out. */
+function staleIdentical(
+	config: Config,
+	configFile: string,
+	catalogs: readonly Catalog[],
+): GraiError[] {
+	const file = relative(config.root, configFile);
+	const problems: GraiError[] = [];
+	for (const [locale, keys] of config.identicalToBase) {
+		for (const key of keys) {
+			const why = staleness(key, locale, config.baseLocale, catalogs);
+			if (why === undefined) continue;
+			problems.push(
+				new GraiError(
+					"identical-stale",
+					{ file, key, locale },
+					`"identicalToBase" lists the key, ${why}. Remove it from the list.`,
+				),
+			);
+		}
+	}
+	return problems;
+}
+
+/** Why a listed key is not one the locale writes as the base locale does any more, if it is not. */
+function staleness(
+	key: string,
+	locale: string,
+	baseLocale: string,
+	catalogs: readonly Catalog[],
+): string | undefined {
+	if (catalogs.every(({ messages }) => !messages.has(key))) {
+		return "which no catalog has";
+	}
+	const messageIn = (of: string) =>
+		catalogs.find((catalog) => catalog.locale === of)?.messages.get(key);
+	const source = messageIn(baseLocale);
+	const value = messageIn(locale);
+	// A key only some catalogs have is the compile's error already.
+	if (source === undefined || value === undefined) return undefined;
+	return isSeed(value, source, locale)
+		? undefined
+		: `but its message is not ${baseLocale}'s any more`;
 }
 
 /** An error for each locale that never reads an input another locale reads. */

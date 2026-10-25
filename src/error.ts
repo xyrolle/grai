@@ -13,6 +13,7 @@ export type GraiErrorCode =
 	| "key-exists"
 	| "key-unused"
 	| "inputs-differ"
+	| "identical-stale"
 	| "call-site-ambiguous"
 	| "message-invalid"
 	| "unsupported"
