@@ -253,7 +253,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - A seeded plural keeps the variants the locale can choose, and its `other` becomes `*` when it has no `*`. It then compiles in a locale with more categories, such as `few` in `ru`.
 - `grai export <locale>` prints a locale's messages for translators, or only the untranslated ones. `grai merge <file>` writes the translations back into the locale's catalog.
   - **The file is XLIFF 2.0**, the OASIS standard translation tools exchange, and both Weblate and Phrase read it.
-    - A placeholder is a `<ph>`, and a pair of tags is a `<pc>` around its words, so a tool keeps a translator from breaking either.
+    - A placeholder is a `<ph>`, and a pair of tags is a `<pc>` around its words, or an `<sc>` and an `<ec>` where it crosses another pair, so a tool keeps a translator from breaking either.
     - **A code's id names one code in all its message's units:** the same placeholder or tag pair, written alike, has the same id in each, and one written otherwise, such as `{amount :number}` beside `{amount}`, has its own. A translation's own codes are the message's too. An id by name alone would let a merge swap one variant's formatter for another's, or the base's for the translation's, and say nothing.
     - CSV, which every tool also reads, holds placeholders as text a translator can mistype, and has no plurals.
     - `--json` writes the same units for scripts, with each code as the catalog writes it, since Node reads no XML.
