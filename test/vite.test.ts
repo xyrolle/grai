@@ -1,5 +1,11 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import {
@@ -7,19 +13,22 @@ import {
 	createServer,
 	type HotPayload,
 	isRunnableDevEnvironment,
+	type Plugin,
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import { type Messages, project } from "./project.ts";
 
 /**
- * What a test's dev server leaves Vite's watcher off: the page and render files the test writes
- * just before the server starts. macOS reports files written that late as changed once the
+ * What a test's dev server leaves Vite's watcher off: the page, package and render files the test
+ * writes just before the server starts. macOS reports files written that late as changed once the
  * watcher runs (14 of 20 trials, about 110 ms after the start), and Vite reloads the page for
  * them, or keeps the reload for the page that connects next. Tests edit catalogs only, which Vite
  * still watches, so a test still sees a reload the plugin would let through.
  */
-const fixtures = { ignored: ["**/index.html", "**/main.js", "**/render.js"] };
+const fixtures = {
+	ignored: ["**/index.html", "**/main.js", "**/package.json", "**/render.js"],
+};
 
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
@@ -260,6 +269,51 @@ describe("the Vite plugin's dev server", () => {
 		const rendered = await serverRender(dir);
 
 		await expect(rendered()).rejects.toThrow();
+	});
+
+	it("serves a page that imports the output by a package import before the first compile has written it", async () => {
+		const { dir } = project(catalogs);
+		// Another writer holds the output, so the first compile waits for it. The writer lets go as
+		// the server resolves its first module, which comes before the output exists.
+		const lock = join(dir, "out", ".grai", "lock");
+		mkdirSync(dirname(lock), { recursive: true });
+		writeFileSync(lock, String(process.pid));
+		let held = true;
+		const writer: Plugin = {
+			name: "writer",
+			resolveId: {
+				order: "pre",
+				handler() {
+					if (held) rmSync(lock);
+					held = false;
+					return null;
+				},
+			},
+		};
+		writeFileSync(
+			join(dir, "package.json"),
+			JSON.stringify({ imports: { "#i18n/*": "./out/*" } }),
+		);
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><script type="module" src="/main.js"></script>`,
+		);
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { m } from "#i18n/messages.js";\nexport const title = m.title();\n`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [writer, grai()],
+		});
+		onTestFinished(() => server.close());
+
+		const main = await server.environments.client.transformRequest("/main.js");
+
+		expect(main?.code).toContain('"/out/messages.js"');
 	});
 
 	/** A dev server of the project, and a page in German running `main` in Chromium. */
