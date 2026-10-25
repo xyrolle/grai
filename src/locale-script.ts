@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { minifySync, parseSync } from "vite";
 import type { Config } from "./config.ts";
@@ -15,8 +16,9 @@ export type PageChunks = {
 /**
  * The page's locale script (`runtime/page-locale.js`), as an inline classic script's text: the
  * function called with the project's settings and the server's language matching (`localeReach`
- * in `runtime/server.js`). It is the same for every page; each page's chunks go in its
- * `data-grai-chunks`.
+ * in `runtime/server.js`). It is the same for every page and every build of a project, so its hash
+ * in a Content Security Policy stays valid until the config or grai changes; each page's chunks go
+ * in its `data-grai-chunks`, which a hash does not cover.
  */
 export function localeScript(config: Config, minify: boolean): string {
 	const settings = {
@@ -36,6 +38,18 @@ export function localeScript(config: Config, minify: boolean): string {
 	};
 	const call = `(${pickPageLocale})(${inlineJson(settings)}, ${localeReach});`;
 	return minify ? minifySync("grai-page-locale.js", call).code : call;
+}
+
+/** The import map a page's locale script writes for a locale, as the script writes it. */
+export function importMapText(chunks: PageChunks, locale: string): string {
+	const copies = JSON.stringify(chunks).replaceAll("{locale}", locale);
+	const { imports }: PageChunks = JSON.parse(copies);
+	return JSON.stringify({ imports });
+}
+
+/** A script's hash, as a Content Security Policy's `script-src` allows it. */
+export function cspHash(text: string): string {
+	return `'sha256-${createHash("sha256").update(text).digest("base64")}'`;
 }
 
 /** JSON that can stand in a `<script>`: no `</script>` or `<!--` ends or comments it. */
