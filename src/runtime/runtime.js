@@ -253,6 +253,18 @@ export function text(...texts) {
 }
 
 /**
+ * A message without inputs as the page's string, chosen once, when its module is evaluated: one
+ * string per locale, in `locales` order. A page keeps its locale's words until it reloads, so a
+ * component can read this string where it would call the message.
+ *
+ * @param {...string} texts
+ * @returns {string}
+ */
+export function pageText(...texts) {
+	return variantFor(texts, undefined);
+}
+
+/**
  * A message with markup: its text, and its parts for the app to draw the markup.
  *
  * @template Inputs, Part

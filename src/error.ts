@@ -19,6 +19,7 @@ export type GraiErrorCode =
 	| "plural-category-unknown"
 	| "selection-not-exhaustive"
 	| "output-locked"
+	| "plugin-order"
 	| "translation-invalid"
 	| "translation-stale"
 	| "translation-incomplete";

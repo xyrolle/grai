@@ -4,13 +4,19 @@ import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
-import { keyModulePrefix, keyPrefix } from "./locale-chunks.ts";
+import {
+	isMessageModule,
+	keyPrefix,
+	textModulePrefix,
+	textPrefix,
+} from "./locale-chunks.ts";
 import {
 	chunkFileName,
 	keyModule,
 	keysModule,
 	messageChunkCopies,
 	messageChunking,
+	textModule,
 } from "./vite-build.ts";
 import {
 	followedFile,
@@ -37,12 +43,17 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
 		!serving && environment?.name === "client";
-	/** keys.js or a key's module, from the compiler's model, for the browser or a server. */
+	/**
+	 * keys.js, a key's module or a text key's string module, from the compiler's model, for the
+	 * browser or a server.
+	 */
 	const moduleCode = (
 		id: string,
 		compiled: Build,
 		consumer: "client" | "server",
 	) => {
+		if (id.startsWith(textModulePrefix))
+			return textModule(files.outdir, compiled, id);
 		if (id !== files.keysFile)
 			return keyModule(files.outdir, compiled, id, consumer);
 		return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
@@ -132,7 +143,11 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			await closeMessages();
 		},
 		async resolveId(id) {
-			if (id.startsWith(keyPrefix) || id.startsWith(patchPrefix))
+			if (
+				id.startsWith(keyPrefix) ||
+				id.startsWith(textPrefix) ||
+				id.startsWith(patchPrefix)
+			)
 				return `\0${id}`;
 			// Until the first compile has written the output, an import of it waits rather than fails:
 			// a page that failed to import it would be reloaded once the file appears.
@@ -142,7 +157,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		async load(id) {
 			const patch = patchOf(id);
 			if (patch !== undefined) return patch;
-			if (id !== files.keysFile && !id.startsWith(keyModulePrefix)) return null;
+			if (id !== files.keysFile && !isMessageModule(id)) return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;
 			if (!("compilation" in compiled)) return this.error(messagesOf(compiled));

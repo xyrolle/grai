@@ -179,6 +179,8 @@ export declare function bindRequests(storage: {
 type CompiledInputs = { readonly [input: string]: unknown };
 /** A compiled message without inputs: its text in each locale, in \`locales\` order. */
 export declare function text(...texts: string[]): Message;
+/** A compiled message without inputs as the page's string, chosen once. */
+export declare function pageText(...texts: string[]): string;
 /** A compiled message with inputs: a function per locale, in \`locales\` order. */
 export declare function message(
 	...variants: ((inputs: CompiledInputs) => string)[]
