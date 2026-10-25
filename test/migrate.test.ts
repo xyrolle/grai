@@ -395,6 +395,88 @@ export function About({ section }: { section: string }) {
 	});
 });
 
+const formatjsCatalogs = {
+	"en.json": {
+		"app.title": "Shop",
+		"app.greeting": "Hello, {name}",
+		"cart.items": "{count, plural, one {# item} other {# items}}",
+		"app.intro": "Read <b>this</b>",
+	},
+	"de.json": {
+		"app.title": "Laden",
+		"app.greeting": "Hallo, {name}",
+		"cart.items": "{count, plural, one {# Artikel} other {# Artikel}}",
+		"app.intro": "Lies <b>das</b>",
+	},
+};
+
+describe("grai migrate, from FormatJS", () => {
+	it("rewrites formatMessage of useIntl, its object's or destructured, and <FormattedMessage> as an expression", () => {
+		const project = migrated("icu", formatjsCatalogs, {
+			"src/shop.tsx": `import { FormattedMessage, useIntl } from "react-intl";
+
+export function Shop({ name, count }: { name: string; count: number }) {
+	const intl = useIntl();
+	const { formatMessage } = useIntl();
+	return (
+		<section aria-label={intl.formatMessage({ id: "app.title", defaultMessage: "Shop" })}>
+			<FormattedMessage id="app.greeting" values={{ name }} />
+			<p>{formatMessage({ id: "cart.items" }, { count })}</p>
+			{count > 0 && <FormattedMessage id="cart.items" values={{ count }} description="badge" />}
+		</section>
+	);
+}
+`,
+		});
+
+		expect(project.left()).toEqual([]);
+		expect(
+			project.text("src/shop.tsx"),
+		).toBe(`import { m } from "../out/messages.js";
+
+export function Shop({ name, count }: { name: string; count: number }) {
+	return (
+		<section aria-label={m.app_title()}>
+			{m.app_greeting({ name })}
+			<p>{m.cart_items({ count })}</p>
+			{count > 0 && m.cart_items({ count })}
+		</section>
+	);
+}
+`);
+	});
+
+	it("reports descriptors not written in the call, rich values, and the rest of the library", () => {
+		const project = migrated("icu", formatjsCatalogs, {
+			"src/left.tsx": `import { FormattedMessage, useIntl } from "react-intl";
+import { messages } from "./messages";
+
+export function Left({ id }: { id: string }) {
+	const intl = useIntl();
+	return (
+		<>
+			{intl.formatMessage(messages.title)}
+			<FormattedMessage id={id} />
+			<FormattedMessage {...messages.title} />
+			<FormattedMessage id="app.intro" values={{ b: (chunks) => <b>{chunks}</b> }} />
+			{intl.formatNumber(5)}
+		</>
+	);
+}
+`,
+		});
+
+		expect(project.left()).toEqual([
+			"src/left.tsx:8:5: its descriptor is not an object written in the call: write { id } in the call, or call the message by name.",
+			"src/left.tsx:9:4: its id is an expression: call the message by name, as m.<key>().",
+			"src/left.tsx:10:4: its descriptor is not an object written in the call: write { id } in the call, or call the message by name.",
+			"src/left.tsx:11:4: the message has markup: render its .parts() instead.",
+			"src/left.tsx:12:5: intl.formatNumber is react-intl's own: replace it by hand, with grai's runtime where it has a counterpart.",
+		]);
+		expect(project.result.changed).toEqual([]);
+	});
+});
+
 describe("grai migrate", () => {
 	it("reports a component it does not parse and a module whose m is another name, and changes neither", () => {
 		const project = migrated("i18next", i18nextCatalogs, {
