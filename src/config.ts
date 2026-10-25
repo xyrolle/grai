@@ -24,6 +24,8 @@ export type Config = {
 	cookieName: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
+	/** Whether the `url` strategy's paths have a prefix for every locale, or for all but the base. */
+	localePrefix: LocalePrefix;
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
 	tests: readonly string[];
 	/** Each locale's keys whose message is the base text on purpose, which are not untranslated. */
@@ -39,6 +41,9 @@ export type Config = {
  * in place, live.
  */
 export type LocaleSwitch = "reload" | "live";
+
+/** Which locales' paths the `url` strategy prefixes: all but the base locale's, or every one. */
+export type LocalePrefix = "as-needed" | "always";
 
 /** A place a request can name its locale in. */
 export type Strategy = "cookie" | "preferredLanguage" | "url";
@@ -57,6 +62,7 @@ const fields = new Set([
 	"strategy",
 	"cookieName",
 	"switch",
+	"localePrefix",
 	"tests",
 	"identicalToBase",
 	"fallbacks",
@@ -99,6 +105,7 @@ export function readConfig(file: string): Config {
 		strategy = [],
 		cookieName,
 		switch: localeSwitch = "reload",
+		localePrefix,
 		tests = conventionalTests,
 		identicalToBase = {},
 		fallbacks = {},
@@ -135,11 +142,26 @@ export function readConfig(file: string): Config {
 			'"strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url"',
 		);
 	}
-	const shadowed = afterUrl(strategy);
+	if (localePrefix !== undefined && !strategy.includes("url")) {
+		throw invalid(
+			'"localePrefix" is read only by the "url" strategy, which "strategy" does not list',
+		);
+	}
+	if (
+		localePrefix !== undefined &&
+		localePrefix !== "as-needed" &&
+		localePrefix !== "always"
+	) {
+		throw invalid(
+			'"localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one',
+		);
+	}
+	const prefix: LocalePrefix = localePrefix ?? "as-needed";
+	const shadowed = prefix === "always" ? [] : afterUrl(strategy);
 	if (shadowed.length > 0) {
 		const them = shadowed.length === 1 ? "it" : "them";
 		throw invalid(
-			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url"`,
+			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url", or prefix every locale's paths with "localePrefix": "always"`,
 		);
 	}
 	const readsCookie = strategy.includes("cookie");
@@ -194,6 +216,7 @@ export function readConfig(file: string): Config {
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
 		switch: localeSwitch,
+		localePrefix: prefix,
 		tests,
 		identicalToBase: readIdenticalToBase(
 			identicalToBase,

@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, tests, identicalToBase, fallbacks, pseudoLocale.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, tests, identicalToBase, fallbacks, pseudoLocale.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -134,6 +134,25 @@ describe("the config", () => {
 		]);
 	});
 
+	it("takes localePrefix only with the url strategy, and a strategy after url only with every locale prefixed", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { localePrefix: "always" })).toEqual([
+			'config-invalid: grai.config.json: "localePrefix" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], localePrefix: "never" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one.',
+		]);
+		expect(
+			await errorsOf(catalogs, {
+				strategy: ["url", "preferredLanguage"],
+				localePrefix: "always",
+			}),
+		).toEqual([]);
+	});
+
 	it("is an error when a strategy follows url, which finds a locale in every path", async () => {
 		expect(
 			await errorsOf(
@@ -144,7 +163,7 @@ describe("the config", () => {
 				},
 			),
 		).toEqual([
-			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url".',
+			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url", or prefix every locale\'s paths with "localePrefix": "always".',
 		]);
 	});
 

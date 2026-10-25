@@ -14,3 +14,5 @@ export declare const strategy: readonly (
 export declare const directions: readonly ("ltr" | "rtl")[];
 /** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
 export declare const cookieName: string | undefined;
+/** Which locales' paths the `url` strategy prefixes: all but the base locale's, or every one. */
+export declare const localePrefix: "as-needed" | "always";
