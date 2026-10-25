@@ -2,12 +2,11 @@
 // on a client navigation only some of them, so each one that renders messages binds the locale;
 // React's cache keeps it for the rest of that request's render.
 import {
-	assertIsLocale,
 	bindRequests,
 	GraiError,
-	locales,
 	type RequestLocale,
-} from "grai/next/output/runtime.js";
+} from "grai/next/output/dispatch.js";
+import { assertIsLocale, locales } from "grai/next/output/runtime.js";
 import { cache } from "react";
 
 export { LocaleProvider } from "./provider.ts";

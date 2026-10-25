@@ -4,12 +4,14 @@
 "use client";
 
 import {
-	assertIsLocale,
 	bindRequests,
 	GraiError,
+	type RequestLocale,
+} from "grai/next/output/dispatch.js";
+import {
+	assertIsLocale,
 	getLocale,
 	locales,
-	type RequestLocale,
 	setLocale,
 } from "grai/next/output/runtime.js";
 import {
