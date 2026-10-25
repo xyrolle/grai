@@ -8,9 +8,10 @@ declare module "grai/nuxt/output/runtime.js" {
 	export function assertIsLocale(value: unknown): string;
 	export function getTextDirection(locale?: string): "ltr" | "rtl";
 	export function extractLocaleFromUrl(url: string | URL): string;
+	/** A request's locale, by its place in `locales`, which setLocale changes for the request. */
+	export type RequestLocale = { index: number };
 	export function bindRequests(storage: {
-		getStore(): number | undefined;
-		enterWith(index: number): void;
+		getStore(): RequestLocale | undefined;
 	}): void;
 	export class GraiError extends Error {
 		constructor(code: string, message: string);
@@ -23,8 +24,6 @@ declare module "grai/nuxt/output/config.js" {
 }
 
 declare module "grai/nuxt/output/server.js" {
-	export function middleware<Result>(
-		request: Request,
-		handler: (resolved: { request: Request; locale: string }) => Result,
-	): Result;
+	export function localeOf(request: Request): string;
+	export const vary: string;
 }

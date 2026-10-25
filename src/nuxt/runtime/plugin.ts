@@ -1,10 +1,11 @@
 import { strategy } from "grai/nuxt/output/config.js";
 import {
+	assertIsLocale,
 	bindRequests,
 	extractLocaleFromUrl,
-	GraiError,
 	getLocale,
 	getTextDirection,
+	locales,
 } from "grai/nuxt/output/runtime.js";
 import {
 	addRouteMiddleware,
@@ -20,17 +21,10 @@ import { type HeadTag, pointAtLocaleChunks } from "./locale-chunks.ts";
 import { requestLocale } from "./request-locale.ts";
 
 // Nuxt renders each request in an app of its own, which every setup, template, plugin and route
-// middleware of the render can find, and the app's event holds the request's locale. The page's
-// URL, cookie or Accept-Language names it, so a render cannot change it.
+// middleware of the render can find, and the app's event holds the request's locale.
 if (import.meta.server) {
 	bindRequests({
 		getStore: () => requestLocale(tryUseNuxtApp()?.ssrContext?.event.context),
-		enterWith() {
-			throw new GraiError(
-				"locale-unbound",
-				"setLocale cannot change the locale of a Nuxt server render, which the request names. Call it in the browser, from an event.",
-			);
-		},
 	});
 }
 
@@ -41,15 +35,22 @@ if (import.meta.server) {
 const plugin: Plugin = defineNuxtPlugin({
 	name: "grai",
 	setup(nuxtApp) {
-		// The request's locale on the server, and the page's <html lang> in a browser.
-		const locale = getLocale();
-		useHead({ htmlAttrs: { lang: locale, dir: getTextDirection(locale) } });
+		// The request's locale on the server, read as the head is written, after the render, so that
+		// a setLocale in the render counts; in a browser, the page's <html lang>.
+		const kept = import.meta.server
+			? requestLocale(nuxtApp.ssrContext?.event.context)
+			: undefined;
+		const locale = () =>
+			kept === undefined ? getLocale() : assertIsLocale(locales[kept.index]);
+		useHead({
+			htmlAttrs: { lang: locale, dir: () => getTextDirection(locale()) },
+		});
 		if (import.meta.server && !import.meta.dev) {
 			nuxtApp.ssrContext?.head.use({
 				key: "grai",
 				hooks: {
 					"ssr:render": ({ tags }: { tags: HeadTag[] }) =>
-						pointAtLocaleChunks(tags, locale),
+						pointAtLocaleChunks(tags, locale()),
 				},
 			});
 		}
@@ -59,7 +60,7 @@ const plugin: Plugin = defineNuxtPlugin({
 				"grai:locale",
 				(to) => {
 					const url = new URL(to.fullPath, useRequestURL());
-					if (extractLocaleFromUrl(url) !== locale) {
+					if (extractLocaleFromUrl(url) !== locale()) {
 						return navigateTo(to.fullPath, { external: true });
 					}
 				},

@@ -204,14 +204,15 @@ describe("the Nuxt example, built, by the cookie and Accept-Language", {
 	const origin = "http://localhost:4822";
 	built(4822, "grai.cookie.json");
 
-	it("renders in the cookie's locale, unprefixed", async () => {
+	it("renders in the cookie's locale, unprefixed, and varies by the headers the strategy reads", async () => {
 		await page
 			.context()
 			.addCookies([{ name: "lang", value: "ro", url: origin }]);
-		await page.goto(`${origin}/about`);
+		const response = await page.goto(`${origin}/about`);
 
 		expect(await html("lang")).toBe("ro");
 		expect(await text("h1")).toBe("Despre magazin");
+		expect(response?.headers().vary).toContain("Cookie, Accept-Language");
 	});
 
 	it("renders in the browser's language when no cookie names one", async () => {
