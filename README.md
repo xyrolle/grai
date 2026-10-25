@@ -176,18 +176,18 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **Not supported yet:**
   - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:unit`'s `usage`, which converts to the locale's units;
-  - an option's value taken from an input, other than a currency, a number's unit and a date's time zone (`currency=$code` works), such as `:relativetime`'s `unit=$unit`;
-  - nested keys in a catalog, which `grai import` flattens.
+  - an option's value taken from an input, other than a currency, a number's unit and a date's time zone (`currency=$code` works), such as `:relativetime`'s `unit=$unit`.
 
   Each is a compile error that names the construct, never an approximation. `docs/followups.md` tracks them.
 
 ## Coming from Paraglide or i18next
 
-Paraglide's inlang message-format catalogs compile unchanged, and its calls stay the same: `m.key(inputs, { locale })`. Three things differ at a call site:
+Paraglide's inlang message-format catalogs compile unchanged, and its calls stay the same: `m.key(inputs, { locale })`. Four things differ at a call site:
 
 - **A message without inputs takes none.** `m.cart_title({ count })` is a type error, where Paraglide accepts it. An input a message never reads is a mistake at the call: a wrong key, or a placeholder a translation lost.
 - **A key missing from any locale fails the compile.** No page ships another locale's words, or a key's name, in its place. A regional locale can still take the messages it lacks from another of its language, with `"fallbacks": { "en-GB": "en" }`.
 - **In the browser, `{ locale }` must be the page's locale.** A built page is meant to hold only its own locale's words, so a call in another throws `locale-not-loaded`, in dev and tests as in a build.
+- **A nested key is called by its names joined by `_`:** `m.cart_title()` for `{ "cart": { "title": … } }`. Paraglide exports that name too, beside `m["cart.title"]`, which grai doesn't.
 
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
 - **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
