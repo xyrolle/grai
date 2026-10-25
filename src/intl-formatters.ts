@@ -30,10 +30,28 @@ function splitUnit(format: Format): {
 	return { options, unit };
 }
 
+/**
+ * The options each formatter was last made with, which Intl took. A catalog repeats the same few
+ * formats over and over, and each locale's message repeats its base's, so most checks are of the
+ * options just checked. Only options Intl took are kept: refused ones are checked, and refused,
+ * each time they come.
+ */
+const taken = new Map<Format["formatter"], string>();
+
 /** Makes a format's formatter once, as formats.js does, so a value Intl refuses throws now. */
 export function checkFormat(format: Format): void {
 	const { options } = splitUnit(format);
-	switch (format.formatter) {
+	const identity = JSON.stringify(options);
+	if (taken.get(format.formatter) === identity) return;
+	makeFormatter(format.formatter, options);
+	taken.set(format.formatter, identity);
+}
+
+function makeFormatter(
+	formatter: Format["formatter"],
+	options: IntlOptions,
+): void {
+	switch (formatter) {
 		case "number":
 			new Intl.NumberFormat(undefined, options);
 			return;
