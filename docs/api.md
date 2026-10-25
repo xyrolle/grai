@@ -63,7 +63,13 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `outdir: string`: the directory the output goes to.
 - `strategy?: ("cookie" | "preferredLanguage" | "url")[]`: where the server looks for a request's locale, in order, before the base locale.
 - `cookieName?: string`: the cookie the `cookie` strategy reads and `setLocale` writes, a name RFC 6265 allows; required with it, refused without it.
+- `cookieMaxAge?: number`: the seconds a browser keeps the cookie, 400 days by default.
+- `cookieDomain?: string`: a host whose subdomains share the cookie, such as `example.com`.
+- `cookieSameSite?: "lax" | "strict" | "none"`: the cookie's SameSite, `"lax"` by default; `"none"`, for a page embedded in another site's, makes it Secure.
 - `switch?: "reload" | "live"`: how a page changes locale. `"reload"`, the default, reloads or navigates; `"live"` keeps every message a call in `grai/svelte`'s build, for an app that switches in place.
+- `localePrefix?: "as-needed" | "always"`: with the `url` strategy, whether the base locale's paths have a prefix too; `"as-needed"`, the default, leaves them without one.
+- `localePrefixes?: Record<string, string>`: with the `url` strategy, a locale's own prefix, one path segment, such as `{ "en-US": "us" }`.
+- `unlocalizedPaths?: string[]`: with the `url` strategy, globs of the paths it leaves alone, such as `["/api/**"]`, whose locale the strategies after it find.
 - `tests?: string[]`: globs of the source files that are tests, which `grai check` does not count as using a key; `[]` makes no file a test.
 - `fallbacks?: Record<string, string>`: each locale that takes the messages it lacks from another locale of its language, such as `{ "en-GB": "en" }`.
 - `identicalToBase?: Record<string, string[]>`: per locale, the keys whose message rightly reads as the base locale's, which `grai check` and `grai export` take as translated.
