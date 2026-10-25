@@ -12,6 +12,7 @@ import {
 	it,
 	onTestFinished,
 } from "vitest";
+import { outsideTests } from "./app-environment.ts";
 
 // The Vue example (examples/vue): built by Vite and served by its own server, then under Vite's
 // dev server, its pages in Chromium. One file, so that the dev suite's edits never reach a build.
@@ -24,7 +25,7 @@ function served(port: number, args: string[] = []): void {
 	beforeAll(async () => {
 		const started = spawn("node", ["server.ts", ...args], {
 			cwd: example,
-			env: { ...process.env, PORT: String(port) },
+			env: outsideTests({ PORT: String(port) }),
 		});
 		server = started;
 		await new Promise<void>((resolve, reject) => {
@@ -77,7 +78,11 @@ describe("the Vue example, built", { timeout: 30_000 }, () => {
 			["build", "--outDir", "dist/client"],
 			["build", "--ssr", "src/entry-server.ts", "--outDir", "dist/server"],
 		]) {
-			const build = spawnSync(vite, args, { cwd: example, encoding: "utf8" });
+			const build = spawnSync(vite, args, {
+				cwd: example,
+				env: outsideTests(),
+				encoding: "utf8",
+			});
 			if (build.status !== 0) {
 				throw new Error(
 					`vite ${args.join(" ")} failed:\n${build.stdout}${build.stderr}`,
