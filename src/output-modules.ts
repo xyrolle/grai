@@ -20,11 +20,32 @@ export type OutputModules = {
 	formats: string | undefined;
 };
 
+/** The runtime's API: what `runtime.js` gives apps, and all of it. */
+const runtimeApi = [
+	"assertIsLocale",
+	"baseLocale",
+	"deLocalizeUrl",
+	"extractLocaleFromUrl",
+	"GraiError",
+	"getLocale",
+	"getTextDirection",
+	"isLocale",
+	"locales",
+	"localizeHref",
+	"localizeUrl",
+	"setLocale",
+];
+
+/** The types of the runtime's API, which `runtime.d.ts` gives apps beside it. */
+const runtimeApiTypes = ["Locale", "MarkupMessage", "Message", "MessagePart"];
+
 /**
  * The modules beside the keys, each named by its content: the config, the runtime that reads it,
  * the plural rules, and the formatters when a message calls one. With them come the entries apps
- * import instead: `runtime.js` and `config.js`, which re-export this output's modules, and
- * `server.js`, the middleware with its imports pinned to them.
+ * import instead: `runtime.js`, the runtime's API alone, and `config.js`, which re-export this
+ * output's modules, and `server.js`, the middleware with its imports pinned to them. The output's
+ * own modules import the runtime's module itself, and an adapter takes what it binds from
+ * `internal.js`, which re-exports all of it.
  */
 export function renderModules(
 	config: Config,
@@ -58,6 +79,8 @@ export function renderModules(
 			? undefined
 			: [`${contentName("formats", formatsCode)}.js`, formatsCode];
 	const reexport = (file: string) => `export * from "./${file}";\n`;
+	const api = (names: readonly string[]) =>
+		`export {\n${names.map((name) => `\t${name},\n`).join("")}} from "./${runtime}.js";\n`;
 	const server = pinImports(
 		sources.server,
 		new Map([
@@ -76,8 +99,13 @@ export function renderModules(
 		],
 		entries: [
 			["config.js", reexport(configFile)],
-			["runtime.js", reexport(`${runtime}.js`)],
-			["runtime.d.ts", reexport(`${runtime}.js`)],
+			["runtime.js", api(runtimeApi)],
+			[
+				"runtime.d.ts",
+				api([...runtimeApi, ...runtimeApiTypes.map((name) => `type ${name}`)]),
+			],
+			["internal.js", reexport(`${runtime}.js`)],
+			["internal.d.ts", reexport(`${runtime}.js`)],
 			["server.js", server],
 			["server.d.ts", serverDeclarations],
 		],
