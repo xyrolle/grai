@@ -261,7 +261,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
     - Each starts from the base text for the same counts. For `ru`'s `one` (1, 21, 31…), English gives both `one` and `other`, so the unit starts from `other`, which shows the count.
     - A translation may place any code of its message.
     - A row that does not tell counts apart, such as `count=0`, stays one unit.
-  - **`merge` refuses a unit, never the file.** A unit made from a base text that has changed since is stale, and one that places a code its message lacks is invalid.
+  - **`merge` refuses a unit, never the file.** A unit made from a base text that has changed since is stale, and one that places a code its message lacks, or that the file gives twice, is invalid.
     - A message must still compile and read the base's inputs. A plural needs every form, from the file or from its current translation.
     - A message no unit changes is left as it is written, and the rest go to the catalog in one write.
   - **Machine translation is not grai's.** grai fetches nothing, and a provider, its key, its prompts and a glossary are each app's choice. A script exports `--json`, translates, and merges, and the merge's checks refuse an answer that breaks a placeholder or a plural.
