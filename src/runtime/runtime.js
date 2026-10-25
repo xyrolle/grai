@@ -12,6 +12,7 @@ import {
 	localStorageKey,
 	prefixes,
 	prefixesEveryLocale,
+	queryParameter,
 	readsUrl,
 	strategy,
 	unlocalizedPaths,
@@ -125,8 +126,8 @@ export function getLocale() {
  * Sets the locale. In a request, for the rest of the request; in a script or a test, for the
  * process. In a browser, for the page: it sets the page's `<html lang>` and `dir`, so the document
  * and its messages never disagree, keeps the locale where the strategy reads it (its cookie, its
- * key in localStorage, or its URL) and reloads, unless `{ reload: false }`, after which only the
- * messages called next are in the new locale.
+ * key in localStorage, its URL's prefix or query parameter) and reloads, unless
+ * `{ reload: false }`, after which only the messages called next are in the new locale.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
@@ -156,11 +157,16 @@ export function setLocale(locale, options) {
 	if (localStorageKey !== undefined)
 		localStorage.setItem(localStorageKey, locale);
 	if (options?.reload === false) return;
-	if (readsUrl) {
-		location.href = localizeUrl(location.href, { locale }).href;
-	} else {
-		location.reload();
+	// The next load must find the locale where the strategy reads a URL: a stale `?lng=` would
+	// otherwise win over the choice.
+	const next = readsUrl
+		? localizeUrl(location.href, { locale })
+		: new URL(location.href);
+	if (queryParameter !== undefined) {
+		next.searchParams.set(queryParameter, locale);
 	}
+	if (next.href === location.href) location.reload();
+	else location.href = next.href;
 }
 
 /**
