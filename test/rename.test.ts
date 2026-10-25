@@ -122,6 +122,21 @@ describe("grai rename", () => {
 		expect(readText(dir, "messages/en.json")).toContain('"cart_title"');
 	});
 
+	it("refuses while a read by a computed name may reach the key, and names the read", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/render.ts":
+				'import { m } from "$lib/i18n";\nexport const render = (name: string) => m[name]();\n',
+		});
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			'src/render.ts:2:41: m[name] may read "cart_title", so the rename cannot change every read of it. Read it as m.cart_title, or rename it by hand.',
+		]);
+		expect(result.changed).toEqual([]);
+	});
+
 	it("refuses a name another key has, in any case, and a name that is no key name", async () => {
 		const { config } = app();
 
