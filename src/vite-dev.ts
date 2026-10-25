@@ -18,6 +18,15 @@ export type ProjectFiles = {
 	keysFile: string;
 };
 
+/**
+ * The id keys.js goes by in dev, where the plugin serves it from memory: not the path of the file
+ * the compile writes for Node and TypeScript. Vite's module graph ties a module to the file of its
+ * id, and its watcher takes each write of that file, which every compile makes, for a change of the
+ * module: it would mark keys.js and every importer changed, and the server's runner would evaluate
+ * the program again on its next render, where the plugin patches it in place.
+ */
+export const devKeysId = "\0grai:keys";
+
 /** How the page imports an edit's patch, and that module's id. */
 export const patchPrefix = "grai:patch/";
 /** The id of the module a per-key import of a key no catalog has resolves to. */
@@ -78,7 +87,7 @@ export function serveMessages(
 				)
 				.flatMap(([, modules]) => [...modules]);
 			for (const environment of environments) {
-				for (const id of [files.keysFile, ...reimporting])
+				for (const id of [devKeysId, ...reimporting])
 					await reload(environment, id);
 			}
 			client.hot.send({ type: "full-reload" });
@@ -94,21 +103,21 @@ export function serveMessages(
 		for (const environment of environments) {
 			if (environment === client) continue;
 			if (!isRunnableDevEnvironment(environment)) {
-				await reload(environment, files.keysFile);
+				await reload(environment, devKeysId);
 				client.hot.send(patched);
 				continue;
 			}
 			// A runner keeps the module it evaluated, which the patch updates: dropping only the
 			// module's code has a later evaluation take the edit, where invalidating it would evaluate
 			// every importer again.
-			const module = environment.moduleGraph.getModuleById(files.keysFile);
+			const module = environment.moduleGraph.getModuleById(devKeysId);
 			if (module !== undefined)
 				environment.moduleGraph.updateModuleTransformResult(module, null);
 			environment.hot.send(patch);
 		}
 		// The pages last, after the servers are sent the patch. A module loaded after the edit takes
 		// it afresh, with the edit in it.
-		const module = client.moduleGraph.getModuleById(files.keysFile);
+		const module = client.moduleGraph.getModuleById(devKeysId);
 		if (module !== undefined) client.moduleGraph.invalidateModule(module);
 		client.hot.send(reloadOnEdit ? { type: "full-reload" } : patch);
 	};
