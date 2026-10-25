@@ -11,8 +11,12 @@ const catalogs = {
 	ar: { title: "سلتك" },
 };
 
-/** A project's output: its messages, runtime and middleware. */
-async function output(config: Record<string, unknown> = {}) {
+/** A project's output as a script or a page loads it: its messages and runtime. */
+const output = (config: Record<string, unknown> = {}) =>
+	project(catalogs, config).load();
+
+/** A project's output as a server loads it: its messages, runtime and middleware. */
+async function served(config: Record<string, unknown> = {}) {
 	const { dir, load } = project(catalogs, config);
 	const { m, runtime } = await load();
 	const server = await import(
@@ -32,12 +36,28 @@ async function output(config: Record<string, unknown> = {}) {
 }
 
 describe("outside a request", () => {
-	it("renders in the base locale, then in the locale setLocale sets for the process", async () => {
+	it("renders in a script in the base locale, then in the locale setLocale sets for the process", async () => {
 		const { m, runtime } = await output();
 
 		expect([m.title?.(), runtime.getLocale()]).toEqual(["Your cart", "en"]);
 		runtime.setLocale("de", { reload: false });
 		expect([m.title?.(), runtime.getLocale()]).toEqual(["Ihr Warenkorb", "de"]);
+	});
+
+	it("throws locale-unbound in a server whose middleware binds each request, unless the call names its locale", async () => {
+		const { m, runtime } = await served();
+
+		for (const call of [
+			() => m.title?.(),
+			() => runtime.getLocale(),
+			() => runtime.setLocale("de", { reload: false }),
+		]) {
+			expect(thrown(call)).toMatchObject({
+				name: "GraiError",
+				code: "locale-unbound",
+			});
+		}
+		expect(m.title?.({}, { locale: "de" })).toBe("Ihr Warenkorb");
 	});
 });
 
@@ -48,7 +68,7 @@ describe("the middleware", () => {
 	};
 	const localeOf = async (
 		m: Messages,
-		middleware: Awaited<ReturnType<typeof output>>["middleware"],
+		middleware: Awaited<ReturnType<typeof served>>["middleware"],
 		path: string,
 		headers: Record<string, string>,
 	) =>
@@ -60,7 +80,7 @@ describe("the middleware", () => {
 		).json();
 
 	it("binds the locale the request names, by the strategy's order, else the base locale", async () => {
-		const { m, middleware } = await output(config);
+		const { m, middleware } = await served(config);
 
 		expect(
 			await localeOf(m, middleware, "/de/cart", {
@@ -77,7 +97,7 @@ describe("the middleware", () => {
 	});
 
 	it("matches Accept-Language by weight, then by language", async () => {
-		const { m, middleware } = await output({ strategy: ["preferredLanguage"] });
+		const { m, middleware } = await served({ strategy: ["preferredLanguage"] });
 
 		expect(
 			await localeOf(m, middleware, "/", {
@@ -183,7 +203,7 @@ describe("the middleware", () => {
 	 * again. A request with `switchTo` calls setLocale before it awaits.
 	 */
 	const interleaved = async (
-		{ m, runtime, middleware }: Awaited<ReturnType<typeof output>>,
+		{ m, runtime, middleware }: Awaited<ReturnType<typeof served>>,
 		requests: { cookie: string; switchTo?: string }[],
 	) => {
 		let release = () => {};
@@ -210,7 +230,7 @@ describe("the middleware", () => {
 	};
 
 	it("keeps each request's locale while requests interleave", async () => {
-		const rendered = await interleaved(await output(config), [
+		const rendered = await interleaved(await served(config), [
 			{ cookie: "lang=de" },
 			{ cookie: "lang=ar" },
 			{ cookie: "lang=en" },
@@ -224,7 +244,7 @@ describe("the middleware", () => {
 	});
 
 	it("lets setLocale switch only its own request while requests interleave", async () => {
-		const rendered = await interleaved(await output(config), [
+		const rendered = await interleaved(await served(config), [
 			{ cookie: "lang=de", switchTo: "ar" },
 			{ cookie: "lang=en" },
 		]);
@@ -236,20 +256,89 @@ describe("the middleware", () => {
 	});
 
 	it("lets setLocale change the locale for the rest of the request only", async () => {
-		const { m, runtime, middleware } = await output(config);
-		const inside = await middleware(
+		const { m, runtime, middleware } = await served(config);
+		const title = () => new Response(m.title?.());
+		const switched = await middleware(
 			new Request("https://shop.test/"),
 			async () => {
 				runtime.setLocale("de");
 				await Promise.resolve();
-				return new Response(m.title?.());
+				return title();
 			},
 		);
+		const next = await middleware(new Request("https://shop.test/"), title);
 
-		expect([await inside.text(), m.title?.()]).toEqual([
+		expect([await switched.text(), await next.text()]).toEqual([
 			"Ihr Warenkorb",
 			"Your cart",
 		]);
+	});
+});
+
+describe("a body the handler streams", () => {
+	const encoder = new TextEncoder();
+	/** A turn of the event loop: what comes after it runs once the middleware has returned. */
+	const later = () => new Promise((resolve) => setTimeout(resolve));
+	/** The body of the middleware's response to a request for `/de/cart` that streams `body`. */
+	const streamed = async (
+		body: (m: Messages) => ReadableStream<Uint8Array>,
+	) => {
+		const { m, middleware } = await served({ strategy: ["url"] });
+		const response = await middleware(
+			new Request("https://shop.test/de/cart"),
+			() => new Response(body(m)),
+		);
+		return response.text();
+	};
+
+	it("renders in the request's locale when its start() pushes it, after awaits, as SvelteKit's does", async () => {
+		const text = await streamed(
+			(m) =>
+				new ReadableStream({
+					async start(controller) {
+						for (let line = 0; line < 4; line++) {
+							await later();
+							controller.enqueue(encoder.encode(`${m.title?.()}|`));
+						}
+						controller.close();
+					},
+				}),
+		);
+
+		expect(text).toBe("Ihr Warenkorb|".repeat(4));
+	});
+
+	it("renders in the request's locale when a task the handler started writes it", async () => {
+		const text = await streamed((m) => {
+			const { readable, writable } = new TransformStream<Uint8Array>();
+			const writer = writable.getWriter();
+			const write = async () => {
+				for (let line = 0; line < 4; line++) {
+					await later();
+					await writer.write(encoder.encode(`${m.title?.()}|`));
+				}
+				await writer.close();
+			};
+			write();
+			return readable;
+		});
+
+		expect(text).toBe("Ihr Warenkorb|".repeat(4));
+	});
+
+	it("fails with locale-unbound when its pull renders it, as the reader starts a pull once the middleware has returned", async () => {
+		let lines = 0;
+		const text = streamed(
+			(m) =>
+				new ReadableStream({
+					pull(controller) {
+						controller.enqueue(encoder.encode(`${m.title?.()}|`));
+						if (++lines === 4) controller.close();
+					},
+				}),
+		);
+
+		await expect(text).rejects.toMatchObject({ code: "locale-unbound" });
 	});
 });
 
@@ -259,7 +348,7 @@ describe("the response's Vary", () => {
 		strategy: string[],
 		response = () => new Response("Your cart"),
 	) => {
-		const { middleware } = await output({
+		const { middleware } = await served({
 			strategy,
 			...(strategy.includes("cookie") ? { cookieName: "lang" } : {}),
 		});
@@ -292,7 +381,7 @@ describe("the response's Vary", () => {
 	});
 
 	it("varies a response whose headers are immutable, as fetch() gives, through a copy", async () => {
-		const { middleware } = await output({ strategy: ["preferredLanguage"] });
+		const { middleware } = await served({ strategy: ["preferredLanguage"] });
 		const response = await middleware(new Request("https://shop.test/"), () =>
 			Response.redirect("https://shop.test/cart", 307),
 		);
@@ -312,7 +401,7 @@ describe("with every locale's paths prefixed", () => {
 		localePrefix: "always",
 	};
 	const answer = async (
-		middleware: Awaited<ReturnType<typeof output>>["middleware"],
+		middleware: Awaited<ReturnType<typeof served>>["middleware"],
 		path: string,
 		init: RequestInit = {},
 	) => {
@@ -327,7 +416,7 @@ describe("with every locale's paths prefixed", () => {
 	};
 
 	it("takes the locale a path names, and sends a page without one to the locale the request prefers", async () => {
-		const { middleware } = await output(config);
+		const { middleware } = await served(config);
 
 		expect([
 			await answer(middleware, "/en/cart"),
@@ -367,7 +456,7 @@ describe("with every locale's paths prefixed", () => {
 
 describe("with paths the url strategy leaves alone", () => {
 	const answer = async (
-		middleware: Awaited<ReturnType<typeof output>>["middleware"],
+		middleware: Awaited<ReturnType<typeof served>>["middleware"],
 		path: string,
 		cookie = "",
 	) => {
@@ -382,7 +471,7 @@ describe("with paths the url strategy leaves alone", () => {
 	};
 
 	it("finds an app page's locale by the strategies after url, and links to it without a prefix", async () => {
-		const { middleware, runtime } = await output({
+		const { middleware, runtime } = await served({
 			strategy: ["url", "cookie"],
 			cookieName: "lang",
 			unlocalizedPaths: ["/app", "/app/**"],
@@ -404,7 +493,7 @@ describe("with paths the url strategy leaves alone", () => {
 	});
 
 	it("sends no app page to a prefixed path, with every locale's paths prefixed", async () => {
-		const { middleware } = await output({
+		const { middleware } = await served({
 			strategy: ["url", "cookie"],
 			cookieName: "lang",
 			localePrefix: "always",
@@ -422,7 +511,7 @@ describe("with paths the url strategy leaves alone", () => {
 });
 
 it("reads and writes a locale's own prefix, where the config gives one", async () => {
-	const { runtime, middleware } = await output({
+	const { runtime, middleware } = await served({
 		strategy: ["url"],
 		localePrefixes: { ar: "arabic" },
 	});
