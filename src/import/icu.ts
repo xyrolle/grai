@@ -4,10 +4,10 @@ import {
 	type Converted,
 	escapeText,
 	type ImportedMessage,
-	pluralLocal,
 	type SourceEntry,
 	textOf,
 } from "./converted.ts";
+import { IcuLocals } from "./icu-locals.ts";
 import { pluralNeeds, selectNeeds } from "./icu-option-needs.ts";
 import {
 	type ChoiceKind,
@@ -50,34 +50,26 @@ function convertMessage(source: string, locale: string): Converted {
 	const nodes = parseIcu(source);
 	const converter = new IcuConverter(locale, nodes);
 	const readings = converter.expand(nodes, undefined);
+	const { locals, selectors } = converter;
 	return {
-		declarations: converter.declarations,
-		selectors: converter.selectors,
+		declarations: locals.declarations,
+		selectors,
 		branches: variantsOf(
 			readings,
-			converter.selectors.map((name) => ({
-				name,
-				values: converter.categoriesOf(name),
-			})),
+			selectors.map((name) => ({ name, values: locals.categoriesOf(name) })),
 		),
 	};
 }
 
 /** Expands a message's nodes into the ways it reads, collecting the selectors and declarations. */
 class IcuConverter {
-	readonly declarations: string[] = [];
 	readonly selectors: string[] = [];
+	readonly locals: IcuLocals;
 	private readonly locale: string;
-	/** The message's inputs, which a plural local's name must not take. */
-	private readonly inputs: ReadonlySet<string>;
-	/** Each counted input's plural local of each type, declared once. */
-	private readonly locals = new Map<string, string>();
-	/** The type of each plural local, by its name. */
-	private readonly localTypes = new Map<string, PluralType>();
 
 	constructor(locale: string, nodes: readonly IcuNode[]) {
 		this.locale = locale;
-		this.inputs = new Set(namesIn(nodes));
+		this.locals = new IcuLocals(locale, new Set(namesIn(nodes)));
 	}
 
 	/** Every way the nodes read, each with what it needs of the selectors; `#` shows `count`. */
@@ -87,12 +79,6 @@ class IcuConverter {
 			readings = followed(readings, this.node(node, count));
 		}
 		return readings;
-	}
-
-	/** The categories a selector takes when it is a plural local, which are all it can take. */
-	categoriesOf(selector: string): readonly string[] | undefined {
-		const type = this.localTypes.get(selector);
-		return type === undefined ? undefined : categoriesOf(this.locale, type);
 	}
 
 	private node(node: IcuNode, count: string | undefined): Reading[] {
@@ -142,7 +128,7 @@ class IcuConverter {
 		node: { name: string; options: IcuOption[] },
 		type: PluralType,
 	): Reading[] {
-		const local = this.pluralLocal(node.name, type);
+		const local = this.locals.plural(node.name, type);
 		this.claim(local);
 		if (node.options.some((option) => option.key.startsWith("="))) {
 			this.claim(node.name, local);
@@ -163,17 +149,6 @@ class IcuConverter {
 				needing(reading, needs),
 			);
 		});
-	}
-
-	/** The local that holds an input's category of a type, declared the first time a choice counts it. */
-	private pluralLocal(input: string, type: PluralType): string {
-		const known = this.locals.get(`${type} ${input}`);
-		if (known !== undefined) return known;
-		const local = pluralLocal(input, type, this.inputs);
-		this.locals.set(`${type} ${input}`, local.name);
-		this.localTypes.set(local.name, type);
-		this.declarations.push(local.declaration);
-		return local.name;
 	}
 
 	/**
