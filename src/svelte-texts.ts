@@ -29,7 +29,14 @@ const svelteCompile = "vite-plugin-svelte:compile";
  * a client build, a component's call of a text key with no arguments becomes a read of that key's
  * string in the page's locale (`pageText` in the runtime). A page's words stay its locale's until
  * it reloads, which `switch: "reload"` promises; under `"live"` components are left as they are,
- * as are the server build and dev.
+ * as is dev.
+ *
+ * The server build reads the same calls as a property, `.text`, whose getter calls the key in the
+ * request's locale. Under `experimental.async`, Svelte takes a call made after a component's
+ * `await` as writing what it touches, and every later read of the namespace as waiting on that
+ * await: a call kept on the server would compile into blocks of its own, which the client's string
+ * does not have, and the page would be drawn again rather than hydrated. A property read waits on
+ * nothing, as the string does.
  */
 export function svelteTexts(core: GraiPlugin): Plugin {
 	let followed: { build: Build; names: ImportedName } | undefined;
@@ -63,12 +70,9 @@ export function svelteTexts(core: GraiPlugin): Plugin {
 			filter: { id: /\.svelte$/ },
 			async handler(code, id) {
 				const build = core.build();
-				if (
-					this.environment.name !== "client" ||
-					build === undefined ||
-					build.config.switch === "live"
-				)
-					return null;
+				if (build === undefined || build.config.switch === "live") return null;
+				const read =
+					this.environment.config.consumer === "server" ? ".text" : "";
 				const ast = parsed(code, id);
 				if (ast === undefined) return null;
 				const bindings = await outputBindings(
@@ -84,7 +88,7 @@ export function svelteTexts(core: GraiPlugin): Plugin {
 					(key) => keys.get(key)?.kind === "text",
 				);
 				if (calls === undefined || calls.length === 0) return null;
-				const edits = withStrings(code, calls);
+				const edits = withTexts(code, calls, read);
 				return {
 					code: edits.toString(),
 					map: edits.generateMap({ source: id, hires: true }),
@@ -138,12 +142,23 @@ function modulesOf(context: Rollup.TransformPluginContext): Modules {
 	};
 }
 
-/** The component with each call read as its key's string, imported once per key and script. */
-function withStrings(code: string, calls: readonly TextCall[]): MagicString {
+/**
+ * The component with each call read from its key's text module, imported once per key and script:
+ * the import itself, or `read` of it.
+ */
+function withTexts(
+	code: string,
+	calls: readonly TextCall[],
+	read: string,
+): MagicString {
 	const edits = new MagicString(code);
 	const imported = new Map<number, Set<string>>();
 	for (const call of calls) {
-		edits.overwrite(call.start, call.end, localName(code, call.key));
+		edits.overwrite(
+			call.start,
+			call.end,
+			`${localName(code, call.key)}${read}`,
+		);
 		const keys = imported.get(call.scriptStart) ?? new Set();
 		imported.set(call.scriptStart, keys.add(call.key));
 	}
