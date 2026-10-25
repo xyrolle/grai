@@ -179,9 +179,11 @@ function servedWith(flags: string[]): void {
 		if (build.status !== 0) {
 			throw new Error(`next build failed:\n${build.stdout}${build.stderr}`);
 		}
+		// The leader of a process group of its own, so that stopping it stops what it forks.
 		const started = spawn(next, ["start", "--port", "4771"], {
 			cwd: example,
 			env,
+			detached: true,
 		});
 		server = started;
 		await new Promise<void>((resolve, reject) => {
@@ -193,9 +195,27 @@ function servedWith(flags: string[]): void {
 			);
 		});
 	}, 120_000);
-	afterAll(() => {
-		server?.kill();
-	});
+	afterAll(() => (server ? stopped(server) : undefined));
+}
+
+/** Stops a server's whole process group, and resolves once the server has exited. */
+async function stopped(server: ChildProcess): Promise<void> {
+	const running = server.exitCode === null && server.signalCode === null;
+	const exited = running
+		? new Promise<void>((resolve) => server.once("exit", () => resolve()))
+		: undefined;
+	if (server.pid === undefined) return;
+	try {
+		process.kill(-server.pid, "SIGTERM");
+	} catch (error) {
+		// A group whose processes have all exited.
+		if (
+			!(error instanceof Error && "code" in error && error.code === "ESRCH")
+		) {
+			throw error;
+		}
+	}
+	await exited;
 }
 
 let browser: Browser;

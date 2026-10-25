@@ -9,7 +9,7 @@
 // - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
 	readdirSync,
 	readFileSync,
@@ -22,6 +22,7 @@ import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeNextApps } from "./next-apps.mjs";
+import { startServer, stopServer } from "./servers.mjs";
 
 const EDITS = 7;
 const SAVE_INTERVAL_MS = 1500;
@@ -44,7 +45,7 @@ const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
 
 /** Starts `next <args>` in an app, and resolves once it prints a line matching `ready`. */
 function started(root, args, ready) {
-	const child = spawn(next, args, {
+	const child = startServer(next, args, {
 		cwd: root,
 		env,
 		stdio: ["ignore", "pipe", "pipe"],
@@ -83,12 +84,6 @@ async function firstResponse(url) {
 	throw new Error(`${url} did not answer in 120 s`);
 }
 
-async function stopped(server) {
-	const exited = new Promise((resolve) => server.child.on("exit", resolve));
-	server.child.kill();
-	await exited;
-}
-
 /** The page's downloads in a built app, brotli-compressed: its document, its scripts, the rest. */
 async function pageBytes(browser, root, path) {
 	const build = spawnSync(next, ["build"], {
@@ -122,7 +117,7 @@ async function pageBytes(browser, root, path) {
 	});
 	await Promise.all(bodies);
 	await page.close();
-	await stopped(server);
+	await stopServer(server.child);
 	return sizes;
 }
 
@@ -273,9 +268,9 @@ for (const app of selectedApps()) {
 				outdir,
 			);
 		}
-		await stopped(empty.server);
+		await stopServer(empty.server.child);
 		const kept = await devStart(root, path, { empty: false });
-		await stopped(kept.server);
+		await stopServer(kept.server.child);
 		const edit = ({ shown, written }) =>
 			written === undefined
 				? shown.toFixed(0)
