@@ -153,7 +153,7 @@ describe("the Vite plugin's build", () => {
 
 		expect(browser.page).toMatch(/=>`Hallo \$\{/);
 		expect(server.server).toMatch(
-			/function ?\(i\) \{\s*return `Hallo \$\{i\.name\}`/,
+			/function ?\(i\) \{\s*return `Hallo \$\{i\["name"\]\}`/,
 		);
 		expect([
 			m.greeting?.({ name: "Ana" }, { locale: "en" }),

@@ -50,7 +50,7 @@ describe("a recompile after an edit", () => {
 		// "$" and "{" apart, or Biome takes the strings for template literals written by mistake.
 		expect([key("greeting")?.kind, key("greeting")?.variants]).toEqual([
 			"message",
-			["(i) => `Hello $" + "{i.name}`", "(i) => `Hallo $" + "{i.name}`"],
+			["(i) => `Hello $" + '{i["name"]}`', "(i) => `Hallo $" + '{i["name"]}`'],
 		]);
 	});
 
@@ -101,7 +101,7 @@ describe("a recompile after an edit", () => {
 		]);
 		expect(fixed.result.errors).toEqual([]);
 		expect(readFileSync(join(dir, "out", "keys", "0.js"), "utf8")).toContain(
-			"Servus $" + "{i.name}",
+			"Servus $" + '{i["name"]}',
 		);
 	});
 
