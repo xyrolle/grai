@@ -1,6 +1,6 @@
 import { ownEntry } from "../own-entry.ts";
 import { MessageProblem } from "../problem.ts";
-import { IcuPatternReader } from "./icu-pattern.ts";
+import { IcuPatternReader, type PatternScope } from "./icu-pattern.ts";
 import { invalid } from "./icu-scanner.ts";
 import { dateSkeletonCall, numberSkeletonCall } from "./icu-skeletons.ts";
 
@@ -71,7 +71,7 @@ export function parseIcu(source: string): IcuNode[] {
  */
 class IcuParser extends IcuPatternReader {
 	/** `{name}`, or a choice: `{name, plural|select, options}`. */
-	protected argument(): IcuNode {
+	protected argument(scope: PatternScope): IcuNode {
 		this.index++;
 		const name = this.word();
 		if (name === "") {
@@ -87,7 +87,7 @@ class IcuParser extends IcuPatternReader {
 		if (!this.take(",")) {
 			throw invalid(`{${name}, ${kind} must list its options.`);
 		}
-		const options = this.options(name, kind);
+		const options = this.options(name, kind, scope);
 		if (!options.some((option) => option.key === "other")) {
 			throw invalid(
 				`{${name}, ${kind}} has no other option, which ICU requires.`,
@@ -137,8 +137,13 @@ class IcuParser extends IcuPatternReader {
 	}
 
 	/** A choice's options up to its closing `}`: each key, once, and its message in braces. */
-	private options(name: string, kind: ChoiceKind): IcuOption[] {
+	private options(
+		name: string,
+		kind: ChoiceKind,
+		scope: PatternScope,
+	): IcuOption[] {
 		const options: IcuOption[] = [];
+		const optionScope = { inTag: scope.inTag, counted: kind !== "select" };
 		let key = this.key(name, kind);
 		if (kind !== "select" && key === "offset") throw this.offset(name, kind);
 		while (key !== "") {
@@ -150,7 +155,7 @@ class IcuParser extends IcuPatternReader {
 					`the key ${key} of {${name}, ${kind}} must be followed by its message in braces, and a key holds no space, punctuation or symbol.`,
 				);
 			}
-			options.push({ key, nodes: this.nodes(kind !== "select", undefined) });
+			options.push({ key, nodes: this.nodes(optionScope) });
 			if (!this.take("}")) {
 				throw invalid(`the option ${key} of {${name}} must be closed by }.`);
 			}
