@@ -1,0 +1,12 @@
+{
+	"Home": {
+		"title": "أهلا بك",
+		"greeting": "مرحبا، {name}!",
+		"items": "{count, plural, zero {لا عناصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصرًا} other {# عنصر}}",
+		"ranked": "حللت في المركز {place, selectordinal, other {#}}"
+	},
+	"About": {
+		"title": "من نحن",
+		"visits": "{count, number} زيارة"
+	}
+}

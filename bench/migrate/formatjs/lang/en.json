@@ -1,0 +1,7 @@
+{
+	"shop.title": "Shop",
+	"shop.greeting": "Hello, {name}!",
+	"cart.items": "{count, plural, =0 {Your cart is empty} one {# item} other {# items}}",
+	"cart.total": "Total: {sum, number}",
+	"order.status": "{status, select, shipped {On its way} delivered {Delivered} other {Being packed}}"
+}

@@ -5,3 +5,4 @@ coverage/
 *.log
 bench/.cache/
 bench/.wrangler/
+bench/.migrate-*/
