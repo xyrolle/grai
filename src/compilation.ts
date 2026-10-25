@@ -161,7 +161,7 @@ function editedKeys(
 	for (const [index, catalog] of catalogs.entries()) {
 		const before = previous.catalogs[index];
 		if (catalog === before) continue;
-		if (catalog.edit === undefined || catalog.edit.from !== before)
+		if (catalog.edit === undefined || catalog.edit.from !== before?.revision)
 			return undefined;
 		for (const key of catalog.edit.keys) keys.add(key);
 	}
