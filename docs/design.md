@@ -270,6 +270,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - **`merge` refuses a unit, never the file.** A unit made from a base text that has changed since is stale, and one that places a code its message lacks is invalid.
     - A message must still compile and read the base's inputs. A plural needs every form, from the file or from its current translation.
     - A message no unit changes is left as it is written, and the rest go to the catalog in one write.
+    - A merged message keeps the base's shape: a pattern stays a pattern, and a message with declarations keeps them, with selectors or without.
   - **Machine translation is not grai's.** grai fetches nothing, and a provider, its key, its prompts and a glossary are each app's choice. A script exports `--json`, translates, and merges, and the merge's checks refuse an answer that breaks a placeholder or a plural.
   - The XML reader reads only what this XLIFF needs, and strictly: no DTD, no entities beyond XML's five and numeric references. A tool's comments, CDATA, groups, segments, notes and metadata are read past or joined.
 - `grai add <key> --en "…" --de "…"` adds a key to every catalog that lacks it, at once: a new key to every catalog, or one some locales lack to theirs. It refuses unless a text is given for each locale that lacks the key and for no other, so it never overwrites a message.

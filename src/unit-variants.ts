@@ -16,7 +16,9 @@ export type Variants = readonly (readonly [
 	pattern: string,
 ])[];
 
-export function rawVariants(value: unknown): [string, string][] {
+/** A message's variants as written, each its key and its pattern; a pattern alone is one with no key. */
+function rawVariants(value: unknown): [string, string][] {
+	if (typeof value === "string") return [["", value]];
 	const fields = Array.isArray(value) ? value[0] : undefined;
 	if (!isRecord(fields) || !isRecord(fields.match)) return [];
 	return Object.entries(fields.match).flatMap(
@@ -41,8 +43,7 @@ export function translatedVariants(
 	locale: string,
 	selectors: readonly Selector[],
 ): Variants | undefined {
-	if (translation === undefined || typeof translation === "string")
-		return undefined;
+	if (translation === undefined) return undefined;
 	try {
 		const names = parseMessage(locale, translation).selectors.map(
 			(selector) => selector.name,
@@ -177,12 +178,13 @@ const sampleCounts = [
 	1000000,
 ];
 
-/** For a plural, the counts each form is for in the locale; for a select, the value. */
+/** For a plural, the counts each form is for in the locale; for a select, the value; for no selector, nothing. */
 export function noteOf(
 	variant: readonly (readonly [string, string])[],
 	selectors: readonly Selector[],
 	locale: string,
-): string {
+): string | undefined {
+	if (variant.length === 0) return undefined;
 	return variant
 		.map(([name, key], index) => {
 			const rules = countingRules(selectors[index], key);

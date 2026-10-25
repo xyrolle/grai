@@ -103,10 +103,24 @@ function project(seed: number): { base: Catalog; target: Catalog } {
 	const german: Record<string, unknown> = {};
 	for (let index = 0; index < 6; index++) {
 		const key = `key_${index}`;
-		if (next() < 0.7) {
+		const shape = next();
+		if (shape < 0.6) {
 			const source = pieces(next);
 			english[key] = piecesPattern(source);
 			german[key] = piecesPattern(translation(source, next));
+			continue;
+		}
+		if (shape < 0.7) {
+			const source = pieces(next);
+			const declared = (pattern: readonly Piece[]) => [
+				{
+					declarations: ["input n", "local total = n: number"],
+					selectors: [],
+					match: { "": piecesPattern(pattern) },
+				},
+			];
+			english[key] = declared(source);
+			german[key] = declared(translation(source, next));
 			continue;
 		}
 		const one = pieces(next);
