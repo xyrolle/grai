@@ -1,3 +1,4 @@
+import { ownEntry } from "../own-entry.ts";
 import { MessageProblem } from "../problem.ts";
 
 /**
@@ -172,7 +173,7 @@ class IcuParser {
 		const style = this.take(",") ? this.word() : "";
 		if (!this.take("}"))
 			throw invalid(`{${name}, ${kind} must be closed by }.`);
-		const format = formats[kind]?.[style];
+		const format = ownEntry(formats[kind] ?? {}, style);
 		if (format === undefined) {
 			throw new MessageProblem(
 				"unsupported",

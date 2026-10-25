@@ -6,6 +6,7 @@
 
 import { functions, shapesText } from "../format-functions.ts";
 import { parseCall } from "../format-options.ts";
+import { ownEntry } from "../own-entry.ts";
 import { MessageProblem } from "../problem.ts";
 
 /** A format as i18next writes it, such as `currency(USD)` or `list(type: disjunction)`. */
@@ -16,7 +17,7 @@ export function formatCall(format: string, written: string): string {
 	const [, name = "", optionsText] = formatWritten.exec(format) ?? [];
 	const kind = name.toLowerCase();
 	const options = optionsOf(kind, optionsText);
-	const convert = converters[kind];
+	const convert = ownEntry(converters, kind);
 	if (convert === undefined) {
 		throw new MessageProblem(
 			"unsupported",

@@ -280,6 +280,26 @@ describe("a message", () => {
 		]);
 	});
 
+	it("is an error when it calls a function or gives an option grai does not have, even one named as what every object has", async () => {
+		expect(
+			await errorsOf({
+				en: {
+					called: "{n :constructor}",
+					option: "{n :number constructor=1}",
+					refused: "{n :unit unit=meter toString=1}",
+				},
+			}),
+		).toEqual([
+			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			expect.stringContaining(
+				'"option" (en): {n :number constructor=1}: "constructor=1" is not an option of :number, or is given twice. Its options are select, style,',
+			),
+			expect.stringContaining(
+				'"refused" (en): {n :unit unit=meter toString=1}: "toString=1" is not an option of :unit, or is given twice. Its options are unit,',
+			),
+		]);
+	});
+
 	it("is an error when a declaration or a variant key is malformed", async () => {
 		expect(
 			await errorsOf({

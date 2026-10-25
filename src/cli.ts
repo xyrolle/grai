@@ -10,6 +10,7 @@ import { mergeCommand } from "./cli/merge.ts";
 import { renameCommand } from "./cli/rename.ts";
 import { seedCommand } from "./cli/seed.ts";
 import { watchCommand } from "./cli/watch.ts";
+import { ownEntry } from "./own-entry.ts";
 
 /** Each command by its name, in the order the usage lists them. */
 const commands: Record<string, Command> = {
@@ -34,7 +35,7 @@ ${Object.values(commands)
 The config is grai.config.json in the current directory, unless --config names another file.`;
 
 const [name = "", ...args] = process.argv.slice(2);
-const command = commands[name];
+const command = ownEntry(commands, name);
 if (name === "--help" || name === "help") {
 	console.log(usage);
 } else if (command === undefined) {
