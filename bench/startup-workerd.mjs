@@ -26,11 +26,14 @@ export function workerFiles(module, mode, callsFile, locale) {
 	return directory;
 }
 
-/** Loads a worker's module in a new workerd and renders the sample there: the times it reports. */
-export async function inWorkerd(directory) {
+/**
+ * Starts a new workerd on a worker's directory, its modules as they are, and answers its first
+ * request: the times its entry reports. The entry is startup-worker.js unless named.
+ */
+export async function inWorkerd(directory, entry = "startup-worker.js") {
 	const worker = await unstable_startWorker({
 		name: "grai-startup",
-		entrypoint: join(directory, "startup-worker.js"),
+		entrypoint: join(directory, entry),
 		compatibilityDate: "2026-10-01",
 		compatibilityFlags: ["nodejs_compat", "new_module_registry"],
 		build: {
