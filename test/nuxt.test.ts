@@ -42,6 +42,18 @@ describe("the module", { timeout: 30_000 }, () => {
 });
 
 describe("the pages of the url strategy", () => {
+	const asNeeded = {
+		localePrefix: "as-needed",
+		prefixes: ["en", "ro"],
+		unlocalizedPaths: [],
+	} as const;
+	const index: NuxtPage = { name: "index", path: "/", file: "index.vue" };
+	const docs: NuxtPage = {
+		name: "docs",
+		path: "/docs/:page()",
+		file: "docs.vue",
+	};
+
 	it("routes every page under each locale's prefix but the base locale's, its children's absolute paths too", () => {
 		const pages: NuxtPage[] = [
 			{ name: "index", path: "/", file: "index.vue" },
@@ -57,7 +69,7 @@ describe("the pages of the url strategy", () => {
 			},
 		];
 
-		expect(localizedPages(pages, ["en", "ro"], "en")).toEqual([
+		expect(localizedPages(pages, ["en", "ro"], "en", asNeeded)).toEqual([
 			{ name: "index___ro", path: "/ro", file: "index.vue" },
 			{
 				name: "about___ro",
@@ -74,6 +86,31 @@ describe("the pages of the url strategy", () => {
 					{ name: "account-help___ro", path: "/ro/help", file: "help.vue" },
 				],
 			},
+		]);
+	});
+
+	it("routes a locale under its own prefix, as localePrefixes names it", () => {
+		const routing = { ...asNeeded, prefixes: ["en", "romana"] };
+
+		expect(localizedPages([index], ["en", "ro"], "en", routing)).toEqual([
+			{ name: "index___ro", path: "/romana", file: "index.vue" },
+		]);
+	});
+
+	it("routes every page under the base locale's prefix too when every locale's paths are prefixed", () => {
+		const routing = { ...asNeeded, localePrefix: "always" } as const;
+
+		expect(localizedPages([index], ["en", "ro"], "en", routing)).toEqual([
+			{ name: "index___en", path: "/en", file: "index.vue" },
+			{ name: "index___ro", path: "/ro", file: "index.vue" },
+		]);
+	});
+
+	it("leaves a page at a path the strategy leaves alone without copies", () => {
+		const routing = { ...asNeeded, unlocalizedPaths: ["/docs/**"] };
+
+		expect(localizedPages([index, docs], ["en", "ro"], "en", routing)).toEqual([
+			{ name: "index___ro", path: "/ro", file: "index.vue" },
 		]);
 	});
 });
