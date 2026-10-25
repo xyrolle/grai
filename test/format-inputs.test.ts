@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { optionInput } from "../src/format-inputs.ts";
 import { errorsOf, project, thrown } from "./project.ts";
 
 const when = new Date(Date.UTC(2026, 9, 24, 15, 5, 30));
@@ -155,3 +156,17 @@ function intlError(make: () => unknown): string {
 	}
 	throw new Error("expected Intl to throw");
 }
+
+it("takes an option from an input only when it is one of the input options' own, never one every object has", () => {
+	for (const option of ["constructor", "toString", "__proto__"]) {
+		const token = `${option}=$x`;
+		expect(() =>
+			optionInput("number", option, "$x", undefined, {
+				source: `{n :number ${token}}`,
+				token,
+			}),
+		).toThrow(
+			`"${token}" takes its value from an input, which only a currency`,
+		);
+	}
+});

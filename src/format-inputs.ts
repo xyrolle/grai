@@ -8,6 +8,7 @@
  */
 
 import type { IntlFormatter, IntlOptions } from "./format-functions.ts";
+import { ownEntry } from "./own-entry.ts";
 import { MessageProblem } from "./problem.ts";
 
 /**
@@ -49,7 +50,7 @@ export function optionInput(
 ): OptionInput | undefined {
 	if (!text.startsWith("$")) return undefined;
 	const { source, token } = where;
-	const spec = fromInputs[formatter]?.[option];
+	const spec = ownEntry(fromInputs[formatter] ?? {}, option);
 	if (spec === undefined) {
 		throw new MessageProblem(
 			"unsupported",
