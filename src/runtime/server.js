@@ -8,11 +8,12 @@ import {
 	localePrefix,
 	locales,
 	strategy,
+	unlocalizedPaths,
 } from "./config.js";
 import {
 	assertIsLocale,
 	bindRequests,
-	extractLocaleFromUrl,
+	localeOfPath,
 	localizeUrl,
 } from "./runtime.js";
 
@@ -34,8 +35,9 @@ const vary = headersRead().join(", ");
  * @returns {Promise<Response>}
  */
 export async function middleware(request, handler) {
-	const locale = localeOf(request);
-	const response = unprefixedPage(request)
+	const { pathname } = new URL(request.url);
+	const locale = localeOf(request, pathname);
+	const response = unprefixedPage(request, pathname)
 		? Response.redirect(
 				localizeUrl(request.url, { locale: assertIsLocale(locale) }),
 				307,
@@ -49,39 +51,34 @@ export async function middleware(request, handler) {
 /**
  * Whether the request asks for a page at a path without a locale prefix, which with every
  * locale's paths prefixed is not a page's own: a GET or a HEAD, as a form's POST must not be
- * answered with another address.
+ * answered with another address, at a path the `url` strategy does not leave alone.
  *
  * @param {Request} request
+ * @param {string} pathname
  */
-function unprefixedPage(request) {
+function unprefixedPage(request, pathname) {
 	return (
 		localePrefix === "always" &&
 		strategy.includes("url") &&
 		(request.method === "GET" || request.method === "HEAD") &&
-		fromUrl(request.url) === undefined
+		localeOfPath(pathname) === undefined &&
+		!unlocalizedPaths.some((pattern) => pattern.test(pathname))
 	);
 }
 
 /**
- * The locale the request's path names. With every locale's paths prefixed, a path without a prefix
- * names none, and the strategies after `url` find the request's locale.
+ * The first locale the strategy finds in the request, else the base locale.
  *
- * @param {string} url
+ * @param {Request} request
+ * @param {string} pathname
  */
-function fromUrl(url) {
-	const locale = extractLocaleFromUrl(url);
-	const named = new URL(url).pathname.split("/")[1] === locale;
-	return localePrefix === "always" && !named ? undefined : locale;
-}
-
-/** The first locale the strategy finds in the request, else the base locale. */
-function localeOf(/** @type {Request} */ request) {
+function localeOf(request, pathname) {
 	for (const source of strategy) {
 		const locale =
 			source === "cookie"
 				? fromCookie(request.headers.get("cookie") ?? "")
 				: source === "url"
-					? fromUrl(request.url)
+					? localeOfPath(pathname)
 					: fromAcceptLanguage(request.headers.get("accept-language") ?? "");
 		if (locale !== undefined) return locale;
 	}

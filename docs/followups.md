@@ -97,12 +97,6 @@ An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de
 
 Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
 
-## Paths the `url` strategy leaves alone
-
-With the base locale unprefixed, `url` answers every path, so a site cannot localize its public pages by URL and its app (`/dashboard`) by cookie.
-
-Done when: the config can name the paths `url` does not cover, the strategies after it then apply to those paths, and a test covers a covered and an uncovered path.
-
 ## Custom locale prefixes
 
 A locale's prefix is its tag (`/en-US/…`). A site that wants `/us/…` cannot have it. Neither reference app needs it, so it waits for an adopter who does.
