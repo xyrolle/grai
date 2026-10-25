@@ -1,4 +1,5 @@
-import { join, relative } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { type FileUses, type Use, usesIn } from "./call-sites.ts";
 import type { Catalog } from "./catalog.ts";
 import { catalogEntries } from "./catalog-entries.ts";
@@ -9,6 +10,7 @@ import {
 	parseCatalogs,
 	readProject,
 } from "./compile.ts";
+import { withListedKeysChanged } from "./config-file.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
 import { occurrencesOf, positionOf, sourceFiles } from "./sources.ts";
@@ -18,10 +20,10 @@ import { writeAll } from "./write-all.ts";
 export type RenameResult = CompileResult & { changed: string[] };
 
 /**
- * Renames a key in every catalog and at every call site under the roots (the project's root by
- * default), all of them or none, then compiles. It changes nothing when no catalog has the key,
- * when the new name is no key name or is taken, or when a source writes the key's name where it
- * cannot tell that it means the key; each is an error that names the place.
+ * Renames a key in every catalog, at every call site under the roots (the project's root by
+ * default) and in the config's lists, all of them or none, then compiles. It changes nothing when
+ * no catalog has the key, when the new name is no key name or is taken, or when a source writes
+ * the key's name where it cannot tell that it means the key; each is an error that names the place.
  */
 export async function rename(
 	configFile: string,
@@ -53,6 +55,12 @@ export async function rename(
 	for (const { source, uses } of sites) {
 		texts.set(source.path, renamed(source.text, uses, from, to));
 	}
+	const configText = withListedKeysChanged(
+		readFileSync(configFile, "utf8"),
+		config.identicalToBase,
+		(key) => (key === from ? to : key),
+	);
+	if (configText !== undefined) texts.set(resolve(configFile), configText);
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
 	return { ...(await compile(configFile)), changed };
