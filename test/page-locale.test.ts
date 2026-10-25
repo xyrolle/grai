@@ -14,17 +14,22 @@ const catalogs = {
 };
 
 const page = `<!doctype html><html><head><meta charset="utf-8"><script type="module" src="/main.js"></script></head><body></body></html>`;
-/** The page's code: its title, and a switch the tests call as a visitor would. */
+/**
+ * The page's code: its title, the switches the tests call as a visitor would, and what the page
+ * holds now: its `<html lang>`, its locale and its title.
+ */
 const main = `import { m } from "./out/messages.js";
-import { setLocale } from "./out/runtime.js";
+import { getLocale, setLocale } from "./out/runtime.js";
 document.body.textContent = m.title();
 window.switchTo = (locale) => setLocale(locale);
+window.keep = (locale) => setLocale(locale, { reload: false });
+window.holds = () => [document.documentElement.lang, getLocale(), m.title()].join(" ");
 `;
 
 /** A project of one page, with the config's strategy. */
-function site(config: Record<string, unknown>) {
+function site(config: Record<string, unknown>, html = page) {
 	const { dir } = project(catalogs, config);
-	writeFileSync(join(dir, "index.html"), page);
+	writeFileSync(join(dir, "index.html"), html);
 	writeFileSync(join(dir, "main.js"), main);
 	return dir;
 }
@@ -59,8 +64,10 @@ type Visit = {
 	headers?: Record<string, string>;
 	/** What a server makes of the built page before sending it. */
 	served?: (html: string) => string;
-	/** What the visitor stored before. */
+	/** What the visitor stored before, in `localStorage`. */
 	stored?: Record<string, string>;
+	/** The visitor's cookies. */
+	cookies?: Record<string, string>;
 };
 
 /**
@@ -70,11 +77,18 @@ type Visit = {
 async function visit(
 	dist: string,
 	url: string,
-	{ headers = {}, served = (html) => html, stored }: Visit,
+	{ headers = {}, served = (html) => html, stored, cookies = {} }: Visit,
 ) {
 	const browser = await chromium.launch();
 	onTestFinished(() => browser.close());
 	const context = await browser.newContext({ locale: "ro-MD" });
+	await context.addCookies(
+		Object.entries(cookies).map(([name, value]) => ({
+			name,
+			value,
+			url: "http://grai.test",
+		})),
+	);
 	if (stored !== undefined) {
 		await context.addInitScript(
 			`for (const [key, value] of ${JSON.stringify(Object.entries(stored))}) localStorage.setItem(key, value);`,
@@ -178,16 +192,67 @@ describe("a page's locale, when no server picks it", () => {
 		);
 	});
 
-	it("is the one a server drew the page in, with its <html lang>", async () => {
-		const { dist } = await built(site({ strategy: ["preferredLanguage"] }));
+	it("is the visitor's stored choice on a page built with an <html lang>, which is only its default", async () => {
+		const { dist } = await built(
+			site(
+				{ strategy: ["cookie", "preferredLanguage"], cookieName: "lang" },
+				page.replace("<html>", '<html lang="en">'),
+			),
+		);
 		const { seen, messageFiles } = await visit(dist, "/", {
-			served: (html) => html.replace("<html>", '<html lang="ar" dir="rtl">'),
+			cookies: { lang: "ar" },
 		});
 
 		expect(await seen()).toBe("ar rtl سلتك");
 		expect(messageFiles().every((path) => path.includes("/grai-ar/"))).toBe(
 			true,
 		);
+	});
+
+	it("is the one a server drew the page in, with an <html lang> other than the page was built with", async () => {
+		const { dist } = await built(
+			site(
+				{ strategy: ["preferredLanguage"] },
+				page.replace("<html>", '<html lang="en">'),
+			),
+		);
+		const { seen, messageFiles } = await visit(dist, "/", {
+			served: (html) =>
+				html.replace('<html lang="en">', '<html lang="ar" dir="rtl">'),
+		});
+
+		expect(await seen()).toBe("ar rtl سلتك");
+		expect(messageFiles().every((path) => path.includes("/grai-ar/"))).toBe(
+			true,
+		);
+	});
+
+	it("is kept for the next load by setLocale with { reload: false }, and the page keeps its words", async () => {
+		const { dist } = await built(
+			site({
+				strategy: ["localStorage", "preferredLanguage"],
+				localStorageKey: "locale",
+			}),
+		);
+		const { tab, seen } = await visit(dist, "/", {});
+		await tab.evaluate(`keep("ar")`);
+
+		expect(await tab.evaluate(`holds()`)).toBe("ro ro Coșul tău");
+		await tab.reload();
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+		expect(await seen()).toBe("ar rtl سلتك");
+	});
+
+	it("is not changed by setLocale where the strategy keeps the choice nowhere, which says so", async () => {
+		const { dist } = await built(site({}));
+		const { tab } = await visit(dist, "/", {});
+
+		expect(
+			await tab.evaluate(
+				`(() => { try { switchTo("ar"); return "reloading"; } catch (error) { return error.code; } })()`,
+			),
+		).toBe("locale-unkept");
+		expect(await tab.evaluate(`holds()`)).toBe("en en Your cart");
 	});
 
 	it("is picked the same way by the dev server", async () => {
