@@ -1,0 +1,9 @@
+{
+	"title": "Your cart",
+	"items_one": "{{count}} item",
+	"items_other": "{{count}} items",
+	"summary": {
+		"total": "Total: {{sum}}",
+		"empty": "Nothing more to add"
+	}
+}
