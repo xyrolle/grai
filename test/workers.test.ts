@@ -15,7 +15,7 @@ const interleaving = fileURLToPath(
 const locales = ["en", "ro", "ar"] as const;
 const titleOf = (locale: string): string =>
 	JSON.parse(readFileSync(`${example}messages/${locale}.json`, "utf8")).title;
-/** 30 requests, ten in each locale, in turn. */
+/** The interleaving Worker's 30 requests, in the order it sends them: ten in each locale, in turn. */
 const sent = Array.from({ length: 10 }, () => locales).flat();
 
 /** A request to one of the two Workers, and what the tests read of its response. */
@@ -129,23 +129,12 @@ describe.each([
 	});
 
 	describe("30 requests interleaved, ten in each locale", () => {
-		/** The interleaving Worker's answers to `sent`, all in flight at once. */
-		const answers = (sent: { locale: string; switchTo?: string }[]) =>
-			Promise.all(
-				sent.map(async ({ locale, switchTo }) => {
-					const query = new URLSearchParams({
-						requests: String(sent.length),
-						...(switchTo === undefined ? {} : { switchTo }),
-					});
-					const response = await servers.interleave(`/?${query}`, {
-						headers: { cookie: `lang=${locale}` },
-					});
-					return response.json();
-				}),
-			);
+		/** What the interleaving Worker's 30 requests answered, in the order it sent them. */
+		const answers = async (query = "") =>
+			(await servers.interleave(`/${query}`, { headers: {} })).json();
 
 		it("keeps each request in its own locale", async () => {
-			expect(await answers(sent.map((locale) => ({ locale })))).toEqual(
+			expect(await answers()).toEqual(
 				sent.map((locale) => ({
 					locale,
 					bound: locale,
@@ -155,15 +144,13 @@ describe.each([
 		});
 
 		it("lets setLocale switch only the request that calls it", async () => {
-			const switching = sent.map((locale) =>
-				locale === "ro" ? { locale, switchTo: "ar" } : { locale },
-			);
+			const switchedTo = (locale: string) => (locale === "ro" ? "ar" : locale);
 
-			expect(await answers(switching)).toEqual(
-				switching.map(({ locale, switchTo = locale }) => ({
+			expect(await answers("?switch=ro:ar")).toEqual(
+				sent.map((locale) => ({
 					locale,
-					bound: switchTo,
-					renders: [titleOf(locale), titleOf(switchTo)],
+					bound: switchedTo(locale),
+					renders: [titleOf(locale), titleOf(switchedTo(locale))],
 				})),
 			);
 		});
