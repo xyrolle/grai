@@ -43,7 +43,8 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   config.js                      the project's locales and strategy, which the runtime reads
   plurals.js                     each locale's plural rules, compiled from CLDR
   formats.js                     the Intl formatters messages call, when any does
-  runtime.js    runtime.d.ts     the runtime, the same for every project
+  runtime.js    runtime.d.ts     the runtime's API, the same for every project
+  dispatch.js   dispatch.d.ts    the runtime's code, which the output's modules import; apps never do
   server.js     server.d.ts      the request middleware; client code never imports it
   keys.js       keys.d.ts        every message, as the re-exports of its shards
   keys/<n>.js   keys/<n>.d.ts    a shard: about 512 keys
@@ -73,7 +74,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   - A key the build has still resolves to keys.js outside a test run, so a page that imports hundreds of keys by path loads no module more for them (app B has 23,379 such imports in 1,924 files). The plugin resolves these paths before Vite does, since Vite's resolver would take them straight to keys.js.
   - It keeps each per-key import's importer, so that a build that adds or removes the key has the importer resolve it again: an added key reaches keys.js, and a removed one the module that throws.
 - **The per-locale variants of the message modules exist only in memory too.** They have the same exports, with one locale's function each, and the bundler adapters build them from the compiler's model.
-- **The output brings its own runtime.** `runtime.js` is the package's runtime module, as it is, beside the `config.js` it reads. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies.
+- **The output brings its own runtime.** `runtime.js` and `dispatch.js` are the package's runtime modules, as they are, beside the `config.js` they read. The output imports nothing from `grai`, so it runs wherever the app's code runs: a Worker, a script, or a server bundle that leaves out its dependencies.
 
 ### The browser's locale
 
@@ -119,7 +120,7 @@ Tests switch the locale within the page, and so do many apps, without a reload. 
 
 ```js
 // keys/3.js, a shard, for locales ["en", "de"]
-import { message, text } from "../runtime.js";
+import { message, text } from "../dispatch.js";
 import { plural_en } from "../plurals.js";
 
 export const cart_title = /*#__PURE__*/ text("Your cart", "Ihr Warenkorb");
@@ -167,7 +168,7 @@ export declare const cart_items: Message<{ count: number }>;
   Each use narrows the type, so an input both selected on `1` and `2` without `*` and formatted as a number is `1 | 2`, and one a locale selects on `a` and `b` and another on `a` is `"a"`. Two uses no value suits both of, such as `{x :currency currency=$x}`, which formats `x` as a number and takes its currency from it, are a compile error naming both, so a call that type-checks renders in every locale. A key's inputs are the union over its locales.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
 - **Go to definition lands on the key in the base locale's catalog.** Each shard's declarations have a declaration map, from each key's name to the line its key is on in the base catalog, and TypeScript 6's tsserver and TypeScript 7's language server both follow it. An edit regenerates the maps only when it moves a key to another line, so a message's new words cost no map.
-- **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `runtime.d.ts` declares what the shards and `server.js` import from the runtime, and `config.js` and `plurals.js` carry JSDoc types.
+- **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `dispatch.d.ts` declares what the shards and `server.js` import from the runtime's code, and `config.js` and `plurals.js` carry JSDoc types.
 - **The declarations are sharded like the modules.** One file loads a little faster in an editor the first time, but an edit rewrites it whole, so every edit after costs more. A file per key costs the most in `tsc` and in completion alike.
 
 ## Selection: plurals and selects
@@ -231,7 +232,7 @@ These are MessageFormat 2's rules, restricted to the constructs above:
   - The watches are set up again before each compile, so a file an editor saves by renaming another over it is seen, and so is a change during the compile.
   - A catalog that does not exist yet is watched for through its directory.
 - **Each file is written to a temporary file in `.grai/` and renamed over the old one**, which is atomic on POSIX file systems. A reader sees the old file or the new one, never part of one. A file whose content is already there is not written, so file watchers, Vite's caches and TypeScript's incremental state stay warm.
-- **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime first, then the shards, then `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
+- **The writes go in dependency order, a level at a time, each level's files at once:** `config.js` and the runtime's code first, then its API and the shards, then `server.js` and `keys.js`, then `messages.js`, then any file no longer output, and the manifest last. At every instant, every import in the output resolves to a whole file, so no tool has to wait for the output or check it for a partial write.
 - **One writer per outdir.** The writer takes a lock: a file holding its pid, linked into place so that it never exists empty. A lock whose process is gone is taken over, and a live one is waited for. The CLI's `watch` and the Vite plugin can then share an outdir.
 - **In dev, the Vite plugin serves from memory and sends HMR itself.** It watches the config and the catalogs with `fs.watch` (3–10 ms to see a save, against 48–114 ms for Vite's watcher: `hmr`) and ignores every other file, and the output directory's changes are its own, so a compile is never reported twice. The plugin still writes the files, for TypeScript and editors.
 - **An edit patches the page in place.** The dev module keeps every key's locales in a table. After an edit the plugin sends only the changed keys' functions, as a module the page imports; the page writes them into the table and dispatches a cancelable `grai:change` event on `window`. A framework adapter that renders again cancels it; otherwise the page reloads. The server's dev render takes the same patch, so an edit never evaluates the app again. A key added or removed, or a change of locales, reloads the page, and the server's environments take the module again. It is 17–30 ms from the save to the page, against 202–459 ms for re-sending the whole module (`hmr`).
@@ -261,6 +262,8 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `cookieName`, `getTextDirection`, `MessagePart`;
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`. Without it they leave every URL as it is, since no URL then names a locale: in an app that keeps the locale in a cookie, `/de/…` is a path of its own, and a prefix would lead to a page it does not have;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
+
+**`runtime.js` exports only that API.** It re-exports it from `dispatch.js`, the runtime's code, which also holds what the output's own modules call: the dispatcher the shards call and the request binding `server.js` sets. An editor then offers an app nothing it should not call. A bundle drops a re-export, so a page holds the same code as when one module held it all. Splitting the code itself in two would put a call between the API and the bound locale, which a bundle keeps.
 
 ## Servers
 

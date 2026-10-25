@@ -1,9 +1,9 @@
 import type { CompiledKey } from "./compilation.ts";
 
 /**
- * The imports a module of keys needs from the output, each file named by `specifier`: the runtime
- * functions it names, the `unmatched` the keys' code throws with, the functions of plurals.js they
- * count with, and the formatters they call.
+ * The imports a module of keys needs from the output, each file named by `specifier`: the
+ * dispatcher's functions it names, the `unmatched` the keys' code throws with, the functions of
+ * plurals.js they count with, and the formatters they call.
  */
 export function outputImports(
 	specifier: (file: string) => string,
@@ -20,7 +20,7 @@ export function outputImports(
 	}
 	const from = (file: string) => JSON.stringify(specifier(file));
 	const lines = [
-		`import { ${[...uses].sort().join(", ")} } from ${from("runtime.js")};`,
+		`import { ${[...uses].sort().join(", ")} } from ${from("dispatch.js")};`,
 	];
 	if (plurals.size > 0) {
 		lines.push(

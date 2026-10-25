@@ -17,9 +17,9 @@ import {
 	bindRequests,
 	localeOfPath,
 	localizeUrl,
-} from "./runtime.js";
+} from "./dispatch.js";
 
-/** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
+/** @type {AsyncLocalStorage<import("./dispatch.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 

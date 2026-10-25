@@ -67,6 +67,7 @@ export type GraiModuleKind =
 
 /** The output's files that go to the `grai-runtime` chunk, with their kinds. */
 const runtimeFiles = new Map<string, GraiModuleKind>([
+	["dispatch.js", "runtime"],
 	["runtime.js", "runtime"],
 	["config.js", "config"],
 	["plurals.js", "plurals"],
