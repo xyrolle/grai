@@ -1,4 +1,4 @@
-import { dirname, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import {
 	type DevEnvironment,
 	isRunnableDevEnvironment,
@@ -102,6 +102,23 @@ export function serveMessages(
 		client.hot.send({ type: "update", updates: [] });
 		if (server.ws.clients.size === 0) client.hot.send({ type: "full-reload" });
 	};
+	/**
+	 * Tells every environment's plugins that the output's modules were created, as Vite's watcher
+	 * does once it reports them. A page that imported the output while a compile failed left Vite's
+	 * resolver a lookup that found nothing, and the page reloads before the watcher catches up.
+	 */
+	const created = (build: Build) =>
+		Promise.all(
+			Object.values(server.environments).flatMap((environment) =>
+				[...build.rendered.files.keys()]
+					.filter((file) => file.endsWith(".js"))
+					.map((file) =>
+						environment.pluginContainer.watchChange(join(files.outdir, file), {
+							event: "create",
+						}),
+					),
+			),
+		);
 	/** A compile or an update that threw, as when the outdir cannot be written. */
 	const failed = (thrown: unknown) => {
 		const error = thrown instanceof Error ? thrown : new Error(String(thrown));
@@ -120,6 +137,11 @@ export function serveMessages(
 			const before = previous;
 			previous = next;
 			compiled(next);
+			if (before === undefined && showing) {
+				// The first output comes after a failed compile: Vite learns of it before the page reloads.
+				created(next).then(cleared, failed);
+				return;
+			}
 			cleared();
 			if (before !== undefined) update(before, next).catch(failed);
 		},
