@@ -53,7 +53,6 @@ export type Runtime = {
 	deLocalizeUrl(url: string | URL): URL;
 	extractLocaleFromUrl(url: string | URL): string;
 	getTextDirection(locale?: string): "ltr" | "rtl";
-	localeOfPath(pathname: string): string | undefined;
 };
 
 export function project(

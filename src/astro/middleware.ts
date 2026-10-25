@@ -21,7 +21,7 @@ export type LocaleProject = {
 	): Promise<Response>;
 	/** `getTextDirection` from the output's `runtime.js`. */
 	getTextDirection(locale?: string): "ltr" | "rtl";
-	/** `localeOfPath` from the output's `runtime.js`: the locale a path names, if it names one. */
+	/** `localeOfPath` from the output's `internal.js`: the locale a path names, if it names one. */
 	localeOfPath(pathname: string): string | undefined;
 	/** The name of the project's grai config, which errors name. */
 	configName: string;

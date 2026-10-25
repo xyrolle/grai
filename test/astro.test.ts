@@ -300,14 +300,21 @@ async function compiledProject(config: Record<string, unknown>) {
 		config,
 	);
 	const { m, runtime } = await load();
-	const server = await outputServer(dir);
+	const server = await outputModule<Pick<LocaleProject, "middleware">>(
+		dir,
+		"server.js",
+	);
+	const internal = await outputModule<Pick<LocaleProject, "localeOfPath">>(
+		dir,
+		"internal.js",
+	);
 	return {
 		m,
 		middleware: (project: Partial<LocaleProject> = {}) =>
 			localeMiddleware({
 				middleware: server.middleware,
 				getTextDirection: runtime.getTextDirection,
-				localeOfPath: runtime.localeOfPath,
+				localeOfPath: internal.localeOfPath,
 				configName: "grai.config.json",
 				requestStrategies: { beforeUrl: [], afterUrl: [] },
 				...project,
@@ -315,10 +322,12 @@ async function compiledProject(config: Record<string, unknown>) {
 	};
 }
 
-async function outputServer(
+/** A module of a project's output, by its name, as the middleware's code imports it. */
+async function outputModule<Module>(
 	dir: string,
-): Promise<{ middleware: LocaleProject["middleware"] }> {
-	return import(pathToFileURL(join(dir, "out", "server.js")).href);
+	file: string,
+): Promise<Module> {
+	return import(pathToFileURL(join(dir, "out", file)).href);
 }
 
 /** What the middleware reads of Astro's context, for a request to `path`. */
