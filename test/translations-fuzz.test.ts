@@ -49,6 +49,7 @@ const codes = [
 	"{n :number}",
 	"{when :date dateStyle=long}",
 	"{#br/}",
+	"{#a title=|{x}| href=|a\\|b}|/}",
 ];
 
 function pieces(next: () => number): Piece[] {
