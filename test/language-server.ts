@@ -105,6 +105,8 @@ async function askEditor(
 					"grai/next/config": [source("next/config.ts")],
 					"grai/next/proxy": [source("next/proxy.ts")],
 					"grai/react": [source("react/markup.ts")],
+					"grai/astro": [source("astro.ts")],
+					"grai/astro/middleware": [source("astro/middleware.ts")],
 				},
 			},
 			files: ["use.ts"],
