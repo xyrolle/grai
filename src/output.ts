@@ -13,7 +13,7 @@ import type { Output, OutputFile } from "./render.ts";
 import { removeTemporary, writeTemporary } from "./replace-file.ts";
 
 /** grai's own directory in the outdir: the manifest, the writer's lock and files being written. */
-const stateDirectory = ".grai";
+export const stateDirectory = ".grai";
 
 /**
  * How long a file stays once the output stops naming it, in ms: far longer than a module loader

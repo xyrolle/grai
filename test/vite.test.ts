@@ -971,6 +971,47 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		await expect.poll(rendered, devWait).toBe("Heading 2");
 	});
 
+	it("starts from the build the last server saved, with the edit made while none ran, and patches the next edit", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
+		);
+		const catalog = join(dir, "messages", "en.json");
+		const retitled = (from: string, to: string) =>
+			writeFileSync(
+				catalog,
+				readFileSync(catalog, "utf8").replace(`"${from}"`, `"${to}"`),
+			);
+		const started = async () => {
+			const server = await createServer({
+				root: dir,
+				configFile: false,
+				logLevel: "silent",
+				server: { watch: fixtures },
+				plugins: [grai()],
+			});
+			onTestFinished(() => server.close());
+			const ssr = server.environments.ssr;
+			if (!isRunnableDevEnvironment(ssr))
+				throw new Error("ssr is not runnable");
+			const rendered = async () =>
+				(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+			return { server, rendered };
+		};
+		const first = await started();
+		expect(await first.rendered()).toBe("Title");
+		await first.server.close();
+		expect(existsSync(join(dir, "out", ".grai", "build"))).toBe(true);
+		retitled("Title", "Heading");
+
+		const second = await started();
+
+		expect(await second.rendered()).toBe("Heading");
+		retitled("Heading", "Caption");
+		await expect.poll(second.rendered, devWait).toBe("Caption");
+	});
+
 	it("reloads the open pages after an edit with reloadOnEdit, rather than patch them, and patches the server's render", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
