@@ -104,6 +104,24 @@ describe("a recompile after an edit", () => {
 			"Servus $" + "{i.name}",
 		);
 	});
+
+	it("reports an edit that leaves out the comma after an entry, and so does the next compile", async () => {
+		const { dir, config, compile } = project(catalogs);
+		const first = await recompile(config, undefined);
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Titel",', '"Überschrift"'),
+		);
+		const edited = await recompile(config, first.build);
+
+		expect(edited.result.errors.map((error) => error.code)).toEqual([
+			"catalog-invalid",
+		]);
+		expect((await compile()).errors.map((error) => error.code)).toEqual([
+			"catalog-invalid",
+		]);
+	});
 });
 
 describe("the messages of an edited catalog", () => {
@@ -154,5 +172,21 @@ describe("the messages of an edited catalog", () => {
 
 		expect(oneLine).toBeUndefined();
 		expect(duplicated).toBeUndefined();
+	});
+
+	it("are left to a whole parse when an entry lacks its comma, or the last has one", () => {
+		const text = laidOut(before).toString();
+		const edited = (replaced: string, by: string) =>
+			editedMessages(
+				laidOut(before),
+				parsed(before),
+				Buffer.from(text.replace(replaced, by)),
+			);
+
+		expect(edited('"One",', '"Uno"')).toBeUndefined();
+		expect(edited('"Three"\n', '"Tres",\n')).toBeUndefined();
+		expect(
+			edited('"Three"\n', '"Three"\n\t"fourth": "Four"\n'),
+		).toBeUndefined();
 	});
 });
