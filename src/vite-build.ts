@@ -101,22 +101,31 @@ export const ownChunkBytes = 4096;
 
 /**
  * The client build's chunking. The runtime has a chunk of its own, so a message chunk holds keys and
- * nothing else. The keys go in chunks by the entries that use them: a set of `ownChunkBytes` or more
- * has a chunk of its own, which every entry that loads it uses whole, and each smaller set joins the
- * set nearest it by those entries until it is as large. The larger sets keep their own chunks, so the
- * words a page loads and does not use come only from sets under `ownChunkBytes`.
+ * nothing else. The keys a first paint needs (Rolldown's `$initial`) are chunked before the keys only
+ * a later import needs, so no chunk holds both. Among each, keys go in chunks by the entries that use
+ * them: a set of `ownChunkBytes` or more has a chunk of its own, which every entry that loads it uses
+ * whole, and each smaller set joins the set nearest it by those entries until it is as large. The
+ * larger sets keep their own chunks, so the words a page loads and does not use come only from sets
+ * under `ownChunkBytes`.
  */
 export function messageChunking(outdir: string): EnvironmentOptions {
 	const runtime = runtimeModules(outdir);
-	const keys = {
-		name: messageDirectory,
-		test: isMessageModule,
-		entriesAware: true,
+	const keyChunks = (modules: { tags?: "$initial"[] }) => {
+		const keys = {
+			name: messageDirectory,
+			test: isMessageModule,
+			entriesAware: true,
+			...modules,
+		};
+		return [
+			{ ...keys, minSize: ownChunkBytes },
+			{ ...keys, entriesAwareMergeThreshold: ownChunkBytes },
+		];
 	};
 	const groups = [
 		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
-		{ ...keys, minSize: ownChunkBytes },
-		{ ...keys, entriesAwareMergeThreshold: ownChunkBytes },
+		...keyChunks({ tags: ["$initial"] }),
+		...keyChunks({}),
 	];
 	return {
 		build: { rolldownOptions: { output: { codeSplitting: { groups } } } },
