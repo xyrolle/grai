@@ -9,10 +9,14 @@ import { readEntries, type Source } from "./sources.ts";
 export const importFormats = ["i18next", "icu"] as const;
 export type ImportFormat = (typeof importFormats)[number];
 
-/** A converted message, with the source file and key the report names it by. */
+/**
+ * A converted message, with the source file and key the report names it by, and the key its
+ * library's calls name it by.
+ */
 export type KeyedMessage = ImportedMessage & {
 	file: string;
 	sourceKey: string;
+	calledBy: string;
 };
 
 /** Each locale's converted messages, by grai key. */
@@ -29,7 +33,8 @@ const converters: Record<
 /**
  * Converts every source's messages and names each by its grai key, in each of the locales. When
  * the sources hold several namespaces, each key starts with its own. Two source keys that become
- * one grai key, ignoring case, are an error.
+ * one grai key, ignoring case, are an error. An i18next call names a file's namespace, `ns:a.b`,
+ * even when it is the only one; an ICU call names the message's path joined by `.`.
  */
 export function convertSources(
 	sources: readonly Source[],
@@ -55,9 +60,13 @@ export function convertSources(
 			const path =
 				namespace === "" ? message.path : [namespace, ...message.path];
 			const key = names.name(path, sourceKey, source.file);
+			const calledBy =
+				format === "i18next" && source.namespace !== ""
+					? `${source.namespace}:${dotted}`
+					: path.join(".");
 			messages
 				.get(source.locale)
-				?.set(key, { ...message, file: source.file, sourceKey });
+				?.set(key, { ...message, file: source.file, sourceKey, calledBy });
 		}
 	}
 	errors.push(...names.collisions());

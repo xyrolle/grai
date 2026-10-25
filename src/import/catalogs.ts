@@ -1,5 +1,5 @@
 import type { Config } from "../config.ts";
-import { parseMessage } from "../message.ts";
+import { type LocaleMessage, parseMessage } from "../message.ts";
 import { MessageProblem } from "../problem.ts";
 import type { KeyedMessage, MessagesByLocale } from "./convert.ts";
 import { type CatalogValue, catalogValue } from "./converted.ts";
@@ -14,10 +14,28 @@ export type Catalog = Map<string, CatalogValue>;
 /** A locale's new catalog, and the file it goes to. */
 export type CatalogFile = { locale: string; path: string; catalog: Catalog };
 
-/** The catalogs of an import, how many keys each holds, and its report. */
+/**
+ * A key the import wrote, as its source library's calls name it, and what a grai call of it
+ * takes: every input it reads in some locale, sorted, and whether it has markup in one.
+ */
+export type ImportedKey = {
+	calledBy: string;
+	key: string;
+	inputs: string[];
+	markup: boolean;
+};
+
+/** The catalogs of an import, the keys each holds, and its report. */
 export type ImportedCatalogs = ImportReport & {
 	files: CatalogFile[];
-	keys: number;
+	keys: ImportedKey[];
+};
+
+/** A locale's catalog value for a key, the message it compiles to, and how its source calls it. */
+type LocaleValue = {
+	value: CatalogValue;
+	compiled: LocaleMessage;
+	calledBy: string;
 };
 
 const schema = "https://inlang.com/schema/inlang-message-format";
@@ -37,7 +55,7 @@ export function catalogsOf(
 			path,
 			catalog: new Map([["$schema", schema]]),
 		})),
-		keys: 0,
+		keys: [],
 		leftOut: [],
 		changed: [],
 	};
@@ -45,12 +63,27 @@ export function catalogsOf(
 		const values = valuesOf(key, messages, imported);
 		if (values === undefined) continue;
 		for (const { locale, catalog } of imported.files) {
-			const value = values.get(locale);
+			const value = values.get(locale)?.value;
 			if (value !== undefined) catalog.set(key, value);
 		}
-		imported.keys++;
+		imported.keys.push(importedKey(key, values));
 	}
 	return imported;
+}
+
+/** A written key, by its values in the locales, whose sources all call it alike. */
+function importedKey(
+	key: string,
+	values: ReadonlyMap<string, LocaleValue>,
+): ImportedKey {
+	const inLocales = [...values.values()];
+	const inputs = inLocales.flatMap(({ compiled }) => [...compiled.inputs]);
+	return {
+		calledBy: inLocales[0]?.calledBy ?? key,
+		key,
+		inputs: [...new Set(inputs)].sort(),
+		markup: inLocales.some(({ compiled }) => compiled.markup),
+	};
 }
 
 /** Every key, the base locale's in its order first. */
@@ -70,14 +103,14 @@ function valuesOf(
 	key: string,
 	messages: MessagesByLocale,
 	report: ImportReport,
-): Map<string, CatalogValue> | undefined {
+): Map<string, LocaleValue> | undefined {
 	const inLocales = [...messages].map(([locale, byKey]) => ({
 		locale,
 		message: byKey.get(key),
 	}));
 	const named = inLocales.find(({ message }) => message !== undefined)?.message;
 	const where = { file: named?.file ?? "", key: named?.sourceKey ?? key };
-	const values = new Map<string, CatalogValue>();
+	const values = new Map<string, LocaleValue>();
 	const problems: LocaleDetail[] = [];
 	for (const { locale, message } of inLocales) {
 		try {
@@ -102,7 +135,7 @@ function valuesOf(
 function valueIn(
 	locale: string,
 	message: KeyedMessage | undefined,
-): CatalogValue {
+): LocaleValue {
 	if (message === undefined) {
 		throw new MessageProblem(
 			"key-missing",
@@ -111,6 +144,6 @@ function valueIn(
 	}
 	if (message.result instanceof MessageProblem) throw message.result;
 	const value = catalogValue(message.result);
-	parseMessage(locale, value);
-	return value;
+	const compiled = parseMessage(locale, value);
+	return { value, compiled, calledBy: message.calledBy };
 }
