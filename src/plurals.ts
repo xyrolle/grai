@@ -79,7 +79,7 @@ export const numberReaders: Readonly<
 
 /**
  * plurals.js: a function per locale and type giving a count's category, compiled from CLDR's
- * rules, and the number readers: the whole number an `:integer` selector compares, and the
+ * rules, and the number readers: the whole number an `:integer` selector compares, and the whole
  * percent a `:percent` one does. A count is taken as a number, as Intl.PluralRules takes it. A
  * whole, non-negative count, the usual one, takes a path with the fraction and exponent operands
  * folded away; any other is split into the operands its locale's rules read. That path also tests
@@ -131,8 +131,9 @@ export const ${numberReaders.integer} = (n) => {
 };
 
 /**
- * A count as the percent :percent shows: its decimal point moved two places, which is exact where
- * multiplying by 100 is not (0.29 * 100 is 28.999999999999996).
+ * A count as the whole percent :percent shows: its decimal point moved two places, which is exact
+ * where multiplying by 100 is not (0.29 * 100 is 28.999999999999996), then rounded as :integer
+ * rounds, so 0.014 is the 1 that 1% shows.
  *
  * @param {unknown} n
  */
@@ -140,7 +141,7 @@ export const ${numberReaders.percent} = (n) => {
 	const x = Number(n);
 	if (!Number.isFinite(x)) return x * 100;
 	const [digits, exponent = "0"] = String(x).split("e");
-	return Number(\`\${digits}e\${Number(exponent) + 2}\`);
+	return ${numberReaders.integer}(\`\${digits}e\${Number(exponent) + 2}\`);
 };
 `;
 

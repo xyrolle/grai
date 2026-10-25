@@ -96,7 +96,7 @@ export function checkNumberKey(
 				`the variant ${selector.name}=${key} can never be chosen: a number matches the key it is written as, ${shortest}. Write that instead.`,
 			);
 		}
-		if (selector.number === "integer" && !Number.isInteger(Number(key))) {
+		if (selector.number !== "number" && !Number.isInteger(Number(key))) {
 			throw new MessageProblem(
 				"message-invalid",
 				`the variant ${selector.name}=${key} can never be chosen: ${selector.name} is a whole number. Remove it.`,
