@@ -49,12 +49,6 @@ Neither reference app uses them, but they are common in MessageFormat 2 catalogs
 
 Done when: each compiles, with a test, and the design lists it among the constructs.
 
-## The output under `noPropertyAccessFromIndexSignature`
-
-The keys' code reads an input as `i.count`, and the inputs it is given are typed by an index signature, so an app whose checkJs sets `noPropertyAccessFromIndexSignature`, as @tsconfig/strictest does, gets an error at every read. `i["count"]` costs three bytes a read where a minifier does not run, as in a server build; taking the inputs apart in the parameter is shorter, but reads every input a locale's variants name on every call.
-
-Done when: the checkJs test sets it too and passes, with the startup and bytes numbers of the chosen form.
-
 ## Bind the locale in Next.js server components
 
 Next renders server components outside the middleware's call, so an `AsyncLocalStorage` binding set there does not reach them.

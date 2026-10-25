@@ -100,8 +100,8 @@ import { plural_en } from "../plurals.js";
 export const cart_title = /*#__PURE__*/ text("Your cart", "Ihr Warenkorb");
 
 export const cart_items = /*#__PURE__*/ message(
-	(i) => (plural_en(i.count) === "one" ? `${i.count} item` : `${i.count} items`),
-	(i) => `${i.count} Artikel`,
+	(i) => (plural_en(i["count"]) === "one" ? `${i["count"]} item` : `${i["count"]} items`),
+	(i) => `${i["count"]} Artikel`,
 );
 ```
 
@@ -110,7 +110,7 @@ export const cart_items = /*#__PURE__*/ message(
   - A message without inputs is a string per locale (`text`).
   - One locale may use a plain pattern where another selects: the German above needs no plural.
 - **A message with markup also has `.parts()`**, built the same way. A part is `{ type: "text", value }` or `{ type: "markup-start" | "markup-end" | "markup-standalone", name, options, attributes }`. An option is a literal, or the value of an input or local (a formatted local as its text); an attribute is a literal, or `true` when it has none. The app then decides how markup looks, and translators decide where it stands.
-- **Inputs are read as `i.name`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B).
+- **Inputs are read as `i["name"]`, not `i?.name`.** The types require them, and the body is repeated in every message function (40k in app B). The brackets keep an app's checkJs clean under `noPropertyAccessFromIndexSignature`, which `@tsconfig/strictest` sets, as the compiled functions take their inputs typed by an index signature. A minifier writes them back as `i.name`, so a browser's bundle does not change; a server build, which is not minified, grows 1% (BYTES). Taking the inputs apart in the parameter, `({ count: _count }) =>`, was the other way: it reads every input a function names on every call, and it is larger minified and slower to load (NUMBERS).
 - **A server build writes each locale's function as a function expression, `function (i) { return … }`.** V8 parses every arrow function of a module in full when it loads the module, but only pre-parses a function expression, until its first call. A server loads every locale's functions and a request calls few of them, so the Vite plugin's server build loads app A's messages about a fifth faster (`docs/runtime.md`). The browser's modules and `keys.js` keep arrows, which are shorter.
 - **Calls are not replaced after the framework compiled them.** Each locale's function is a pure arrow of its inputs, so a bundler transform could put a call's string in its place, in a build per locale. But Svelte has by then compiled each call as a dynamic expression, and the string stays inside it: on the page of 2,000 calls the strings hydrate in 23.9–24.1 ms against 23.3–24.3 ms for the calls at a 4× CPU slowdown, where `grai/svelte`'s, put in before Svelte compiles, take 15.9–16.2 ms (`docs/runtime.md`). It would also take a copy per locale of every client chunk that calls a message, 978 more files on app A. Inlining the text into the template is the open question (`docs/followups.md`).
 
