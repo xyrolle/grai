@@ -2,7 +2,9 @@
 // is, beside the config.js it writes with the project's locales.
 import {
 	baseLocale,
+	cookieAttributes,
 	cookieName,
+	cookieSecure,
 	customPrefixes,
 	directions,
 	leavesPathsAlone,
@@ -126,8 +128,14 @@ export function setLocale(locale, options) {
 	document.documentElement.lang = locale;
 	document.documentElement.dir = directions[index] ?? "ltr";
 	if (strategy.includes("cookie")) {
+		// A browser drops a Secure cookie an http page sets, so it is Secure on https, and always
+		// where its policy needs it.
+		const secure =
+			cookieSecure === "always" || location.protocol === "https:"
+				? "; secure"
+				: "";
 		// biome-ignore lint/suspicious/noDocumentCookie: the reload that follows must see it, and the Cookie Store API is asynchronous and not in every browser.
-		document.cookie = `${cookieName}=${locale}; path=/; max-age=34560000; samesite=lax`;
+		document.cookie = `${cookieName}=${locale}${cookieAttributes}${secure}`;
 	}
 	if (options?.reload === false) return;
 	if (readsUrl) {
