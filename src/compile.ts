@@ -2,6 +2,7 @@ import { createHash, hash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { serialize } from "node:v8";
 import {
 	type Catalog,
 	type CatalogSource,
@@ -32,6 +33,8 @@ export type Build = {
 	/** Where each key is in the base locale's catalog, for the declaration maps. */
 	positions: ReadonlyMap<string, Position>;
 	rendered: Rendered;
+	/** What a saved build must match to be taken up again: `buildKey` of the config as read. */
+	key: string;
 };
 
 /** The runtime's modules, which every output carries, their imports of each other pinned. */
@@ -212,6 +215,7 @@ async function build(
 			compilation,
 			positions,
 			rendered,
+			key: buildKey(configured, { pseudoLocale, localeCopies }),
 		},
 	};
 }
@@ -285,4 +289,21 @@ function inputsOf(
 /** JSON of a config's maps and sets, as lists of their entries. */
 function collectionsAsLists(_key: string, value: unknown): unknown {
 	return value instanceof Map || value instanceof Set ? [...value] : value;
+}
+
+/**
+ * What a saved build must match to be taken up again (`savedBuild`): the compiler and the runtime
+ * that made it, the config as read, and the options it was compiled with. The runtime names V8, in
+ * whose format the build is saved, and ICU, whose plural rules and locale data the compile reads.
+ */
+export function buildKey(
+	config: Config,
+	{ pseudoLocale = false, localeCopies = false }: CompileOptions,
+): string {
+	return JSON.stringify({
+		compiler: hashOfCompiler(),
+		runtime: [process.versions.v8, process.versions.icu],
+		options: { pseudoLocale, localeCopies },
+		config: hash("sha1", serialize(config)),
+	});
 }
