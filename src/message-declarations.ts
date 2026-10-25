@@ -48,6 +48,11 @@ export function parseDeclarations(texts: readonly string[]): Declarations {
 	return { declared, plurals, formatted };
 }
 
+/** The name a declaration, such as `local price = amount: number`, gives its value. */
+export function declaredName(declaration: string): string {
+	return parseDeclaration(declaration).name;
+}
+
 /** A declaration: an input, a plural local of an input, or a formatted local of one. */
 type Declaration =
 	| { kind: "input"; name: string }
