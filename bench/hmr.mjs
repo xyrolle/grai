@@ -25,7 +25,6 @@ import { writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
 
-const PORT = 4747;
 const EDITS = 20;
 const SHOWN = 500;
 const SAVE_INTERVAL_MS = 500;
@@ -294,7 +293,8 @@ async function measure(browser, app, design) {
 		root,
 		configFile: false,
 		logLevel: "silent",
-		server: { host: "127.0.0.1", port: PORT, strictPort: true },
+		// A port the system picks, so that runs side by side never meet.
+		server: { host: "127.0.0.1", port: 0 },
 		plugins: pluginsFor(design, app, root, locale, timings),
 	});
 	await server.listen();
