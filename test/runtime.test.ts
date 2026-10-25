@@ -273,6 +273,40 @@ describe("the middleware's lookup, for a framework that renders apart from it", 
 			server.vary,
 		]).toEqual(["ar", "de", "en", "Cookie, Accept-Language"]);
 	});
+
+	it("finds the redirect the middleware would answer a page without a prefix with, its Vary included", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			localePrefix: "always",
+		});
+		await load();
+		const server = await import(
+			pathToFileURL(join(dir, "out", "server.js")).href
+		);
+		const redirectOf = (path: string, init: RequestInit = {}) => {
+			const response: Response | undefined = server.redirectOf(
+				new Request(`https://shop.test${path}`, init),
+			);
+			return (
+				response && [
+					response.status,
+					response.headers.get("location"),
+					response.headers.get("vary"),
+				]
+			);
+		};
+
+		expect([
+			redirectOf("/cart?step=2", { headers: { cookie: "lang=ar" } }),
+			redirectOf("/de/cart"),
+			redirectOf("/cart", { method: "POST" }),
+		]).toEqual([
+			[307, "https://shop.test/ar/cart?step=2", "Cookie"],
+			undefined,
+			undefined,
+		]);
+	});
 });
 
 describe("the response's Vary", () => {

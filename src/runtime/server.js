@@ -42,15 +42,43 @@ export const vary = headersRead().join(", ");
 export async function middleware(request, handler) {
 	const { pathname } = new URL(request.url);
 	const locale = findLocale(request, pathname);
-	const response = unprefixedPage(request, pathname)
-		? Response.redirect(
-				localizeUrl(request.url, { locale: assertIsLocale(locale) }),
-				307,
-			)
-		: await requests.run({ index: locales.indexOf(locale) }, () =>
-				handler({ request, locale }),
-			);
+	const response =
+		redirectAt(request, pathname, locale) ??
+		(await requests.run({ index: locales.indexOf(locale) }, () =>
+			handler({ request, locale }),
+		));
 	return vary === "" ? response : withVary(response);
+}
+
+/**
+ * The redirect the middleware answers a request with, its `Vary` included, else undefined: with
+ * every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
+ * For a framework that renders apart from the middleware.
+ *
+ * @param {Request} request
+ * @returns {Response | undefined}
+ */
+export function redirectOf(request) {
+	const { pathname } = new URL(request.url);
+	const redirect = redirectAt(request, pathname, findLocale(request, pathname));
+	return redirect === undefined || vary === "" ? redirect : withVary(redirect);
+}
+
+/**
+ * The redirect of a page asked for without a locale prefix to its locale's path, if every
+ * locale's paths are prefixed.
+ *
+ * @param {Request} request
+ * @param {string} pathname
+ * @param {string} locale
+ * @returns {Response | undefined}
+ */
+function redirectAt(request, pathname, locale) {
+	if (!unprefixedPage(request, pathname)) return undefined;
+	return Response.redirect(
+		localizeUrl(request.url, { locale: assertIsLocale(locale) }),
+		307,
+	);
 }
 
 /**
