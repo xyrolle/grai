@@ -17,21 +17,25 @@ export const changeEvent = "grai:change";
  */
 export function devModule(outdir: string, build: Build): string {
 	const keys = [...build.compilation.keys];
-	const exports = keys.map(([key, compiled]) => {
-		const name = JSON.stringify(key);
-		return compiled.kind === "markup"
-			? `export const ${key} = markup(live(${name}, "v"), live(${name}, "p"));`
-			: `export const ${key} = message(...live(${name}, "v"));`;
-	});
+	const texts = keys.filter(([, compiled]) => compiled.kind === "text");
+	const calls = keys.filter(([, compiled]) => compiled.kind !== "text");
+	const textRows = texts
+		.map(
+			([key, compiled]) =>
+				`${JSON.stringify(key)}:{"v":[${compiled.variants.join(",")}]}`,
+		)
+		.join(",");
 	return `${outputImports(outdir, build.compilation.keys.values(), ["markup", "message"])}
-const T = {
-${keys.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
-};
+const T = Object.assign(JSON.parse(${JSON.stringify(`{${textRows}}`)}), {
+${calls.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
+});
 const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
 	const variant = T[key][field][n];
 	return typeof variant === "function" ? variant(inputs) : variant;
 }), key];
-${exports.join("\n")}
+const made = {};
+for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
+export const { ${keys.map(([key]) => key).join(", ")} } = made;
 if (import.meta.hot) {
 	import.meta.hot.on(${JSON.stringify(updateEvent)}, async ({ url }) => {
 		const { rows } = await import(/* @vite-ignore */ url);
