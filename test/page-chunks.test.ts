@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { build, type Rolldown } from "vite";
 import { describe, expect, it } from "vitest";
 import { ownChunkBytes } from "../src/vite-build.ts";
-import { graiPlugin } from "../src/vite-plugin.ts";
+import { type GraiAdapter, graiPlugin } from "../src/vite-plugin.ts";
 import { project } from "./project.ts";
 
 /** A word repeated into a message whose key's module alone reaches `ownChunkBytes`. */
@@ -18,7 +18,13 @@ const sized = (word: string) =>
 async function built(
 	catalog: Record<string, string>,
 	entries: Record<string, readonly string[]>,
-	{ modules = {} }: { modules?: Record<string, readonly string[]> } = {},
+	{
+		modules = {},
+		adapter = () => ({}),
+	}: {
+		modules?: Record<string, readonly string[]>;
+		adapter?: (dir: string) => GraiAdapter;
+	} = {},
 ) {
 	const { dir } = project({ en: catalog, de: catalog });
 	writeFileSync(
@@ -43,7 +49,7 @@ async function built(
 		root: dir,
 		configFile: false,
 		logLevel: "silent",
-		plugins: [graiPlugin({}).plugin],
+		plugins: [graiPlugin({}, adapter(dir)).plugin],
 		build: {
 			write: false,
 			rolldownOptions: {
@@ -78,6 +84,38 @@ async function built(
 }
 
 describe("the Vite plugin's chunks by page", () => {
+	it("puts the keys the same pages load in one chunk, though different entries of those pages use them", async () => {
+		const catalog = {
+			menu: sized("Menu"),
+			save: sized("Save"),
+			article: sized("Article"),
+			title: sized("Title"),
+		};
+		const entries = {
+			layout: ["menu", "save"],
+			article: ["save", "article"],
+			about: ["title"],
+		};
+		const pages = (dir: string) => ({
+			pageEntries: () => [
+				[join(dir, "layout.js"), join(dir, "article.js")],
+				[join(dir, "layout.js"), join(dir, "about.js")],
+			],
+		});
+
+		expect((await built(catalog, entries, { adapter: pages })).keysOf).toEqual([
+			["article"],
+			["menu", "save"],
+			["title"],
+		]);
+		expect((await built(catalog, entries)).keysOf).toEqual([
+			["article"],
+			["menu"],
+			["save"],
+			["title"],
+		]);
+	});
+
 	it("merges two sets of keys when the request it saves outweighs the bytes it loads in vain", async () => {
 		// A set nearer by its entries than the shared one, but whose words two pages would load for
 		// nothing: under ownChunkBytes, which Rolldown's merge alone would take.

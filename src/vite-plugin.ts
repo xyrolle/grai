@@ -54,8 +54,20 @@ export type GraiOptions = {
 /** grai's Vite plugin, and the build its last compile made, for the adapters built on it. */
 export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
 
+/**
+ * What a framework's adapter tells the plugin. `pageEntries`: the entries each page's first paint
+ * loads together, by their module ids as the bundler names them (real paths), which the client
+ * build chunks keys by. Called once a client build has loaded every module.
+ */
+export type GraiAdapter = {
+	pageEntries?: () => Iterable<readonly string[]>;
+};
+
 /** grai's Vite plugin (`vite.ts` says what it does), with its build. */
-export function graiPlugin(options: GraiOptions): GraiPlugin {
+export function graiPlugin(
+	options: GraiOptions,
+	adapter: GraiAdapter = {},
+): GraiPlugin {
 	let files: ProjectFiles = { configFile: "", outdir: "", keysFile: "" };
 	let serving = false;
 	/** Whether Vite runs tests, as Vitest has it, where a module is what a test can mock. */
@@ -80,7 +92,9 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			build,
 			files.keysFile,
 			(module) => graph.getModuleInfo(module),
-			undefined,
+			adapter.pageEntries === undefined
+				? undefined
+				: [...adapter.pageEntries()],
 		);
 		return pageChunks.get(id);
 	};
