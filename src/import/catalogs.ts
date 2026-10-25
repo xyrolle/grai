@@ -11,10 +11,11 @@ export type Catalog = Record<string, CatalogValue>;
 /** A locale's new catalog, and the file it goes to. */
 export type CatalogFile = { locale: string; path: string; catalog: Catalog };
 
-/** The catalogs of an import, how many keys each holds, and its report. */
+/** The catalogs of an import, how many keys each holds, what the sources tell translators of them, and its report. */
 export type ImportedCatalogs = ImportReport & {
 	files: CatalogFile[];
 	keys: number;
+	descriptions: Map<string, string>;
 };
 
 const schema = "https://inlang.com/schema/inlang-message-format";
@@ -35,6 +36,7 @@ export function catalogsOf(
 			catalog: { $schema: schema },
 		})),
 		keys: 0,
+		descriptions: new Map(),
 		leftOut: [],
 		changed: [],
 	};
@@ -45,9 +47,22 @@ export function catalogsOf(
 			const value = values.get(locale);
 			if (value !== undefined) catalog[key] = value;
 		}
+		const description = descriptionOf(key, messages, config.baseLocale);
+		if (description !== undefined) imported.descriptions.set(key, description);
 		imported.keys++;
 	}
 	return imported;
+}
+
+/** What the sources tell translators of a key: the base locale's source, or the first locale's that does. */
+function descriptionOf(
+	key: string,
+	messages: MessagesByLocale,
+	baseLocale: string,
+): string | undefined {
+	return [messages.get(baseLocale), ...messages.values()]
+		.map((byKey) => byKey?.get(key)?.description)
+		.find((description) => description !== undefined);
 }
 
 /** Every key, the base locale's in its order first. */

@@ -32,12 +32,13 @@ export function convertIcu(
 	entries: readonly SourceEntry[],
 	locale: string,
 ): ImportedMessage[] {
-	return entries.map(({ path, value }) => {
+	return entries.map(({ path, value, description }) => {
 		try {
-			return { path, result: convertMessage(textOf(value), locale), notes: [] };
+			const result = convertMessage(textOf(value), locale);
+			return { path, result, notes: [], description };
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
-			return { path, result: error, notes: [] };
+			return { path, result: error, notes: [], description };
 		}
 	});
 }

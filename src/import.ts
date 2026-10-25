@@ -5,7 +5,11 @@ import { catalogsOf } from "./import/catalogs.ts";
 import { convertSources, type ImportFormat } from "./import/convert.ts";
 import type { ImportReport } from "./import/report.ts";
 import { findSources } from "./import/sources.ts";
-import { existingCatalogs, writeCatalogs } from "./import/write.ts";
+import {
+	existingCatalogs,
+	unkeptDescriptions,
+	writeCatalogs,
+} from "./import/write.ts";
 
 export { type ImportFormat, importFormats } from "./import/convert.ts";
 export {
@@ -44,8 +48,12 @@ export function importCatalogs(
 	const errors: GraiError[] = [];
 	const sources = findSources(inputs, config, errors);
 	const messages = convertSources(sources, format, config.locales, errors);
-	const { files, keys, leftOut, changed } = catalogsOf(messages, config);
+	const { files, keys, descriptions, leftOut, changed } = catalogsOf(
+		messages,
+		config,
+	);
 	errors.push(...existingCatalogs(files, config.root));
+	errors.push(...unkeptDescriptions(descriptions, config, configFile));
 	if (keys === 0 && errors.length === 0) {
 		errors.push(
 			new GraiError(
@@ -58,6 +66,6 @@ export function importCatalogs(
 	if (errors.length > 0) {
 		return { written: [], keys, leftOut, changed, errors: sortErrors(errors) };
 	}
-	const written = writeCatalogs(files, config.root);
+	const written = writeCatalogs(files, descriptions, config);
 	return { written, keys, leftOut, changed, errors: [] };
 }
