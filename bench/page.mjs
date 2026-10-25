@@ -88,14 +88,20 @@ export function pageSource(app, { from, inline, translate }) {
 `;
 }
 
-/** What a reader sees: the text alone, as the DOM holds it, whitespace collapsed as HTML shows it. */
-export const visibleText = (html) =>
+/**
+ * The page's text exactly as the DOM holds it, whitespace and all: its tags and Svelte's
+ * hydration comments dropped, and the entities Svelte writes read back.
+ */
+export const pageText = (html) =>
 	html
-		.replace(/<[^>]*>/g, " ")
+		.replace(/<[^>]*>/g, "")
 		.replace(/&#123;/g, "{")
 		.replace(/&#125;/g, "}")
-		.replace(/\s+/g, " ")
-		.trim();
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&amp;/g, "&");
 
 /** The props the page renders: each call's values, as `values` writes them, and the table's rows. */
 export function pageProps(app, values = (call) => call.inputs) {

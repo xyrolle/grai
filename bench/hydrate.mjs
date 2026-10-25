@@ -117,10 +117,8 @@ async function benchLocale(browser, app, locale) {
 					document.html,
 					rate,
 				);
-				// Svelte trims the spaces at the edges of an element's text, so the words are compared.
-				const text = result.text.replace(/\s+/g, "");
-				expected ??= text;
-				if (text !== expected)
+				expected ??= result.text;
+				if (result.text !== expected)
 					throw new Error(
 						`${document.name} hydrates other text than Paraglide in ${locale}`,
 					);
