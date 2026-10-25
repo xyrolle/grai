@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
 import { project } from "./project.ts";
 
@@ -18,6 +19,18 @@ const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}" },
 	de: { title: "Titel", greeting: "Hallo {name}" },
 };
+
+/** Compiles a project in a process of its own, as another grai would, and gives its errors' codes. */
+async function compileElsewhere(config: string): Promise<string[]> {
+	const { stdout } = await promisify(execFile)(process.execPath, [
+		"--input-type=module",
+		"-e",
+		"const { compile } = await import(process.argv[1]); console.log(JSON.stringify((await compile(process.argv[2])).errors.map((error) => error.code)));",
+		fileURLToPath(new URL("../src/index.ts", import.meta.url)),
+		config,
+	]);
+	return JSON.parse(stdout);
+}
 
 function modified(dir: string): Record<string, number> {
 	const out = join(dir, "out");
@@ -107,14 +120,57 @@ it("writes a file of the output again when it is missing", async () => {
 	expect((await compile()).written).toEqual(["keys.js"]);
 });
 
-it("takes over the lock of a writer that is gone", async () => {
+it("lets two compiles in one process write one outdir, one after the other", async () => {
+	for (let trial = 0; trial < 10; trial++) {
+		const { compile } = project(catalogs);
+		const results = await Promise.all([compile(), compile()]);
+
+		expect(results.map((result) => result.errors)).toEqual([[], []]);
+	}
+});
+
+it("lets one writer at a time write, when several processes compile at once", async () => {
+	for (let trial = 0; trial < 3; trial++) {
+		const { config, load } = project(catalogs);
+		const errors = await Promise.all(
+			[1, 2, 3].map(() => compileElsewhere(config)),
+		);
+
+		expect(errors).toEqual([[], [], []]);
+		expect((await load()).m.title?.()).toBe("Title");
+	}
+});
+
+it("refuses a lock whose writer is gone, in every process, and says which file to delete", async () => {
+	const { dir, config, compile } = project(catalogs);
+	const lock = join(dir, "out", ".grai", "lock");
+	mkdirSync(dirname(lock), { recursive: true });
+	const gone = String(spawnSync(process.execPath, ["-e", ""]).pid);
+	writeFileSync(lock, gone);
+
+	const errors = await Promise.all(
+		[1, 2, 3].map(() => compileElsewhere(config)),
+	);
+	const [refused] = (await compile()).errors;
+
+	expect(errors).toEqual([
+		["output-locked"],
+		["output-locked"],
+		["output-locked"],
+	]);
+	expect(refused?.message).toContain(`delete ${lock}`);
+	expect(readFileSync(lock, "utf8")).toBe(gone);
+});
+
+it("removes the claims of writers no longer running as it takes the lock", async () => {
 	const { dir, compile } = project(catalogs);
+	const state = join(dir, "out", ".grai");
+	mkdirSync(state, { recursive: true });
 	const gone = spawnSync(process.execPath, ["-e", ""]).pid;
-	mkdirSync(join(dir, "out", ".grai"), { recursive: true });
-	writeFileSync(join(dir, "out", ".grai", "lock"), String(gone));
+	writeFileSync(join(state, `lock.${gone}.left`), String(gone));
 
 	expect((await compile()).errors).toEqual([]);
-	expect(existsSync(join(dir, "out", ".grai", "lock"))).toBe(false);
+	expect(readdirSync(state)).not.toContain(`lock.${gone}.left`);
 });
 
 it("waits for a live writer's lock before it writes", async () => {
@@ -124,8 +180,11 @@ it("waits for a live writer's lock before it writes", async () => {
 	writeFileSync(join(state, "lock"), String(process.pid));
 
 	const compiling = compile();
+	// Its claim beside the lock says it waits.
 	await vi.waitFor(() =>
-		expect(existsSync(join(state, `lock.${process.pid}`))).toBe(true),
+		expect(readdirSync(state).some((name) => name.startsWith("lock."))).toBe(
+			true,
+		),
 	);
 	expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
 	rmSync(join(state, "lock"));
