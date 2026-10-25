@@ -219,6 +219,38 @@ describe("the Vite plugin's build", () => {
 		expect(shipped).not.toContain("Ţîţļé");
 	});
 
+	it("takes a per-key path to that key's own module, not to keys.js, which would load every key", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		writeFileSync(
+			join(dir, "page.js"),
+			`import { title } from "#i18n/messages/title.js";\nconsole.log(title());\n`,
+		);
+		let loaded: string[] = [];
+		await build({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			plugins: [
+				grai(),
+				{
+					name: "loaded",
+					buildEnd() {
+						loaded = [...this.getModuleIds()];
+					},
+				},
+			],
+			build: {
+				write: false,
+				rolldownOptions: { input: join(dir, "page.js") },
+			},
+		});
+
+		expect(
+			loaded.filter((id) => id.includes("keys.js") || id.includes("grai:key")),
+		).toEqual(["\0grai:key/title"]);
+	});
+
 	it("fails the build with the compiler's errors", async () => {
 		const { dir } = project({ en: { title: "Title" }, de: {} });
 		await expect(

@@ -187,10 +187,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 					id.startsWith(patchPrefix)
 				)
 					return `\0${id}`;
-				if (!serving) return null;
-				const compiled = build ?? (await first);
-				// Vite's resolver takes a per-key path to keys.js and to its exports alone, so a key no
-				// catalog has would fail the page; it gets a module of its own instead.
+				const compiled = serving ? (build ?? (await first)) : build;
 				const module = moduleOf(id);
 				if (module.type !== "key" || importer === undefined) return null;
 				const resolved = await this.resolve(id, importer, {
@@ -198,13 +195,21 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 					skipSelf: true,
 				});
 				if (resolved?.id !== files.keysFile) return resolved;
-				const missing = missingKeyImport(module.key, importer);
+				// In dev, Vite's resolver takes a per-key path to keys.js and to its exports alone, so a key
+				// no catalog has would fail the page; it gets a module of its own instead.
+				const missing = serving
+					? missingKeyImport(module.key, importer)
+					: undefined;
 				if (missing !== undefined) return missing;
-				// In a test run, a key's path that the app maps to keys.js resolves to that key's module
-				// alone, so a test that mocks the path mocks that key and no other. A page keeps keys.js
-				// as one module, since a module per key costs it a request each.
+				// In a build and in a test run, a key's path that the app maps to keys.js resolves to that
+				// key's module alone. Through keys.js, which re-exports every key, the bundler spent 56 s of
+				// a server build of 13,000 keys working out which entries reach each key; and a test that
+				// mocks the path mocks that key and no other. A dev page keeps keys.js as one module, since
+				// a module per key costs it a request each.
 				const key =
-					testing && compiled !== undefined && "compilation" in compiled
+					(!serving || testing) &&
+					compiled !== undefined &&
+					"compilation" in compiled
 						? pathKey(compiled, id)
 						: undefined;
 				return key === undefined ? resolved : `\0${keyPrefix}${key}`;
