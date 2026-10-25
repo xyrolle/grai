@@ -248,7 +248,7 @@ function inputsOf(config: Config, hashes: readonly string[]): string {
 			config.locales,
 			config.baseLocale,
 			config.strategy,
-			config.cookieName,
+			config.cookie,
 			[...config.fallbacks],
 			hashes,
 		]),

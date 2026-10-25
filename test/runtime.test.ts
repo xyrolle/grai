@@ -236,6 +236,9 @@ describe("in a browser", () => {
 				get href() {
 					return visited.href;
 				},
+				get protocol() {
+					return new URL(visited.href).protocol;
+				},
 				set href(value: string) {
 					visited.href = value;
 				},
@@ -258,10 +261,42 @@ describe("in a browser", () => {
 		expect([runtime.getLocale(), m.title?.()]).toEqual(["de", "Ihr Warenkorb"]);
 		runtime.setLocale("ar");
 		expect(visited).toEqual({
-			cookie: "lang=ar; path=/; max-age=34560000; samesite=lax",
+			cookie: "lang=ar; path=/; max-age=34560000; samesite=lax; secure",
 			reloads: 1,
 			href: "https://shop.test/de/cart?step=2",
 		});
+	});
+
+	it("writes the cookie by the config's policy, Secure on https and wherever the policy needs it", async () => {
+		const cookieOf = async (href: string, config: Record<string, unknown>) => {
+			const visited = page("de");
+			visited.href = href;
+			const { runtime } = await output({ strategy: ["cookie"], ...config });
+			runtime.setLocale("ar", { reload: false });
+			return visited.cookie;
+		};
+
+		expect([
+			await cookieOf("http://shop.test/", { cookieName: "lang" }),
+			await cookieOf("http://shop.test/", {
+				cookieName: "lang",
+				cookieMaxAge: 3600,
+				cookieDomain: "shop.test",
+				cookieSameSite: "strict",
+			}),
+			await cookieOf("http://shop.test/", {
+				cookieName: "lang",
+				cookieSameSite: "none",
+			}),
+			await cookieOf("http://shop.test/", { cookieName: "__Host-lang" }),
+			await cookieOf("http://shop.test/", { cookieName: "__Secure-lang" }),
+		]).toEqual([
+			"lang=ar; path=/; max-age=34560000; samesite=lax",
+			"lang=ar; path=/; max-age=3600; domain=shop.test; samesite=strict",
+			"lang=ar; path=/; max-age=34560000; samesite=none; secure",
+			"__Host-lang=ar; path=/; max-age=34560000; samesite=lax; secure",
+			"__Secure-lang=ar; path=/; max-age=34560000; samesite=lax; secure",
+		]);
 	});
 
 	it("renders a message in the page's locale alone, as a production page holds no other", async () => {

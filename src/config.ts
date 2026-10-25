@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
+import { type Cookie, cookieFields, readCookie } from "./cookie.ts";
 import { GraiError } from "./error.ts";
 import { readFallbacks } from "./fallbacks.ts";
 import { isGlob } from "./globs.ts";
@@ -19,8 +20,8 @@ export type Config = {
 	outdir: string;
 	/** Where the server's middleware looks for a request's locale, in order, before the base locale. */
 	strategy: readonly Strategy[];
-	/** The cookie the `cookie` strategy reads and `setLocale` writes. */
-	cookieName: string | undefined;
+	/** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
+	cookie: Cookie | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
 	/** Globs of the source files that are tests, by path from the root: a key only they name is unused. */
@@ -52,15 +53,13 @@ const fields = new Set([
 	"catalogs",
 	"outdir",
 	"strategy",
-	"cookieName",
+	...cookieFields,
 	"switch",
 	"tests",
 	"identicalToBase",
 	"fallbacks",
 ]);
 const localePlaceholder = "{locale}";
-/** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
-const cookieNameToken = /^[\w!#$%&'*+\-.^`|~]+$/;
 /**
  * Test files as Vitest and Jest name them, Jest's `__tests__` folders, and the project's own
  * `test` and `tests` folders. A test ships nothing. A folder named `tests` deeper down may ship,
@@ -93,7 +92,6 @@ export function readConfig(file: string): Config {
 		catalogs,
 		outdir,
 		strategy = [],
-		cookieName,
 		switch: localeSwitch = "reload",
 		tests = conventionalTests,
 		identicalToBase = {},
@@ -137,19 +135,7 @@ export function readConfig(file: string): Config {
 			`"strategy" lists ${shadowed.map((source) => `"${source}"`).join(", ")} after "url", which never gets to ${them}: a path without a locale prefix is the base locale's. Put ${them} before "url"`,
 		);
 	}
-	const readsCookie = strategy.includes("cookie");
-	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
-		throw invalid(
-			readsCookie
-				? '"cookieName" must name the cookie the "cookie" strategy reads'
-				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
-		);
-	}
-	if (typeof cookieName === "string" && !cookieNameToken.test(cookieName)) {
-		throw invalid(
-			'"cookieName" must be a cookie name, as RFC 6265 has it: letters, digits and !#$%&\'*+-.^_`|~, without spaces',
-		);
-	}
+	const cookie = readCookie(raw, strategy.includes("cookie"), invalid);
 	if (localeSwitch !== "reload" && localeSwitch !== "live") {
 		throw invalid(
 			'"switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place',
@@ -183,7 +169,7 @@ export function readConfig(file: string): Config {
 		),
 		outdir: resolve(root, outdir),
 		strategy,
-		cookieName: typeof cookieName === "string" ? cookieName : undefined,
+		cookie,
 		switch: localeSwitch,
 		tests,
 		identicalToBase: readIdenticalToBase(
