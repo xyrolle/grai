@@ -1,4 +1,10 @@
-import { existsSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	rmSync,
+	utimesSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
@@ -121,16 +127,21 @@ it("reports no compile that changed nothing, as one that an event late from a sa
 	const state = join(dir, "out", ".grai");
 
 	// Another writer holds the output, so the compile an event starts waits where the test sees it,
-	// having read the catalogs as they are: an event that changes nothing.
+	// having read the catalogs as they are: an event that changes nothing. With this process's claim
+	// gone, the compile makes it again as it comes to the lock, which shows it is there.
+	const claims = () =>
+		readdirSync(state).filter((name) =>
+			name.startsWith(`lock.${process.pid}.`),
+		);
+	for (const claim of claims()) rmSync(join(state, claim));
 	writeFileSync(join(state, "lock"), String(process.pid));
 	utimesSync(catalog, new Date(), new Date());
-	await expect
-		.poll(() => existsSync(join(state, `lock.${process.pid}`)))
-		.toBe(true);
+	await expect.poll(() => claims().length).toBe(1);
 	rmSync(join(state, "lock"));
 	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
 
-	await expect.poll(() => reported.at(-1)?.written).toEqual(["keys/0.js"]);
+	await expect.poll(() => reported.length).toBe(2);
+	expect(reported[1]?.written.map(withoutContentHash)).toContain("keys/0.js");
 	expect(reported.map((result) => result.written.length > 0)).toEqual([
 		true,
 		true,
