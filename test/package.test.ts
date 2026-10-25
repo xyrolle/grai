@@ -1,13 +1,32 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+	cpSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 /** The package manager running the tests, as it names itself to scripts; else pnpm on the PATH. */
 const pnpm = process.env.npm_execpath ?? "pnpm";
+/** What the build and `pnpm pack` read: the manifest, the docs it ships, the sources and configs. */
+const packageFiles = [
+	"package.json",
+	"README.md",
+	"LICENSE",
+	"tsconfig.json",
+	"tsconfig.build.json",
+	"src",
+	"scripts",
+];
 
 /** What `pnpm pack --json` prints. */
 type Packed = { files: { path: string }[] };
@@ -17,26 +36,45 @@ type Manifest = {
 	bin: Record<string, string>;
 };
 
-let packed: string[] | undefined;
-
-/** The files `pnpm pack` puts in the tarball, sorted. Its prepack builds the package first. */
-function packedFiles(): string[] {
-	if (packed !== undefined) return packed;
-	const destination = mkdtempSync(join(tmpdir(), "grai-pack-"));
-	try {
-		const output: Packed = JSON.parse(
-			execFileSync(
-				pnpm,
-				["pack", "--json", "--pack-destination", destination],
-				{ cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-			),
-		);
-		packed = output.files.map((file) => file.path).sort();
-		return packed;
-	} finally {
-		rmSync(destination, { recursive: true, force: true });
+/**
+ * The package packed from a copy of it, whose prepack builds into the copy's own dist: the repo's
+ * dist is what other tests read meanwhile, such as the Next example's build. The copy's
+ * directory, and the files `pnpm pack` put in the tarball, sorted. Both go in `dir`.
+ */
+function packCopy(dir: string): { dir: string; files: string[] } {
+	const copy = join(dir, "package");
+	for (const file of packageFiles) {
+		cpSync(join(root, file), join(copy, file), { recursive: true });
 	}
+	// A junction, as Windows links a directory without an administrator only so.
+	symlinkSync(
+		join(root, "node_modules"),
+		join(copy, "node_modules"),
+		"junction",
+	);
+	const destination = join(dir, "tarball");
+	mkdirSync(destination);
+	const output: Packed = JSON.parse(
+		execFileSync(pnpm, ["pack", "--json", "--pack-destination", destination], {
+			cwd: copy,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		}),
+	);
+	return { dir: copy, files: output.files.map((file) => file.path).sort() };
 }
+
+/** The temporary directory the copy and its tarball are in, removed after the tests. */
+let temp: string | undefined;
+let packed: { dir: string; files: string[] } = { dir: "", files: [] };
+// Packing builds the package, which a loaded machine can take well over a test's five seconds for.
+beforeAll(() => {
+	temp = realpathSync(mkdtempSync(join(tmpdir(), "grai-package-")));
+	packed = packCopy(temp);
+}, 120_000);
+afterAll(() => {
+	if (temp !== undefined) rmSync(temp, { recursive: true, force: true });
+});
 
 /**
  * Each TypeScript module but the runtime's, as dist holds it: compiled, with its declarations. A
@@ -65,12 +103,12 @@ function runtimeModules(): string[] {
 		.sort();
 }
 
-function text(file: string): string {
-	return readFileSync(join(root, file), "utf8");
+function text(dir: string, file: string): string {
+	return readFileSync(join(dir, file), "utf8");
 }
 
 it("packs each module compiled with its declarations, and nothing else", () => {
-	expect(packedFiles()).toEqual(
+	expect(packed.files).toEqual(
 		[
 			"LICENSE",
 			"README.md",
@@ -82,23 +120,26 @@ it("packs each module compiled with its declarations, and nothing else", () => {
 });
 
 it("packs the runtime's modules as they are written", () => {
-	const shipped = packedFiles()
+	const shipped = packed.files
 		.filter((file) => file.startsWith("dist/runtime/"))
-		.map((file) => [file.slice("dist/".length), text(file)]);
-	const written = runtimeModules().map((file) => [file, text(`src/${file}`)]);
+		.map((file) => [file.slice("dist/".length), text(packed.dir, file)]);
+	const written = runtimeModules().map((file) => [
+		file,
+		text(root, `src/${file}`),
+	]);
 
 	expect(shipped).toEqual(written);
 });
 
 it("packs every file the package's exports and bin name", () => {
-	const manifest: Manifest = JSON.parse(text("package.json"));
+	const manifest: Manifest = JSON.parse(text(root, "package.json"));
 	const targets = [
 		...Object.values(manifest.exports).flatMap((conditions) =>
 			Object.values(conditions),
 		),
 		...Object.values(manifest.bin),
 	].map((target) => target.replace(/^\.\//, ""));
-	const files = new Set(packedFiles());
+	const files = new Set(packed.files);
 
 	expect(targets.filter((target) => !files.has(target))).toEqual([]);
 });
