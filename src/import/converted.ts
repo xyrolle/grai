@@ -50,35 +50,12 @@ export type CatalogValue =
 			},
 	  ];
 
-/** A branch that needs no selector value. */
-export function plain(pattern: string): Branch {
-	return { keys: new Map(), pattern };
-}
-
-/** Each branch of `a` followed by each of `b`, with the selector values both need. */
-export function combine(a: readonly Branch[], b: readonly Branch[]): Branch[] {
-	return a.flatMap((first) =>
-		b.map((second) => ({
-			keys: new Map([...first.keys, ...second.keys]),
-			pattern: first.pattern + second.pattern,
-		})),
-	);
-}
-
-/** The branch, needing the selector values `keys` too. */
-export function withKeys(
-	branch: Branch,
-	keys: readonly [string, string][],
-): Branch {
-	return { keys: new Map([...branch.keys, ...keys]), pattern: branch.pattern };
-}
-
 /** A message of one pattern, without selectors. */
 export function plainMessage(pattern: string): Converted {
 	return {
 		declarations: [],
 		selectors: [],
-		branches: [plain(pattern)],
+		branches: [{ keys: new Map(), pattern }],
 	};
 }
 
