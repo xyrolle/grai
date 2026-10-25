@@ -17,7 +17,7 @@ import type { Output } from "./render.ts";
 type Manifest = { inputs: string; files: string[] };
 
 /** grai's own directory in the outdir: the manifest, the writer's lock and files being written. */
-const stateDirectory = ".grai";
+export const stateDirectory = ".grai";
 const lockRetry = 10;
 const lockPatience = 30_000;
 

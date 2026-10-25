@@ -2,6 +2,7 @@ import { createHash, hash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { serialize } from "node:v8";
 import {
 	type Catalog,
 	type CatalogSource,
@@ -31,6 +32,14 @@ export type Build = {
 	/** Where each key is in the base locale's catalog, for the declaration maps. */
 	positions: ReadonlyMap<string, Position>;
 	rendered: Rendered;
+	/** What a saved build must match to be taken up again: `buildKey` of the config as read. */
+	key: string;
+	/**
+	 * The output as the compile that made this build left it, so the next one writes only the files
+	 * that differ; undefined for a build saved by an earlier process, whose output may have been
+	 * written again since, so the next compile compares with the files themselves.
+	 */
+	written: ReadonlyMap<string, string> | undefined;
 };
 
 /** The runtime's modules, which every output carries as they are. */
@@ -185,7 +194,7 @@ async function build(
 			config.outdir,
 			output,
 			inputsOf(config, hashes),
-			previous?.rendered.files,
+			previous?.written,
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
@@ -201,6 +210,8 @@ async function build(
 			compilation,
 			positions,
 			rendered,
+			key: buildKey(configured, pseudoLocale),
+			written: rendered.files,
 		},
 	};
 }
@@ -267,4 +278,18 @@ function inputsOf(config: Config, hashes: readonly string[]): string {
 			hashes,
 		]),
 	);
+}
+
+/**
+ * What a saved build must match to be taken up again (`savedBuild`): the compiler and the runtime
+ * that made it, the config as read and whether it has the pseudo-locale. The runtime names V8, in
+ * whose format the build is saved, and ICU, whose plural rules and locale data the compile reads.
+ */
+export function buildKey(config: Config, pseudoLocale: boolean): string {
+	return JSON.stringify({
+		compiler: hashOfCompiler(),
+		runtime: [process.versions.v8, process.versions.icu],
+		pseudoLocale,
+		config: hash("sha1", serialize(config)),
+	});
 }

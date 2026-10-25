@@ -51,6 +51,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
   messages.js   messages.d.ts    `m`, the namespace of keys.js
   .grai/manifest.json            what the output was compiled from, and its files
+  .grai/build                    the build a watcher saved, which the next one starts from
   .gitignore                     `*`: the output is compiled, never committed
 ```
 
@@ -227,6 +228,10 @@ These are MessageFormat 2's rules, restricted to the constructs above:
   - An edited catalog laid out one entry per line, as editors and formatters write them, has a line break and the same indent before each top-level key and nowhere else, because a JSON string holds no raw line break. The edit's changed bytes lie between two such entry starts, so only that span is parsed, in the old file and in the new. The span must be whole entries with their separators: a comma or the opening brace before it, and a comma after it unless it closes the object. Whenever that cannot be shown exactly (another layout, a duplicated key, a span that does not parse, a separator missing or one too many), the whole file is parsed instead, and reports what is wrong.
   - Only the keys whose messages changed are compiled, and only their shards are rendered and written.
   - A failed recompile leaves the last good build as it was, so the next one starts from it.
+- **A watcher starts from the build the last one saved.** A watcher saves its first build in `.grai/build`, as V8 serializes it, a second after it is made or when the watcher closes, so the save never holds up a start's first page. The next watcher's first compile starts from it as a recompile starts from the last build: a catalog changed in between is compiled as an edit, and each file is compared with the outdir's, which another compile may have written since. A cold dev start then compiles only what changed since the last one, in place of every key.
+  - It is taken up only when the same grai saved it, on the same V8 and ICU, from the same config, with the pseudo-locale or without as this compile: anything else and the compile starts from nothing.
+  - The save is written whole and renamed into place, so a watcher reads one process's build or another's, never part of one, and any of them is a sound start.
+  - It costs disk: 22 MB for app A (6,379 keys × 3).
 - **Watching covers the config and the catalog files, nothing else.** No other file can start a compile, so a framework's generated files never trigger one.
   - Each file is watched as a file, not through its directory, whose events macOS reports late.
   - The watches are set up again before each compile, so a file an editor saves by renaming another over it is seen, and so is a change during the compile.
