@@ -8,7 +8,7 @@ import {
 	parseDeclarations,
 } from "./message-declarations.ts";
 import { numberSelector } from "./number-select.ts";
-import { identifier, parsePattern } from "./pattern.ts";
+import { identifier, isMarkup, parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
 
@@ -61,10 +61,11 @@ function patternMessage(locale: string, source: string): LocaleMessage {
 	let inputs = noInputs;
 	let markup = false;
 	for (const part of pattern) {
-		if (part.type === "variable") {
+		if (part.type === "variable" || part.type === "literal") {
 			const given = part.format?.input?.name;
-			inputs = new Set([...inputs, part.name, ...(given ? [given] : [])]);
-		} else if (part.type !== "text") {
+			const shown = part.type === "variable" ? [part.name] : [];
+			inputs = new Set([...inputs, ...shown, ...(given ? [given] : [])]);
+		} else if (isMarkup(part)) {
 			markup = true;
 			inputs = new Set([...inputs, ...markupVariables(part)]);
 		}
@@ -166,7 +167,9 @@ function withInputs(
 				}
 				if (!isLocal(part.name)) inputs.add(part.name);
 				addOptionInput(part.format);
-			} else if (part.type !== "text") {
+			} else if (part.type === "literal") {
+				addOptionInput(part.format);
+			} else if (isMarkup(part)) {
 				markup = true;
 				for (const name of markupVariables(part)) {
 					if (!isLocal(name)) inputs.add(name);

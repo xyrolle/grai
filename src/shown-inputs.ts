@@ -8,6 +8,7 @@
 import type { Format } from "./format-options.ts";
 import { markupVariables } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
+import { isMarkup } from "./pattern.ts";
 
 export function shownInputs(message: LocaleMessage): Set<string> {
 	const shown = new Set<string>();
@@ -26,7 +27,9 @@ export function shownInputs(message: LocaleMessage): Set<string> {
 			if (part.type === "variable") {
 				show(part.name);
 				showFormat(part.format);
-			} else if (part.type !== "text") {
+			} else if (part.type === "literal") {
+				showFormat(part.format);
+			} else if (isMarkup(part)) {
 				for (const name of markupVariables(part)) show(name);
 			}
 		}

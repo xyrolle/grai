@@ -71,6 +71,8 @@ function codeOf(
 	}
 	if (part.type === "variable")
 		return { id: idOf(part.name), kind: "placeholder", source };
+	if (part.type === "literal")
+		return { id: idOf("literal"), kind: "placeholder", source };
 	const tag = `tag-${part.name}`;
 	if (part.type === "markup-start") {
 		const id = idOf(tag);
