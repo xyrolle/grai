@@ -4,6 +4,12 @@ import { MessageProblem } from "../problem.ts";
 const space = /\p{Pattern_White_Space}*/uy;
 /** An ICU identifier, which names an input, a type or a key: no white space or pattern syntax. */
 const identifier = /[^\p{White_Space}\p{Pattern_Syntax}]*/uy;
+/**
+ * A tag's name, as intl-messageformat reads it: an ASCII letter, then the characters HTML allows in
+ * the name of a custom element.
+ */
+const tagName =
+	/[A-Za-z][-.\d_A-Za-z\u00B7\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u037D\u037F-\u1FFF\u200C-\u200D\u203F-\u2040\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u{10000}-\u{EFFFF}]*/uy;
 /** A whole number as ICU writes an offset or an exact key's: a sign, then digits. */
 const wholeNumber = /[+-]?\d+/y;
 
@@ -23,6 +29,11 @@ export class IcuScanner {
 	protected word(): string {
 		this.space();
 		return this.read(identifier);
+	}
+
+	/** Reads a tag's name, which is empty when none is there. */
+	protected tagName(): string {
+		return this.read(tagName);
 	}
 
 	/** Reads a whole number, if one that a JavaScript number holds exactly is there. */
@@ -63,10 +74,11 @@ export class IcuScanner {
 		return this.source.slice(start, this.index).trimEnd();
 	}
 
-	protected take(char: string): boolean {
+	/** Skips spaces, then reads `token` if it is there. */
+	protected take(token: string): boolean {
 		this.space();
-		if (this.source.charAt(this.index) !== char) return false;
-		this.index++;
+		if (!this.source.startsWith(token, this.index)) return false;
+		this.index += token.length;
 		return true;
 	}
 
