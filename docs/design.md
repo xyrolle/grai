@@ -20,7 +20,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   - formatting: `:number`, `:integer`, `:percent`, `:currency`, `:unit`, `:relativetime`, `:list`, `:datetime`, `:date` and `:time` with their options, in a placeholder (`{x :number}`) or as a local (`local y = x: number`);
   - the escapes `\{`, `\}` and `\\`.
 
-  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input (`unit=$unit`), plural options other than `type`, selecting on a date or on a number its options round, and nested keys (`docs/followups.md`).
+  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input other than a currency, a number's unit or a date's time zone (such as `:relativetime`'s `unit=$unit`), plural options other than `type`, selecting on a date or on a number its options round, and nested keys (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is one compile error naming the locales that lack it and the `grai add` command that adds it to them. A missing translation would otherwise ship as a failed import or as another locale's words.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
@@ -136,6 +136,7 @@ export declare const cart_items: Message<{ count: number }>;
 - **An input's type is the narrowest that every locale accepts:**
   - `number` where any locale counts it with `:plural` or formats it as a number, and `Date | number` where one formats it as a date;
   - the union of the keys, as numbers and strings (`1 | "1" | …`), where every locale that selects on it lists its values without `*`;
+  - `string` where it gives a formatter an option, such as `currency=$code`;
   - `NonNullable<unknown>` where it is only interpolated or selected with `*`, because interpolation turns any value into text.
 
   A key's inputs are the union over its locales, so a call suits every locale.
@@ -173,6 +174,11 @@ These are MessageFormat 2's rules, restricted to the constructs above:
 - **The options are checked when compiling,** by making the formatter once. An option a function does not take, or a value Intl refuses, is a compile error naming them.
 - **Each locale and options gets one formatter, in `formats.js`, made the first time it formats.** Made at module scope, every locale's formatters would be made on every page load. A formatter made once formats a number in 207–213 ns and a date in 462–526 ns, against 8.3–9.3 µs and 21.7–23.9 µs for a new one per call (`intl`).
 - **A formatted value is passed to Intl through `Number()`,** as Intl itself takes a date by its time value.
+- **An option the app's data decides can come from an input: `currency=$code`, `unit=$unit` and `timeZone=$zone`.** Which currency an amount is in, or which time zone a reader is in, is data. How the value looks, its style and its fields, is the message's to write, so those options stay literal and are checked when compiling.
+  - The compile checks such a call with a value the option takes, so the literal options around it are still checked. A currency needs `style=currency` written beside it, and a unit `style=unit`, or Intl would leave them out. So a call takes one option from an input at most.
+  - The input is typed `string`. A value Intl refuses throws a `GraiError` with the code `format-option-invalid`, which names the option and the value.
+  - Each value gets its own formatter, made the first time it formats and kept in a map. A number formats in 216–305 ns with its currency from an input, against 205–248 ns with it written; Paraglide, which finds a formatter by the options each call builds, takes 688–1,054 ns (`option-inputs`).
+- **A date's time zone is an input, not a value bound once per request as the locale is.** Bound per request, it costs a date the same, 450–556 ns against 447–601 ns from an input (`option-inputs`), so the choice comes down to where the zone is known. A server and a page agree on a date only if both read its zone from the same place. With an input, that place is the app's own data, which it already renders on the server and hydrates with. A zone bound per request would also have to reach the page, and every date without a zone would still differ between a server, which formats in its own zone (UTC on Workers), and a browser, which formats in the reader's.
 
 ## Errors
 
