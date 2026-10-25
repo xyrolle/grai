@@ -625,6 +625,7 @@ describe("grai import --from icu", () => {
 					attribute: "<b x>y</b>",
 					unopened: "a</b>",
 					crossed: "<b>{n, plural, other {</b>}}</b>",
+					spelled: "{n, spellout}",
 				},
 			},
 			["en"],
@@ -644,6 +645,7 @@ describe("grai import --from icu", () => {
 			"attribute: it is not a valid ICU message: the tag <b must end with > or />.",
 			"unopened: it is not a valid ICU message: the </ at 1 closes no tag.",
 			"crossed: it is not a valid ICU message: the option other of {n} must be closed by }.",
+			"spelled: it is not a valid ICU message: {n, spellout} names no type intl-messageformat reads: number, date, time, plural, selectordinal or select.",
 		]);
 	});
 });

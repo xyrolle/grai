@@ -57,9 +57,9 @@ const formats: Readonly<Record<string, Readonly<Record<string, string>>>> = {
 };
 
 /**
- * Parses an ICU message as intl-messageformat reads it. A currency or skeleton style, an argument
- * of another type or `offset` throws an "unsupported" MessageProblem, and a malformed message a
- * "message-invalid" one.
+ * Parses an ICU message as intl-messageformat reads it. A style grai does not convert, an input
+ * name grai cannot take or `offset` throws an "unsupported" MessageProblem, and a message
+ * intl-messageformat rejects a "message-invalid" one.
  */
 export function parseIcu(source: string): IcuNode[] {
 	return new IcuParser(source).message();
@@ -83,7 +83,11 @@ class IcuParser extends IcuPatternReader {
 		if (!this.take(",")) throw invalid(`{${name} must be closed by }.`);
 		const kind = this.word();
 		if (Object.hasOwn(formats, kind)) return this.formatted(name, kind);
-		if (!isChoiceKind(kind)) throw unsupportedArgument(name, kind);
+		if (!isChoiceKind(kind)) {
+			throw invalid(
+				`{${name}, ${kind}} names no type intl-messageformat reads: number, date, time, plural, selectordinal or select.`,
+			);
+		}
 		if (!this.take(",")) {
 			throw invalid(`{${name}, ${kind} must list its options.`);
 		}
@@ -212,12 +216,4 @@ const wholeNumberNote = "a whole number that JavaScript holds exactly";
 
 function isChoiceKind(kind: string): kind is ChoiceKind {
 	return kind === "plural" || kind === "selectordinal" || kind === "select";
-}
-
-/** Why an argument of a type other than a choice, number, date or time cannot be converted. */
-function unsupportedArgument(name: string, kind: string): MessageProblem {
-	return new MessageProblem(
-		"unsupported",
-		`{${name}, ${kind}} formats the value as ${kind}, which grai does not support. Format it before the call and pass the text as {${name}}.`,
-	);
 }
