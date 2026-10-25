@@ -2,10 +2,13 @@ import type { Compilation } from "./compilation.ts";
 import type { Config } from "./config.ts";
 import { configModule } from "./config-module.ts";
 import { contentName, pinImports } from "./content-names.ts";
-import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import { type Formatter, formatModule } from "./formatters.ts";
 import { pluralModule } from "./plurals.ts";
 import type { OutputFile } from "./render.ts";
+import {
+	runtimeDeclarations,
+	serverDeclarations,
+} from "./runtime-declarations.ts";
 
 /** The runtime's modules as the package has them, which every output carries. */
 export type RuntimeSources = { runtime: string; server: string };
