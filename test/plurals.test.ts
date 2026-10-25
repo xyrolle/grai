@@ -14,6 +14,7 @@ const others = [
 	...[-1, -2, -5, -21, -1.5],
 	1_000_000,
 	2_000_000,
+	...[Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
 ];
 
 /**

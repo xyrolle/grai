@@ -51,17 +51,36 @@ export function categoryOf(
 	count: number,
 ): string {
 	const n = Math.abs(count);
-	const operands: Operands = {
+	return categoryAt(rulesOf(locale, type), {
 		values: { n, i: n, v: 0, w: 0, f: 0, t: 0, e: 0, c: 0 },
 		whole: true,
-	};
-	const rules = rulesOf(locale, type);
+	});
+}
+
+/** The category rules give operands whose every value is known. */
+function categoryAt(
+	rules: Readonly<Record<string, string>>,
+	operands: Operands,
+): string {
 	const holds = (category: string) => {
 		const rule = rules[category];
 		return rule !== undefined && compileRule(rule, operands) === true;
 	};
 	return categoryOrder.find(holds) ?? "other";
 }
+
+/**
+ * The operands `operands()` splits a count that is not finite into: NaN for its value, and NaN
+ * or Infinity for its integer digits. They match no rule of most locales, but a rule such as
+ * fil's `i % 10 != 4` holds for NaN.
+ */
+const nonFiniteOperands: readonly Operands[] = [
+	Number.NaN,
+	Number.POSITIVE_INFINITY,
+].map((i) => ({
+	values: { n: Number.NaN, i, v: 0, w: 0, f: 0, t: 0, e: 0, c: 0 },
+	whole: false,
+}));
 
 /** The name the output gives a locale's plural function of a type: `plural_en` or `ordinal_en`. */
 export function pluralName(locale: string, type: PluralType): string {
@@ -152,7 +171,9 @@ const operandNames = ["x", "i", "v", "f"];
  * A locale's function of a type, and whether it splits a count into operands. A locale whose
  * every count is other, such as ru's ordinals, reads no count, so a bundle of it needs no
  * operands; it still takes the count the keys' code passes, as an app's checkJs counts the
- * arguments. Any other takes the operands its rules read, and no other.
+ * arguments. Any other takes the operands its rules read, and no other. A count that is not finite
+ * is other, as Intl.PluralRules gives it; a locale whose rules would give its operands another
+ * category, such as fil, first gives it other itself.
  */
 function pluralFunction(
 	locale: string,
@@ -174,10 +195,15 @@ function pluralFunction(
 	const read = operandNames
 		.slice(0, last + 1)
 		.map((operand) => (decimal.reads.has(operand) ? operand : ""));
+	const finite = nonFiniteOperands.some(
+		(operands) => categoryAt(rules, operands) !== "other",
+	)
+		? `\tif (!Number.isFinite(Number(n))) return "other";\n`
+		: "";
 	const split =
 		last === -1 ? "" : `\tconst [${read.join(", ")}] = operands(Number(n));\n`;
 	return {
-		code: `/** @param {unknown} n */\nexport const ${name} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer.js};\n${split}\treturn ${decimal.js};\n};\n`,
+		code: `/** @param {unknown} n */\nexport const ${name} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer.js};\n${finite}${split}\treturn ${decimal.js};\n};\n`,
 		splits: split !== "",
 	};
 }
