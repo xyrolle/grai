@@ -24,6 +24,7 @@ import {
 	textModule,
 } from "./vite-build.ts";
 import {
+	devKeysId,
 	followedFile,
 	keyFromKeys,
 	type ProjectFiles,
@@ -85,7 +86,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		consumer: "client" | "server",
 	) => {
 		if (id.startsWith(textModulePrefix)) return textModule(compiled, id);
-		if (id === files.keysFile)
+		if (id === devKeysId || id === files.keysFile)
 			return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
 		return serving
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
@@ -200,6 +201,14 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 					return `\0${id}`;
 				const compiled = serving ? (build ?? (await first)) : build;
 				const module = moduleOf(id);
+				// In dev, keys.js is the plugin's module, by an id of its own (`devKeysId`).
+				if (module.type === "keys" && serving) {
+					const resolved = await this.resolve(id, importer, {
+						...options,
+						skipSelf: true,
+					});
+					return resolved?.id === files.keysFile ? devKeysId : resolved;
+				}
 				if (module.type !== "key" || importer === undefined) return null;
 				const resolved = await this.resolve(id, importer, {
 					...options,
@@ -223,7 +232,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 					"compilation" in compiled
 						? pathKey(compiled, id)
 						: undefined;
-				return key === undefined ? resolved : `\0${keyPrefix}${key}`;
+				if (key !== undefined) return `\0${keyPrefix}${key}`;
+				return serving ? devKeysId : resolved;
 			},
 		},
 		async load(id) {
@@ -234,7 +244,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			}
 			const served = devModuleOf(id);
 			if (served !== undefined) return served;
-			if (id !== files.keysFile && !isMessageModule(id)) return null;
+			if (id !== devKeysId && id !== files.keysFile && !isMessageModule(id))
+				return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;
 			if (!("compilation" in compiled)) return this.error(messagesOf(compiled));

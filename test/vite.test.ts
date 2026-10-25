@@ -881,6 +881,37 @@ export const render = () => {
 		return { page, title };
 	}
 
+	it("keeps the server's program when the compile writes keys.js, which the plugin serves from memory", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";
+globalThis.evaluations = (globalThis.evaluations ?? 0) + 1;
+export const render = () => \`\${m.title()} \${globalThis.evaluations}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		expect(await rendered()).toBe("Title 1");
+
+		// What Vite's watcher does when it sees keys.js written, as every compile writes it now that it
+		// names its shards by their content: the module graph takes the file's modules as changed.
+		for (const environment of Object.values(server.environments))
+			environment.moduleGraph.onFileChange(join(dir, "out", "keys.js"));
+
+		expect(await rendered()).toBe("Title 1");
+	});
+
 	it("patches a server render's messages in place, and a later evaluation keeps the edit", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
@@ -1009,15 +1040,14 @@ export const render = () => \`\${title()} \${footer()}\`;
 		return { resolved, rendered };
 	}
 
-	it("resolves a page's key paths to keys.js, one module for every key", async () => {
+	it("resolves a page's key paths to keys.js, one module for every key, by the dev module's own id", async () => {
 		const { dir } = project(catalogs);
 		const { resolved, rendered } = await keyPaths(dir, "development");
-		const keys = join(dir, "out", "keys.js");
 
 		expect(await rendered()).toBe("Title Footer");
 		expect([await resolved("title"), await resolved("footer")]).toEqual([
-			keys,
-			keys,
+			"\0grai:keys",
+			"\0grai:keys",
 		]);
 	});
 
