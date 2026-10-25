@@ -1,8 +1,10 @@
 // Imports the catalogs in import/ with `grai import`, compiles them, and renders every imported
 // message with grai and with the library it came from, i18next or intl-messageformat, for each
-// locale and a range of inputs. It lists every difference, apart from the one the import reports:
-// i18next shows a key's name for a plural form a locale lacks. i18next runs with escapeValue off,
-// as grai leaves escaping to the framework that renders the text.
+// locale and a range of inputs. It lists every difference, apart from those the import reports:
+// i18next shows a key's name for a plural form a locale lacks, and escapes values for HTML. i18next
+// runs with escapeValue off, as grai leaves escaping to the framework that renders the text, and
+// then again with its default, over values with HTML in them, where only the messages the import
+// says it escapes may differ.
 //   node import-equivalence.mjs
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -11,6 +13,9 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import i18next from "i18next";
 import { IntlMessageFormat } from "intl-messageformat";
+import { graiSource } from "./grai.mjs";
+
+const { importCatalogs } = await import(join(graiSource, "import.ts"));
 
 const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const locales = ["en", "ru", "ar"];
@@ -36,10 +41,13 @@ for (const format of ["i18next", "icu"]) {
 				outdir: "out",
 			}),
 		);
-		const report = execFileSync(
-			process.execPath,
-			[cli, "import", "--from", format, "source"],
-			{ cwd: dir, encoding: "utf8" },
+		const report = importCatalogs(join(dir, "grai.config.json"), format, [
+			join(dir, "source"),
+		]);
+		const escaped = new Set(
+			report.changed
+				.filter(({ detail }) => detail.startsWith("i18next escapes"))
+				.map(({ key }) => key),
 		);
 		execFileSync(process.execPath, [cli, "compile"], { cwd: dir });
 		const { m } = await import(
@@ -65,26 +73,47 @@ for (const format of ["i18next", "icu"]) {
 		)) {
 			if (!(key in m)) continue;
 			for (const locale of locales) {
-				const render =
+				const modes =
 					format === "i18next"
-						? i18nextRenderer(sources[locale], locale)
-						: icuRenderer(sources[locale], locale);
-				for (const inputs of inputSets()) {
-					const theirs = render(sourceKey, { ...inputs, ...options });
-					const ours = graiRender(m[key], inputs, locale);
-					tally.compared++;
-					if (theirs === ours) tally.equal++;
-					else if (reportedDifference(theirs, sourceKey)) tally.reported++;
-					else
-						tally.different.push(
-							`${locale} ${sourceKey} ${JSON.stringify(inputs)}: ${JSON.stringify(theirs)} from ${format}, ${JSON.stringify(ours)} from grai`,
-						);
+						? [
+								{
+									render: i18nextRenderer(sources[locale], locale, false),
+									inputs: inputSets(),
+									escapes: false,
+								},
+								{
+									render: i18nextRenderer(sources[locale], locale, true),
+									inputs: htmlInputSets(),
+									escapes: true,
+								},
+							]
+						: [
+								{
+									render: icuRenderer(sources[locale], locale),
+									inputs: inputSets(),
+									escapes: false,
+								},
+							];
+				for (const { render, inputs, escapes } of modes) {
+					for (const input of inputs) {
+						const theirs = render(sourceKey, { ...input, ...options });
+						const ours = graiRender(m[key], input, locale);
+						tally.compared++;
+						if (theirs === ours) tally.equal++;
+						else if (
+							reportedDifference(theirs, sourceKey) ||
+							(escapes && escaped.has(sourceKey))
+						)
+							tally.reported++;
+						else
+							tally.different.push(
+								`${locale} ${sourceKey} ${JSON.stringify(input)}: ${JSON.stringify(theirs)} from ${format}, ${JSON.stringify(ours)} from grai`,
+							);
+					}
 				}
 			}
 		}
-		const leftOut = report
-			.split("\n")
-			.filter((line) => line.startsWith("left out:")).length;
+		const leftOut = report.leftOut.length;
 		console.log(
 			`${format}: ${tally.compared} renders of the imported keys compared, ${tally.equal} equal, ${tally.reported} differ as the import reports, ${tally.different.length} differ otherwise; ${leftOut} keys left out, as reported`,
 		);
@@ -141,13 +170,27 @@ function importedKeys(catalog, format, path = []) {
 	return keys;
 }
 
-function i18nextRenderer(catalog, locale) {
+/** Values with HTML in them, for i18next's escaping to show. */
+function* htmlInputSets() {
+	for (const count of [3, 21])
+		yield {
+			count,
+			n: count,
+			g: "female",
+			name: "<b>A&B</b>",
+			names: ["<i>Ion</i>", "Ana & Maria"],
+			value: count,
+			d: dateOf(count),
+		};
+}
+
+function i18nextRenderer(catalog, locale, escapeValue) {
 	const instance = i18next.createInstance();
 	instance.init({
 		lng: locale,
 		resources: { [locale]: { translation: catalog } },
 		fallbackLng: false,
-		interpolation: { escapeValue: false },
+		interpolation: { escapeValue },
 		initAsync: false,
 	});
 	return (key, inputs) => instance.t(key, inputs);
