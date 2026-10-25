@@ -38,11 +38,19 @@ function packedFiles(): string[] {
 	}
 }
 
-/** Each TypeScript module but the runtime's, as dist holds it: compiled, with its declarations. */
+/**
+ * Each TypeScript module but the runtime's, as dist holds it: compiled, with its declarations. A
+ * declaration file is no module, and compiles to nothing.
+ */
 function compiledModules(): string[] {
 	return readdirSync(join(root, "src"), { recursive: true, encoding: "utf8" })
 		.map((file) => file.replaceAll("\\", "/"))
-		.filter((file) => file.endsWith(".ts") && !file.startsWith("runtime/"))
+		.filter(
+			(file) =>
+				file.endsWith(".ts") &&
+				!file.endsWith(".d.ts") &&
+				!file.startsWith("runtime/"),
+		)
 		.flatMap((file) => {
 			const module = `dist/${file.replace(/\.ts$/, "")}`;
 			return [`${module}.d.ts`, `${module}.js`];
