@@ -12,7 +12,10 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 
 ## Catalogs and config
 
-- **Catalogs are the inlang message-format JSON, flat, one file per locale,** so existing Paraglide catalogs compile unchanged. `$schema` is ignored.
+- **Catalogs are the inlang message-format JSON, one file per locale,** so existing Paraglide catalogs compile unchanged. `$schema` is ignored.
+- **An object of messages nests keys.** A message's key is the names of the objects it is in and its own, joined by `_`: `{ "cart": { "title": … } }` holds `cart_title`. That's how `grai import` names a nested source key, and how Paraglide exports one, so the call is `m.cart_title()` either way. As in the format, a message is a string or an array, and any other object holds messages.
+  - Two paths that name one key (`cart.title` and `cart_title`) are an error in their catalog, and so is a message with variants written without its array.
+  - The joined key must be a key name like any other, so `cart.item-count` is an error naming its path.
 - **The constructs are a deliberate subset:**
   - text and `{name}` placeholders;
   - markup: `{#tag}…{/tag}` and `{#tag/}`, with options (`href=|/terms|`, `rel=$rel`) and attributes (`@translate=no`, `@hidden`);
@@ -20,7 +23,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   - formatting: `:number`, `:integer`, `:percent`, `:currency`, `:unit`, `:relativetime`, `:list`, `:datetime`, `:date` and `:time` with their options, in a placeholder (`{x :number}`) or as a local (`local y = x: number`);
   - the escapes `\{`, `\}` and `\\`.
 
-  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input (`unit=$unit`), plural options other than `type`, selecting on a date or on a number its options round, and nested keys (`docs/followups.md`).
+  Anything else is a compile error that names the construct, rather than an approximation. That covers other functions such as `:string`, an option's value taken from an input (`unit=$unit`), plural options other than `type`, and selecting on a date or on a number its options round (`docs/followups.md`).
 - **A key is a JavaScript identifier, unique ignoring case.** It is the export name, and the last segment of its per-key import path. On a case-insensitive file system, two such paths that differ only in case are one file.
 - **Every key is in every locale.** A key missing from a locale is one compile error naming the locales that lack it and the `grai add` command that adds it to them. A missing translation would otherwise ship as a failed import or as another locale's words.
 - **The config is one JSON file, `grai.config.json`:** `locales`, `baseLocale`, `catalogs` (`"messages/{locale}.json"`), `outdir`, and the server's `strategy` and `cookieName`. JSON is read without executing code, so the CLI, Vite and Next read the same file the same way.
@@ -274,8 +277,10 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - `grai rename <key> <new>` renames the key in every catalog and at every call site, then compiles. It changes nothing when any other place writes the name (an object key, a string, someone else's property), and names each, since only the author knows what it means. A new name another key has, ignoring case, or one a file that binds the key already uses, refuses it too.
   - `grai check --fix` removes each key no source names, then checks. A key that a read by a computed name may reach stays, and the report names the read: `m[expr]`, narrowed by a template's or a concatenation's literal start, `m` used whole (`Object.keys(m)`, `typeof m`), or per-key modules loaded by a built path. A key that is no key name, such as `sign-in`, stays too: the scan finds only names, so it cannot see `m["sign-in"]`, and the check reports the key as invalid, for `grai rename` to fix.
 - **Every command that writes a catalog edits its text, and every other byte stays,** so a diff shows only the change:
-  - `add`, `seed` and `merge` give a key the catalog has its new value in place, and add a new key after the last entry, in the catalog's own layout: its indent, line breaks and spacing. A catalog with no entries yet, or a new one, takes another catalog's layout;
-  - a rename changes the key's string, and a removal takes the entry with the separator before it;
+  - `add`, `seed` and `merge` give a key the catalog has its new value in place, and add a new key after the last entry of its object, in that object's layout: its indent, line breaks and spacing. A catalog with no entries yet, or a new one, takes another catalog's layout;
+  - a new key goes where the base catalog has it, so `seed` and `merge` keep the base's objects. `add` puts it in the deepest object whose key, then `_`, starts it (`cart_tax` in `cart`), at the same path in every catalog, making the objects a catalog lacks;
+  - a rename changes the key's string, and keeps its place while its object's key, then `_`, still starts the new name; else the message moves to where `add` would put the new key;
+  - a removal takes the entry with the separator before it, and an object it leaves empty goes too;
   - `import` writes new catalogs, an entry per line indented by a tab.
 
   The files are written all or none: each new text goes to a temporary file first, and they are renamed into place once all are written.
