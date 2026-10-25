@@ -1,10 +1,11 @@
 // Server render: the message-heavy page (page.mjs) rendered by Svelte inside a request, with its
-// messages from Paraglide, from grai's server entry, from a per-locale module, inlined into the
-// template, or from i18next or use-intl. What inlining saves is what messages cost the render.
+// messages from Paraglide, from grai's compiled output, from i18next or use-intl, or inlined into
+// the template by the prototype. What inlining saves is what messages cost the render.
 //   node ssr.mjs [app...]
 import { join } from "node:path";
 import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
+import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import {
@@ -18,19 +19,15 @@ import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
 
+const INLINED = "prototype, inlined into the template";
+
 async function serverVariants(app, locale) {
-	const paraglide = join(await paraglideOutput(app), "messages.js");
-	const prototype = writePrototype(app);
-	const localeModule = join(prototype, `${locale}.js`);
 	const { directory: libraries } = writeLibraryModules(app, locale);
 	return {
-		Paraglide: { from: paraglide },
-		"grai, shared dispatcher, ALS": {
-			from: join(prototype, "server-shared.js"),
-		},
-		"grai, per-locale module": { from: localeModule },
-		"inlined into the template": {
-			from: localeModule,
+		Paraglide: { from: join(await paraglideOutput(app), "messages.js") },
+		grai: { from: join((await graiOutput(app)).outdir, "keys.js") },
+		[INLINED]: {
+			from: join(writePrototype(app), `${locale}.js`),
 			inline: app.messages[locale],
 		},
 		i18next: {
@@ -79,9 +76,7 @@ for (const app of selectedApps()) {
 				),
 			]);
 		}
-		const inlined = results.find(
-			([name]) => name === "inlined into the template",
-		)[1];
+		const inlined = results.find(([name]) => name === INLINED)[1];
 		for (const [name, ns] of results) {
 			console.log(
 				`| ${name} | ${locale} | ${formatNs(ns / 1e6)} | ${((100 * (ns - inlined)) / ns).toFixed(0)}% |`,
