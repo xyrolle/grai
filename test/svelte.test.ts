@@ -293,19 +293,6 @@ const greeting = m.greeting({ name });</script>
 		);
 	});
 
-	it("leaves the components as they are when the page switches locale live", async () => {
-		const dir = svelteApp(
-			{
-				"App.svelte": `<script>import { m } from "./out/messages.js";</script>\n<h1>{m.title()}</h1>`,
-			},
-			{ switch: "live" },
-		);
-
-		expect(await built(dir, withTexts(), "client")).toEqual(
-			await built(dir, withCalls(), "client"),
-		);
-	});
-
 	it("reads the server's calls as a property, and leaves dev as it is", async () => {
 		const dir = svelteApp({
 			"App.svelte": `<script>import { m } from "./out/messages.js";</script>\n<h1>{m.title()}</h1>`,

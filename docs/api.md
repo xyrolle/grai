@@ -90,7 +90,7 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `cookieMaxAge?: number`: the seconds a browser keeps the cookie, 400 days by default.
 - `cookieDomain?: string`: a host whose subdomains share the cookie, such as `example.com`.
 - `cookieSameSite?: "lax" | "strict" | "none"`: the cookie's SameSite, `"lax"` by default; `"none"`, for a page embedded in another site's, makes it Secure.
-- `switch?: "reload" | "live"`: how a page changes locale. `"reload"`, the default, reloads or navigates; `"live"` keeps every message a call in `grai/svelte`'s build, for an app that switches in place.
+- `switch?: "reload"`: how a page changes locale. `"reload"`, the default, reloads or navigates. `"live"`, where a page would switch in place, is refused until grai does it (`docs/followups.md`).
 - `localePrefix?: "as-needed" | "always"`: with the `url` strategy, whether the base locale's paths have a prefix too; `"as-needed"`, the default, leaves them without one.
 - `localePrefixes?: Record<string, string>`: with the `url` strategy, a locale's own prefix, one path segment, such as `{ "en-US": "us" }`.
 - `unlocalizedPaths?: string[]`: with the `url` strategy, globs of the paths it leaves alone, such as `["/api/**"]`, whose locale the strategies after it find.
@@ -121,11 +121,9 @@ The compiler writes these modules, with their declarations, into `outdir`.
 - `locales`: the project's locales, in the config's order, typed as a tuple of their literals.
 - `baseLocale`: the config's base locale, typed as its literal.
 - `getLocale(): Locale`: the locale messages render in: the request's on the server, the page's in a browser.
-- `setLocale(locale: Locale, options?: { reload?: boolean })`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it keeps the locale in the cookie or the URL, and reloads. With `{ reload: false }`, its type follows the config's `switch`:
-  - under `"reload"` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words, and a test picks its locale with `testing.js`'s `useLocale`;
-  - under `"live"` it returns `Promise<void>`, which resolves once the locale's message chunks are in, and the page switches in place.
+- `setLocale(locale: Locale, options?: { reload?: boolean })`: sets the locale for the rest of the request on the server, or for the process in a script. In a browser it keeps the locale in the cookie or the URL, and reloads. With `{ reload: false }` it returns `void`, and only keeps the choice for the page's next load: the page keeps its words, and a test picks its locale with `testing.js`'s `useLocale`. Under `"live"`, which the config refuses until grai switches a page in place, it would return `Promise<void>`, resolving once the locale's message chunks are in.
 
-  The runtime does neither yet: today `{ reload: false }` sets `<html lang>` and `dir`, and the messages called next are in the new locale (`docs/followups.md`).
+  The runtime does not keep only the choice yet: today `{ reload: false }` sets `<html lang>` and `dir`, and the messages called next are in the new locale (`docs/followups.md`).
 - `isLocale(value: unknown): value is Locale`: whether a value is one of the project's locales.
 - `assertIsLocale(value: unknown): Locale`: the value, if it is one of the project's locales; otherwise throws a `GraiError`.
 - `getTextDirection(locale?: Locale): "ltr" | "rtl"`: the direction a locale's script is written in, the bound locale's by default.
