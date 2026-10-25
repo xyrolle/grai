@@ -21,7 +21,7 @@ async function graiBuild(app, entry) {
 		root: dirname(entry),
 		configFile: false,
 		logLevel: "silent",
-		plugins: [graiPlugin({ config })],
+		plugins: [graiPlugin({ config, localeChunks: true })],
 		build: { write: false, rolldownOptions: { input: entry } },
 	});
 	const code = new Map(

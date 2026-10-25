@@ -61,7 +61,7 @@ import { grai } from "grai/vite";
 export default { plugins: [grai()] };
 ```
 
-The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, a page loads the keys its code uses in few chunks, each copied once per locale: keys the same pages use share a chunk, and small sets of them are pooled (`docs/design.md`).
+The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, a page loads the keys its code uses in few chunks: keys the same pages use share a chunk, and small sets of them are pooled (`docs/design.md`). With `grai({ localeChunks: true })`, the client build also copies each of those chunks once per locale, for an adapter that points each page at its own locale's copies, as `grai/sveltekit` does.
 
 A tool that reads a client build's chunks can ask which of grai's modules an id is, rather than spell grai's module ids:
 

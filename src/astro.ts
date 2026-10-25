@@ -52,7 +52,11 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 				updateConfig({
 					vite: {
 						plugins: [
-							graiVite({ config: configFile, reloadOnEdit: true }),
+							graiVite({
+								config: configFile,
+								reloadOnEdit: true,
+								localeChunks: true,
+							}),
 							middlewareModule(() => middleware),
 						],
 					},

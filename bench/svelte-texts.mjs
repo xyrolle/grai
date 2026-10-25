@@ -161,20 +161,20 @@ async function benchLocale(browser, app, dir, compiledKeys, locale) {
 	const inlinedEntry = writeEntry(dir, `Inlined-${locale}`, inlined);
 	const variants = {
 		"grai/vite: calls": await clientBuild(dir, callsEntry, [
-			graiVite(),
+			graiVite({ localeChunks: true }),
 			svelte(),
 		]),
 		"grai/svelte: strings": await clientBuild(dir, callsEntry, [
-			graiSvelte(),
+			graiSvelte({ localeChunks: true }),
 			svelte(),
 		]),
 		"strings after the compile": await clientBuild(dir, callsEntry, [
-			graiVite(),
+			graiVite({ localeChunks: true }),
 			svelte(),
 			stringsAfterCompile(strings),
 		]),
 		"text inlined": await clientBuild(dir, inlinedEntry, [
-			graiVite(),
+			graiVite({ localeChunks: true }),
 			svelte(),
 		]),
 	};
