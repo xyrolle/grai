@@ -131,6 +131,30 @@ describe("grai import --from i18next", () => {
 		]);
 	});
 
+	it("reads {{-name}}, {{name}} and $t(key) as i18next does, each in the text the one before left", async () => {
+		const messages = {
+			title: "Shop",
+			spaced: "{{ -name}}",
+			empty: "a {{}} b",
+			across: "{{x {{-name}} y}}",
+			nested: "$t($t(title)",
+		};
+		const { result, load } = imported("i18next", {
+			"en.json": messages,
+			"ru.json": messages,
+		});
+		const m = await load();
+
+		expect(m.empty?.()).toBe("a {{}} b");
+		expect(m.across?.({ name: "Ana" })).toBe("{{x Ana y}}");
+		expect(m.nested?.()).toBe("$t(Shop");
+		expect(
+			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
+		).toEqual([
+			"spaced: {{ -name}} reads an input whose name is not a JavaScript identifier, which grai does not support. Pass it as one input, such as {{name}}.",
+		]);
+	});
+
 	it("inlines $t(key) of a text, and leaves out in every locale what grai cannot express", async () => {
 		const { result, load } = imported("i18next", {
 			"en.json": {
