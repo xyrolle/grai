@@ -7,6 +7,7 @@ import {
 	localePrefix,
 	locales,
 	strategy,
+	unlocalizedPaths,
 } from "./config.js";
 
 export { baseLocale, cookieName, locales };
@@ -16,6 +17,9 @@ const urlsNameLocales = strategy.includes("url");
 /** Whether a locale has a prefix: every one's with `localePrefix: "always"`, else all but the base's. */
 const prefixed = (/** @type {string} */ locale) =>
 	localePrefix === "always" || locale !== baseLocale;
+/** Whether a path is one the `url` strategy leaves alone, which never has a prefix. */
+const leftAlone = (/** @type {string} */ pathname) =>
+	unlocalizedPaths.some((pattern) => pattern.test(pathname));
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {
@@ -163,9 +167,22 @@ export function getTextDirection(locale) {
  * @returns {string}
  */
 export function extractLocaleFromUrl(url) {
-	if (!urlsNameLocales) return baseLocale;
-	const first = new URL(url).pathname.split("/")[1];
-	return isLocale(first) && prefixed(first) ? first : baseLocale;
+	return localeOfPath(new URL(url).pathname) ?? baseLocale;
+}
+
+/**
+ * The locale a URL's path names for the `url` strategy: its prefix's, else the base locale's,
+ * unless every locale's paths are prefixed, when a path without one names none. A path the strategy
+ * leaves alone names none either.
+ *
+ * @param {string} pathname
+ * @returns {string | undefined}
+ */
+export function localeOfPath(pathname) {
+	if (!urlsNameLocales || leftAlone(pathname)) return undefined;
+	const first = pathname.split("/")[1];
+	if (isLocale(first) && prefixed(first)) return first;
+	return localePrefix === "always" ? undefined : baseLocale;
 }
 
 /**
@@ -194,7 +211,7 @@ export function deLocalizeUrl(url) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
-	if (urlsNameLocales && prefixed(locale)) {
+	if (urlsNameLocales && prefixed(locale) && !leftAlone(copy.pathname)) {
 		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
 		// redirect to drop it.
 		const path = copy.pathname === "/" ? "" : copy.pathname;

@@ -131,6 +131,8 @@ export type MarkupMessage<
 	parts: Call<Inputs, MessagePart<Tag>[]>;
 };
 // What the rest of the output calls; not for apps.
+/** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
+export declare function localeOfPath(pathname: string): Locale | undefined;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
 export declare function bindRequests(storage: {
 	getStore(): RequestLocale | undefined;
