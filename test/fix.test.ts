@@ -173,6 +173,19 @@ export const promo = (season: string) => m[\`promo_\${season}\`]();
 		expect(fixed.removed).toEqual([]);
 	});
 
+	it("takes a computed name's literal start as its reach only when a name alone follows it", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/pick.ts":
+				'import { m } from "$lib/i18n";\nexport const pick = (name: string) => m["cart" + name ? "promo" + "_spring" : "banner" + "_old"]();\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual([]);
+	});
+
 	it("keeps every unused key while a source reads the namespace whole", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
