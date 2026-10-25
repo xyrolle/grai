@@ -180,3 +180,9 @@ Done when: a client-router navigation into another locale loads the page anew, w
 A server island (`server:defer`) and an Astro action are requests of their own, to paths without the page's locale prefix. Under the `url` strategy they render in the base locale; the `cookie` and `preferredLanguage` strategies find the reader's.
 
 Done when: a server island and an action on a page under `/ro/` render in `ro` under the `url` strategy, with a test in the Astro example.
+
+## The import map under a CSP of hashes
+
+`handleLocale` gives the import map Kit's nonce, but no hash. Under a `csp` in `hash` mode, and on a prerendered page in `auto` mode, the browser refuses the map: the page then imports the shared message chunks, and its preloads still fetch the locale's copies, so it downloads both.
+
+Done when: the map's hash joins the page's `script-src`, in the `Content-Security-Policy` header and in a prerendered page's `<meta http-equiv>`, with a test of the example in `hash` mode that downloads only the locale's copies.
