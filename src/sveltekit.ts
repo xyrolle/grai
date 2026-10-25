@@ -22,7 +22,7 @@ const MESSAGE_PRELOAD = new RegExp(
  * What the handle takes from the project's compiled output: its `server.js` and `runtime.js`.
  * Methods, so that the output's functions, typed with the project's own locales, fit.
  */
-export type CompiledLocale = {
+type CompiledLocale = {
 	/** `middleware` from the output's `server.js`. */
 	middleware(
 		request: Request,
