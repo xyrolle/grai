@@ -235,7 +235,16 @@ try {
 	});
 });
 
-describe("the Vite plugin's dev server", () => {
+/**
+ * A dev server test's budget, and each wait's within it. On a loaded machine, launching Chromium,
+ * starting a dev server and loading a page take seconds each: past Vitest's 5 s for a test and
+ * expect.poll's 1 s for a wait. A wait gets Playwright's own 30 s, so a condition never reached
+ * fails as itself before the test's minute runs out.
+ */
+const devTest = { timeout: 60_000 };
+const devWait = { timeout: 30_000 };
+
+describe("the Vite plugin's dev server", devTest, () => {
 	/** A dev server of the project, and a server render of its title through Vite's SSR runner. */
 	async function serverRender(dir: string) {
 		writeFileSync(
@@ -365,7 +374,7 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
 		await server.listen();
 		await expect
-			.poll(() => existsSync(join(dir, "out", "messages.js")))
+			.poll(() => existsSync(join(dir, "out", "messages.js")), devWait)
 			.toBe(true);
 		const rendered = async () =>
 			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
@@ -377,10 +386,10 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
 		);
 
-		await expect.poll(rendered).toBe("Heading 1");
+		await expect.poll(rendered, devWait).toBe("Heading 1");
 		// The next time the runner evaluates the program, for any other reason, it keeps the edit.
 		ssr.hot.send({ type: "full-reload" });
-		await expect.poll(rendered).toBe("Heading 2");
+		await expect.poll(rendered, devWait).toBe("Heading 2");
 	});
 
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
@@ -440,7 +449,7 @@ try {
 	});
 });
 
-describe("the Vite plugin's dev server, after a compile fails", () => {
+describe("the Vite plugin's dev server, after a compile fails", devTest, () => {
 	const broken = (dir: string) =>
 		writeFileSync(join(dir, "messages", "de.json"), '{ "title": "Tit');
 	const fixed = (dir: string, title: string) =>
@@ -554,13 +563,13 @@ import.meta.hot.send("test:ping");
 		const { dir } = project(catalogs);
 		const { server, sent, browser } = await devServer(dir);
 		await expect
-			.poll(() => existsSync(join(dir, "out", "messages.js")))
+			.poll(() => existsSync(join(dir, "out", "messages.js")), devWait)
 			.toBe(true);
 		broken(dir);
-		await expect.poll(() => sent.includes("error")).toBe(true);
+		await expect.poll(() => sent.includes("error"), devWait).toBe(true);
 		const errors = sent.length;
 		fixed(dir, "Überschrift");
-		await expect.poll(() => sent.length > errors).toBe(true);
+		await expect.poll(() => sent.length > errors, devWait).toBe(true);
 
 		// A page gets its payloads in order, so by the time its ping is answered it has handled what
 		// the server kept for it.
