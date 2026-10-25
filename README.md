@@ -251,7 +251,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 | Server render of 2,000 messages | 0.13 ms | 0.20–0.23 ms | 3.9 ms | 4.8–5.0 ms | `ssr` |
 | Hydrating that page | 5.4–6.9 ms | 7.9–10.4 ms | 12.2–15.6 ms | 16.7–21.6 ms | `hydrate` |
 | That page's JS, brotli | 22.9–24.9 KB | 38.0–40.5 KB | 125–133 KB | 125–133 KB | `hydrate` |
-| The runtime in the browser, brotli | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB | `library-bytes` |
+| The runtime in the browser, its whole API, brotli | 1.0 KB | 3.6 KB | 12.1 KB | 10.2 KB | `library-bytes` |
 | A new server process: load, then first render | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms | `startup` |
 | Type checking 500 calls with `tsc` 7 | 82 ms | 278 ms | 609 ms | 521 ms | `types` |
 | The editor's first completion of a key | 0.2 s | 1.0 s | 49 s | 21 s | `types` |
