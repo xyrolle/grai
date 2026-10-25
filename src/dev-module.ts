@@ -23,7 +23,7 @@ export function devModule(outdir: string, build: Build): string {
 			? `export const ${key} = markup(live(${name}, "v"), live(${name}, "p"));`
 			: `export const ${key} = message(...live(${name}, "v"));`;
 	});
-	return `${outputImports(outdir, build.compilation.keys.values(), ["markup", "message"])}
+	return `${outputImports((file) => join(outdir, file), build.compilation.keys.values(), ["markup", "message"])}
 const T = {
 ${keys.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
 };
@@ -68,7 +68,7 @@ export function patchModule(
 	const rows = changed.map(
 		(key) => `\t${key}: ${row(build.compilation.keys.get(key))},`,
 	);
-	return `${outputImports(outdir, keys, [])}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
+	return `${outputImports((file) => join(outdir, file), keys, [])}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }
 
 /** A key's row in the dev table: its locales' variants, and their parts for markup. */
