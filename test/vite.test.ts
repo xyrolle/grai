@@ -309,6 +309,26 @@ describe("the Vite plugin's build", () => {
 			].join("\n"),
 		);
 	});
+
+	it("reads the namespace by scope, so a parameter or declaration of its name is not grai's", async () => {
+		const { dir } = project(catalogs);
+		const code = [
+			`import { m } from "./out/messages.js";`,
+			"export const ids = (rows) => rows.map((m) => m.id);",
+			"export function sized(m) { return m.size; }",
+			"export const widths = ({ m }) => m.width;",
+			"export function block() { const m = { label: 1 }; return m.label; }",
+			"export function caught() { try { return m.title(); } catch (m) { return m.message; } }",
+			"console.log(m.title(), m.subtitle());",
+		].join("\n");
+
+		await expect(built(dir, { a: `${code}\n` })).rejects.toThrow(
+			'a.js:7:26: "subtitle": m.subtitle names a key no catalog has. Add it with grai add subtitle --en "…" --de "…", or fix the name.',
+		);
+		await expect(
+			built(dir, { a: `${code.split("\n").slice(0, -1).join("\n")}\n` }),
+		).resolves.toBeDefined();
+	});
 });
 
 describe("the Vite plugin's message chunks", () => {

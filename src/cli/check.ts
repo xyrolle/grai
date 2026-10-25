@@ -1,6 +1,7 @@
 import { check } from "../check.ts";
 import type { GraiError } from "../error.ts";
 import { fixLines, removeUnusedKeys } from "../fix.ts";
+import type { Unchecked } from "../missing-key-calls.ts";
 import {
 	type Command,
 	failed,
@@ -33,12 +34,21 @@ export const checkCommand: Command = {
 			for (const line of fixLines(fixed)) console.log(line);
 			if (fixed.errors.length > 0) return failed(fixed.errors);
 		}
-		const { problems, untranslated } = await check(config, sources);
+		const { problems, untranslated, unchecked } = await check(config, sources);
 		if (values.json === true) {
 			console.log(
-				JSON.stringify(checkedJson(problems, untranslated), null, "\t"),
+				JSON.stringify(
+					checkedJson(problems, untranslated, unchecked),
+					null,
+					"\t",
+				),
 			);
 			return problems.length > 0 ? 1 : 0;
+		}
+		for (const { file, name, line, column } of unchecked) {
+			console.log(
+				`grai: not checked: ${file} declares ${name} again (${line}:${column}), so check cannot tell which of its ${name}.key reads are grai's.`,
+			);
 		}
 		for (const [locale, keys] of untranslated) {
 			console.log(untranslatedLine(locale, keys));
@@ -56,10 +66,14 @@ function untranslatedLine(locale: string, keys: readonly string[]): string {
 	return `grai: ${keys.length} untranslated in ${locale}: ${shownKeys}${more}`;
 }
 
-/** A check's findings as JSON, for scripts: every problem, and every untranslated key by locale. */
+/**
+ * A check's findings as JSON, for scripts: every problem, every untranslated key by locale, and
+ * each file whose reads of a namespace it left out.
+ */
 function checkedJson(
 	problems: readonly GraiError[],
 	untranslated: ReadonlyMap<string, readonly string[]>,
+	unchecked: readonly Unchecked[],
 ) {
 	return {
 		problems: problems.map(({ code, file, key, locale, message }) => ({
@@ -70,5 +84,6 @@ function checkedJson(
 			message,
 		})),
 		untranslated: Object.fromEntries(untranslated),
+		unchecked,
 	};
 }
