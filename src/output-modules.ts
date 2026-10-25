@@ -27,12 +27,13 @@ export function renderModules(
 	config: Config,
 	sources: RuntimeSources,
 	compilation: Compilation,
+	localeCopies: boolean,
 ): {
 	modules: OutputModules;
 	immutable: OutputFile[];
 	entries: OutputFile[];
 } {
-	const configCode = configModule(config);
+	const configCode = configModule(config, localeCopies);
 	const configFile = `${contentName("config", configCode)}.js`;
 	const runtimeCode = pinImports(
 		sources.runtime,

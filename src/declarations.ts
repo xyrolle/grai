@@ -178,6 +178,9 @@ export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateT
 /** server.d.ts: the middleware, typed with the project's locales. */
 export const serverDeclarations = `import type { Locale } from "./runtime.js";
 
+/** Whether the build that compiled the output writes a copy of each message chunk per locale. */
+export declare const localeCopies: boolean;
+
 /**
  * Resolves a request's locale by the config's strategy and binds it for the handler and all it
  * calls. Returns the handler's response, its \`Vary\` listing the request headers the strategy

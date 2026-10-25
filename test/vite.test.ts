@@ -429,6 +429,19 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 		});
 	});
 
+	it("says in config.js whether the build wrote them, for the server", async () => {
+		const flag = async (localeChunks: boolean) => {
+			const { dir } = project(catalogs);
+			await built(dir, { page }, { localeChunks });
+			const config = await import(
+				pathToFileURL(join(dir, "out", "config.js")).href
+			);
+			return config.localeCopies;
+		};
+
+		expect([await flag(true), await flag(false)]).toEqual([true, false]);
+	});
+
 	it("writes none unless the app asks for them", async () => {
 		const { dir } = project(catalogs);
 		const { sources } = await built(dir, { page });

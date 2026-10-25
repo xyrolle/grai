@@ -52,6 +52,10 @@
 			"types": "./dist/sveltekit.d.ts",
 			"default": "./dist/sveltekit.js"
 		},
+		"./sveltekit/vite": {
+			"types": "./dist/sveltekit-vite.d.ts",
+			"default": "./dist/sveltekit-vite.js"
+		},
 		"./sveltekit/client": {
 			"types": "./dist/sveltekit-client.d.ts",
 			"default": "./dist/sveltekit-client.js"

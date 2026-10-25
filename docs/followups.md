@@ -2,12 +2,6 @@
 
 Open work that `docs/design.md` leaves to measurement or to a later change.
 
-## Ship one locale per page through an import map
-
-The Vite plugin writes each message chunk once per locale under `grai-<locale>/` (`docs/design.md`). The SvelteKit adapter still has to write the import map to the page's locale and point Kit's `modulepreload` links at the copies.
-
-Done when: `grai/sveltekit` does both, with a browser test that a page of the example loads no other locale's words and no shared message chunk.
-
 ## Chunk messages by the entries a page loads together
 
 A SvelteKit page loads its layouts with it, but the bundler sees each layout and page as an entry of its own: a set of keys that a layout and a few of its pages use is a set apart from the layout's own, though every page under the layout loads both. On app B, whose 60 pages share one layout, the layout's first paint loads 8 message chunks, and the app's tuned setup on Paraglide, which grouped keys by the routes that reach them and the layout's keys in one chunk, loads 21 a page (median) against grai's 26, in 10% fewer bytes. Simulated on app B's build, sets by the pages that load them rather than by entries give 13% fewer requests and 6% fewer bytes. Rolldown's sets cannot say which entries load together, and its merge picks the nearest set by the count of entries apart, not by the bytes a page would load.

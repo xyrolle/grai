@@ -2,8 +2,8 @@ import type { Config } from "./config.ts";
 import { cookieAttributes } from "./cookie.ts";
 import { globPattern } from "./globs.ts";
 
-/** config.js: the project's config, as the runtime reads it. */
-export function configModule(config: Config): string {
+/** config.js: the project's config, as the runtime reads it, and whether its build has copies. */
+export function configModule(config: Config, localeCopies: boolean): string {
 	return [
 		`export const locales = ${JSON.stringify(config.locales)};`,
 		`export const baseLocale = ${JSON.stringify(config.baseLocale)};`,
@@ -21,6 +21,8 @@ export function configModule(config: Config): string {
 		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,
 		"/** @type {readonly RegExp[]} */",
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
+		"/** @type {boolean} */",
+		`export const localeCopies = ${localeCopies};`,
 		"",
 	].join("\n");
 }

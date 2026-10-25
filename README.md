@@ -74,29 +74,37 @@ kindOf(id); // "runtime", "config", "plurals", "formats" (the grai-runtime chunk
 
 ### Svelte
 
-In a Svelte or SvelteKit app, take the plugin from `grai/svelte`, listed before Svelte's:
+In a Svelte app, take the plugin from `grai/svelte`, listed before Svelte's, and in a SvelteKit app from `grai/sveltekit/vite` (below):
 
 ```ts
 // vite.config.ts
-import { sveltekit } from "@sveltejs/kit/vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { grai } from "grai/svelte";
 
-export default { plugins: [grai(), sveltekit()] };
+export default { plugins: [grai(), svelte()] };
 ```
 
 It is `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. Svelte draws a string as a plain value, where it gives each call a signal of its own, so a page of 2,000 messages with app A's catalog hydrates in two-thirds of the time (`docs/runtime.md`). The app needs `svelte` and `magic-string`. With `"switch": "live"` in the config, for a page that changes locale in place, every call stays a call.
 
 ### SvelteKit
 
-`grai/sveltekit`'s `handleLocale` renders each request in its locale, from the output's middleware and text direction. `examples/sveltekit` is a complete app.
+`grai/sveltekit`'s `handleLocale` renders each request in its locale, from the output's middleware and text direction, and `grai/sveltekit/vite`'s plugin, listed before Kit's, builds the app. `examples/sveltekit` is a complete app.
+
+```ts
+// vite.config.ts
+import { sveltekit } from "@sveltejs/kit/vite";
+import { grai } from "grai/sveltekit/vite";
+
+export default { plugins: [grai(), sveltekit()] };
+```
 
 ```ts
 // src/hooks.server.ts
 import { handleLocale } from "grai/sveltekit";
 import { getTextDirection } from "#lib/i18n/runtime.js";
-import { middleware } from "#lib/i18n/server.js";
+import { localeCopies, middleware } from "#lib/i18n/server.js";
 
-export const handle = handleLocale({ middleware, getTextDirection });
+export const handle = handleLocale({ middleware, getTextDirection, localeCopies });
 ```
 
 It resolves the locale by `grai.config.json`'s `strategy` and binds it while the request renders. It writes the locale into `src/app.html`'s `%grai.lang%` and `%grai.dir%`:
@@ -116,6 +124,8 @@ export const reroute: Reroute = ({ url }) => deLocalizeUrl(url).pathname;
 ```
 
 Links then name their locale with `localizeHref("/about")`.
+
+A built page downloads only its own locale's words. The plugin is `grai/svelte`'s, and it also writes a copy of each message chunk per locale, which the output's `localeCopies` says; `handleLocale` then writes the page an import map from the shared chunks to its locale's copies, and points Kit's preloads at the copies. Built with any other plugin, `localeCopies` is false, and a page loads the shared chunks.
 
 In dev, an edited message shows in the open page without a reload once `src/hooks.client.ts` imports `grai/sveltekit/client`. Svelte draws again only what read the edited keys, and the page's loads and remote functions run again for the text they return. A build leaves the module out.
 
@@ -267,7 +277,6 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 
 - **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
-- **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, other than a currency, a unit and a time zone (`currency=$code` and `:relativetime`'s `unit=$unit` work), such as `style=$style`.

@@ -9,12 +9,11 @@ import {
 	keyModulePrefix,
 	keyPrefix,
 	localeCopies,
-	localeDirectory,
-	messageDirectory,
 	messageOnly,
 	outputPrefix,
 	textModulePrefix,
 } from "./locale-chunks.ts";
+import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { outputImports } from "./output-imports.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
