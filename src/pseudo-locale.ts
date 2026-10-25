@@ -46,11 +46,21 @@ function pseudoCatalog(
 ): Catalog {
 	if (before !== undefined && base === baseBefore) return before;
 	const edit = base.edit;
-	if (before === undefined || edit === undefined || edit.from !== baseBefore) {
+	if (
+		before === undefined ||
+		edit === undefined ||
+		edit.from !== baseBefore?.revision
+	) {
 		const messages = new Map<string, unknown>();
 		for (const [key, value] of base.messages)
 			messages.set(key, pseudoValue(value));
-		return { locale, file: base.file, messages, paths: base.paths };
+		return {
+			locale,
+			file: base.file,
+			messages,
+			paths: base.paths,
+			revision: Symbol(locale),
+		};
 	}
 	const messages = new Map(before.messages);
 	for (const key of edit.keys) {
@@ -58,7 +68,14 @@ function pseudoCatalog(
 		if (value === undefined) messages.delete(key);
 		else messages.set(key, pseudoValue(value));
 	}
-	const pseudoEdit = { from: before, keys: edit.keys, moved: false };
+	const pseudoEdit = { from: before.revision, keys: edit.keys, moved: false };
 	const { file, paths } = base;
-	return { locale, file, messages, paths, edit: pseudoEdit };
+	return {
+		locale,
+		file,
+		messages,
+		paths,
+		revision: Symbol(locale),
+		edit: pseudoEdit,
+	};
 }
