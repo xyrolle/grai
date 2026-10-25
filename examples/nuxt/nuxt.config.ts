@@ -1,5 +1,6 @@
-// `GRAI_CONFIG=grai.cookie.json nuxt build` builds the same app with another strategy: the
-// cookie, else the browser's languages, instead of the URL prefix.
+// `GRAI_CONFIG=grai.always.json nuxt build` builds the same app with every locale's paths
+// prefixed, Romanian's as /romana, and a page asked for without a prefix sent to the cookie's
+// locale, else the browser's language.
 export default defineNuxtConfig({
 	modules: ["grai/nuxt"],
 	grai: { config: process.env.GRAI_CONFIG ?? "grai.config.json" },

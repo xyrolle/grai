@@ -1,0 +1,10 @@
+{
+	"locales": ["en", "ro", "ar"],
+	"baseLocale": "en",
+	"catalogs": "messages/{locale}.json",
+	"outdir": "app/i18n",
+	"strategy": ["url", "cookie", "preferredLanguage"],
+	"cookieName": "lang",
+	"localePrefix": "always",
+	"localePrefixes": { "ro": "romana" }
+}

@@ -208,30 +208,55 @@ describe("the Nuxt example, built, by the URL prefix", {
 	});
 });
 
-describe("the Nuxt example, built, by the cookie and Accept-Language", {
+describe("the Nuxt example, built, by every locale's prefix, then the cookie and Accept-Language", {
 	timeout: 30_000,
 }, () => {
 	const origin = "http://localhost:4822";
-	built(4822, "grai.cookie.json");
+	built(4822, "grai.always.json");
 
-	it("renders in the cookie's locale, unprefixed, and varies by the headers the strategy reads", async () => {
+	it("sends a page asked for without a prefix to the cookie's locale's own prefix, and varies by the headers the strategy reads", async () => {
+		const sent = await fetch(`${origin}/about`, {
+			headers: { cookie: "lang=ro" },
+			redirect: "manual",
+		});
 		await page
 			.context()
 			.addCookies([{ name: "lang", value: "ro", url: origin }]);
 		const response = await page.goto(`${origin}/about`);
 
+		expect([
+			sent.status,
+			sent.headers.get("location"),
+			sent.headers.get("vary"),
+		]).toEqual([307, `${origin}/romana/about`, "Cookie, Accept-Language"]);
+		expect(page.url()).toBe(`${origin}/romana/about`);
 		expect(await html("lang")).toBe("ro");
 		expect(await text("h1")).toBe("Despre magazin");
 		expect(response?.headers().vary).toContain("Cookie, Accept-Language");
 	});
 
-	it("renders in the browser's language when no cookie names one", async () => {
+	it("sends it to the browser's language when no cookie names one", async () => {
 		const ar = await browser.newPage({ locale: "ar-EG" });
 		onTestFinished(() => ar.context().close());
 		await ar.goto(`${origin}/`);
 
+		expect(ar.url()).toBe(`${origin}/ar`);
 		expect(await ar.locator("html").getAttribute("lang")).toBe("ar");
 		expect(await ar.locator("html").getAttribute("dir")).toBe("rtl");
+	});
+
+	it("renders the base locale under its prefix, and navigates in place under it", async () => {
+		await page.goto(`${origin}/en`);
+		await page.locator("#hydrated").waitFor();
+		await mark();
+
+		await page.click("#about");
+		await page.waitForURL(`${origin}/en/about`);
+
+		expect(await html("lang")).toBe("en");
+		expect(await text("h1")).toBe("About the shop");
+		expect(await marked()).toBe(true);
+		expect(logged).toEqual([]);
 	});
 });
 
