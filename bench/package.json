@@ -35,15 +35,18 @@
 		"migrate-equivalence": "node migrate-equivalence.mjs",
 		"import-fuzz": "node import-fuzz.mjs",
 		"refactor": "node refactor.mjs",
-		"nextjs": "node nextjs.mjs"
+		"nextjs": "node nextjs.mjs",
+		"astro": "node astro.mjs"
 	},
 	"devDependencies": {
+		"@astrojs/svelte": "9.1.1",
 		"@formatjs/cli": "6.16.35",
 		"@formatjs/icu-messageformat-parser": "3.5.22",
 		"@inlang/paraglide-js": "2.29.1",
 		"@inlang/plugin-m-function-matcher": "2.3.4",
 		"@inlang/plugin-message-format": "4.5.5",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
+		"astro": "7.4.2",
 		"grai": "file:..",
 		"i18next": "26.4.7",
 		"intl-messageformat": "12.1.3",
