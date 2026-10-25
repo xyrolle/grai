@@ -5,6 +5,7 @@ import { keyDeclaration } from "./declarations.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
+import { InputConflict } from "./input-types.ts";
 import { caseCollisions, isCompilable, keyProblems } from "./key-checks.ts";
 import { type LocaleMessage, parseMessage } from "./message.ts";
 import { type KeyModule, keyModule, type RuntimeFunction } from "./modules.ts";
@@ -130,8 +131,12 @@ function compileKey(
 	}
 	const messages = parseMessages(key, catalogs, sources, values, errors);
 	if (messages === undefined) return undefined;
+	const declaration = declarationOf(key, messages, base, catalogs, sources);
+	if (declaration instanceof GraiError) {
+		errors.push(declaration);
+		return undefined;
+	}
 	const module = keyModule(key, messages);
-	const declaration = keyDeclaration(key, messages, base?.messages.get(key));
 	return {
 		values,
 		code: module.code,
@@ -146,6 +151,27 @@ function compileKey(
 		parts: module.parts,
 		markup: messages.some((message) => message.markup),
 	};
+}
+
+/** A key's declaration, or the error naming the locale of an input no value suits every use of. */
+function declarationOf(
+	key: string,
+	messages: readonly LocaleMessage[],
+	base: Catalog | undefined,
+	catalogs: readonly Catalog[],
+	sources: readonly (Catalog | undefined)[],
+): string | GraiError {
+	try {
+		return keyDeclaration(key, messages, base?.messages.get(key));
+	} catch (error) {
+		if (!(error instanceof InputConflict)) throw error;
+		for (const [index, { file, locale }] of catalogs.entries()) {
+			if (locale !== error.locale) continue;
+			const where = { file: sources[index]?.file ?? file, key, locale };
+			return new GraiError(error.code, where, error.message);
+		}
+		throw error;
+	}
 }
 
 /**
