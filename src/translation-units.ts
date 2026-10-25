@@ -7,14 +7,13 @@
 import type { Catalog } from "./catalog.ts";
 import { parseMessage } from "./message.ts";
 import { type Piece, patternPieces } from "./pattern-pieces.ts";
+import { baseCategoryOf, noteOf } from "./plural-forms.ts";
 import { isSeed } from "./seed.ts";
 import { catchAll, countingRules } from "./selection.ts";
 import {
 	alignedVariants,
-	baseCategoryOf,
 	chosen,
 	combinations,
-	noteOf,
 	translatedVariants,
 } from "./unit-variants.ts";
 
