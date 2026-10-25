@@ -137,7 +137,7 @@ describe("a formatter's options that inputs give: errors", () => {
 			}),
 		).toEqual([
 			'message-invalid: messages/en.json: "a_local" (en): an option takes countPlural, a local. An option takes an input: name the input itself.',
-			'unsupported: messages/en.json: "a_style" (en): {amount :number style=$style}: "style=$style" takes its value from an input, which only a currency, a number\'s unit and a date\'s time zone can: how a value looks is the message\'s to write. Write the value itself.',
+			'unsupported: messages/en.json: "a_style" (en): {amount :number style=$style}: "style=$style" takes its value from an input, which only a currency, a unit and a time zone can: how a value looks is the message\'s to write. Write the value itself.',
 			'message-invalid: messages/en.json: "no_name" (en): {amount :number style=currency currency=$}: "currency=$" names no input. Write it as currency=$name.',
 			'message-invalid: messages/en.json: "no_style" (en): {amount :number currency=$code}: currency=$code gives a currency, which only style=currency formats with. Write style=currency in the call.',
 			`message-invalid: messages/en.json: "refused" (en): {amount :number style=currency currency=$code maximumFractionDigits=101}: Intl cannot format with these options: ${intlError(() => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 101 }))}`,
