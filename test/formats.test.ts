@@ -263,6 +263,24 @@ describe("a formatted placeholder's errors", () => {
 		]);
 	});
 
+	it("is an error for options Intl refuses each time they come, whatever options the same formatter took before", async () => {
+		const refused = intlError(
+			() => new Intl.NumberFormat(undefined, { style: "currency" }),
+		);
+		expect(
+			await errorsOf({
+				en: {
+					a_percent: "{amount :number style=percent}",
+					b_currency: "{amount :number style=currency}",
+					c_currency: "{amount :number style=currency}",
+				},
+			}),
+		).toEqual([
+			`message-invalid: messages/en.json: "b_currency" (en): {amount :number style=currency}: Intl cannot format with these options: ${refused}`,
+			`message-invalid: messages/en.json: "c_currency" (en): {amount :number style=currency}: Intl cannot format with these options: ${refused}`,
+		]);
+	});
+
 	it("is an error to select on a date or on a number its options round, or to format a local", async () => {
 		expect(
 			await errorsOf({
