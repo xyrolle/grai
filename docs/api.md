@@ -78,6 +78,8 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `fallbacks?: Record<string, string>`: each locale that takes the messages it lacks from another locale of its language, such as `{ "en-GB": "en" }`.
 - `identicalToBase?: Record<string, string[]>`: per locale, the keys whose message rightly reads as the base locale's, which `grai check` and `grai export` take as translated.
 - `pseudoLocale?: string`: a locale, such as `"en-XA"`, made from the base's messages for development and tests, accented and about 35% longer; `grai watch` and the Vite dev server compile it, and no build does.
+- `descriptions?: string`: a JSON file of each key's description for translators, which `grai export` writes as each unit's note.
+- `$schema?: string`: `./node_modules/grai/config.schema.json`, which the package ships, for an editor to complete and check the config.
 
 Relative paths start from the config file's directory. The README's table says more about each field.
 
