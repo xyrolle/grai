@@ -26,6 +26,7 @@ declare module "grai/next/output/config.js" {
 		| "cookie"
 		| "localStorage"
 		| "preferredLanguage"
+		| "query"
 		| "url"
 	)[];
 }

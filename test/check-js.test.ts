@@ -63,9 +63,10 @@ it.each([
 	[
 		"every strategy",
 		{
-			strategy: ["cookie", "localStorage", "preferredLanguage", "url"],
+			strategy: ["cookie", "localStorage", "preferredLanguage", "query", "url"],
 			cookieName: "lang",
 			localStorageKey: "locale",
+			queryParameter: "lng",
 		},
 	],
 ])(
