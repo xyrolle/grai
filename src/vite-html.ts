@@ -76,19 +76,31 @@ export function withPageLocale(
 const firstModule =
 	/<script\b[^>]*\btype=["']?module\b|<link\b[^>]*\brel=["']?modulepreload\b/i;
 const headEnd = /<\/head>/i;
+/** The `lang` of a page's `<html>`, quoted or not. */
+const htmlLang =
+	/<html\b[^>]*?\slang\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i;
 
 /**
  * A page with its locale script ahead of every module script and module preload, and after the
  * tags before them, such as `<meta charset>`, which must come within the page's first 1024 bytes.
- * A page's chunks, in a build that copies them per locale, go in the script's `data-grai-chunks`.
+ * The `<html lang>` the page is built with goes in the script's `data-grai-lang`, for the script to
+ * tell it from one a server writes in its place, and a page's chunks, in a build that copies them
+ * per locale, in its `data-grai-chunks`.
  */
 function withLocaleScript(
 	html: string,
 	script: string,
 	chunks: PageChunks | undefined,
 ): string {
+	const lang = html
+		.match(htmlLang)
+		?.slice(1)
+		.find((value) => value !== undefined);
 	const data =
-		chunks === undefined ? "" : ` data-grai-chunks="${attribute(chunks)}"`;
+		(lang === undefined ? "" : ` data-grai-lang="${attribute(lang)}"`) +
+		(chunks === undefined
+			? ""
+			: ` data-grai-chunks="${attribute(JSON.stringify(chunks))}"`);
 	const tag = `<script${data}>${script}</script>\n`;
 	const at = html.search(firstModule);
 	if (at !== -1) return html.slice(0, at) + tag + html.slice(at);
@@ -159,9 +171,7 @@ function directoryOf(fileName: string): string {
 	return fileName.slice(0, fileName.lastIndexOf("/") + 1);
 }
 
-/** JSON as an HTML attribute's double-quoted value. */
-function attribute(value: unknown): string {
-	return JSON.stringify(value)
-		.replaceAll("&", "&amp;")
-		.replaceAll('"', "&quot;");
+/** Text as an HTML attribute's double-quoted value. */
+function attribute(text: string): string {
+	return text.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 }
