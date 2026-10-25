@@ -429,12 +429,89 @@ describe("grai import --from icu", () => {
 		expect(result.changed).toEqual([]);
 	});
 
-	it("leaves out a style it does not convert, and offsets", () => {
+	it("formats with a number or date skeleton as intl-messageformat reads it, through Intl", async () => {
+		const catalog = {
+			price: "{value, number, ::currency/EUR}",
+			exact: "{value, number, ::currency/JPY .00 sign-always}",
+			share: "{value, number, ::percent .0}",
+			speed:
+				"{value, number, ::unit/speed-kilometer-per-hour unit-width-full-name}",
+			short: "{value, number, ::compact-short}",
+			plain: "{value, number, ::.00# group-off}",
+			digits: "{value, number, ::@@@}",
+			when: "{d, date, ::yMMMd}",
+			time: "{d, time, ::Hmm}",
+		};
+		const { catalog: written, load } = imported("icu", {
+			"en.json": catalog,
+			"ru.json": catalog,
+		});
+		const m = await load();
+		const value = 1234.567;
+		const d = Date.UTC(2026, 9, 24, 15, 5);
+		const number = (options: Intl.NumberFormatOptions) =>
+			new Intl.NumberFormat("ru", options).format(value);
+
+		expect(
+			[m.price, m.exact, m.share, m.speed, m.short, m.plain, m.digits].map(
+				(message) => message?.({ value }, { locale: "ru" }),
+			),
+		).toEqual([
+			number({ style: "currency", currency: "EUR" }),
+			number({
+				style: "currency",
+				currency: "JPY",
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2,
+				signDisplay: "always",
+			}),
+			number({
+				style: "percent",
+				minimumFractionDigits: 1,
+				maximumFractionDigits: 1,
+			}),
+			number({
+				style: "unit",
+				unit: "kilometer-per-hour",
+				unitDisplay: "long",
+				currencyDisplay: "name",
+			}),
+			number({ notation: "compact", compactDisplay: "short" }),
+			number({
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 3,
+				useGrouping: false,
+			}),
+			number({ minimumSignificantDigits: 3, maximumSignificantDigits: 3 }),
+		]);
+		expect(m.when?.({ d })).toBe(
+			new Intl.DateTimeFormat("en", {
+				year: "numeric",
+				month: "short",
+				day: "numeric",
+			}).format(d),
+		);
+		expect(m.time?.({ d })).toBe(
+			new Intl.DateTimeFormat("en", {
+				hourCycle: "h23",
+				hour: "numeric",
+				minute: "2-digit",
+			}).format(d),
+		);
+		expect(written("en")).toMatchObject({
+			price: "{value :currency currency=EUR}",
+			share: "{value :percent minimumFractionDigits=1 maximumFractionDigits=1}",
+		});
+	});
+
+	it("leaves out a style it does not convert, a skeleton stem or a date field Intl has no option for, and offsets", () => {
 		const { result } = imported(
 			"icu",
 			{
 				"en.json": {
-					price: "{value, number, ::currency/EUR}",
+					price: "{value, number, currency}",
+					scaled: "{value, number, ::scale/100}",
+					week: "{d, date, ::yw}",
 					others: "{n, plural, offset:1 other {# others}}",
 				},
 			},
@@ -444,7 +521,9 @@ describe("grai import --from icu", () => {
 		expect(
 			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
 		).toEqual([
-			"price: {value, number, ::currency/EUR} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
+			"price: {value, number, currency} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
+			"scaled: {value, number, ::scale/100} uses the skeleton stem scale/100, which grai import does not convert. Write the call with the Intl options it needs.",
+			"week: {d, date, ::yw} uses the date field w, which grai import does not convert. Write the call with the Intl options it needs.",
 			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
 		]);
 	});
