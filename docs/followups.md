@@ -75,7 +75,7 @@ Done when: the Vite plugin serves that module and reports the key, with a test t
 
 ## Import what `grai import` leaves out
 
-It leaves out ICU's currency and skeleton styles, which need their options mapped one by one. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it. ICU's skeleton stems and date fields that Intl has no option for (`scale`, `integer-width`, weeks, quarters) are left out, as no import can express them.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
 
