@@ -15,7 +15,9 @@ export { baseLocale, locales };
 /** Whether a URL names its locale: only under the `url` strategy, else every path is the app's own. */
 const urlsNameLocales = strategy.includes("url");
 
-/** @typedef {"locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid"} GraiErrorCode */
+/**
+ * @typedef {"locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid" | "locale-unbound"} GraiErrorCode
+ */
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {

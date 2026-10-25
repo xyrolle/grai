@@ -32,7 +32,8 @@ export declare class GraiError extends Error {
 		| "locale-unknown"
 		| "locale-not-loaded"
 		| "value-unmatched"
-		| "format-option-invalid";
+		| "format-option-invalid"
+		| "locale-unbound";
 }
 type MessageOptions = { locale?: Locale };
 /**

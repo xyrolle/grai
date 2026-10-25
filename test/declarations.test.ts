@@ -224,14 +224,15 @@ it("types a runtime GraiError's code as one of the codes the runtime throws", as
 		"use.ts",
 		`import type { GraiError } from "./out/runtime.js";
 declare const error: GraiError;
-const codes: ("locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid")[] = [error.code];
+const codes: ("locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid" | "locale-unbound")[] = [error.code];
+const unbound: GraiError["code"] = "locale-unbound";
 const compiling = error.code === "key-missing";
-console.log(codes, compiling);
+console.log(codes, unbound, compiling);
 `,
 	);
 
-	// Line 4: a code only the compiler reports, which the runtime never throws.
-	expect(errors).toEqual(["4 TS2367"]);
+	// Line 5: a code only the compiler reports, which the runtime never throws.
+	expect(errors).toEqual(["5 TS2367"]);
 });
 
 it("types setLocale by the config's switch: nothing under reload, a promise under live", async () => {

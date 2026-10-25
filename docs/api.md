@@ -92,7 +92,8 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
   - `"locale-unknown"`: a value that is not one of the project's locales;
   - `"locale-not-loaded"`: a call, in a browser, in a locale other than the page's;
   - `"value-unmatched"`: a value a closed select does not list;
-  - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency.
+  - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency;
+  - `"locale-unbound"`: in Next.js, a server component that renders a message before its page or layout bound the locale.
 
 ### `server.js`
 
