@@ -54,6 +54,9 @@ function fromCookie(header) {
 	return undefined;
 }
 
+/** Each locale lowercased, and its likely form (`en-latn-us` for `en-US`), as ranges reach them. */
+const written = locales.map((locale) => locale.toLowerCase());
+const likely = locales.map((locale) => likelyTag(locale));
 /** The locales the base locale first, as `*` takes them. */
 const baseFirst = [
 	baseLocale,
@@ -128,20 +131,49 @@ function covers(range, locale) {
 }
 
 /**
- * The locales a range reaches, the nearest first: the range itself, then the locales of its
- * language.
+ * The locales a range reaches, the nearest first: the range itself, then each parent it is cut down
+ * to (`zh-hant-tw`, `zh-hant`, `zh`), as written and then in its likely form (`zh-tw` is
+ * `zh-hant-tw`), each matched against a locale as written or in its likely form. A sibling is never
+ * reached: `en-au` reaches neither `en-GB` nor `en-US`.
  *
  * @param {string} range
  * @returns {string[]}
  */
 function reachedBy(range) {
-	const language = range.split("-")[0];
-	return [
-		...locales.filter((locale) => locale.toLowerCase() === range),
-		...locales.filter(
-			(locale) => locale.toLowerCase().split("-")[0] === language,
+	const forms = [...parentsOf(range), ...parentsOf(likelyTag(range) ?? range)];
+	return forms.flatMap((form) =>
+		locales.filter(
+			(_, index) => written[index] === form || likely[index] === form,
 		),
-	];
+	);
+}
+
+/**
+ * A tag and each parent it is cut down to, longest first: `zh-hant-tw`, `zh-hant`, `zh`.
+ *
+ * @param {string} tag
+ */
+function parentsOf(tag) {
+	const subtags = tag.split("-");
+	return subtags.map((_, index) =>
+		subtags.slice(0, subtags.length - index).join("-"),
+	);
+}
+
+/**
+ * A tag's likely form, lowercased, from CLDR's likely subtags (`zh-hant-tw` for `zh-TW`), or
+ * undefined for a tag the platform cannot read.
+ *
+ * @param {string} tag
+ * @returns {string | undefined}
+ */
+function likelyTag(tag) {
+	try {
+		return new Intl.Locale(tag).maximize().toString().toLowerCase();
+	} catch (error) {
+		if (!(error instanceof RangeError)) throw error;
+		return undefined;
+	}
 }
 
 /** The headers `localeOf` reads: each strategy's but `url`'s, which the config keeps last. */
