@@ -182,8 +182,10 @@ describe("translation files, fuzzed", () => {
 		for (let seed = 1; seed <= 150; seed++) {
 			const { base, target } = project(seed);
 			const units = exportUnits(base, target, "de", new Set());
-			const xliff = readXliff(writeXliff("en", "de", units)).units;
-			const json = readUnitsJson(writeUnitsJson("en", "de", units)).units;
+			const xliff = readXliff(writeXliff("en", "de", units, new Map())).units;
+			const json = readUnitsJson(
+				writeUnitsJson("en", "de", units, new Map()),
+			).units;
 			const translated = units.filter(
 				({ key }) =>
 					!isSeed(target.messages.get(key), base.messages.get(key), "de"),
@@ -209,6 +211,7 @@ describe("translation files, fuzzed", () => {
 				"en",
 				"de",
 				exportUnits(base, target, "de", new Set()),
+				new Map(),
 			);
 			const next = generator(seed * 7919);
 			for (let mutation = 0; mutation < 50; mutation++) {

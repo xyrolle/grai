@@ -40,6 +40,8 @@ export type Config = {
 	fallbacks: ReadonlyMap<string, string>;
 	/** A locale made from the base's messages for development and tests, which no build ships. */
 	pseudoLocale: string | undefined;
+	/** The file of each key's description for translators, if the project keeps them. */
+	descriptions: string | undefined;
 };
 
 /**
@@ -70,6 +72,7 @@ const fields = new Set([
 	"identicalToBase",
 	"fallbacks",
 	"pseudoLocale",
+	"descriptions",
 ]);
 const localePlaceholder = "{locale}";
 /**
@@ -109,6 +112,7 @@ export function readConfig(file: string): Config {
 		identicalToBase = {},
 		fallbacks = {},
 		pseudoLocale,
+		descriptions,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -167,6 +171,14 @@ export function readConfig(file: string): Config {
 		const problem = pseudoLocaleProblem(pseudoLocale, locales, baseLocale);
 		if (problem !== undefined) throw invalid(problem);
 	}
+	if (
+		descriptions !== undefined &&
+		(typeof descriptions !== "string" || !descriptions.endsWith(".json"))
+	) {
+		throw invalid(
+			'"descriptions" must be the path of a JSON file of each key\'s description for translators, such as "messages/descriptions.json"',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -192,6 +204,8 @@ export function readConfig(file: string): Config {
 		),
 		fallbacks: readFallbacks(fallbacks, locales, baseLocale, invalid),
 		pseudoLocale: typeof pseudoLocale === "string" ? pseudoLocale : undefined,
+		descriptions:
+			descriptions === undefined ? undefined : resolve(root, descriptions),
 	};
 }
 
