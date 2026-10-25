@@ -102,3 +102,9 @@ Done when: the config maps a locale to its prefix, and the URL helpers and the m
 `grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.
 
 Done when: a rename changes them, with a test of each.
+
+## Export and seed a locale that falls back
+
+`grai export en-GB --untranslated` lists every key en-GB takes from en as untranslated, so a translator is asked for all of en again; `grai seed en-GB` copies en's text into en-GB, which then no longer follows en. Both should treat a key a locale takes from its fallback as covered, and still let a translator give the locale its own text.
+
+Done when: `export --untranslated` leaves out a key the locale takes from its fallback, a full export offers it with the fallback's text as its source, `seed` refuses a locale that falls back or seeds nothing it takes from its fallback, and a test covers each.
