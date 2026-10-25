@@ -2,11 +2,17 @@
 
 Open work that `docs/design.md` leaves to measurement or to a later change.
 
-## Chunk messages by the entries a page loads together
+## grai/sveltekit names each page's entries
 
-A SvelteKit page loads its layouts with it, but the bundler sees each layout and page as an entry of its own: a set of keys that a layout and a few of its pages use is a set apart from the layout's own, though every page under the layout loads both. On app B, whose 60 pages share one layout, the layout's first paint loads 8 message chunks, and the app's tuned setup on Paraglide, which grouped keys by the routes that reach them and the layout's keys in one chunk, loads 21 a page (median) against grai's 26, in 10% fewer bytes. Simulated on app B's build, sets by the pages that load them rather than by entries give 13% fewer requests and 6% fewer bytes. Rolldown's sets cannot say which entries load together, and its merge picks the nearest set by the count of entries apart, not by the bytes a page would load.
+grai/vite chunks keys by the pages that load them when an adapter passes `pageEntries` (`docs/design.md`); without it each Kit node is a page of its own, 19 message chunks a page on app B against 13 with the pages. SvelteKit's adapter has to pass each route's leaf and layout nodes and the client entries.
 
-Done when: the message chunking knows which entries a page loads together, from the framework's adapter or from the bundler, and both reference apps measure it.
+Done when: grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
+
+## A page's later imports at its first paint
+
+The merge rule may put a key a page needs only through a later import in a chunk that page's first paint loads, when another page's first paint needs the key: on app B four pages load one such key at first paint. Keeping a set that later imports load off the first paints it is not on, without knowing which pages make which later imports, cost the rule most of its merges: 46 chunks a page against 13. Telling it exactly needs each later import's pages, from its dynamic importers' reach.
+
+Done when: a key reaches a page's first paint only if that page's first paint, not only a later import, needs it, with app B's chunks a page unchanged.
 
 ## Switch locale in place: `"switch": "live"`
 
