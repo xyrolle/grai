@@ -11,7 +11,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { project } from "./project.ts";
-import { handLaid, schemaEntry } from "./sources.ts";
+import { handLaid, readText, schemaEntry, writeSources } from "./sources.ts";
 
 const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 
@@ -373,7 +373,7 @@ describe("grai import", () => {
 			[
 				'left out: i18n/en.json: "ago" (en, de): {{p, uppercase}} formats the value as uppercase, which grai import does not convert. Write it with one of grai\'s formatting functions.',
 				"grai: imported 1 key into messages/en.json, messages/de.json, and left 1 out",
-				"grai: grai.import.json maps each key the source's calls name to its grai key",
+				"grai: grai.import.json maps each key the source's calls name to its grai key, for grai migrate",
 				"",
 			].join("\n"),
 		);
@@ -383,6 +383,52 @@ describe("grai import", () => {
 			$schema: "https://inlang.com/schema/inlang-message-format",
 			cart_title: "Warenkorb",
 		});
+	});
+});
+
+describe("grai migrate", () => {
+	it("prints each call it left, then what it rewrote, and reads i18next's default namespace", async () => {
+		const { dir } = project({ en: {}, de: {} });
+		rmSync(join(dir, "messages"), { recursive: true });
+		writeSources(dir, {
+			"i18n/en/common.json": JSON.stringify({
+				title: "Shop",
+				hi: "Hi {{name}}",
+			}),
+			"i18n/de/common.json": JSON.stringify({
+				title: "Laden",
+				hi: "Hallo {{name}}",
+			}),
+			"i18n/en/cart.json": JSON.stringify({ title: "Cart" }),
+			"i18n/de/cart.json": JSON.stringify({ title: "Warenkorb" }),
+			"src/app.ts": [
+				'import { t } from "i18next";',
+				'export const title = t("title");',
+				'export const cart = t("cart:title");',
+				"export const hi = (key: string) => t(key);",
+				"",
+			].join("\n"),
+		});
+		await grai(dir, "import", "--from", "i18next", "i18n");
+
+		const { code, stdout } = await grai(
+			dir,
+			"migrate",
+			"--default-namespace",
+			"common",
+		);
+
+		expect(code).toBe(0);
+		expect(stdout).toBe(
+			[
+				"src/app.ts:4:36: its key is an expression: call the message by name, as m.<key>().",
+				"grai: rewrote 2 calls in 1 file, and left 1, listed above",
+				"",
+			].join("\n"),
+		);
+		expect(readText(dir, "src/app.ts")).toContain(
+			"export const title = m.common_title();\nexport const cart = m.cart_title();",
+		);
 	});
 });
 
