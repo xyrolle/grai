@@ -252,4 +252,25 @@ describe("grai check's untranslated keys", () => {
 			["ro", ["unit_km", "cart_title"]],
 		]);
 	});
+
+	it("is an error for a key identicalToBase lists that no catalog has, or whose message is translated now", async () => {
+		const { config } = project(
+			{
+				en: { unit_km: "km", hotel: "Hotel" },
+				ro: { unit_km: "km", hotel: "Hotelul" },
+			},
+			{ identicalToBase: { ro: ["unit_km", "hotel", "unit_mph"] } },
+		);
+
+		const { problems } = await check(config);
+
+		expect(
+			problems
+				.filter((problem) => problem.code === "identical-stale")
+				.map((problem) => problem.message),
+		).toEqual([
+			'grai.config.json: "hotel" (ro): "identicalToBase" lists the key, but its message is not en\'s any more. Remove it from the list.',
+			'grai.config.json: "unit_mph" (ro): "identicalToBase" lists the key, which no catalog has. Remove it from the list.',
+		]);
+	});
 });
