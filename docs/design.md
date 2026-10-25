@@ -65,6 +65,16 @@ They come through an import map, which keeps the framework's single client build
 
 **Every client rule is the same in every build, dev and tests included, so nothing fails only after deploy.** On the client, a forced `{ locale }` must be the current locale. Any other throws a `GraiError` (`locale-not-loaded`) naming both locales, and in dev the key too. A build leaves key names out of the page: on app A they would add a third to its gzipped message bytes, and the call site in the stack names the key.
 
+### A Svelte component reads a message without inputs as its string
+
+`grai/svelte`'s plugin is `grai/vite`'s, and in the client build it also rewrites each component: a call of a text key with no arguments, `{m.title()}`, or `{title()}` of the key's own import, becomes a read of that key's string in the page's locale. The string comes from a module of its own (`grai:text/title`), whose `pageText(…)` picks the page's locale once, as the module is evaluated.
+- **Svelte draws an imported value as plain, and treats a call as possibly stateful.** It gives each message call a derived signal and runs it as the page hydrates; a string it sets once. On a page of 2,000 calls with app A's catalog, built by Vite through both plugins, the strings hydrate in 16.6 ms against 24.6 ms for the calls at a 4× CPU slowdown, two-thirds of the way to text inlined into the template (12.7 ms, `svelte-texts`).
+- **Inlining the text into the template would close the rest,** but every component would be built once per locale.
+- **The string modules go into the message chunks, and into their copies per locale,** like the keys, so a page still loads only its locale's words.
+- **A call is rewritten only where it is certain to be grai's.** Names are followed to keys.js through the app's own re-exports, as the bundler binds them. A component that declares one of those names again, as an `{#each}` item or a parameter, is left as it is, and so are calls with arguments (a forced locale among them), markup, values and dynamic keys.
+- **The server build and dev keep every call:** a server renders each request in its own locale, and dev patches a message's function in place. So does `"switch": "live"`, whose page re-renders in another locale.
+- **The plugin reads each component after Svelte's preprocessors and before its compile,** so `grai()` is listed before `sveltekit()`. Listed after, the build fails and says so.
+
 ### Switching locale on the client: a choice
 
 Tests switch the locale within the page, and so do many apps, without a reload. A production page holds only its locale's words. The config's `"switch"` picks one of two designs, each the same in every build:

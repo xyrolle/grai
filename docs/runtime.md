@@ -75,6 +75,16 @@ A server-rendered Svelte page of 2,000 message calls, hydrated, then mounted aga
 
 On app B, whose URL strategy makes Paraglide's per-call lookup cheaper, the per-locale module hydrates 14–18% faster instead of 27–32%.
 
+In a Svelte client build, `grai/svelte` reads each message without inputs as its string (`svelte-texts`). The same page and catalog, built by Vite through grai's own plugins and loaded through its locale's import map, `ro`, at full CPU speed and at a 4× slowdown:
+
+| text messages as | JS, brotli | hydrate | mount again |
+|---|---|---|---|
+| calls (`grai/vite`) | 24.6 KB | 5.8 / 24.6 ms | 2.7 / 11.4 ms |
+| strings (`grai/svelte`) | 23.9 KB | 3.6 / 16.6 ms | 2.2 / 8.8 ms |
+| inlined into the template | 21.0 KB | 2.8 / 12.7 ms | 1.9 / 8.0 ms |
+
+`ru` gives 25.1, 16.7 and 13.3 ms at 4×.
+
 ## Bytes per page
 
 Every page of app A's production build, its keys bundled and minified by Rolldown per scheme (`record-build` in a copy of the app, then `bytes`). Brotli KB:

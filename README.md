@@ -60,6 +60,20 @@ export default { plugins: [grai()] };
 
 The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, each chunk holds only the keys its code uses, once per locale.
 
+### Svelte
+
+In a Svelte or SvelteKit app, take the plugin from `grai/svelte`, listed before Svelte's:
+
+```ts
+// vite.config.ts
+import { sveltekit } from "@sveltejs/kit/vite";
+import { grai } from "grai/svelte";
+
+export default { plugins: [grai(), sveltekit()] };
+```
+
+It is `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. Svelte draws a string as a plain value, where it gives each call a signal of its own, so a page of 2,000 messages with app A's catalog hydrates in two-thirds of the time (`docs/runtime.md`). The app needs `svelte` and `magic-string`. With `"switch": "live"` in the config, for a page that changes locale in place, every call stays a call.
+
 ### SvelteKit
 
 `grai/sveltekit` is in review (#11).
