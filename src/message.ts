@@ -8,7 +8,7 @@ import {
 	parseDeclarations,
 } from "./message-declarations.ts";
 import { numberSelector } from "./number-select.ts";
-import { parsePattern } from "./pattern.ts";
+import { identifier, parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
 
@@ -96,7 +96,7 @@ function parseVariants(
 	const { declared, plurals, formatted } = parseDeclarations(
 		stringList(value.declarations ?? [], "declarations"),
 	);
-	const selectors = stringList(value.selectors ?? [], "selectors").map(
+	const selectors = selectorNames(value.selectors ?? []).map(
 		(name): Selector => {
 			const number = formatted.get(name);
 			if (number !== undefined) return numberSelector(name, number);
@@ -205,6 +205,26 @@ function withInputs(
 		closed,
 		markup,
 	};
+}
+
+/** The names `selectors` lists, each a name and each once: a second selector on a value adds nothing. */
+function selectorNames(value: unknown): string[] {
+	const names = stringList(value, "selectors");
+	for (const [index, name] of names.entries()) {
+		if (!identifier.test(name)) {
+			throw new MessageProblem(
+				"message-invalid",
+				`"${name}" is not a selector: a selector is the name of an input or a local, such as count.`,
+			);
+		}
+		if (names.indexOf(name) !== index) {
+			throw new MessageProblem(
+				"message-invalid",
+				`"selectors" lists ${name} twice, and a second selector on a value chooses nothing the first does not. List it once.`,
+			);
+		}
+	}
+	return names;
 }
 
 function stringList(value: unknown, field: string): string[] {

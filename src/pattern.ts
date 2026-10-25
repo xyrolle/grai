@@ -11,7 +11,8 @@ export type Part =
 	| { type: "variable"; name: string; format?: Format }
 	| MarkupPart;
 
-const identifier = /^[A-Za-z_$][\w$]*$/;
+/** A name a placeholder, a declaration or a selector can give an input or a local. */
+export const identifier: RegExp = /^[A-Za-z_$][\w$]*$/;
 /** A placeholder calling a function, as `{count :number}` or as a declaration writes it, `{count: number}`. */
 const call = /^([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z]\w*)(\s.*)?$/;
 const escapable = new Set(["{", "}", "\\"]);
