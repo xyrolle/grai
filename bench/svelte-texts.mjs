@@ -2,9 +2,11 @@
 // rendered, then loaded and hydrated in Chromium in each locale through its import map:
 // - grai/vite: every message a call, as a client build has them;
 // - grai/svelte: each message without inputs read as its string in the page's locale;
+// - strings after the compile: those calls replaced by their strings once Svelte compiled the
+//   component, as a bundler transform would (strings-after-compile.mjs);
 // - text inlined: those messages' text written into the template, which only a build of every
 //   component per locale reaches.
-// Messages with inputs stay calls in all three. Runs alternate between variants, each in a fresh
+// Messages with inputs stay calls in all four. Runs alternate between variants, each in a fresh
 // context; the JS is what the page loads, its message chunks in its own locale.
 //   node svelte-texts.mjs [app...]
 import { writeFileSync } from "node:fs";
@@ -19,6 +21,7 @@ import { selectedApps } from "./apps.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
 import { PAGE_CALLS, pageProps, pageSource } from "./page.mjs";
 import { otherLocale } from "./request.mjs";
+import { stringsAfterCompile } from "./strings-after-compile.mjs";
 
 const { grai: graiVite } = await import(join(graiSource, "vite.ts"));
 const { grai: graiSvelte } = await import(join(graiSource, "svelte.ts"));
@@ -139,13 +142,18 @@ async function load(browser, document, rate) {
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-async function benchLocale(browser, app, dir, kinds, locale) {
+async function benchLocale(browser, app, dir, compiledKeys, locale) {
 	const props = pageProps(app);
 	const calls = pageSource(app, { from: keys });
+	const isText = (key) => compiledKeys.get(key)?.kind === "text";
 	const texts = Object.fromEntries(
-		Object.entries(app.messages[locale]).filter(
-			([key]) => kinds.get(key) === "text",
-		),
+		Object.entries(app.messages[locale]).filter(([key]) => isText(key)),
+	);
+	const index = app.locales.indexOf(locale);
+	const strings = new Map(
+		[...compiledKeys]
+			.filter(([key]) => isText(key))
+			.map(([key, compiled]) => [key, compiled.variants[index]]),
 	);
 	const inlined = pageSource(app, { from: keys, inline: texts });
 	const body = await serverBody(dir, "Calls", calls, locale, props);
@@ -159,6 +167,11 @@ async function benchLocale(browser, app, dir, kinds, locale) {
 		"grai/svelte: strings": await clientBuild(dir, callsEntry, [
 			graiSvelte(),
 			svelte(),
+		]),
+		"strings after the compile": await clientBuild(dir, callsEntry, [
+			graiVite(),
+			svelte(),
+			stringsAfterCompile(strings),
 		]),
 		"text inlined": await clientBuild(dir, inlinedEntry, [
 			graiVite(),
@@ -211,9 +224,6 @@ for (const app of selectedApps()) {
 	const { build: compiled } = await recompile(config, undefined);
 	if (compiled === undefined)
 		throw new Error(`grai cannot compile ${app.name}`);
-	const kinds = new Map(
-		[...compiled.compilation.keys].map(([key, { kind }]) => [key, kind]),
-	);
 	console.log(
 		`\n### ${app.name}: a page with ${PAGE_CALLS} message calls in Chromium ${browser.version()}, median of ${RUNS} loads, ms\n`,
 	);
@@ -222,6 +232,12 @@ for (const app of selectedApps()) {
 	);
 	console.log("|---|---|---|---|---|---|---|---|");
 	for (const locale of [app.baseLocale, otherLocale(app)])
-		await benchLocale(browser, app, dirname(config), kinds, locale);
+		await benchLocale(
+			browser,
+			app,
+			dirname(config),
+			compiled.compilation.keys,
+			locale,
+		);
 }
 await browser.close();
