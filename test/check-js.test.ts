@@ -94,6 +94,16 @@ it.each([
 					cart_shipped: "Shipped {when :date}",
 					cart_converted: "In {amount :currency currency=$code}",
 					cart_guests: "With {names :list}, {days :relativetime unit=day}",
+					cart_weight: [
+						{
+							declarations: [
+								"input kg",
+								"local n = kg: number maximumFractionDigits=1",
+							],
+							selectors: ["n"],
+							match: { "n=1.5": "{n} kg", "n=*": "{n} kg" },
+						},
+					],
 					cart_place: [
 						{
 							declarations: [
@@ -148,6 +158,16 @@ it.each([
 					cart_shipped: "شحن {when :date}",
 					cart_converted: "بعملة {amount :currency currency=$code}",
 					cart_guests: "مع {names :list}، {days :relativetime unit=day}",
+					cart_weight: [
+						{
+							declarations: [
+								"input kg",
+								"local n = kg: number maximumFractionDigits=1",
+							],
+							selectors: ["n"],
+							match: { "n=1.5": "{n} kg", "n=*": "{n} kg" },
+						},
+					],
 					cart_place: [
 						{
 							declarations: [

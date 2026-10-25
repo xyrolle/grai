@@ -17,9 +17,21 @@ const others = [
 	...[Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
 ];
 
+/** plurals.js for these locales, loaded, with the digits a rounding selector shows or without. */
+async function plurals(
+	locales: readonly string[],
+	digits: boolean,
+): Promise<Record<string, (count: number | string) => string>> {
+	const code = pluralModule(locales, { digits });
+	return await import(
+		`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
+	);
+}
+
 /**
  * Where plurals.js disagrees with Intl.PluralRules of a type, for every locale of CLDR's rules of
- * that type Intl knows: on a count's category, and on a locale's categories.
+ * that type Intl knows, with and without the digits a rounding selector shows: on a count's
+ * category, and on a locale's categories.
  */
 async function disagreements(
 	type: PluralType,
@@ -27,20 +39,23 @@ async function disagreements(
 	counts: readonly number[],
 ): Promise<{ locales: readonly string[]; differences: string[] }> {
 	const locales = Intl.PluralRules.supportedLocalesOf(Object.keys(languages));
-	const plurals = await import(
-		`data:text/javascript;base64,${Buffer.from(pluralModule(locales)).toString("base64")}`
-	);
 	const differences: string[] = [];
-	for (const locale of locales) {
-		const rules = new Intl.PluralRules(locale, { type });
-		const plural: (count: number) => string = plurals[pluralName(locale, type)];
-		for (const count of counts) {
-			if (plural(count) !== rules.select(count)) {
-				differences.push(
-					`${locale} ${count}: ${plural(count)}, Intl ${rules.select(count)}`,
-				);
+	for (const digits of [false, true]) {
+		const functions = await plurals(locales, digits);
+		for (const locale of locales) {
+			const rules = new Intl.PluralRules(locale, { type });
+			const plural = functions[pluralName(locale, type)];
+			for (const count of counts) {
+				if (plural?.(count) !== rules.select(count)) {
+					differences.push(
+						`${digits ? "digits " : ""}${locale} ${count}: ${plural?.(count)}, Intl ${rules.select(count)}`,
+					);
+				}
 			}
 		}
+	}
+	for (const locale of locales) {
+		const rules = new Intl.PluralRules(locale, { type });
 		const intl = new Set<string>(rules.resolvedOptions().pluralCategories);
 		const categories = categoriesOf(locale, type).join(", ");
 		const expected = ["zero", "one", "two", "few", "many", "other"]
@@ -106,4 +121,61 @@ it("reads the whole percent Intl.NumberFormat shows a count as", async () => {
 			(count) => percent(count) !== Number(shown.format(count).slice(0, -1)),
 		),
 	).toEqual([]);
+});
+
+/** Options that round a number, each set as a :number local writes them. */
+const roundings: readonly Intl.NumberFormatOptions[] = [
+	{ minimumFractionDigits: 1 },
+	{ minimumFractionDigits: 2, maximumFractionDigits: 2 },
+	{ maximumFractionDigits: 0 },
+	{ maximumFractionDigits: 1, roundingMode: "floor" },
+	{ minimumSignificantDigits: 3 },
+	{ maximumSignificantDigits: 2 },
+	{
+		maximumSignificantDigits: 2,
+		maximumFractionDigits: 1,
+		roundingPriority: "lessPrecision",
+	},
+	{ minimumFractionDigits: 2, maximumFractionDigits: 2, roundingIncrement: 5 },
+	{ minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" },
+];
+const rounded = [
+	...[0, 1, 2, 3, 5, 7, 11, 21, 101, 1000, 1_000_000],
+	...[
+		0.5, 0.95, 1.04, 1.05, 1.5, 2.25, 11.1, 21.5, 101.01, 0.001, 1.2345, 7.999,
+	],
+	...[-1, -1.5],
+	...[Number.NaN, Number.POSITIVE_INFINITY],
+];
+
+it("chooses every locale's category of the digits a rounding :number shows, as Intl.PluralRules does with its options", async () => {
+	for (const [type, languages] of [
+		["cardinal", cardinalRules],
+		["ordinal", ordinalRules],
+	] as const) {
+		const locales = Intl.PluralRules.supportedLocalesOf(Object.keys(languages));
+		const functions = await plurals(locales, true);
+		const differences: string[] = [];
+		for (const options of roundings) {
+			const shown = new Intl.NumberFormat("en", {
+				...options,
+				useGrouping: false,
+			});
+			for (const locale of locales) {
+				const rules = new Intl.PluralRules(locale, { ...options, type });
+				const plural = functions[pluralName(locale, type)];
+				for (const count of rounded) {
+					const digits = shown.format(count);
+					if (plural?.(digits) !== rules.select(count)) {
+						differences.push(
+							`${type} ${locale} ${JSON.stringify(options)} ${count} as ${digits}: ${plural?.(digits)}, Intl ${rules.select(count)}`,
+						);
+					}
+				}
+			}
+		}
+
+		expect(locales.length).toBeGreaterThan(100);
+		expect(differences.slice(0, 20)).toEqual([]);
+	}
 });

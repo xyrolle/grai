@@ -30,6 +30,28 @@ function splitUnit(format: Format): {
 	return { options, unit };
 }
 
+/**
+ * The digits a rounding number selector reads a value as, with the options Intl shows them with:
+ * in Latin digits, so plural rules can read them, without a percent's sign. The compile checks a
+ * key with it, and `digitsCode` writes the same for formats.js.
+ */
+export function shownDigits(options: IntlOptions, value: number): string {
+	const text = new Intl.NumberFormat("en", options).format(value);
+	return options.style === "percent" ? text.replace("%", "") : text;
+}
+
+/** formats.js's function that gives a value's digits as `shownDigits` does. */
+export function digitsCode(name: string, options: IntlOptions): string {
+	const made = `${name}_made`;
+	const percent = options.style === "percent" ? '.replace("%", "")' : "";
+	return `/** @type {Intl.NumberFormat | undefined} */
+let ${made};
+/** @param {unknown} value */
+export const ${name} = (value) =>
+	(${made} ??= new Intl.NumberFormat("en", ${JSON.stringify(options)})).format(Number(value))${percent};
+`;
+}
+
 /** Makes a format's formatter once, as formats.js does, so a value Intl refuses throws now. */
 export function checkFormat(format: Format): void {
 	const { options } = splitUnit(format);

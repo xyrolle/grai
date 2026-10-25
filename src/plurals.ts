@@ -3,10 +3,14 @@ import {
 	categoryOrder,
 	chain,
 	compileRule,
-	decimalOperands,
 	integerOperands,
 	type Operands,
 } from "./plural-conditions.ts";
+import {
+	countSplitting,
+	digitSplitting,
+	type Splitting,
+} from "./plural-operands.ts";
 import { cardinalRules, ordinalRules } from "./plural-rules.ts";
 
 /** CLDR's two kinds of plural rules: for counting (1 item), and for ranking (1st). */
@@ -57,6 +61,32 @@ export function categoryOf(
 	});
 }
 
+/**
+ * The category CLDR's rules of a type give digits a rounding number shows in a locale, such as
+ * "1.0", worked out when compiling.
+ */
+export function categoryOfDigits(
+	locale: string,
+	type: PluralType,
+	digits: string,
+): string {
+	const [whole = "", fraction = ""] = digits.replace("-", "").split(".");
+	const trimmed = fraction.replace(/0+$/, "");
+	return categoryAt(rulesOf(locale, type), {
+		values: {
+			n: Math.abs(Number(digits)),
+			i: Number(whole),
+			v: fraction.length,
+			w: trimmed.length,
+			f: Number(fraction || 0),
+			t: Number(trimmed || 0),
+			e: 0,
+			c: 0,
+		},
+		whole: false,
+	});
+}
+
 /** The category rules give operands whose every value is known. */
 function categoryAt(
 	rules: Readonly<Record<string, string>>,
@@ -103,41 +133,25 @@ export const numberReaders: Readonly<
  * whole, non-negative count, the usual one, takes a path with the fraction and exponent operands
  * folded away; any other is split into the operands its locale's rules read. That path also tests
  * the count's type, which Number.isInteger implies, as TypeScript narrows by `typeof` and not by
- * Number.isInteger, and an app's checkJs reads this file.
+ * Number.isInteger, and an app's checkJs reads this file. With `digits`, for a project with a
+ * rounding number selector, a function also takes the digits such a selector shows, as a string.
  */
-export function pluralModule(locales: readonly string[]): string {
+export function pluralModule(
+	locales: readonly string[],
+	{ digits }: { digits: boolean } = { digits: false },
+): string {
+	const splitting = digits ? digitSplitting : countSplitting;
 	const functions = pluralTypes.flatMap((type) =>
-		locales.map((locale) => pluralFunction(locale, type)),
+		locales.map((locale) => pluralFunction(locale, type, splitting)),
 	);
 	const splits = functions.some((plural) => plural.splits);
 	return [
 		"// Plural rules from Unicode CLDR, © Unicode, Inc., under the Unicode License v3.\n",
-		...(splits ? [operandsFunction] : []),
+		...(splits ? [splitting.code] : []),
 		numberReadersCode,
 		...functions.map((plural) => plural.code),
 	].join("\n");
 }
-
-const operandsFunction = `/**
- * A count's operands: its absolute value, integer digits, number of fraction digits, and fraction
- * digits, once it is rounded as Intl.PluralRules rounds it, half away from zero to three digits.
- *
- * @param {number} n
- * @returns {[x: number, i: number, v: number, f: number]}
- */
-const operands = (n) => {
-	const x = Math.abs(n);
-	const text = String(x);
-	if (text.includes("e")) return x < 1 ? [0, 0, 0, 0] : [x, x, 0, 0];
-	let [whole, fraction = ""] = text.split(".");
-	if (fraction.length > 3) {
-		const thousandths = Number(whole + fraction.slice(0, 3)) + (fraction.charAt(3) >= "5" ? 1 : 0);
-		whole = String(Math.floor(thousandths / 1000));
-		fraction = String(thousandths % 1000).padStart(3, "0").replace(/0+$/, "");
-	}
-	return [Number(\`\${whole}.\${fraction || 0}\`), Number(whole), fraction.length, Number(fraction || 0)];
-};
-`;
 
 const numberReadersCode = `/**
  * A count as the whole number :integer shows: rounded half away from zero, as Intl rounds it.
@@ -164,9 +178,6 @@ export const ${numberReaders.percent} = (n) => {
 };
 `;
 
-/** The operands \`operands()\` gives, in its order, by the names a function reads them by. */
-const operandNames = ["x", "i", "v", "f"];
-
 /**
  * A locale's function of a type, and whether it splits a count into operands. A locale whose
  * every count is other, such as ru's ordinals, reads no count, so a bundle of it needs no
@@ -178,6 +189,7 @@ const operandNames = ["x", "i", "v", "f"];
 function pluralFunction(
 	locale: string,
 	type: PluralType,
+	{ operands, names, argument }: Splitting,
 ): { code: string; splits: boolean } {
 	const name = pluralName(locale, type);
 	const rules = rulesOf(locale, type);
@@ -188,11 +200,9 @@ function pluralFunction(
 		};
 	}
 	const integer = chain(rules, integerOperands);
-	const decimal = chain(rules, decimalOperands);
-	const last = operandNames.findLastIndex((operand) =>
-		decimal.reads.has(operand),
-	);
-	const read = operandNames
+	const decimal = chain(rules, operands);
+	const last = names.findLastIndex((operand) => decimal.reads.has(operand));
+	const read = names
 		.slice(0, last + 1)
 		.map((operand) => (decimal.reads.has(operand) ? operand : ""));
 	const finite = nonFiniteOperands.some(
@@ -201,7 +211,9 @@ function pluralFunction(
 		? `\tif (!Number.isFinite(Number(n))) return "other";\n`
 		: "";
 	const split =
-		last === -1 ? "" : `\tconst [${read.join(", ")}] = operands(Number(n));\n`;
+		last === -1
+			? ""
+			: `\tconst [${read.join(", ")}] = operands(${argument});\n`;
 	return {
 		code: `/** @param {unknown} n */\nexport const ${name} = (n) => {\n\tif (typeof n === "number" && Number.isInteger(n) && n >= 0) return ${integer.js};\n${finite}${split}\treturn ${decimal.js};\n};\n`,
 		splits: split !== "",

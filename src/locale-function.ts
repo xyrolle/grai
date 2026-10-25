@@ -62,7 +62,7 @@ export function localeFunction(
 	used: Used,
 ): LocaleFunction {
 	const { variants, closed } = message;
-	const { value, condition, prologue } = localeReads(message, used.plurals);
+	const { value, condition, prologue } = localeReads(message, used);
 	/** A placeholder's code: its value, through its formatter if it has one, with the option an input gives. */
 	const placeholder = (part: VariablePart) => {
 		const local = message.formatted.get(part.name);
