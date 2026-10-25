@@ -271,6 +271,9 @@ importers:
       grai:
         specifier: workspace:*
         version: link:../..
+      magic-string:
+        specifier: 1.4.3
+        version: 1.4.3
       svelte:
         specifier: 5.57.2
         version: 5.57.2

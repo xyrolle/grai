@@ -1,13 +1,11 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// The SvelteKit example (examples/sveltekit), compiled and built as an app builds it, served by
-// adapter-node, and its pages in a real browser.
+// The SvelteKit example (examples/sveltekit), built as an app builds it, with grai/svelte's plugin,
+// served by adapter-node, and its pages in a real browser.
 const example = fileURLToPath(
 	new URL("../examples/sveltekit/", import.meta.url),
 );
@@ -24,13 +22,9 @@ function run(command: string, args: string[]): void {
 	}
 }
 
-/** Compiles the catalogs by `config` (grai.config.json by default), builds the app and serves it. */
-async function served(port: number, config?: string) {
-	run(
-		"grai",
-		config === undefined ? ["compile"] : ["compile", "--config", config],
-	);
-	run("vite", ["build"]);
+/** Builds the app in Vite's `mode` (`production` by default) and serves it. */
+async function served(port: number, mode = "production") {
+	run("vite", ["build", "--mode", mode]);
 	const server = spawn("node", ["build"], {
 		cwd: example,
 		env: { ...process.env, PORT: String(port) },
@@ -121,28 +115,11 @@ describe("handleLocale, by the cookie and Accept-Language", {
 }, () => {
 	const origin = "http://localhost:4752";
 	let server: ChildProcess;
-	let configDir: string;
 	beforeAll(async () => {
 		// The same app, with another strategy: the cookie, else the browser's languages.
-		configDir = mkdtempSync(join(tmpdir(), "grai-sveltekit-"));
-		const config = join(configDir, "grai.config.json");
-		writeFileSync(
-			config,
-			JSON.stringify({
-				locales: ["en", "ro", "ar"],
-				baseLocale: "en",
-				catalogs: join(example, "messages/{locale}.json"),
-				outdir: join(example, "src/lib/i18n"),
-				strategy: ["cookie", "preferredLanguage"],
-				cookieName: "lang",
-			}),
-		);
-		server = await served(4752, config);
+		server = await served(4752, "cookie");
 	}, 60_000);
-	afterAll(() => {
-		server?.kill();
-		rmSync(configDir, { recursive: true, force: true });
-	});
+	afterAll(() => server?.kill());
 
 	it("renders in the cookie's locale", async () => {
 		const page = await (await browser.newContext()).newPage();
