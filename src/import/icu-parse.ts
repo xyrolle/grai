@@ -74,6 +74,11 @@ class IcuParser extends IcuPatternReader {
 	protected argument(): IcuNode {
 		this.index++;
 		const name = this.word();
+		if (name === "") {
+			throw invalid(
+				"{ must be followed by a name, which holds no space, punctuation or symbol.",
+			);
+		}
 		if (this.take("}")) return { type: "argument", name: inputOf(name) };
 		if (!this.take(",")) throw invalid(`{${name} must be closed by }.`);
 		const kind = this.word();
@@ -93,7 +98,7 @@ class IcuParser extends IcuPatternReader {
 
 	/** The rest of a formatted argument, `{name, type` read: its style, if any, and its `}`. */
 	private formatted(name: string, kind: string): IcuNode {
-		const style = this.take(",") ? this.styleText() : "";
+		const style = this.take(",") ? this.style(name, kind) : "";
 		if (!this.take("}"))
 			throw invalid(`{${name}, ${kind} must be closed by }.`);
 		if (style.startsWith("::")) {
@@ -115,36 +120,72 @@ class IcuParser extends IcuPatternReader {
 		return { type: "argument", name: inputOf(name), format };
 	}
 
+	/** The style after an argument's type and comma, which must name one. */
+	private style(name: string, kind: string): string {
+		const style = this.styleText();
+		if (style === undefined) {
+			throw invalid(
+				`the style of {${name}, ${kind}} has a ' that no other ' closes.`,
+			);
+		}
+		if (style === "") {
+			throw invalid(
+				`{${name}, ${kind},} must name a style after its comma, or have no comma.`,
+			);
+		}
+		return style;
+	}
+
 	/** A choice's options up to its closing `}`, each a key and a message in braces. */
 	private options(name: string, kind: ChoiceKind): IcuOption[] {
 		const options: IcuOption[] = [];
-		while (!this.take("}")) {
-			const key = this.word();
-			if (key.startsWith("offset:")) {
-				throw new MessageProblem(
-					"unsupported",
-					`{${name}, ${kind}, ${key}} subtracts an offset from the count, which grai does not support.`,
-				);
-			}
-			if (key === "" || !this.take("{")) {
+		let key = this.key(name, kind);
+		if (kind !== "select" && key === "offset") throw this.offset(name, kind);
+		while (key !== "") {
+			if (!this.take("{")) {
 				throw invalid(
-					`each option of {${name}, ${kind}} must be a key and a message in braces.`,
+					`the key ${key} of {${name}, ${kind}} must be followed by its message in braces, and a key holds no space, punctuation or symbol.`,
 				);
 			}
 			options.push({ key, nodes: this.nodes(kind !== "select", undefined) });
 			if (!this.take("}")) {
 				throw invalid(`the option ${key} of {${name}} must be closed by }.`);
 			}
+			key = this.key(name, kind);
+		}
+		if (!this.take("}")) {
+			throw invalid(
+				`each option of {${name}, ${kind}} must be a key and a message in braces.`,
+			);
 		}
 		return options;
 	}
 
-	/** A formatted argument's style, as written up to its closing brace: a name, or a skeleton. */
-	private styleText(): string {
-		const end = this.source.indexOf("}", this.index);
-		const style = this.source.slice(this.index, end === -1 ? undefined : end);
-		this.index += style.length;
-		return style.trim();
+	/** An option's key: an identifier, or a plural's `=` and whole number; empty if none is there. */
+	private key(name: string, kind: ChoiceKind): string {
+		const key = this.word();
+		if (key !== "" || kind === "select" || !this.take("=")) return key;
+		const exact = this.wholeNumber();
+		if (exact === undefined) {
+			throw invalid(
+				`an = in {${name}, ${kind}} must be followed by ${wholeNumberNote}, as in =0.`,
+			);
+		}
+		return `=${exact}`;
+	}
+
+	/** Why a plural's `offset:n`, which ICU reads before its keys, is left out. */
+	private offset(name: string, kind: ChoiceKind): MessageProblem {
+		const offset = this.offsetValue();
+		if (offset === undefined) {
+			return invalid(
+				`offset in {${name}, ${kind}} must be followed by : and ${wholeNumberNote}, as in offset:1.`,
+			);
+		}
+		return new MessageProblem(
+			"unsupported",
+			`{${name}, ${kind}, offset:${offset}} subtracts an offset from the count, which grai does not support.`,
+		);
 	}
 }
 
@@ -157,6 +198,9 @@ function inputOf(name: string): string {
 	}
 	return name;
 }
+
+/** The numbers ICU takes after `=` and `offset:`, as intl-messageformat reads them. */
+const wholeNumberNote = "a whole number that JavaScript holds exactly";
 
 function isChoiceKind(kind: string): kind is ChoiceKind {
 	return kind === "plural" || kind === "selectordinal" || kind === "select";
