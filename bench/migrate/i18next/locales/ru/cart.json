@@ -1,0 +1,11 @@
+{
+	"title": "Ваша корзина",
+	"items_one": "{{count}} товар",
+	"items_few": "{{count}} товара",
+	"items_many": "{{count}} товаров",
+	"items_other": "{{count}} товара",
+	"summary": {
+		"total": "Итого: {{sum}}",
+		"empty": "Больше нечего добавить"
+	}
+}
