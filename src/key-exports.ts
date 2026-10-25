@@ -1,10 +1,11 @@
 /**
- * The exports of a module's keys, each its name and the value it exports. `taken` holds every name the module's own
- * code calls or binds besides its keys: its imports, such as `text`, and any binding of its own,
- * such as the dev module's `T`. A key binds its own name, `export const key = value;`, unless that
- * name is taken. Then the key binds a name of its own, `$` and the key, with `$` again while that
- * is bound too, exported under the key: `const $text = value; export { $text as text };`. So no
- * key can take the name of anything its module calls, and a key that takes none costs nothing.
+ * The exports of a module's keys, each its name and the value it exports. `taken` holds every
+ * name the module's own code calls or binds besides its keys: its imports, such as `text`, and
+ * any binding of its own, such as the dev module's `T`. A key binds its own name,
+ * `export const key = value;`, unless that name is taken. Then the key binds a name of its own,
+ * `$` and the key, with `$` again while that is bound too, exported under the key:
+ * `const $text = value; export { $text as text };`. So no key can take the name of anything its
+ * module calls, and a key that takes none costs nothing.
  */
 export function keyExports(
 	keys: readonly { readonly name: string; readonly value: string }[],
