@@ -36,6 +36,13 @@ const fixtures = {
 	ignored: ["**/index.html", "**/main.js", "**/package.json", "**/render.js"],
 };
 
+/**
+ * Where a test's dev server listens: 127.0.0.1 alone, at a port the system picks. On `localhost`
+ * it may listen on ::1 alone, and another process may hold 127.0.0.1 at that port, which a browser
+ * reaches as `localhost` too.
+ */
+const loopback = { host: "127.0.0.1", port: 0 };
+
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
@@ -620,7 +627,7 @@ export const render = () => {
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: fixtures },
+			server: { ...loopback, watch: fixtures },
 			plugins: [grai()],
 		});
 		await server.listen();
@@ -650,7 +657,7 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: fixtures },
+			server: { ...loopback, watch: fixtures },
 			plugins: [grai()],
 		});
 		onTestFinished(() => server.close());
@@ -933,7 +940,7 @@ import.meta.hot.send("test:ping");
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: fixtures },
+			server: { ...loopback, watch: fixtures },
 			plugins: [
 				grai(),
 				{
