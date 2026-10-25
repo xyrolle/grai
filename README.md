@@ -319,6 +319,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 
 - **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
+- **A Next app started on a loopback address, `127.0.0.1` or `[::1]`, never answers a page:** there Next 16.4 sends each of the proxy's rewrites back to itself, and grai/next's proxy rewrites each one again. Start Next on its default host, `0.0.0.0` or the machine's address, as behind a reverse proxy (`docs/followups.md`).
 - **Under a CSP of hashes, a built SvelteKit page downloads its locale's message chunks and the shared ones.** The browser refuses the import map, which carries Kit's nonce but no hash yet. A CSP of nonces works, as Kit's `auto` mode gives a page it renders on request.
 - **Not supported yet:**
   - `:unit`'s `usage`, which converts to the locale's units;
