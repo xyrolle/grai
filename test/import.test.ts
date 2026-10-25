@@ -58,6 +58,10 @@ function imported(
 const counts = (render: (count: number) => string | undefined) =>
 	[0, 1, 2, 5, 21].map(render);
 
+/** What the import says of a message whose values i18next escapes. */
+const escapingDetail =
+	"i18next escapes the values of {{name}} for HTML by default, and grai gives them as they are, for the page to escape as React, Vue and Svelte do when they show text. Where this text is set as HTML, escape the values first.";
+
 describe("grai import --from i18next", () => {
 	it("flattens nested keys into identifiers and reads {{name}} as a placeholder", async () => {
 		const { result, load } = imported("i18next", {
@@ -283,6 +287,22 @@ describe("grai import --from i18next", () => {
 			"item (ru): it has no _few, _many form: those counts show the _other text, where i18next shows the key's name.",
 			'friend_male (en, ru): it may be i18next\'s context male of friend, which grai imports as a key of its own. Call it where { context: "male" } was passed.',
 		]);
+	});
+
+	it("reports each message whose values i18next escapes for HTML, which grai gives as they are", () => {
+		const catalog = {
+			greeting: "Hi {{name}}",
+			raw: "Hi {{- name}}",
+			guests: "With {{names, list}}",
+			price: "Costs {{value, number}}",
+			item_one: "One item",
+			item_other: "{{count}} items",
+		};
+		const { result } = imported("i18next", { "en.json": catalog }, ["en"]);
+
+		expect(
+			result.changed.map(({ key, detail }) => `${key}: ${detail}`),
+		).toEqual(["greeting", "guests"].map((key) => `${key}: ${escapingDetail}`));
 	});
 
 	it("prefixes each key with its namespace when a locale's directory holds several files", async () => {

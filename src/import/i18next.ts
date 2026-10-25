@@ -94,11 +94,9 @@ function convertText(
 		);
 	}
 	try {
-		return {
-			path,
-			result: plainMessage(patternOf(value, texts).pattern),
-			notes,
-		};
+		const { pattern, escaped } = patternOf(value, texts);
+		if (escaped.size > 0) notes.push(escapedValues);
+		return { path, result: plainMessage(pattern), notes };
 	} catch (error) {
 		if (!(error instanceof MessageProblem)) throw error;
 		return { path, result: error, notes };
@@ -138,16 +136,29 @@ function convertPlural(
 			}
 		}
 		const missing = missingForms(forms, categories, suffix);
-		return {
-			path,
-			result: countChoice(patterns, kind),
-			notes: kind === "cardinal" ? missing : [ordinalKey, ...missing],
-		};
+		// The count is a number, which escaping leaves as it is.
+		const escapes = [...patterns.values()].some(({ escaped }) =>
+			[...escaped].some((name) => name !== "count"),
+		);
+		const notes = [
+			...(kind === "cardinal" ? [] : [ordinalKey]),
+			...missing,
+			...(escapes ? [escapedValues] : []),
+		];
+		return { path, result: countChoice(patterns, kind), notes };
 	} catch (error) {
 		if (!(error instanceof MessageProblem)) throw error;
 		return { path, result: error, notes: [] };
 	}
 }
+
+/**
+ * What a message whose values i18next escapes renders differently: grai leaves escaping to whatever
+ * shows the text, as a framework does, since escaping in the message would show `&amp;` in every
+ * text a framework or a native view escapes again.
+ */
+const escapedValues =
+	"i18next escapes the values of {{name}} for HTML by default, and grai gives them as they are, for the page to escape as React, Vue and Svelte do when they show text. Where this text is set as HTML, escape the values first.";
 
 /** How an ordinal is called once imported: by a key of its own, as i18next calls it by the plural's. */
 const ordinalKey =

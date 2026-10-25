@@ -2,8 +2,15 @@ import { MessageProblem } from "../problem.ts";
 import { escapeText, textOf } from "./converted.ts";
 import { formatCall } from "./i18next-formats.ts";
 
-/** A grai pattern, with the inputs it reads. */
-export type Pattern = { pattern: string; inputs: ReadonlySet<string> };
+/**
+ * A grai pattern, with the inputs it reads, and those of them that i18next escapes for HTML by
+ * default and that can hold text: `{{name}}` and a list, not `{{- name}}` or a number or a date.
+ */
+export type Pattern = {
+	pattern: string;
+	inputs: ReadonlySet<string>;
+	escaped: ReadonlySet<string>;
+};
 
 /** A file's messages by dotted key, which `$t(key)` names. */
 export type Texts = ReadonlyMap<string, unknown>;
@@ -22,6 +29,7 @@ const nestingLimit = 10;
 export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 	const text = textOf(value);
 	const inputs = new Set<string>();
+	const escaped = new Set<string>();
 	let pattern = "";
 	let last = 0;
 	for (const match of text.matchAll(reference)) {
@@ -31,17 +39,22 @@ export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 		if (placeholder !== undefined) {
 			const comma = placeholder.indexOf(",");
 			const read = comma === -1 ? placeholder : placeholder.slice(0, comma);
+			const raw = read.trim().startsWith("-");
 			const name = inputOf(read.trim().replace(/^-\s*/, ""), written);
+			const format = comma === -1 ? "" : placeholder.slice(comma + 1).trim();
 			pattern +=
-				comma === -1
+				format === ""
 					? `{${name}}`
-					: `{${name} ${formatCall(placeholder.slice(comma + 1).trim(), written)}}`;
+					: `{${name} ${formatCall(format, written)}}`;
 			inputs.add(name);
+			if (!raw && (format === "" || format.startsWith("list"))) {
+				escaped.add(name);
+			}
 		} else {
 			pattern += nestedText(nested?.trim() ?? "", texts, depth);
 		}
 	}
-	return { pattern: pattern + escapeText(text.slice(last)), inputs };
+	return { pattern: pattern + escapeText(text.slice(last)), inputs, escaped };
 }
 
 function inputOf(name: string, written: string): string {
