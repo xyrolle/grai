@@ -6,6 +6,7 @@ import { devModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import {
 	isMessageModule,
+	keyModulePrefix,
 	keyPrefix,
 	textModulePrefix,
 	textPrefix,
@@ -21,8 +22,10 @@ import {
 } from "./vite-build.ts";
 import {
 	followedFile,
+	keyFromKeys,
 	type ProjectFiles,
 	patchPrefix,
+	pathKey,
 	serveMessages,
 } from "./vite-dev.ts";
 
@@ -42,6 +45,8 @@ export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
 export function graiPlugin(options: GraiOptions): GraiPlugin {
 	let files: ProjectFiles = { configFile: "", outdir: "", keysFile: "" };
 	let serving = false;
+	/** Whether Vite runs tests, as Vitest has it, where a module is what a test can mock. */
+	let testing = false;
 	let build: Build | undefined;
 	/** The first compile: its build, or the errors that kept it from one. */
 	let first: Promise<Build | readonly Error[]> | undefined;
@@ -65,9 +70,11 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	) => {
 		if (id.startsWith(textModulePrefix))
 			return textModule(files.outdir, compiled, id);
-		if (id !== files.keysFile)
-			return keyModule(files.outdir, compiled, id, consumer);
-		return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
+		if (id === files.keysFile)
+			return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
+		return serving
+			? keyFromKeys(files, id.slice(keyModulePrefix.length))
+			: keyModule(files.outdir, compiled, id, consumer);
 	};
 
 	const plugin: Plugin = {
@@ -80,6 +87,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			const { outdir } = readConfig(configFile);
 			files = { configFile, outdir, keysFile: join(outdir, "keys.js") };
 			serving = environment.command === "serve";
+			testing = environment.mode === "test";
 		},
 		configEnvironment(name) {
 			return !serving && name === "client"
@@ -171,7 +179,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 				)
 					return `\0${id}`;
 				if (!serving) return null;
-				await first;
+				const compiled = build ?? (await first);
 				// Vite's resolver takes a per-key path to keys.js and to its exports alone, so a key no
 				// catalog has would fail the page; it gets a module of its own instead.
 				const module = moduleOf(id);
@@ -181,7 +189,16 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 					skipSelf: true,
 				});
 				if (resolved?.id !== files.keysFile) return resolved;
-				return missingKeyImport(module.key, importer) ?? resolved;
+				const missing = missingKeyImport(module.key, importer);
+				if (missing !== undefined) return missing;
+				// In a test run, a key's path that the app maps to keys.js resolves to that key's module
+				// alone, so a test that mocks the path mocks that key and no other. A page keeps keys.js
+				// as one module, since a module per key costs it a request each.
+				const key =
+					testing && "compilation" in compiled
+						? pathKey(compiled, id)
+						: undefined;
+				return key === undefined ? resolved : `\0${keyPrefix}${key}`;
 			},
 		},
 		async load(id) {
