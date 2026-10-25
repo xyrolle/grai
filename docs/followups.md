@@ -20,6 +20,12 @@ A text message called in a request reads the request's locale from `AsyncLocalSt
 
 Done when: `bench/` runs grai's own output on a quiet machine and shows a text call in a request at 20 ns or less, or the design records why the floor is higher.
 
+## Function expressions on a server without Vite
+
+The Vite plugin's server build writes each message function as a function expression, which V8 only pre-parses, and loads app A's messages in 24–25 ms against 30 ms with arrows (`startup`). `keys.js` still writes arrows, and a server that loads it without the Vite plugin, such as a Next.js server bundle or a plain Node server, pays the difference.
+
+Done when: such a server loads function expressions while the browser keeps arrows, and `startup`'s row for the compiler's output shows the gain.
+
 ## Support ordinals, number selection, more functions and markup options
 
 These are compile errors today:
