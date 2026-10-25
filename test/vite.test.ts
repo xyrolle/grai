@@ -185,6 +185,21 @@ describe("the Vite plugin's build", () => {
 			}),
 		).rejects.toThrow(/catalog/);
 	});
+
+	it("fails the build where a source names a key no catalog has, as grai check does", async () => {
+		const { dir } = project(catalogs);
+
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\nconsole.log(m.title(), m.subtitle(), m["caption"]());\n`,
+			}),
+		).rejects.toThrow(
+			[
+				'a.js:2:26: "subtitle": m.subtitle names a key no catalog has. Add it with grai add subtitle --en "…" --de "…", or fix the name.',
+				'a.js:2:41: "caption": m["caption"] names a key no catalog has. Add it with grai add caption --en "…" --de "…", or fix the name.',
+			].join("\n"),
+		);
+	});
 });
 
 describe("grai/vite's module kinds", () => {
