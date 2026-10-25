@@ -4,6 +4,7 @@
  */
 
 import type { Catalog } from "./catalog.ts";
+import { written } from "./catalog-keys.ts";
 import { GraiError } from "./error.ts";
 
 const keyName = /^[A-Za-z_$][\w$]*$/;
@@ -55,14 +56,17 @@ export function keyProblems(
 	values: readonly unknown[],
 	collisions: ReadonlyMap<string, string>,
 ): GraiError[] {
-	const file =
-		catalogs.find((catalog) => catalog.messages.has(key))?.file ?? "";
+	const catalog = catalogs.find((each) => each.messages.has(key));
+	const file = catalog?.file ?? "";
 	if (!isKeyName(key)) {
+		const path = catalog?.paths.get(key) ?? [key];
+		const nested =
+			path.length > 1 ? `${written(path)} joins to this key by _, and ` : "";
 		return [
 			new GraiError(
 				"key-invalid",
 				{ file, key },
-				"a key must be a JavaScript identifier and not a reserved word, as it is the message's export name. Use letters, digits, _ and $.",
+				`${nested}a key must be a JavaScript identifier and not a reserved word, as it is the message's export name. Use letters, digits, _ and $.`,
 			),
 		];
 	}

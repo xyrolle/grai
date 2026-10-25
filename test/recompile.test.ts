@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Catalog } from "../src/catalog.ts";
+import { catalogKeys } from "../src/catalog-keys.ts";
 import { recompile } from "../src/compile.ts";
 import { editedMessages } from "../src/edit.ts";
 import { project } from "./project.ts";
@@ -13,6 +15,14 @@ const catalogs = {
 /** A catalog as editors write it: one entry per line, indented by a tab. */
 const laidOut = (messages: Record<string, unknown>) =>
 	Buffer.from(JSON.stringify(messages, null, "\t"));
+
+const where = { file: "messages/en.json", locale: "en" };
+
+/** A catalog's parse of these messages. */
+const parsed = (messages: Record<string, unknown>): Catalog => ({
+	...where,
+	...catalogKeys(messages, where),
+});
 
 describe("a recompile after an edit", () => {
 	it("compiles only the keys the edit touched, and writes only their shard", async () => {
@@ -97,38 +107,44 @@ describe("a recompile after an edit", () => {
 });
 
 describe("the messages of an edited catalog", () => {
-	const before = { first: "One", second: ["variants"], third: "Three" };
+	const before = {
+		first: "One",
+		second: ["variants"],
+		nested: { title: "Title" },
+		third: "Three",
+	};
 	const parse = (messages: Record<string, unknown>) =>
-		editedMessages(
-			laidOut(before),
-			new Map(Object.entries(before)),
-			laidOut(messages),
-		);
+		editedMessages(laidOut(before), parsed(before), laidOut(messages));
 
 	it("are those of a whole parse, from the entries the edit touched alone", () => {
 		const edits = [
 			{ ...before, second: ["other variants"] },
 			{ ...before, fourth: "Four" },
-			{ first: "One", second: ["variants"] },
-			{ first: "Uno", second: ["variants"], third: "Tres" },
+			{ ...before, nested: { title: "Heading", body: "Body" } },
+			{ first: "One", second: ["variants"], nested: { title: "Title" } },
+			{ ...before, first: "Uno", third: "Tres" },
 		];
 		for (const edit of edits) {
-			expect(Object.fromEntries(parse(edit)?.messages ?? [])).toEqual(edit);
+			const whole = parsed(edit);
+			const edited = parse(edit);
+			expect(edited?.messages).toEqual(whole.messages);
+			expect(edited?.paths).toEqual(whole.paths);
 		}
 		expect([
-			...(parse({ first: "One", second: ["variants"] })?.keys ?? []),
-		]).toEqual(["third"]);
+			...(parse({ ...before, nested: { title: "Title", body: "Body" } })
+				?.keys ?? []),
+		]).toEqual(["nested_body"]);
 	});
 
 	it("are left to a whole parse when the edit cannot be shown to touch whole entries", () => {
 		const oneLine = editedMessages(
 			Buffer.from(JSON.stringify(before)),
-			new Map(Object.entries(before)),
+			parsed(before),
 			Buffer.from(JSON.stringify({ ...before, first: "Uno" })),
 		);
 		const duplicated = editedMessages(
 			laidOut(before),
-			new Map(Object.entries(before)),
+			parsed(before),
 			Buffer.from(
 				laidOut(before)
 					.toString()

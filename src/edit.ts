@@ -1,19 +1,23 @@
+import type { Catalog } from "./catalog.ts";
+import { type CatalogKeys, catalogKeys } from "./catalog-keys.ts";
+import { isRecord } from "./config.ts";
+
 /**
  * Applies an edit of a catalog file to its previous parse, parsing only the entries the edit
  * touched. A catalog laid out one entry per line (as editors and formatters write them) has a
  * line break and the same indent before each top-level key, and nowhere else, since a JSON string
  * holds no raw line break. The bytes the edit changed lie between two such entry starts, so only
  * that span is parsed, in the old file and in the new. Returns undefined whenever that cannot be
- * shown exactly, for the caller to parse the whole file. With the messages come the keys whose
- * message the edit added, changed or removed, and whether any key now starts on another line.
+ * shown exactly, for the caller to parse the whole file. With the messages and their paths come
+ * the keys whose message the edit added, changed or removed, and whether any key now starts on
+ * another line.
  */
 export function editedMessages(
 	previousBytes: Buffer,
-	previous: ReadonlyMap<string, unknown>,
+	previous: Catalog,
 	bytes: Buffer,
-):
-	| { messages: Map<string, unknown>; keys: Set<string>; moved: boolean }
-	| undefined {
+): (CatalogKeys & { keys: Set<string>; moved: boolean }) | undefined {
+	const where = { file: previous.file, locale: previous.locale };
 	const indent = entryIndent(bytes);
 	if (indent === undefined) return undefined;
 	const marker = Buffer.from(`\n${indent}"`);
@@ -27,27 +31,33 @@ export function editedMessages(
 	const grown = bytes.length - previousBytes.length;
 	const before = previousBytes.subarray(from + 1, to - grown);
 	const after = bytes.subarray(from + 1, to);
-	const removed = entries(before);
-	const added = entries(after);
+	const removed = spanKeys(before, where);
+	const added = spanKeys(after, where);
 	if (removed === undefined || added === undefined) return undefined;
-	const removedKeys = Object.keys(removed);
-	const isPreviousSpan = removedKeys.every(
-		(key) => previous.has(key) && sameJson(previous.get(key), removed[key]),
+	const isPreviousSpan = [...removed.messages].every(
+		([key, value]) =>
+			sameJson(previous.paths.get(key), removed.paths.get(key)) &&
+			sameJson(previous.messages.get(key), value),
 	);
-	const duplicates = Object.keys(added).some(
-		(key) => previous.has(key) && !Object.hasOwn(removed, key),
+	const duplicates = [...added.messages.keys()].some(
+		(key) => previous.messages.has(key) && !removed.messages.has(key),
 	);
 	if (!isPreviousSpan || duplicates) return undefined;
-	const messages = new Map(previous);
-	for (const key of removedKeys) messages.delete(key);
-	for (const [key, value] of Object.entries(added)) messages.set(key, value);
+	const messages = new Map(previous.messages);
+	const paths = new Map(previous.paths);
+	for (const key of removed.messages.keys()) {
+		messages.delete(key);
+		paths.delete(key);
+	}
+	for (const [key, value] of added.messages) messages.set(key, value);
+	for (const [key, path] of added.paths) paths.set(key, path);
 	const keys = new Set<string>();
-	for (const key of [...removedKeys, ...Object.keys(added)]) {
+	for (const key of [...removed.messages.keys(), ...added.messages.keys()]) {
 		if (
 			!(
-				Object.hasOwn(removed, key) &&
-				Object.hasOwn(added, key) &&
-				sameJson(removed[key], added[key])
+				removed.messages.has(key) &&
+				added.messages.has(key) &&
+				sameJson(removed.messages.get(key), added.messages.get(key))
 			)
 		) {
 			keys.add(key);
@@ -55,9 +65,10 @@ export function editedMessages(
 	}
 	// Keys keep their lines when the span keeps its keys, in order, and its number of lines.
 	const moved =
-		removedKeys.join("\0") !== Object.keys(added).join("\0") ||
+		[...removed.messages.keys()].join("\0") !==
+			[...added.messages.keys()].join("\0") ||
 		lineBreaks(before) !== lineBreaks(after);
-	return { messages, keys, moved };
+	return { messages, paths, keys, moved };
 }
 
 /** The whitespace before the first key, if the object's first key starts a line. */
@@ -78,14 +89,18 @@ function spanEnd(
 	return close >= unchangedFrom ? close : undefined;
 }
 
-/** The entries of a span such as `\t"a": "x",\n\t"b": [...],`, or undefined if it is not whole entries. */
-function entries(span: Buffer): Record<string, unknown> | undefined {
+/**
+ * The keys of a span such as `\t"a": "x",\n\t"b": {...},`, or undefined if it is not whole
+ * entries, or its keys are not valid ones, which a parse of the whole file reports.
+ */
+function spanKeys(
+	span: Buffer,
+	where: { file: string; locale: string },
+): CatalogKeys | undefined {
 	const text = span.toString("utf8").trim().replace(/,$/, "");
 	try {
 		const value: unknown = JSON.parse(`{${text}}`);
-		return typeof value === "object" && value !== null && !Array.isArray(value)
-			? { ...value }
-			: undefined;
+		return isRecord(value) ? catalogKeys(value, where) : undefined;
 	} catch {
 		return undefined;
 	}
