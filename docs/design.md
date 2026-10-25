@@ -149,7 +149,8 @@ export declare const cart_items: Message<{ count: number }>;
   - `number` where a locale counts it with `:plural` or formats it as a number or a relative time, `Date | number` where one formats it as a date, and `readonly string[]` where one formats it as a list;
   - the keys, as numbers and strings (`1 | "1" | …`), where a locale selects on it and lists its values without `*`;
   - `string` where it gives a formatter an option, such as `currency=$code`;
-  - `NonNullable<unknown>` where it is only interpolated, selected with `*` or given to markup, because interpolation turns any value into text.
+  - `string | number | bigint | boolean | object` where it is shown as text, which is what a template literal turns into text: a symbol has none, and throws in a message's text and in its parts alike;
+  - `NonNullable<unknown>` where it is only selected with `*` or given to markup.
 
   Each use narrows the type, so an input both selected on `1` and `2` without `*` and formatted as a number is `1 | 2`, and one a locale selects on `a` and `b` and another on `a` is `"a"`. Two uses no value suits both of, such as `{x :currency currency=$x}`, which formats `x` as a number and takes its currency from it, are a compile error naming both, so a call that type-checks renders in every locale. A key's inputs are the union over its locales.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
