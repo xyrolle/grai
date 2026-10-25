@@ -120,7 +120,8 @@ export function graiPlugin(
 		compiled: Build,
 		consumer: "client" | "server",
 	) => {
-		if (id.startsWith(textModulePrefix)) return textModule(compiled, id);
+		if (id.startsWith(textModulePrefix))
+			return textModule(compiled, id, consumer);
 		if (id === devKeysId || id === files.keysFile)
 			return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
 		return serving
