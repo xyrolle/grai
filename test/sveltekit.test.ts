@@ -30,29 +30,63 @@ function run(command: string, args: string[]): void {
 	}
 }
 
-/** Builds the app in Vite's `mode` (`production` by default) and serves it. */
-async function served(port: number, mode = "production") {
-	run("vite", ["build", "--mode", mode]);
-	const server = spawn("node", ["build"], {
+/** A server the suite started, and the origin it printed. */
+type Served = { server: ChildProcess; origin: string };
+
+/**
+ * Starts a server on 127.0.0.1 and a port the system picks, so that runs of this file side by side
+ * never meet, and resolves once it prints the address it listens on. It leads a process group of
+ * its own, so that stopping it stops what it forks.
+ */
+async function listening(
+	command: string,
+	args: string[],
+	env: Record<string, string> = {},
+): Promise<Served> {
+	const server = spawn(command, args, {
 		cwd: example,
-		env: { ...process.env, PORT: String(port) },
+		env: { ...process.env, NO_COLOR: "1", ...env },
+		detached: true,
 	});
-	await new Promise<void>((resolve, reject) => {
-		server.stdout.on("data", (chunk) => {
-			if (String(chunk).includes("Listening on")) resolve();
+	let printed = "";
+	const origin = await new Promise<string>((resolve, reject) => {
+		server.stdout?.on("data", (chunk) => {
+			printed += chunk;
+			const address = /http:\/\/127\.0\.0\.1:\d+/.exec(printed)?.[0];
+			if (address !== undefined) resolve(address);
 		});
 		server.on("exit", (code) =>
-			reject(new Error(`the server exited: ${code}`)),
+			reject(new Error(`${command} exited: ${code}\n${printed}`)),
 		);
 	});
-	return server;
+	return { server, origin };
 }
 
-/** Stops a server and waits for it to exit, so the next one finds its port free. */
-async function stopped(server: ChildProcess | undefined): Promise<void> {
-	if (server === undefined || server.exitCode !== null) return;
-	const exited = new Promise((resolve) => server.once("exit", resolve));
-	server.kill();
+/** Builds the app in Vite's `mode` (`production` by default) and serves it with adapter-node. */
+function served(mode = "production"): Promise<Served> {
+	run("vite", ["build", "--mode", mode]);
+	return listening("node", ["build"], { HOST: "127.0.0.1", PORT: "0" });
+}
+
+/** Stops a server's whole process group, and resolves once the server has exited. */
+async function stopped(served: Served | undefined): Promise<void> {
+	if (served === undefined) return;
+	const { server } = served;
+	const exited =
+		server.exitCode === null && server.signalCode === null
+			? new Promise<void>((resolve) => server.once("exit", () => resolve()))
+			: undefined;
+	if (server.pid === undefined) return;
+	try {
+		process.kill(-server.pid, "SIGTERM");
+	} catch (error) {
+		// A group whose processes have all exited.
+		if (
+			!(error instanceof Error && "code" in error && error.code === "ESRCH")
+		) {
+			throw error;
+		}
+	}
 	await exited;
 }
 
@@ -78,10 +112,11 @@ const html = (page: Page, attribute: "lang" | "dir") =>
 
 // Building and serving an app takes seconds.
 describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
-	const origin = "http://localhost:4751";
-	let server: ChildProcess;
+	let origin = "";
+	let server: Served | undefined;
 	beforeAll(async () => {
-		server = await served(4751);
+		server = await served();
+		origin = server.origin;
 	}, 60_000);
 	afterAll(() => stopped(server));
 
@@ -166,11 +201,12 @@ async function bytesOf(url: string): Promise<number> {
 describe("handleLocale, in a build without the locale copies", {
 	timeout: 30_000,
 }, () => {
-	const origin = "http://localhost:4753";
-	let server: ChildProcess;
+	let origin = "";
+	let server: Served | undefined;
 	beforeAll(async () => {
 		// The same app, built with grai/svelte's plugin, which writes no copies.
-		server = await served(4753, "svelte");
+		server = await served("svelte");
+		origin = server.origin;
 	}, 60_000);
 	afterAll(() => stopped(server));
 
@@ -201,12 +237,13 @@ describe("handleLocale, in a build without the locale copies", {
 describe("handleLocale, by the cookie and Accept-Language", {
 	timeout: 30_000,
 }, () => {
-	const origin = "http://localhost:4752";
-	let server: ChildProcess;
+	let origin = "";
+	let server: Served | undefined;
 	beforeAll(async () => {
 		// The same app, with another strategy, the cookie, else the browser's languages, and a CSP
 		// whose scripts need Kit's nonce.
-		server = await served(4752, "cookie");
+		server = await served("cookie");
+		origin = server.origin;
 	}, 60_000);
 	afterAll(() => stopped(server));
 
@@ -244,25 +281,17 @@ describe("handleLocale, by the cookie and Accept-Language", {
 });
 
 describe("grai/sveltekit/client under vite dev", { timeout: 30_000 }, () => {
-	const origin = "http://localhost:4750";
-	let server: ChildProcess;
+	let origin = "";
+	let server: Served | undefined;
 	beforeAll(async () => {
-		const started = spawn(
-			bin("vite"),
-			["dev", "--port", "4750", "--strictPort"],
-			{
-				cwd: example,
-			},
-		);
-		server = started;
-		await new Promise<void>((resolve, reject) => {
-			started.stdout.on("data", (chunk) => {
-				if (String(chunk).includes("localhost:4750")) resolve();
-			});
-			started.on("exit", (code) =>
-				reject(new Error(`vite dev exited: ${code}`)),
-			);
-		});
+		server = await listening(bin("vite"), [
+			"dev",
+			"--host",
+			"127.0.0.1",
+			"--port",
+			"0",
+		]);
+		origin = server.origin;
 	}, 60_000);
 	afterAll(() => stopped(server));
 
