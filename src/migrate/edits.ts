@@ -37,6 +37,20 @@ export function deletion(text: string, { start, end }: Span): Edit {
 	};
 }
 
+/** An array literal without some of its elements, written from the source of the rest. */
+export function arrayWithout(
+	text: string,
+	list: ESTree.ArrayExpression,
+	removed: ReadonlySet<Node>,
+): Edit {
+	const kept = list.elements.flatMap((element) =>
+		element === null || removed.has(element)
+			? []
+			: [text.slice(element.start, element.end)],
+	);
+	return { start: list.start, end: list.end, text: `[${kept.join(", ")}]` };
+}
+
 /** An import without some of its specifiers: the whole import gone when it keeps none. */
 export function importWithout(
 	text: string,
