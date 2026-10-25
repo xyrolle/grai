@@ -1,5 +1,6 @@
 import type { Catalog } from "./catalog.ts";
 import { catalogWithMessages } from "./catalog-file.ts";
+import { placedPath } from "./catalog-keys.ts";
 import {
 	type CompileResult,
 	compile,
@@ -14,8 +15,10 @@ import { writeAll } from "./write-all.ts";
 
 /**
  * Adds a key to every catalog that lacks it, with its text in each of those locales, then compiles.
- * It writes nothing unless some catalog lacks the key, a text is given for each that does and for
- * no other, and every text is a valid message.
+ * It goes where the base catalog has it, or else in the deepest object of messages of the base
+ * catalog whose key, then `_`, starts it, at the same path in every catalog. It writes nothing
+ * unless some catalog lacks the key, a text is given for each that does and for no other, and
+ * every text is a valid message.
  */
 export async function add(
 	configFile: string,
@@ -34,11 +37,13 @@ export async function add(
 	const problems =
 		invalid === undefined ? textProblems(catalogs, texts, where) : [invalid];
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
+	const placed =
+		base?.paths.get(key) ?? placedPath(key, base?.paths.values() ?? []);
 	const catalogTexts = new Map<string, string>();
 	for (const [locale, path] of read.config.catalogs) {
 		const text = texts[locale];
 		if (text !== undefined) {
-			catalogTexts.set(path, catalogWithMessages(path, [[[key], text]], path));
+			catalogTexts.set(path, catalogWithMessages(path, [[placed, text]], path));
 		}
 	}
 	writeAll(catalogTexts);

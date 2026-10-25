@@ -102,3 +102,22 @@ function unwrapped(
 		`${written(path)} is a message with variants, which the format writes as an array of one object. Wrap it in [ ].`,
 	);
 }
+
+/**
+ * Where a new key goes in a catalog whose keys are at `paths`: in the deepest object whose key,
+ * then `_`, starts it, named by the rest; else at the top, as it is.
+ */
+export function placedPath(key: string, paths: Iterable<KeyPath>): KeyPath {
+	let placed: KeyPath = [key];
+	for (const path of paths) {
+		for (let depth = path.length - 1; depth > placed.length - 1; depth--) {
+			const object = path.slice(0, depth);
+			const prefix = `${keyOf(object)}_`;
+			if (key.length > prefix.length && key.startsWith(prefix)) {
+				placed = [...object, key.slice(prefix.length)];
+				break;
+			}
+		}
+	}
+	return placed;
+}

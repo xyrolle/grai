@@ -100,7 +100,7 @@ export async function mergeDocument(
 					catalogWithMessages(
 						path,
 						merged.messages.map(([key, value]): [KeyPath, unknown] => [
-							[key],
+							target?.paths.get(key) ?? base.paths.get(key) ?? [key],
 							value,
 						]),
 						like,
