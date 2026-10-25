@@ -132,13 +132,13 @@ export declare const cart_items: Message<{ count: number }>;
   - A message without inputs takes `inputs?: Record<string, never>`.
   - `MarkupMessage<I, T>` adds `.parts(): MessagePart<T>[]`, where `T` is the union of the tags every locale writes. A part named otherwise is a type error, so an app's renderer can map exactly those tags.
   - Messages return `string`.
-- **An input's type is the narrowest that every locale accepts:**
-  - `number` where any locale counts it with `:plural` or formats it as a number, and `Date | number` where one formats it as a date;
-  - the union of the keys, as numbers and strings (`1 | "1" | …`), where every locale that selects on it lists its values without `*`;
+- **An input's type is what every use of it takes, in every locale:**
+  - `number` where a locale counts it with `:plural` or formats it as a number or a relative time, `Date | number` where one formats it as a date, and `readonly string[]` where one formats it as a list;
+  - the keys, as numbers and strings (`1 | "1" | …`), where a locale selects on it and lists its values without `*`;
   - `string` where it gives a formatter an option, such as `currency=$code`;
-  - `NonNullable<unknown>` where it is only interpolated or selected with `*`, because interpolation turns any value into text.
+  - `NonNullable<unknown>` where it is only interpolated, selected with `*` or given to markup, because interpolation turns any value into text.
 
-  A key's inputs are the union over its locales, so a call suits every locale.
+  Each use narrows the type, so an input both selected on `1` and `2` without `*` and formatted as a number is `1 | 2`, and one a locale selects on `a` and `b` and another on `a` is `"a"`. Two uses no value suits both of, such as `{x :currency currency=$x}`, which formats `x` as a number and takes its currency from it, are a compile error naming both, so a call that type-checks renders in every locale. A key's inputs are the union over its locales.
 - **The doc comment is the base locale's text**, so an editor shows the words at the call site.
 - **Go to definition lands on the key in the base locale's catalog.** Each shard's declarations have a declaration map, from each key's name to the line its key is on in the base catalog, and TypeScript 6's tsserver and TypeScript 7's language server both follow it. An edit regenerates the maps only when it moves a key to another line, so a message's new words cost no map.
 - **The output's JavaScript type-checks too**, under `checkJs` with `strict`, as an app with it in `src` checks it. `runtime.d.ts` declares what the shards and `server.js` import from the runtime, and `config.js` and `plurals.js` carry JSDoc types.

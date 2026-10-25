@@ -305,6 +305,52 @@ describe("a message", () => {
 		]);
 	});
 
+	it("is an error when no value suits every use of an input, in a locale or across them", async () => {
+		const closed = (match: Record<string, string>) => [
+			{ declarations: ["input n"], selectors: ["n"], match },
+		];
+		expect(
+			await errorsOf({
+				en: {
+					paid: "{x :currency currency=$x}",
+					listed: "{x :list}",
+					named: closed({ "n=a": "{n :number}", "n=b": "{n :number}" }),
+					picked: closed({ "n=a": "A", "n=b": "B" }),
+				},
+				de: {
+					paid: "{x :currency currency=$x}",
+					listed: "{x :number}",
+					named: closed({ "n=a": "{n :number}", "n=b": "{n :number}" }),
+					picked: closed({ "n=c": "C" }),
+				},
+			}),
+		).toEqual([
+			'message-invalid: messages/de.json: "listed" (de): x is formatted as a list in en and is formatted as a number in de, and no value suits both. Give each use its own input.',
+			'message-invalid: messages/de.json: "picked" (de): n is selected without * on a, b in en and is selected without * on c in de, and no value suits both. Give each use its own input.',
+			'message-invalid: messages/en.json: "named" (en): n is selected without * on a, b in en and is formatted as a number in en, and no value suits both. Give each use its own input.',
+			'message-invalid: messages/en.json: "paid" (en): x is formatted as a number in en and gives a value its currency in en, and no value suits both. Give each use its own input.',
+		]);
+	});
+
+	it("names the keys locales list together when no value is one of them all", async () => {
+		const closed = (keys: string[]) => [
+			{
+				declarations: ["input n"],
+				selectors: ["n"],
+				match: Object.fromEntries(keys.map((key) => [`n=${key}`, key])),
+			},
+		];
+		expect(
+			await errorsOf({
+				en: { picked: closed(["a", "b"]) },
+				de: { picked: closed(["a", "c"]) },
+				ru: { picked: closed(["b", "c"]) },
+			}),
+		).toEqual([
+			'message-invalid: messages/ru.json: "picked" (ru): n is selected without * on a in en, de and is selected without * on b, c in ru, and no value suits both. Give each use its own input.',
+		]);
+	});
+
 	it("is an error when a variant names a plural or ordinal category its locale does not have", async () => {
 		expect(
 			await errorsOf({

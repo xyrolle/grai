@@ -211,3 +211,49 @@ console.log(texts);
 	// Lines 8 and 9: a number given as text, and a date given as text.
 	expect(errors).toEqual(["8 TS2322", "9 TS2322"]);
 });
+
+it("types an input by every use of it in every locale, so a call that type-checks renders", async () => {
+	const picked = (one: string, two: string) => [
+		{
+			declarations: ["input n"],
+			selectors: ["n"],
+			match: { "n=1": `{n :number} ${one}`, "n=2": `{n :number} ${two}` },
+		},
+	];
+	const { dir, compile } = project({
+		en: {
+			picked: picked("one", "two"),
+			greeting: "Hi {name}",
+			paid: "{amount :currency currency=$code}",
+		},
+		de: {
+			picked: picked("eins", "zwei"),
+			greeting: "Hallo {name}",
+			paid: "{amount :currency currency=$code}",
+		},
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+const texts: string[] = [
+	m.picked({ n: 1 }),
+	m.picked({ n: 2 }),
+	m.greeting({ name: "Ana" }),
+	m.greeting({ name: 1n }),
+	m.greeting({ name: new Date() }),
+	m.paid({ amount: 2, code: "EUR" }),
+];
+m.picked({ n: 3 });
+m.picked({ n: "1" });
+m.paid({ amount: 2, code: 12 });
+console.log(texts);
+`,
+	);
+
+	// Lines 10 to 12: a number the select does not list, a number given as text, and a currency
+	// given as a number.
+	expect(errors).toEqual(["10 TS2322", "11 TS2322", "12 TS2322"]);
+});
