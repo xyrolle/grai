@@ -96,7 +96,8 @@ function middlewareCode(
 	const output = (file: string) => JSON.stringify(join(grai.outdir, file));
 	return `import { localeMiddleware } from "grai/astro/middleware";
 import { middleware } from ${output("server.js")};
-import { getTextDirection, localeOfPath } from ${output("runtime.js")};
+import { getTextDirection } from ${output("runtime.js")};
+import { localeOfPath } from ${output("internal.js")};
 
 export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, ...${JSON.stringify(project)} });
 `;
