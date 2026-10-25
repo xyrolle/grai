@@ -229,6 +229,16 @@ describe("grai export", () => {
 		]);
 		expect(units[0]?.note).toBe("n: 0");
 	});
+
+	it("gives each code of a unit an id of its own that XML can hold, whatever its tag is named", async () => {
+		const legend = "{#dot/} {#dot/} {#dot.2/} {#a&b/}";
+		const { config } = project({ en: { legend }, de: { legend } });
+
+		const xliff = await exported(config, "de");
+		const ids = [...xliff.matchAll(/<ph id="([^"]+)"/g)].map(([, id]) => id);
+
+		expect(ids).toEqual(["tag-dot", "tag-dot.2", "tag-dot-2e-2", "tag-a-26-b"]);
+	});
 });
 
 describe("grai merge", () => {

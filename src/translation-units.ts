@@ -18,6 +18,7 @@ import {
 	rawVariants,
 	translatedVariants,
 } from "./unit-variants.ts";
+import { idText } from "./xml-text.ts";
 
 export type Unit = {
 	id: string;
@@ -121,7 +122,7 @@ function unitText(
 	target: string | undefined,
 	note: string | undefined,
 ): UnitText {
-	const id = [key, ...variant.flat()].map(idPart).join(".");
+	const id = [key, ...variant.flat()].map(idText).join(".");
 	return { id, key, variant, source, target, note };
 }
 
@@ -140,12 +141,4 @@ function withCodes(texts: readonly UnitText[]): Unit[] {
 		target:
 			text.target === undefined ? undefined : patternPieces(text.target, ids),
 	}));
-}
-
-/** Text as a unit id may hold it: letters, digits and _ as they are, any other character as -hex-. */
-function idPart(text: string): string {
-	return text.replaceAll(
-		/[^A-Za-z0-9_]/gu,
-		(character) => `-${(character.codePointAt(0) ?? 0).toString(16)}-`,
-	);
 }

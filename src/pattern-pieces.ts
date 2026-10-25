@@ -4,6 +4,7 @@
  */
 
 import { type Part, parsePattern } from "./pattern.ts";
+import { idText } from "./xml-text.ts";
 
 /** A code a translator places but does not edit: a placeholder, or markup. */
 export type Code = {
@@ -20,8 +21,8 @@ export type Piece = { text: string } | Code;
 /**
  * The ids of one message's codes, the same in all its units, so that an id names one code wherever
  * a file places it. A code gets an id of its own for each way it is written, and for each time one
- * pattern repeats it: its name, with `tag-` before a markup's, then `.2`, `.3` for the name's next
- * ones.
+ * pattern repeats it: its name as an id holds it, with `tag-` before a markup's, then `.2`, `.3`
+ * for the name's next ones.
  */
 export class CodeIds {
 	private readonly ids = new Map<string, string>();
@@ -80,8 +81,10 @@ const kinds: Readonly<Record<CodePart["type"], Code["kind"]>> = {
 	"markup-standalone": "standalone",
 };
 
+/** A code's name as its ids begin, written as an id holds text, so that a `.2` follows only its repeats. */
 function nameOf(part: CodePart): string {
-	return part.type === "variable" ? part.name : `tag-${part.name}`;
+	const name = idText(part.name);
+	return part.type === "variable" ? name : `tag-${name}`;
 }
 
 function writtenPieces(source: string): Written[] {
