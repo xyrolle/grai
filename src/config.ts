@@ -15,7 +15,15 @@ export type Config = {
 	strategy: readonly Strategy[];
 	/** The cookie the `cookie` strategy reads and `setLocale` writes. */
 	cookieName: string | undefined;
+	/** How a page changes locale. */
+	switch: LocaleSwitch;
 };
+
+/**
+ * How a page changes locale: by reloading, so its words are fixed while it lives (the default), or
+ * in place, live.
+ */
+export type LocaleSwitch = "reload" | "live";
 
 /** A place a request can name its locale in. */
 export type Strategy = "cookie" | "preferredLanguage" | "url";
@@ -33,6 +41,7 @@ const fields = new Set([
 	"outdir",
 	"strategy",
 	"cookieName",
+	"switch",
 ]);
 const localePlaceholder = "{locale}";
 
@@ -57,6 +66,7 @@ export function readConfig(file: string): Config {
 		outdir,
 		strategy = [],
 		cookieName,
+		switch: localeSwitch = "reload",
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -89,6 +99,11 @@ export function readConfig(file: string): Config {
 				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
 		);
 	}
+	if (localeSwitch !== "reload" && localeSwitch !== "live") {
+		throw invalid(
+			'"switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place',
+		);
+	}
 	const root = dirname(resolve(file));
 	return {
 		root,
@@ -103,6 +118,7 @@ export function readConfig(file: string): Config {
 		outdir: resolve(root, outdir),
 		strategy,
 		cookieName: typeof cookieName === "string" ? cookieName : undefined,
+		switch: localeSwitch,
 	};
 }
 
