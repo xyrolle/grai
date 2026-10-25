@@ -21,10 +21,18 @@ export type LocaleProject = {
 	): Promise<Response>;
 	/** `getTextDirection` from the output's `runtime.js`. */
 	getTextDirection(locale?: string): "ltr" | "rtl";
+	/** `localeOfPath` from the output's `runtime.js`: the locale a path names, if it names one. */
+	localeOfPath(pathname: string): string | undefined;
 	/** The name of the project's grai config, which errors name. */
 	configName: string;
-	/** The strategies that read a request beyond its URL: a prerendered page has nothing for them. */
-	requestStrategies: readonly string[];
+	/**
+	 * The strategies that read a request beyond its URL, which a prerendered page has none of: those
+	 * before `url`, which a URL's locale gives way to, and those after it, for a path naming none.
+	 */
+	requestStrategies: {
+		beforeUrl: readonly string[];
+		afterUrl: readonly string[];
+	};
 	/** Each locale's import map, in a build; dev serves every locale from one module. */
 	importMaps?: Readonly<Record<string, ImportMap>> | undefined;
 };
@@ -58,8 +66,10 @@ export function localeMiddleware(
 			const response = await next();
 			const body = documentBody(response);
 			if (body === undefined) return response;
-			if (context.isPrerendered && project.requestStrategies.length > 0) {
-				throw prerendered(project, context.routePattern);
+			if (context.isPrerendered) {
+				const reading = requestRead(project, context.request);
+				if (reading.length > 0)
+					throw prerendered(project, context.routePattern, reading);
 			}
 			return withBody(response, body, {
 				lang: locale,
@@ -94,13 +104,29 @@ function withBody(
 	});
 }
 
-function prerendered(project: LocaleProject, page: string): GraiError {
-	const strategies = project.requestStrategies
+/** The strategies a request's locale would be read from beyond its URL, for its path. */
+function requestRead(
+	{ requestStrategies, localeOfPath }: LocaleProject,
+	request: Request,
+): readonly string[] {
+	const named = localeOfPath(new URL(request.url).pathname) !== undefined;
+	return [
+		...requestStrategies.beforeUrl,
+		...(named ? [] : requestStrategies.afterUrl),
+	];
+}
+
+function prerendered(
+	project: LocaleProject,
+	page: string,
+	strategies: readonly string[],
+): GraiError {
+	const by = strategies
 		.map((strategy) => JSON.stringify(strategy))
 		.join(" and ");
 	return new GraiError(
 		"config-invalid",
 		{ file: project.configName },
-		`the page ${page} is prerendered, but "strategy" finds the locale in the request (by ${strategies}), which a prerendered page does not have: it would show every reader the one locale it was built in. Render the page on demand (export const prerender = false), or find the locale in the URL alone ("strategy": ["url"]).`,
+		`the page ${page} is prerendered, but "strategy" finds its locale in the request (by ${by}), which a prerendered page does not have: it would show every reader the one locale it was built in. Render the page on demand (export const prerender = false), or have its URL name its locale, with "url" first in "strategy".`,
 	);
 }

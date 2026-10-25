@@ -6,7 +6,7 @@ import type { Plugin } from "vite";
 import { disagreements } from "./astro/agreement.ts";
 import type { ImportMap, LocaleProject } from "./astro/middleware.ts";
 import { compile } from "./compile.ts";
-import { type Config, readConfig } from "./config.ts";
+import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import { localeDirectory, messageDirectory } from "./locale-chunks.ts";
 import { grai as graiVite } from "./vite.ts";
@@ -71,7 +71,7 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 				}
 				middleware = middlewareCode(grai, {
 					configName: basename(configFile),
-					requestStrategies: grai.strategy.filter((name) => name !== "url"),
+					requestStrategies: requestStrategies(grai.strategy),
 					importMaps: building
 						? importMaps(grai.locales, chunksUrl(config))
 						: undefined,
@@ -84,15 +84,31 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 /** The project's middleware: grai/astro's, given the output's functions and the configs' facts. */
 function middlewareCode(
 	grai: Config,
-	project: Omit<LocaleProject, "middleware" | "getTextDirection">,
+	project: Omit<
+		LocaleProject,
+		"middleware" | "getTextDirection" | "localeOfPath"
+	>,
 ): string {
 	const output = (file: string) => JSON.stringify(join(grai.outdir, file));
 	return `import { localeMiddleware } from "grai/astro/middleware";
 import { middleware } from ${output("server.js")};
-import { getTextDirection } from ${output("runtime.js")};
+import { getTextDirection, localeOfPath } from ${output("runtime.js")};
 
-export const onRequest = localeMiddleware({ middleware, getTextDirection, ...${JSON.stringify(project)} });
+export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, ...${JSON.stringify(project)} });
 `;
+}
+
+/**
+ * The strategies that read a request beyond its URL: before `url` they outrank the URL's locale,
+ * and after it they find the locale of a path that names none. Without `url`, all come before it.
+ */
+function requestStrategies(
+	strategy: readonly Strategy[],
+): LocaleProject["requestStrategies"] {
+	const url = strategy.indexOf("url");
+	return url === -1
+		? { beforeUrl: strategy, afterUrl: [] }
+		: { beforeUrl: strategy.slice(0, url), afterUrl: strategy.slice(url + 1) };
 }
 
 /** The Vite plugin that serves the project's middleware, once Astro's config is done. */
