@@ -38,7 +38,8 @@ export type FixResult = {
  * (`m[name]`, `m` used whole) in one may reach. The tests that still name a removed key are
  * reported, to change with it. A key that is no key name stays, since the scan finds only names
  * and so cannot tell whether a source writes it (`m["sign-in"]`); check reports it as invalid. It
- * writes every file or none, and none when a catalog would be left without messages.
+ * writes every file or none, and none when a catalog would be left without messages, unless its
+ * locale falls back on another for the words it lacks.
  */
 export async function removeUnusedKeys(
 	configFile: string,
@@ -80,8 +81,11 @@ export async function removeUnusedKeys(
 		.filter(({ keys }) => keys.length > 0)
 		.map(({ place, written, keys }) => ({ place, written, keys }));
 	const removed = new Set(result.removed);
-	const emptied = catalogs.filter(({ messages }) =>
-		[...messages.keys()].every((key) => removed.has(key)),
+	// A locale that falls back takes the words it lacks from another, so its catalog may be empty.
+	const emptied = catalogs.filter(
+		({ locale, messages }) =>
+			!config.fallbacks.has(locale) &&
+			[...messages.keys()].every((key) => removed.has(key)),
 	);
 	if (emptied.length > 0) {
 		return {
