@@ -39,15 +39,17 @@ const isPrefixed = (/** @type {unknown} */ locale) =>
 const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
 
+/** @typedef {"locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid"} GraiErrorCode */
+
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {
 	/** @override */
 	name = "GraiError";
-	/** @type {string} */
+	/** @type {GraiErrorCode} */
 	code;
 
 	/**
-	 * @param {string} code
+	 * @param {GraiErrorCode} code
 	 * @param {string} message
 	 */
 	constructor(code, message) {
