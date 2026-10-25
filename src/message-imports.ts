@@ -65,6 +65,7 @@ const exportedNamespace = new RegExp(
 	"g",
 );
 const keyName = new RegExp(`^${name}$`);
+const otherModule: MessageModule = { type: "other" };
 
 /** The names a namespace goes by in the files: `m`, and each name a file exports it as. */
 export function namespaceNames(texts: Iterable<string>): Set<string> {
@@ -77,16 +78,25 @@ export function namespaceNames(texts: Iterable<string>): Set<string> {
 	return names;
 }
 
-/** A file's import statements, and what they bind of the messages, given the namespace's names. */
+/**
+ * A file's import statements, and what they bind of the messages, given the namespace's names. A
+ * path named keys is taken for keys.js unless `isKeysFile`, for a caller that can tell, says it is
+ * another module.
+ */
 export function messageBindings(
 	text: string,
 	namespaceNames: ReadonlySet<string>,
+	isKeysFile: (specifier: string) => boolean = () => true,
 ): MessageBindings {
 	const statements = [
 		...statementsOf(text, statement),
 		...statementsOf(text, destructuredImport),
 		...statementsOf(text, dynamicImport),
-	];
+	].map((found) =>
+		found.module.type === "keys" && !isKeysFile(found.specifier.text)
+			? { ...found, module: otherModule }
+			: found,
+	);
 	const namespaces = new Set<string>();
 	const keys = new Map<string, string>();
 	const wrappers = new Map<string, MessageModule["type"]>();

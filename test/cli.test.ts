@@ -113,6 +113,37 @@ describe("grai check", () => {
 		expect((await grai(counting.dir, "check")).code).toBe(0);
 	});
 
+	it("takes a name a file declares again for none of grai's, and says it left that file's reads of it unchecked", async () => {
+		const { dir } = project(catalogs);
+		const shadowing = [
+			`import { m } from "../out/messages.js";`,
+			"export const ids = (rows) => rows.map((m) => m.id);",
+			"export function sorted(m) { return m.sortOrder; }",
+			"export const hours = ({ m }) => m.hours;",
+			"{ const m = { createdAt: 1 }; console.log(m.createdAt); }",
+			"try { m.cart_title(); } catch (m) { console.log(m.message); }",
+		].join("\n");
+		writeSources(dir, {
+			"package.json": JSON.stringify({ imports: { "#lib/*": "./src/*" } }),
+			"src/rows.js": `${shadowing}\n`,
+			"src/aliased.js": `import * as t from "../out/keys.js";\nconsole.log(t.cart_titel(), t.cart_title(), t.cart_greeting);\n`,
+			"src/testing/keys.js": "export const deepKeys = 1;\n",
+			"src/uses.js": `import { deepKeys } from "#lib/testing/keys.js";\nconsole.log(deepKeys);\n`,
+		});
+
+		const { code, stdout, stderr } = await grai(dir, "check");
+
+		expect(code).toBe(1);
+		expect(stderr.split("\n")).toEqual([
+			`src/aliased.js:2:15: "cart_titel": t.cart_titel names a key no catalog has. Add it with grai add cart_titel --en "…" --de "…", or fix the name.`,
+			"grai: 1 error",
+			"",
+		]);
+		expect(stdout).toContain(
+			"grai: not checked: src/rows.js declares m again (2:40), so check cannot tell which of its m.key reads are grai's.",
+		);
+	});
+
 	it("names each place a source names a key no catalog has, in Svelte, Vue and JavaScript, with the grai add that adds it", async () => {
 		const { dir } = project(catalogs);
 		const sources = {
@@ -177,7 +208,7 @@ describe("grai check", () => {
 		const json = await grai(dir, "check", "--json");
 		expect([json.code, JSON.parse(json.stdout)]).toEqual([
 			0,
-			{ problems: [], untranslated: { de: ["cart_title"] } },
+			{ problems: [], untranslated: { de: ["cart_title"] }, unchecked: [] },
 		]);
 	});
 });
