@@ -11,6 +11,7 @@
 		"server": "node server.mjs",
 		"interleave": "node interleave.mjs",
 		"workerd": "node workerd.mjs",
+		"middleware": "node middleware.mjs",
 		"ssr": "node ssr.mjs",
 		"hydrate": "node hydrate.mjs",
 		"svelte-texts": "node svelte-texts.mjs",
