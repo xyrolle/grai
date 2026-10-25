@@ -136,12 +136,15 @@ class IcuParser extends IcuPatternReader {
 		return style;
 	}
 
-	/** A choice's options up to its closing `}`, each a key and a message in braces. */
+	/** A choice's options up to its closing `}`: each key, once, and its message in braces. */
 	private options(name: string, kind: ChoiceKind): IcuOption[] {
 		const options: IcuOption[] = [];
 		let key = this.key(name, kind);
 		if (kind !== "select" && key === "offset") throw this.offset(name, kind);
 		while (key !== "") {
+			if (options.some((option) => option.key === key)) {
+				throw invalid(`{${name}, ${kind}} lists the key ${key} twice.`);
+			}
 			if (!this.take("{")) {
 				throw invalid(
 					`the key ${key} of {${name}, ${kind}} must be followed by its message in braces, and a key holds no space, punctuation or symbol.`,

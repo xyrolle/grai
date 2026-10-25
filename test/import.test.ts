@@ -685,6 +685,7 @@ describe("grai import --from icu", () => {
 					huge: "{n, plural, =9007199254740993 {one} other {other}}",
 					unstyled: "{n, number,}",
 					quoted: "{n, number, 'x}",
+					twice: "{n, plural, few {a} few {b} other {c}}",
 				},
 			},
 			["en"],
@@ -700,6 +701,7 @@ describe("grai import --from icu", () => {
 			"huge: it is not a valid ICU message: an = in {n, plural} must be followed by a whole number that JavaScript holds exactly, as in =0.",
 			"unstyled: it is not a valid ICU message: {n, number,} must name a style after its comma, or have no comma.",
 			"quoted: it is not a valid ICU message: the style of {n, number} has a ' that no other ' closes.",
+			"twice: it is not a valid ICU message: {n, plural} lists the key few twice.",
 		]);
 	});
 });
