@@ -181,16 +181,19 @@ describe("a recompile after an edit", () => {
 				match: { "n=one": "{n} one", "n=*": "{n}" },
 			},
 		];
-		const plurals = () => readFileSync(join(dir, "out", "plurals.js"), "utf8");
+		const plurals = async () =>
+			readFileSync(await outputFile(dir, "plurals.js"), "utf8");
 		write(rounded, rounded);
 		const selecting = await recompile(config, first.build);
-		const digits = plurals();
+		const digits = await plurals();
 		write("Hello {name}", "Hallo {name}");
 		await recompile(config, selecting.build);
 
-		expect(selecting.result.written).toContain("plurals.js");
+		expect(selecting.result.written.map(withoutContentHash)).toContain(
+			"plurals.js",
+		);
 		expect(digits).toContain("const countOperands = ");
-		expect(plurals()).not.toContain("countOperands");
+		expect(await plurals()).not.toContain("countOperands");
 	});
 
 	it("starts again from the last good build after a compile that failed", async () => {
