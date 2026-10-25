@@ -9,6 +9,7 @@
 	"scripts": {
 		"browsers": "playwright-core install chromium webkit",
 		"server": "node server.mjs",
+		"client": "node client.mjs",
 		"interleave": "node interleave.mjs",
 		"workerd": "node workerd.mjs",
 		"middleware": "node middleware.mjs",
