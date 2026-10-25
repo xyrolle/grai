@@ -57,7 +57,9 @@ Done when: each compiles, with a test, and the design lists it among the constru
 
 MessageFormat 2 lets a local be made from another, as in `local a = n: number` then `local b = a: integer`, and its functions compose: `b` takes `a`'s value and options, then its own. grai refuses such a local with an error naming both, and its message says to make it from the input instead.
 
-Done when: a plural, formatted or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
+`:offset` is one such function: its value keeps its operand's options, so `local o = n: offset subtract=1` after `local n = count: number select=ordinal` selects by the ordinal rules and shows the digits `n` shows. grai's `:offset` reads an input only, so it always selects by the cardinal rules and shows `:number`'s default, which is its own restriction, not MessageFormat 2's default.
+
+Done when: a plural, formatted, `:offset` or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
 
 ## Bind the locale in Next's server actions and route handlers
 
