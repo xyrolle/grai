@@ -79,6 +79,19 @@ describe("grai import --from i18next", () => {
 		).toBe("Привет, Ana, <b>!");
 	});
 
+	it("imports a key named __proto__ as any other", async () => {
+		const key = "__proto__";
+		const { result, catalog, load } = imported("i18next", {
+			"en.json": JSON.parse(`{"${key}": "Prototype"}`),
+			"ru.json": JSON.parse(`{"${key}": "Прототип"}`),
+		});
+		const m = await load();
+
+		expect(result).toMatchObject({ keys: 1, errors: [] });
+		expect(Object.hasOwn(catalog("en"), key)).toBe(true);
+		expect(m[key]?.({}, { locale: "ru" })).toBe("Прототип");
+	});
+
 	it("turns plural suffixes into one message that chooses on count, _zero as an exact 0", async () => {
 		const project = imported("i18next", {
 			"en.json": {

@@ -5,8 +5,11 @@ import type { KeyedMessage, MessagesByLocale } from "./convert.ts";
 import { type CatalogValue, catalogValue } from "./converted.ts";
 import { type ImportReport, type LocaleDetail, noticesOf } from "./report.ts";
 
-/** A grai catalog: its schema, then each key's message. */
-export type Catalog = Record<string, CatalogValue>;
+/**
+ * A grai catalog: its schema, then each key's message, in order. A map, so that a key such as
+ * `__proto__` is an entry like any other.
+ */
+export type Catalog = Map<string, CatalogValue>;
 
 /** A locale's new catalog, and the file it goes to. */
 export type CatalogFile = { locale: string; path: string; catalog: Catalog };
@@ -32,7 +35,7 @@ export function catalogsOf(
 		files: [...config.catalogs].map(([locale, path]) => ({
 			locale,
 			path,
-			catalog: { $schema: schema },
+			catalog: new Map([["$schema", schema]]),
 		})),
 		keys: 0,
 		leftOut: [],
@@ -43,7 +46,7 @@ export function catalogsOf(
 		if (values === undefined) continue;
 		for (const { locale, catalog } of imported.files) {
 			const value = values.get(locale);
-			if (value !== undefined) catalog[key] = value;
+			if (value !== undefined) catalog.set(key, value);
 		}
 		imported.keys++;
 	}
