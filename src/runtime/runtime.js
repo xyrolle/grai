@@ -4,6 +4,7 @@ import {
 	baseLocale,
 	cookieName,
 	directions,
+	localePrefix,
 	locales,
 	strategy,
 } from "./config.js";
@@ -12,6 +13,9 @@ export { baseLocale, cookieName, locales };
 
 /** Whether a URL names its locale: only under the `url` strategy, else every path is the app's own. */
 const urlsNameLocales = strategy.includes("url");
+/** Whether a locale has a prefix: every one's with `localePrefix: "always"`, else all but the base's. */
+const prefixed = (/** @type {string} */ locale) =>
+	localePrefix === "always" || locale !== baseLocale;
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export class GraiError extends Error {
@@ -115,7 +119,7 @@ export function setLocale(locale, options) {
 
 /**
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {value is string}
  */
 export function isLocale(value) {
 	return typeof value === "string" && locales.includes(value);
@@ -151,8 +155,9 @@ export function getTextDirection(locale) {
 }
 
 /**
- * The locale a URL names: its first path segment when that is a locale other than the base
- * locale, which has no prefix. Without the `url` strategy no URL names one: the base locale.
+ * The locale a URL names: its first path segment when that is a locale's prefix, else the base
+ * locale, whose paths have no prefix unless every locale's do. Without the `url` strategy no URL
+ * names one: the base locale.
  *
  * @param {string | URL} url
  * @returns {string}
@@ -160,9 +165,7 @@ export function getTextDirection(locale) {
 export function extractLocaleFromUrl(url) {
 	if (!urlsNameLocales) return baseLocale;
 	const first = new URL(url).pathname.split("/")[1];
-	return first !== undefined && first !== baseLocale && isLocale(first)
-		? first
-		: baseLocale;
+	return isLocale(first) && prefixed(first) ? first : baseLocale;
 }
 
 /**
@@ -174,7 +177,7 @@ export function extractLocaleFromUrl(url) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (urlsNameLocales && first !== baseLocale && isLocale(first)) {
+	if (urlsNameLocales && isLocale(first) && prefixed(first)) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -191,7 +194,7 @@ export function deLocalizeUrl(url) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
-	if (urlsNameLocales && locale !== baseLocale) {
+	if (urlsNameLocales && prefixed(locale)) {
 		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
 		// redirect to drop it.
 		const path = copy.pathname === "/" ? "" : copy.pathname;
