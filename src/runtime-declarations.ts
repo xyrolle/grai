@@ -1,4 +1,4 @@
-import type { Config } from "./config.ts";
+import type { Config, LocaleSwitch } from "./config.ts";
 
 /** runtime.d.ts: the runtime's API, typed with the project's locales. */
 export function runtimeDeclarations(config: Config): string {
@@ -15,12 +15,7 @@ export declare function isLocale(value: unknown): value is Locale;
 export declare function assertIsLocale(value: unknown): Locale;
 /** The locale messages render in: the request's on the server, the page's in a browser. */
 export declare function getLocale(): Locale;
-/**
- * Sets the locale: for the rest of the request on the server, for the process in a script. In a
- * browser it sets \`<html lang>\` and \`dir\`, keeps the locale in the cookie or the URL and
- * reloads, unless \`{ reload: false }\`.
- */
-export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;
+${setLocaleDeclaration(config.switch)}
 /** The direction a locale's script is written in, the bound locale's by default. */
 export declare function getTextDirection(locale?: Locale): "ltr" | "rtl";
 /** The locale a URL's first path segment names under the \`url\` strategy, else the base locale. */
@@ -109,6 +104,27 @@ export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateT
 // A declaration file without an export list exports every name it declares, Call included.
 export {};
 `;
+}
+
+/**
+ * setLocale's declaration, by how the project's pages change locale: under "reload" a page keeps
+ * its words until it loads again, and under "live" it switches in place, once the locale's
+ * message chunks are in.
+ */
+function setLocaleDeclaration(localeSwitch: LocaleSwitch): string {
+	return localeSwitch === "live"
+		? `/**
+ * Sets the locale: for the rest of the request on the server, for the process in a script. In a
+ * browser it keeps the locale in the cookie or the URL and reloads, or with \`{ reload: false }\`
+ * switches the page in place, resolving once the locale's message chunks are in.
+ */
+export declare function setLocale(locale: Locale, options?: { reload?: boolean }): Promise<void>;`
+		: `/**
+ * Sets the locale: for the rest of the request on the server, for the process in a script. In a
+ * browser it keeps the locale in the cookie or the URL and reloads, or with \`{ reload: false }\`
+ * only keeps it, for the page's next load: the page keeps its words.
+ */
+export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;`;
 }
 
 /** server.d.ts: the middleware, typed with the project's locales. */
