@@ -474,6 +474,16 @@ describe("grai import --from icu", () => {
 		expect(m.alone?.()).toBe("a <br/> b");
 	});
 
+	it("reads a } outside every argument and tag as text, as intl-messageformat does", async () => {
+		const m = await imported(
+			"icu",
+			{ "en.json": { brace: "a } b {n, plural, other {x}}}" } },
+			["en"],
+		).load();
+
+		expect(m.brace?.({ n: 1 })).toBe("a } b x}");
+	});
+
 	it("formats # and number, date and time arguments as intl-messageformat does", async () => {
 		const { result, load } = imported(
 			"icu",
@@ -626,6 +636,7 @@ describe("grai import --from icu", () => {
 					unopened: "a</b>",
 					crossed: "<b>{n, plural, other {</b>}}</b>",
 					spelled: "{n, spellout}",
+					tagged: "<b>}</b>",
 				},
 			},
 			["en"],
@@ -646,6 +657,7 @@ describe("grai import --from icu", () => {
 			"unopened: it is not a valid ICU message: the </ at 1 closes no tag.",
 			"crossed: it is not a valid ICU message: the option other of {n} must be closed by }.",
 			"spelled: it is not a valid ICU message: {n, spellout} names no type intl-messageformat reads: number, date, time, plural, selectordinal or select.",
+			"tagged: it is not a valid ICU message: the tag <b> must be closed by </b>.",
 		]);
 	});
 });
