@@ -90,6 +90,24 @@ vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing 
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
 
+## Import ICU names that are not JavaScript identifiers
+
+`grai import` leaves out an ICU message whose argument is named `{0}` or `{имя}`, which intl-messageformat takes, since a grai input is a JavaScript identifier.
+
+Done when: such an argument imports under an identifier, `grai.import.json` maps the source's name to it for `grai migrate`, and the import fuzz generates such names.
+
+## Import an ICU ordinal's offset
+
+`grai import` leaves out `{n, selectordinal, offset:1 …}`, which chooses by the ordinal category of the count less the offset.
+
+Done when: it converts, a test checks it against intl-messageformat, and the import fuzz's ordinals with offsets render the same.
+
+## Import i18next's formats a project adds, and `$t()` with options
+
+`grai import` leaves out a format i18next does not build in, such as `{{value, uppercase}}`, which a project adds or i18next shows unformatted, and `$t(key, { … })` or `$t(key, format)`, which passes options or a format to the nested message.
+
+Done when: the import can map a project's format to a grai function, `$t()` with options nests the message with those inputs, and `bench/import-equivalence.mjs` covers both.
+
 ## Localized pathnames
 
 The `url` strategy prefixes a path with its locale and leaves the path as it is. A site that translates its paths (`/about` and `/de/ueber-uns`) for search engines cannot say so.
