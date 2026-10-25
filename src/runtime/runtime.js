@@ -6,11 +6,14 @@ import {
 	customPrefixes,
 	directions,
 	leavesPathsAlone,
+	localePath,
 	locales,
 	prefixes,
 	prefixesEveryLocale,
 	readsUrl,
+	routePath,
 	strategy,
+	translatesPaths,
 	unlocalizedPaths,
 } from "./config.js";
 
@@ -202,7 +205,9 @@ export function localeOfPath(pathname) {
 }
 
 /**
- * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is.
+ * A URL as the app's route: without its locale prefix, and in the route's words where the config
+ * translates its path (`/de/ueber-uns` is `/about`). Without the `url` strategy a URL has neither,
+ * and stays as it is.
  *
  * @param {string | URL} url
  * @returns {URL}
@@ -210,15 +215,21 @@ export function localeOfPath(pathname) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (readsUrl && localeOfPrefix(first) !== undefined) {
-		copy.pathname = `/${rest.join("/")}`;
+	const prefix = readsUrl ? localeOfPrefix(first) : undefined;
+	if (prefix !== undefined) copy.pathname = `/${rest.join("/")}`;
+	const locale = prefix ?? (prefixesEveryLocale ? undefined : baseLocale);
+	if (translatesPaths && readsUrl && locale !== undefined) {
+		const route = routePath(copy.pathname, locales.indexOf(locale));
+		// Setting a URL's path serializes it again, so a path that stays is not set.
+		if (route !== copy.pathname) copy.pathname = route;
 	}
 	return copy;
 }
 
 /**
- * A URL with a locale's prefix: the current locale's, unless `options.locale` names another.
- * Without the `url` strategy no URL takes one, and it stays as it is.
+ * A URL with a locale's prefix, in its words where the config translates the path: the current
+ * locale's, unless `options.locale` names another. Without the `url` strategy no URL takes one,
+ * and it stays as it is.
  *
  * @param {string | URL} url
  * @param {{ locale?: string }} [options]
@@ -227,11 +238,14 @@ export function deLocalizeUrl(url) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
-	if (
-		readsUrl &&
-		(prefixesEveryLocale || locale !== baseLocale) &&
-		!(leavesPathsAlone && leftAlone(copy.pathname))
-	) {
+	if (!readsUrl || (leavesPathsAlone && leftAlone(copy.pathname))) {
+		return copy;
+	}
+	if (translatesPaths) {
+		const words = localePath(copy.pathname, locales.indexOf(locale));
+		if (words !== copy.pathname) copy.pathname = words;
+	}
+	if (prefixesEveryLocale || locale !== baseLocale) {
 		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
 		// redirect to drop it.
 		const path = copy.pathname === "/" ? "" : copy.pathname;

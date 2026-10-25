@@ -453,6 +453,37 @@ it("reads and writes a locale's own prefix, where the config gives one", async (
 	]);
 });
 
+it("links to a page in its locale's words, and reads them back as the app's route", async () => {
+	const { runtime } = await output({
+		strategy: ["url"],
+		pathnames: {
+			"/about": { de: "/ueber-uns", ar: "/عن" },
+			"/products/[id]": { de: "/produkte/[id]" },
+		},
+	});
+	const routeOf = (url: string) => runtime.deLocalizeUrl(url).pathname;
+
+	expect([
+		runtime.localizeHref("/about", { locale: "de" }),
+		runtime.localizeHref("/products/7?view=all", { locale: "de" }),
+		runtime.localizeHref("/cart", { locale: "de" }),
+		runtime.localizeHref("/de/ueber-uns", { locale: "ar" }),
+		runtime.localizeHref("/de/produkte/7", { locale: "en" }),
+		routeOf("https://shop.test/de/produkte/7"),
+		routeOf("https://shop.test/ar/%D8%B9%D9%86"),
+		routeOf("https://shop.test/de/cart"),
+	]).toEqual([
+		"/de/ueber-uns",
+		"/de/produkte/7?view=all",
+		"/de/cart",
+		"/ar/%D8%B9%D9%86",
+		"/products/7",
+		"/products/7",
+		"/about",
+		"/cart",
+	]);
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies and its reloads. */
 	function page(lang: string) {

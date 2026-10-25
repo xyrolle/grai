@@ -40,6 +40,10 @@ const runtime = {
 		"utf8",
 	),
 	server: readFileSync(new URL("./runtime/server.js", import.meta.url), "utf8"),
+	pathnames: readFileSync(
+		new URL("./runtime/pathnames.js", import.meta.url),
+		"utf8",
+	),
 };
 
 /**

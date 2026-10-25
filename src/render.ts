@@ -9,6 +9,7 @@ import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
 import { formatModule } from "./formatters.ts";
 import { globPattern } from "./globs.ts";
 import type { RuntimeFunction } from "./modules.ts";
+import { pathnamesModule } from "./pathnames.ts";
 import { pluralModule } from "./plurals.ts";
 
 /** The output's files, level by level: a file imports only files of earlier levels. */
@@ -31,7 +32,7 @@ const keysPerShard = 512;
  */
 export function renderOutput(
 	config: Config,
-	runtime: { runtime: string; server: string },
+	runtime: { runtime: string; server: string; pathnames: string },
 	compilation: Compilation,
 	base: BaseCatalog,
 	previous?: Rendered,
@@ -72,7 +73,11 @@ export function renderOutput(
 	const keysIndex = modules
 		.map(([file]) => `export * from "./${file}";\n`)
 		.join("");
+	const translatesPaths = config.urlRouting.pathnames.length > 0;
 	const output: Output = [
+		...(translatesPaths
+			? [[["pathnames.js", runtime.pathnames] as const]]
+			: []),
 		[
 			["config.js", configModule(config)],
 			["runtime.d.ts", runtimeDeclarations(config)],
@@ -217,6 +222,7 @@ function configModule(config: Config): string {
 		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,
 		"/** @type {readonly RegExp[]} */",
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
+		...pathnamesModule(config.urlRouting.pathnames),
 		"",
 	].join("\n");
 }
@@ -246,7 +252,8 @@ function directionOf(locale: string): "ltr" | "rtl" {
  * page carries the code of only the options its config uses.
  */
 function routingConstants(config: Config): string[] {
-	const { localePrefix, prefixes, unlocalizedPaths } = config.urlRouting;
+	const { localePrefix, prefixes, unlocalizedPaths, pathnames } =
+		config.urlRouting;
 	const constants = {
 		readsUrl: config.strategy.includes("url"),
 		prefixesEveryLocale: localePrefix === "always",
@@ -254,6 +261,7 @@ function routingConstants(config: Config): string[] {
 			(prefix, index) => prefix !== config.locales[index],
 		),
 		leavesPathsAlone: unlocalizedPaths.length > 0,
+		translatesPaths: pathnames.length > 0,
 	};
 	return Object.entries(constants).map(
 		([name, value]) => `export const ${name} = ${value};`,

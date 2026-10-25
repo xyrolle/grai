@@ -22,7 +22,13 @@ export declare const prefixesEveryLocale: boolean;
 export declare const customPrefixes: boolean;
 /** Whether the config names paths the `url` strategy leaves alone: `unlocalizedPaths`. */
 export declare const leavesPathsAlone: boolean;
+/** Whether the config translates paths into each locale's words: `pathnames`. */
+export declare const translatesPaths: boolean;
 /** Each locale's prefix in the `url` strategy's paths, in `locales` order. */
 export declare const prefixes: readonly string[];
+/** A path in a locale's words, by its position in `locales`, as the app's route: `/ueber-uns` as `/about`. */
+export declare function routePath(pathname: string, locale: number): string;
+/** A route in a locale's words, by its position in `locales`: `/about` as `/ueber-uns`. */
+export declare function localePath(pathname: string, locale: number): string;
 /** The paths the `url` strategy leaves alone, as regular expressions of a URL's path. */
 export declare const unlocalizedPaths: readonly RegExp[];

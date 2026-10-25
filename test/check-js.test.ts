@@ -60,6 +60,13 @@ it.each([
 		"cookie and URL strategies",
 		{ strategy: ["cookie", "url"], cookieName: "lang" },
 	],
+	[
+		"paths translated per locale",
+		{
+			strategy: ["url"],
+			pathnames: { "/products/[id]": { ar: "/muntajat/[id]" } },
+		},
+	],
 ])(
 	"writes JavaScript that an app's strict checkJs takes, unused locals checked, with %s",
 	async (_, config) => {
