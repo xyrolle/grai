@@ -2,6 +2,7 @@ import {
 	type MessageBindings,
 	messageBindings,
 	namespaceNames,
+	readsNamespace,
 	statementAt,
 } from "./message-imports.ts";
 import {
@@ -96,7 +97,10 @@ function isNamespaceIndex(
 	return isNamespaceAt(text, before(text, access), bindings);
 }
 
-/** Whether the name that ends at `end` is a namespace binding, and not a property of something else. */
+/**
+ * Whether the name that ends at `end` is the namespace: a binding of it, or its property of a
+ * namespace import of messages.js, and not a property of something else.
+ */
 function isNamespaceAt(
 	text: string,
 	end: number,
@@ -104,7 +108,7 @@ function isNamespaceAt(
 ): boolean {
 	const name = nameEndingAt(text, end);
 	const start = end - name.length + 1;
-	return bindings.namespaces.has(name) && text[before(text, start)] !== ".";
+	return readsNamespace(text, start, name, bindings, true);
 }
 
 /** Characters around a reference to a binding, which no string or object key has around it. */

@@ -1,3 +1,5 @@
+import { before, nameEndingAt } from "./sources.ts";
+
 /** A module of the output, by its import path: `messages.js` (`m`), `keys.js`, one key's path, or another. */
 type MessageModule =
 	| { type: "messages" | "keys" | "other" }
@@ -28,6 +30,13 @@ export type MessageBindings = {
 	keys: ReadonlyMap<string, string>;
 	/** The lists of `export { … }` without a path, whose names are re-exported, not read. */
 	reexports: readonly { start: number; end: number }[];
+	/**
+	 * Local names of `import * as name` of another module than keys.js, by its kind: `name.m` is the
+	 * namespace when the module is messages.js, and may be, through the app's own module, otherwise.
+	 */
+	wrappers: ReadonlyMap<string, MessageModule["type"]>;
+	/** The names the namespace goes by in the project, which may follow a wrapper's name. */
+	namespaceNames: ReadonlySet<string>;
 };
 
 const name = "[A-Za-z_$][\\w$]*";
@@ -80,10 +89,13 @@ export function messageBindings(
 	];
 	const namespaces = new Set<string>();
 	const keys = new Map<string, string>();
+	const wrappers = new Map<string, MessageModule["type"]>();
 	for (const { binds, module, names, namespace } of statements) {
 		if (!binds) continue;
 		if (namespace !== undefined && module.type === "keys") {
 			namespaces.add(namespace);
+		} else if (namespace !== undefined) {
+			wrappers.set(namespace, module.type);
 		}
 		for (const { imported, local } of names) {
 			if (namespaceNames.has(imported)) namespaces.add(local);
@@ -97,7 +109,26 @@ export function messageBindings(
 		start: match.index,
 		end: match.index + match[0].length,
 	}));
-	return { statements, namespaces, keys, reexports };
+	return { statements, namespaces, keys, reexports, wrappers, namespaceNames };
+}
+
+/**
+ * Whether a namespace's name at `at` reads the namespace: as the file's own binding of it, or as a
+ * property of a wrapper, `messages.m`. A wrapper of the app's own module may hold some other `m`,
+ * so only a `certain` caller, which changes what it finds, leaves those out.
+ */
+export function readsNamespace(
+	text: string,
+	at: number,
+	name: string,
+	bindings: MessageBindings,
+	certain: boolean,
+): boolean {
+	const dot = before(text, at);
+	if (text[dot] !== ".") return bindings.namespaces.has(name);
+	const wrapper = bindings.wrappers.get(nameEndingAt(text, before(text, dot)));
+	if (!bindings.namespaceNames.has(name)) return false;
+	return wrapper === "messages" || (!certain && wrapper !== undefined);
 }
 
 /** The statement, if any, an offset lies in. */
