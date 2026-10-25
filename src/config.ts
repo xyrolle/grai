@@ -38,6 +38,8 @@ export type Config = {
 	cookie: Cookie | undefined;
 	/** The key in `localStorage` the `localStorage` strategy reads and `setLocale` writes, if it has it. */
 	localStorageKey: string | undefined;
+	/** The URL's query parameter the `query` strategy reads and `setLocale` names the locale in, if it has it. */
+	queryParameter: string | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
 	/** Which locales' paths the `url` strategy prefixes, each one's prefix, and the paths it leaves alone. */
@@ -64,13 +66,19 @@ export type LocaleSwitch = "reload" | "live";
  * A place a request or a page can name its locale in. `localStorage` is the page's alone, which a
  * request does not carry.
  */
-export type Strategy = "cookie" | "localStorage" | "preferredLanguage" | "url";
+export type Strategy =
+	| "cookie"
+	| "localStorage"
+	| "preferredLanguage"
+	| "query"
+	| "url";
 
 /** The strategies, in the order the docs and config.schema.json list them. */
 export const strategies: ReadonlySet<string> = new Set([
 	"cookie",
 	"localStorage",
 	"preferredLanguage",
+	"query",
 	"url",
 ]);
 
@@ -83,6 +91,7 @@ export const configFields: ReadonlySet<string> = new Set([
 	"strategy",
 	...cookieFields,
 	"localStorageKey",
+	"queryParameter",
 	"switch",
 	...urlRoutingFields,
 	"tests",
@@ -162,7 +171,7 @@ export function readConfig(file: string): Config {
 	}
 	if (!isStrategy(strategy)) {
 		throw invalid(
-			'"strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage" or "url"',
+			'"strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query" or "url"',
 		);
 	}
 	const urlRouting = readUrlRouting(raw, strategy, locales, invalid);
@@ -171,6 +180,16 @@ export function readConfig(file: string): Config {
 		raw,
 		strategy.includes("localStorage"),
 		{ field: "localStorageKey", source: "localStorage", place: "the key" },
+		invalid,
+	);
+	const queryParameter = readPlaceName(
+		raw,
+		strategy.includes("query"),
+		{
+			field: "queryParameter",
+			source: "query",
+			place: "the URL's query parameter",
+		},
 		invalid,
 	);
 	if (localeSwitch !== "reload" && localeSwitch !== "live") {
@@ -235,6 +254,7 @@ export function readConfig(file: string): Config {
 		strategy,
 		cookie,
 		localStorageKey,
+		queryParameter,
 		switch: localeSwitch,
 		urlRouting,
 		tests,

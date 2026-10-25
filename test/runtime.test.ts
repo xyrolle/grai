@@ -220,6 +220,27 @@ describe("the middleware", () => {
 		).toEqual(["de", "Ihr Warenkorb"]);
 	});
 
+	it("reads the locale a query parameter names, matched as a preferred language is", async () => {
+		const { m, middleware } = await output({
+			strategy: ["query", "cookie"],
+			queryParameter: "lng",
+			cookieName: "lang",
+		});
+		const cookie = { cookie: "lang=ar" };
+
+		expect(
+			await Promise.all([
+				localeOf(m, middleware, "/?lng=de-AT", cookie),
+				localeOf(m, middleware, "/?lng=fr", cookie),
+				localeOf(m, middleware, "/", cookie),
+			]),
+		).toEqual([
+			["de", "Ihr Warenkorb"],
+			["ar", "سلتك"],
+			["ar", "سلتك"],
+		]);
+	});
+
 	it("keeps each request's locale while requests interleave", async () => {
 		const rendered = await interleaved(await output(config), [
 			{ cookie: "lang=de" },
@@ -274,6 +295,7 @@ describe("the response's Vary", () => {
 			strategy,
 			...(strategy.includes("cookie") ? { cookieName: "lang" } : {}),
 			...(strategy.includes("localStorage") ? { localStorageKey: "lang" } : {}),
+			...(strategy.includes("query") ? { queryParameter: "lng" } : {}),
 		});
 		return (
 			await middleware(new Request("https://shop.test/cart"), response)
@@ -291,6 +313,7 @@ describe("the response's Vary", () => {
 		[["preferredLanguage", "url"], "Accept-Language"],
 		[["cookie", "preferredLanguage", "url"], "Cookie, Accept-Language"],
 		[["localStorage", "preferredLanguage"], "Accept-Language"],
+		[["query", "cookie"], "Cookie"],
 	])("with the strategy %j, lists %j", async (strategy, vary) => {
 		expect(await varyOf(strategy)).toBe(vary);
 	});
@@ -633,6 +656,18 @@ document.body.textContent = before + " | " + seen();
 		expect(await tab.textContent("body")).toBe(
 			"de ltr de Ihr Warenkorb | ar rtl ar سلتك",
 		);
+	});
+
+	it("names the new locale in the URL's query parameter with the query strategy", async () => {
+		const visited = page("de");
+		const { runtime } = await output({
+			strategy: ["query"],
+			queryParameter: "lng",
+		});
+		runtime.setLocale("ar");
+
+		expect(visited.href).toBe("https://shop.test/de/cart?step=2&lng=ar");
+		expect(visited.reloads).toBe(0);
 	});
 
 	it("goes to the new locale's URL with the url strategy", async () => {

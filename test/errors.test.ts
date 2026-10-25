@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -124,13 +124,19 @@ describe("the config", () => {
 		const catalogs = { en: { title: "Title" } };
 
 		expect(await errorsOf(catalogs, { strategy: ["header"] })).toEqual([
-			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage" or "url".',
+			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query" or "url".',
 		]);
 		expect(await errorsOf(catalogs, { strategy: ["localStorage"] })).toEqual([
 			'config-invalid: grai.config.json: "localStorageKey" must name the key the "localStorage" strategy reads.',
 		]);
 		expect(await errorsOf(catalogs, { localStorageKey: "locale" })).toEqual([
 			'config-invalid: grai.config.json: "localStorageKey" is read only by the "localStorage" strategy, which "strategy" does not list.',
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["query"] })).toEqual([
+			'config-invalid: grai.config.json: "queryParameter" must name the URL\'s query parameter the "query" strategy reads.',
+		]);
+		expect(await errorsOf(catalogs, { queryParameter: "lng" })).toEqual([
+			'config-invalid: grai.config.json: "queryParameter" is read only by the "query" strategy, which "strategy" does not list.',
 		]);
 		expect(await errorsOf(catalogs, { strategy: ["cookie"] })).toEqual([
 			'config-invalid: grai.config.json: "cookieName" must name the cookie the "cookie" strategy reads.',

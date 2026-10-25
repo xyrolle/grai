@@ -11,6 +11,7 @@ export declare const strategy: readonly (
 	| "cookie"
 	| "localStorage"
 	| "preferredLanguage"
+	| "query"
 	| "url"
 )[];
 /** The direction each locale's script is written in, in `locales` order. */
@@ -23,6 +24,8 @@ export declare const cookieAttributes: string;
 export declare const cookieSecure: "always" | "https";
 /** The key in `localStorage` the `localStorage` strategy reads and `setLocale` writes, if it has it. */
 export declare const localStorageKey: string | undefined;
+/** The URL's query parameter the `query` strategy reads and `setLocale` names the locale in, if it has it. */
+export declare const queryParameter: string | undefined;
 /** Whether the strategy lists `url`. */
 export declare const readsUrl: boolean;
 /** Whether every locale's paths have a prefix, the base locale's too: `localePrefix: "always"`. */
