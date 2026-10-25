@@ -1,11 +1,13 @@
 /**
  * Why a rename cannot change a key's uses safely, each an error naming the place: a source names
- * the key where it may mean something else.
+ * the key where it may mean something else, or a read by a computed name may reach it.
  */
 
 import type { FileUses } from "./call-sites.ts";
+import { dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
-import { occurrencesOf, positionOf } from "./sources.ts";
+import { messageBindings, namespaceNames } from "./message-imports.ts";
+import { occurrencesOf, positionOf, type SourceFile } from "./sources.ts";
 
 /** A file's places the rename cannot change safely: mentions, and a binding the new name would shadow. */
 export function siteProblems(
@@ -34,4 +36,32 @@ export function siteProblems(
 		);
 	}
 	return problems;
+}
+
+/** An error for each read by a computed name in the files that may reach the key. */
+export function reachProblems(
+	files: readonly SourceFile[],
+	from: string,
+): GraiError[] {
+	const namespaces = namespaceNames(files.map(({ text }) => text));
+	return files.flatMap((source) =>
+		dynamicReadsIn(source.text, messageBindings(source.text, namespaces))
+			.filter(({ prefix }) => from.startsWith(prefix))
+			.map(({ at, written }) =>
+				placed(
+					source,
+					at,
+					`${written} may read "${from}", so the rename cannot change every read of it. Read it as m.${from}, or rename it by hand.`,
+				),
+			),
+	);
+}
+
+function placed(source: SourceFile, at: number, detail: string): GraiError {
+	const { line, column } = positionOf(source.text, at);
+	return new GraiError(
+		"call-site-ambiguous",
+		{ file: `${source.file}:${line}:${column}` },
+		detail,
+	);
 }

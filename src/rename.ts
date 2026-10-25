@@ -15,7 +15,7 @@ import {
 import { withListedKeysChanged } from "./config-file.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
-import { siteProblems } from "./rename-checks.ts";
+import { reachProblems, siteProblems } from "./rename-checks.ts";
 import { sourceFiles } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
@@ -47,7 +47,10 @@ export async function rename(
 	if (named.length > 0) return unchanged(named);
 	const files = sourceFiles(roots ?? [config.root], config.root, config.outdir);
 	const sites = usesIn(files, from);
-	const problems = sites.flatMap((site) => siteProblems(site, from, to));
+	const problems = [
+		...sites.flatMap((site) => siteProblems(site, from, to)),
+		...reachProblems(files, from),
+	];
 	if (problems.length > 0) return unchanged(sortErrors(problems));
 	const texts = new Map<string, string>();
 	for (const [index, { file, bytes }] of read.sources.entries()) {
