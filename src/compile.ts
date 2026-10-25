@@ -9,6 +9,7 @@ import {
 	parseEditedCatalog,
 	readCatalogSources,
 } from "./catalog.ts";
+import { hasObjects } from "./catalog-keys.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
 import { type Config, readConfig } from "./config.ts";
 import { keyPositions, type Position } from "./declaration-maps.ts";
@@ -152,6 +153,7 @@ async function build(
 			? keyPositions(
 					sources[baseIndex]?.bytes.toString("utf8") ?? "",
 					catalogs[baseIndex]?.messages.keys(),
+					hasObjects(catalogs[baseIndex]?.paths.values() ?? []),
 				)
 			: previous.positions;
 	const { output, rendered } = renderOutput(

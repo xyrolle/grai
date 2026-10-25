@@ -4,6 +4,8 @@
  */
 
 import { join, relative } from "node:path";
+import { messageEntries } from "./catalog-entries.ts";
+import { keyOf } from "./catalog-keys.ts";
 
 /** Where something starts in a text: its line and its column, both from 0. */
 export type Position = readonly [line: number, column: number];
@@ -69,9 +71,10 @@ function sameLines(
 }
 
 /**
- * Where each top-level key of a catalog starts, at the first character of its name. A catalog laid
- * out one entry per line has each key at the start of a line, after the first key's indent; in a
- * catalog on one line, each key is found where its name is first written.
+ * Where each key of a catalog starts, at the first character of its name. A catalog laid out one
+ * entry per line has each top-level key at the start of a line, after the first key's indent; in a
+ * catalog on one line, each key is found where its name is first written. A key in an object of
+ * messages, when `nested` says the catalog has one, is found by the scan of its entries.
  *
  * `keys` are the catalog's keys as its parse holds them, mostly in the file's order. A key found
  * where the next of them is expected is stored under the parse's string, not a slice of the text:
@@ -81,6 +84,20 @@ function sameLines(
 export function keyPositions(
 	text: string,
 	keys: Iterable<string> = [],
+	nested = false,
+): Map<string, Position> {
+	const positions = topLevelPositions(text, keys);
+	if (nested) {
+		for (const [key, position] of nestedPositions(text)) {
+			positions.set(key, position);
+		}
+	}
+	return positions;
+}
+
+function topLevelPositions(
+	text: string,
+	keys: Iterable<string>,
 ): Map<string, Position> {
 	const positions = new Map<string, Position>();
 	const indent = /^\{\r?\n([ \t]*)"/.exec(text)?.[1];
@@ -119,6 +136,28 @@ export function keyPositions(
 }
 
 const quote = 34;
+
+/** Where the name of each key in an object of messages starts, from one pass over the text. */
+function nestedPositions(text: string): Map<string, Position> {
+	const positions = new Map<string, Position>();
+	let line = 0;
+	let lineStart = 0;
+	let at = 0;
+	for (const { path, keyStart } of messageEntries(text)) {
+		for (; at < keyStart; at++) {
+			if (text.charCodeAt(at) === lineFeed) {
+				line++;
+				lineStart = at + 1;
+			}
+		}
+		if (path.length > 1) {
+			positions.set(keyOf(path), [line, keyStart + 1 - lineStart]);
+		}
+	}
+	return positions;
+}
+
+const lineFeed = 10;
 
 /**
  * The declaration map of a shard's `.d.ts`: each declaration's name, at `column` of its line, to

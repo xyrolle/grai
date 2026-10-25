@@ -37,12 +37,6 @@ const messageFields = new Set(["declarations", "selectors", "match"]);
  */
 export function parseMessage(locale: string, value: unknown): LocaleMessage {
 	if (typeof value === "string") return patternMessage(locale, value);
-	if (isRecord(value)) {
-		throw new MessageProblem(
-			"unsupported",
-			"the value is an object of nested keys, which grai does not support. Flatten it into keys joined by _.",
-		);
-	}
 	const variants = Array.isArray(value) ? value[0] : undefined;
 	if (!Array.isArray(value) || value.length !== 1 || !isRecord(variants)) {
 		throw new MessageProblem(

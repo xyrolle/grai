@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { relative } from "node:path";
+import { type CatalogKeys, catalogKeys, type KeyPath } from "./catalog-keys.ts";
 import { type Config, isMissing, isRecord } from "./config.ts";
 import { editedMessages } from "./edit.ts";
 import { GraiError } from "./error.ts";
@@ -7,20 +8,18 @@ import { GraiError } from "./error.ts";
 /** One locale's catalog file as read: its path relative to the project's root, and its bytes. */
 export type CatalogSource = { locale: string; file: string; bytes: Buffer };
 
-/** One locale's catalog, parsed: its raw messages by key. */
+/** One locale's catalog, parsed: its raw messages by key, and where each key is in the file. */
 export type Catalog = {
 	locale: string;
 	file: string;
 	messages: ReadonlyMap<string, unknown>;
+	paths: ReadonlyMap<string, KeyPath>;
 	/**
 	 * For a catalog parsed from an edit: the catalog edited, the keys the edit touched, and whether
 	 * a key now starts on another line.
 	 */
 	edit?: { from: Catalog; keys: ReadonlySet<string>; moved: boolean };
 };
-
-/** The key the format reserves for the catalog's JSON schema; it is not a message. */
-const schemaKey = "$schema";
 
 /** Reads every locale's catalog file at once. A file that cannot be read is an error naming it. */
 export async function readCatalogSources(config: Config): Promise<{
@@ -84,11 +83,7 @@ export function parseCatalog({ locale, file, bytes }: CatalogSource): Catalog {
 			"the catalog must hold a JSON object of messages by key.",
 		);
 	}
-	const messages = new Map<string, unknown>();
-	for (const key in value) {
-		if (key !== schemaKey) messages.set(key, value[key]);
-	}
-	return withMessages({ locale, file }, messages);
+	return withKeys({ locale, file }, catalogKeys(value, where));
 }
 
 /**
@@ -100,18 +95,17 @@ export function parseEditedCatalog(
 	previous: Catalog,
 	previousBytes: Buffer,
 ): Catalog {
-	const edited = editedMessages(previousBytes, previous.messages, source.bytes);
+	const edited = editedMessages(previousBytes, previous, source.bytes);
 	if (edited === undefined) return parseCatalog(source);
-	edited.messages.delete(schemaKey);
 	return {
-		...withMessages(source, edited.messages),
+		...withKeys(source, edited),
 		edit: { from: previous, keys: edited.keys, moved: edited.moved },
 	};
 }
 
-function withMessages(
+function withKeys(
 	{ locale, file }: { locale: string; file: string },
-	messages: Map<string, unknown>,
+	{ messages, paths }: CatalogKeys,
 ): Catalog {
 	if (messages.size === 0) {
 		throw new GraiError(
@@ -120,5 +114,5 @@ function withMessages(
 			`the catalog has no messages, so ${locale} would render nothing. Add its messages, or remove ${locale} from "locales".`,
 		);
 	}
-	return { locale, file, messages };
+	return { locale, file, messages, paths };
 }
