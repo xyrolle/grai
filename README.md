@@ -93,7 +93,7 @@ It is `grai/vite`'s plugin, and in the client build a component's call of a mess
 
 ### Workers, Bun, Deno and Node
 
-The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
+The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls and while the response's body is read, so a streamed page renders in it too, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
 
 ```ts
 // src/worker.ts
@@ -106,10 +106,12 @@ export default {
 };
 ```
 
-Workers, Bun (`bun src/worker.ts`) and Deno (`deno serve src/worker.ts`) serve this module as it is. `examples/workers` is a complete Worker, and `test/workers.test.ts` serves it in all three. In Hono, which also runs on Node, the middleware is one line:
+Workers, Bun (`bun src/worker.ts`) and Deno (`deno serve src/worker.ts`) serve this module as it is. `examples/workers` is a complete Worker, and `test/workers.test.ts` serves it in all three. In Hono, which also runs on Node, the middleware sets the response it gives back:
 
 ```ts
-app.use((c, next) => middleware(c.req.raw, () => next().then(() => c.res)));
+app.use(async (c, next) => {
+	c.res = await middleware(c.req.raw, () => next().then(() => c.res));
+});
 ```
 
 It needs `AsyncLocalStorage`, from `node:async_hooks`, which Node, Bun and Deno have. Workers have it by default from compatibility date 2026-08-04; on an earlier date, add the `nodejs_als` compatibility flag, which adds only that.

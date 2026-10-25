@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { UnderlyingSource } from "node:stream/web";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { describe, expect, it, onTestFinished } from "vitest";
@@ -161,6 +162,98 @@ describe("the middleware", () => {
 			"Ihr Warenkorb",
 			"Your cart",
 		]);
+	});
+});
+
+describe("a body the handler streams", () => {
+	const encoder = new TextEncoder();
+	/**
+	 * A body that renders the title on each pull, `chunks` times. Its pulls are synchronous, so the
+	 * reads after the first one start them, in the reader's context.
+	 */
+	const titles = (
+		m: Messages,
+		chunks: number,
+		source: UnderlyingSource<Uint8Array> = {},
+	) => {
+		let sent = 0;
+		return new ReadableStream<Uint8Array>({
+			pull(controller) {
+				controller.enqueue(encoder.encode(`${m.title?.()}|`));
+				if (++sent === chunks) controller.close();
+			},
+			...source,
+		});
+	};
+	/** The middleware's response to a request for `/de/cart`, whose handler returns `body`. */
+	const streamed = async (
+		body: (m: Messages) => ReadableStream<Uint8Array>,
+	) => {
+		const { m, middleware } = await output({ strategy: ["url"] });
+		return middleware(
+			new Request("https://shop.test/de/cart"),
+			() => new Response(body(m)),
+		);
+	};
+
+	it("renders every chunk in the request's locale, pulled after the middleware returns", async () => {
+		const response = await streamed((m) => titles(m, 4));
+
+		expect(await response.text()).toBe("Ihr Warenkorb|".repeat(4));
+	});
+
+	it("is pulled only as the response's body is read", async () => {
+		let pulls = 0;
+		const response = await streamed((m) =>
+			titles(m, 4, {
+				pull(controller) {
+					pulls++;
+					controller.enqueue(encoder.encode(`${m.title?.()}|`));
+				},
+			}),
+		);
+		const before = pulls;
+		await response.body?.getReader().read();
+
+		expect([before, pulls]).toEqual([1, 2]);
+	});
+
+	it("passes its error on to the response's body", async () => {
+		const failure = new Error("the page failed to render");
+		const response = await streamed((m) =>
+			titles(m, 4, {
+				pull() {
+					throw failure;
+				},
+			}),
+		);
+
+		await expect(response.text()).rejects.toBe(failure);
+	});
+
+	it("is cancelled in the request's locale when the response's body is", async () => {
+		const cancelled: unknown[] = [];
+		const response = await streamed((m) =>
+			titles(m, 4, {
+				cancel(reason) {
+					cancelled.push(reason, m.title?.());
+				},
+			}),
+		);
+		await response.body?.cancel("the reader left");
+
+		expect(cancelled).toEqual(["the reader left", "Ihr Warenkorb"]);
+	});
+
+	it("is passed on as it is when it comes from fetch(), as no app code renders it", async () => {
+		const { middleware } = await output({ strategy: ["url"] });
+		const fetched = await fetch("data:text/plain,Ihr%20Warenkorb");
+		const response = await middleware(
+			new Request("https://shop.test/de/cart"),
+			() => fetched,
+		);
+
+		expect(response.body).toBe(fetched.body);
 	});
 });
 

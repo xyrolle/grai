@@ -30,11 +30,14 @@ it("binds each request's locale through Hono's middleware chain, and varies its 
 	let started = 0;
 
 	const app = new Hono();
-	app.use((c, next) => middleware(c.req.raw, () => next().then(() => c.res)));
+	app.use(async (c, next) => {
+		c.res = await middleware(c.req.raw, () => next().then(() => c.res));
+	});
 	app.get("/", async (c) => {
 		const before = m.title?.();
 		if (++started === 3) release();
 		await allStarted;
+		c.header("vary", "Accept-Encoding");
 		return c.json([before, m.title?.()]);
 	});
 	const responses = await Promise.all(
@@ -51,8 +54,8 @@ it("binds each request's locale through Hono's middleware chain, and varies its 
 		["Your cart", "Your cart"],
 	]);
 	expect(responses.map((response) => response.headers.get("vary"))).toEqual([
-		"Cookie",
-		"Cookie",
-		"Cookie",
+		"Accept-Encoding, Cookie",
+		"Accept-Encoding, Cookie",
+		"Accept-Encoding, Cookie",
 	]);
 });

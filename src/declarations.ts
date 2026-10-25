@@ -261,8 +261,9 @@ export const serverDeclarations = `import type { Locale } from "./runtime.js";
 
 /**
  * Resolves a request's locale by the config's strategy and binds it for the handler and all it
- * calls. Returns the handler's response, its \`Vary\` listing the request headers the strategy
- * reads.
+ * calls, and while the response's body is read, so a streamed page renders in it too. Returns the
+ * handler's response, its \`Vary\` listing the request headers the strategy reads: a copy of it,
+ * when its body is read in the request or its headers are immutable.
  */
 export declare function middleware(
 	request: Request,
