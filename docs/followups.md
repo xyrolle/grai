@@ -26,6 +26,12 @@ The Vite plugin's server build writes each message function as a function expres
 
 Done when: such a server loads function expressions while the browser keeps arrows, and `startup`'s row for the compiler's output shows the gain.
 
+## Resolve a package import of the output after a broken first compile
+
+In dev the plugin resolves its own output once a compile has succeeded, from the build's list of files, but only an import that names a path. A package import such as `#i18n/messages.js` goes to Vite's resolver, which keeps a lookup that found nothing until its watcher reports the file. After a broken first compile is fixed, the plugin reloads the page before that report, so the page fails to import the output until the next reload.
+
+Done when: a dev page that imports the output by a package import gets it on the reload that follows the fix, with a test beside the one for a relative import in `test/vite.test.ts`.
+
 ## Support the MessageFormat 2 constructs that are still compile errors
 
 These are compile errors today:
