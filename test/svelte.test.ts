@@ -6,7 +6,7 @@ import { chromium } from "playwright-core";
 import { build, createServer, type PluginOption } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/svelte.ts";
-import { grai as graiVite } from "../src/vite.ts";
+import { graiModules, grai as graiVite } from "../src/vite.ts";
 import { project } from "./project.ts";
 
 const catalogs = {
@@ -66,7 +66,7 @@ export function page(locale) {
 	return dir;
 }
 
-/** What a build of the app writes, by file name, unminified so a test can read it. */
+/** What a build of the app writes, by file name and as chunks, unminified so a test can read it. */
 async function built(
 	dir: string,
 	plugins: PluginOption[],
@@ -98,6 +98,7 @@ async function built(
 				file.type === "chunk" ? file.code : String(file.source),
 			]),
 		),
+		chunks: files.filter((file) => file.type === "chunk"),
 		entry:
 			files.find((file) => file.type === "chunk" && file.isEntry)?.fileName ??
 			"",
@@ -129,6 +130,29 @@ describe("grai/svelte's client build", () => {
 		expect(files.get(copy?.replace("grai/", "grai-de/") ?? "")).not.toContain(
 			'"Title"',
 		);
+	});
+
+	it("names a text key's string module text in graiModules, as the message chunk it went to", async () => {
+		const dir = svelteApp({
+			"App.svelte": `<script>import { m } from "./out/messages.js";</script>
+<h1>{m.title()}</h1><p>{m.greeting({ name: "Ana" })}</p>`,
+		});
+		const { chunks } = await built(dir, withTexts(), "client");
+		const kindOf = graiModules({ config: join(dir, "grai.config.json") });
+		const placed = Object.fromEntries(
+			chunks.flatMap((chunk) =>
+				chunk.moduleIds
+					.filter((id) => kindOf(id) !== undefined)
+					.map((id) => [id.replace(`${dir}/`, ""), [kindOf(id), chunk.name]]),
+			),
+		);
+
+		expect(placed).toEqual({
+			"out/runtime.js": ["runtime", "grai-runtime"],
+			"out/config.js": ["config", "grai-runtime"],
+			"\0grai:text/title": ["text", "grai~client"],
+			"\0grai:key/greeting": ["key", "grai~client"],
+		});
 	});
 
 	it("follows the key to grai's output through a named import, a module script and an app's re-export", async () => {

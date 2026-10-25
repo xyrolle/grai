@@ -16,7 +16,7 @@ import {
 	type Plugin,
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { grai } from "../src/vite.ts";
+import { grai, graiModules } from "../src/vite.ts";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -37,7 +37,7 @@ const catalogs = {
 
 /**
  * What a Vite build of `entries` writes, for a browser or, with `ssr`, for a server: every file,
- * and each entry's code with its imports'.
+ * its chunks, and each entry's code with its imports'.
  */
 async function built(
 	dir: string,
@@ -92,7 +92,7 @@ async function built(
 			.filter((chunk) => chunk.isEntry)
 			.map((chunk) => [chunk.name, chunk.fileName]),
 	);
-	return { entries: entryCode, sources, entryFiles };
+	return { entries: entryCode, sources, entryFiles, chunks };
 }
 
 describe("the Vite plugin's build", () => {
@@ -146,6 +146,49 @@ describe("the Vite plugin's build", () => {
 				a: `import { m } from "./out/messages.js";\nconsole.log(m.title());\n`,
 			}),
 		).rejects.toThrow(/catalog/);
+	});
+});
+
+describe("grai/vite's module kinds", () => {
+	it("names each module of grai's in a client build by its kind, as the chunk it went to", async () => {
+		const catalog = {
+			title: "Title",
+			total: "{amount :number}",
+			items: [
+				{
+					declarations: ["input count", "local countPlural = count: plural"],
+					selectors: ["countPlural"],
+					match: {
+						"countPlural=one": "{count} item",
+						"countPlural=other": "{count} items",
+					},
+				},
+			],
+		};
+		const { dir, config } = project({ en: catalog, de: catalog });
+		const { chunks } = await built(dir, {
+			page: `import { m } from "./out/messages.js";\nconsole.log(m.title(), m.total({ amount: 1 }), m.items({ count: 2 }));\n`,
+		});
+		const kindOf = graiModules({ config });
+		const placed = Object.fromEntries(
+			chunks.flatMap((chunk) =>
+				chunk.moduleIds.map((id) => [
+					id.replace(`${dir}/`, ""),
+					[kindOf(id), chunk.name],
+				]),
+			),
+		);
+
+		expect(placed).toEqual({
+			"page.js": [undefined, "page"],
+			"out/runtime.js": ["runtime", "grai-runtime"],
+			"out/config.js": ["config", "grai-runtime"],
+			"out/plurals.js": ["plurals", "grai-runtime"],
+			"out/formats.js": ["formats", "grai-runtime"],
+			"\0grai:key/title": ["key", "grai~page"],
+			"\0grai:key/total": ["key", "grai~page"],
+			"\0grai:key/items": ["key", "grai~page"],
+		});
 	});
 });
 

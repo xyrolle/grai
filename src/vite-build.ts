@@ -53,15 +53,51 @@ export function textModule(
 }
 
 /**
+ * A module grai's client build puts in a chunk of its own. The runtime and the modules it reads
+ * (`runtime`, `config`, `plurals`, `formats`) go to the `grai-runtime` chunk; a key's module
+ * (`key`) and a text key's string module (`text`) go to the message chunks under `grai/`.
+ */
+export type GraiModuleKind =
+	| "runtime"
+	| "config"
+	| "plurals"
+	| "formats"
+	| "key"
+	| "text";
+
+/** The output's files that go to the `grai-runtime` chunk, with their kinds. */
+const runtimeFiles = new Map<string, GraiModuleKind>([
+	["runtime.js", "runtime"],
+	["config.js", "config"],
+	["plurals.js", "plurals"],
+	["formats.js", "formats"],
+]);
+
+/** The `grai-runtime` chunk's modules in a project whose output is `outdir`, by id. */
+function runtimeModules(outdir: string): Map<string, GraiModuleKind> {
+	return new Map(
+		[...runtimeFiles].map(([file, kind]) => [join(outdir, file), kind]),
+	);
+}
+
+/** Which module of grai's an id is, in a project whose output is `outdir`; nothing for any other. */
+export function moduleKindIn(
+	outdir: string,
+): (id: string) => GraiModuleKind | undefined {
+	const runtime = runtimeModules(outdir);
+	return (id) => {
+		if (id.startsWith(keyModulePrefix)) return "key";
+		if (id.startsWith(textModulePrefix)) return "text";
+		return runtime.get(id);
+	};
+}
+
+/**
  * The client build's chunking: the runtime in a chunk of its own, and the keys in chunks by the
  * entries that use them, so a message chunk holds keys and nothing else.
  */
 export function messageChunking(outdir: string): EnvironmentOptions {
-	const runtime = new Set(
-		["runtime.js", "config.js", "plurals.js", "formats.js"].map((file) =>
-			join(outdir, file),
-		),
-	);
+	const runtime = runtimeModules(outdir);
 	const groups = [
 		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
 		{
