@@ -18,7 +18,7 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 | Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 17–30 ms from the save to the page, against 202–459 ms re-evaluating the module (`hmr`). |
 | Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface fits in 378 bytes min+gzip; Paraglide's is 1.9–2.1 KB (`runtime-size`). |
 
-**Open: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.3–2.6 ms against 5.4–5.6 ms with the locale's copies, and the bundle 19.1–20.4 KB against 22.9–23.8 KB (`hydrate`); a server render takes 0.04 ms against 0.13 ms (`ssr`). On app A's largest page the messages take 17.2 KB against 24.5 KB (`bytes`). It needs a copy per locale of every component chunk with such a text, behind the import map; whether real pages gain enough over `grai/svelte`'s strings for that is open (`docs/followups.md`). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
+**Not adopted: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.3–2.6 ms against 5.4–5.6 ms with the locale's copies, and the bundle 19.1–20.4 KB against 22.9–23.8 KB (`hydrate`); a server render takes 0.04 ms against 0.13 ms (`ssr`). On app A's real pages, where messages are a small part of what hydration does, it hydrates within the noise of `grai/svelte`'s strings, for a copy per locale of every component chunk with such a text (Browser, below). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
 
 Not adopted:
 - **Strings put in place of the calls after the framework compiled them.** Svelte has compiled each call as a dynamic expression, so the page hydrates as it does with the calls: 23.9–24.1 ms against 23.3–24.3 ms at a 4× slowdown, where `grai/svelte`'s strings take 15.9–16.2 ms (`svelte-texts`). It would also cost the build: SvelteKit has one client build, so a build per locale, 2 more client builds of 8.1 s on app A, cannot serve its pages, and copies per locale of the 326 of its 1,598 client chunks that call a message are 978 more files behind the import map (`inline-cost`).
@@ -103,6 +103,20 @@ In a Svelte client build, `grai/svelte` reads each message without inputs as its
 | inlined into the template | 21.2 KB | 2.9 / 12.9 ms | 1.9 / 7.9 ms |
 
 `ru` gives 23.3, 15.9, 24.1 and 12.5 ms at 4×.
+
+Seven of app A's real pages, built three ways (`inline-build` in copies of the app) and served side by side (`inline-pages`): the five heaviest its demo data fills, by the keys they load (ranks 1, 2, 3, 5 and 8 of 73), and two typical ones. On each, every build's page has the same text, whitespace included, as served and as hydrated, and hydration keeps the same server elements. Median of 15 interleaved loads, ms from SvelteKit's start until it has hydrated the page, at full speed and at a 4× slowdown, at a load of 15–22:
+
+| keys | JS, brotli: strings / inlined | calls (`grai/vite`) | strings (`grai/svelte`) | inlined into the template |
+|---|---|---|---|---|
+| 1,315 | 522 / 509 KB | 485 / 635 | 457 / 658 | 429 / 600 |
+| 1,094 | 478 / 466 KB | 384 / 527 | 400 / 520 | 409 / 523 |
+| 1,046 | 435 / 428 KB | 376 / 494 | 334 / 460 | 331 / 449 |
+| 991 | 432 / 419 KB | 360 / 459 | 335 / 492 | 313 / 459 |
+| 977 | 405 / 399 KB | 313 / 442 | 310 / 444 | 294 / 461 |
+| 689 | 298 / 293 KB | 274 / 371 | 257 / 359 | 253 / 368 |
+| 601 | 442 / 431 KB | 410 / 551 | 385 / 547 | 400 / 517 |
+
+Against the strings, inlining changes the 4× time by −9% to +4%, no more than the calls differ from the strings in the same run, either way, and the page's JS falls by 1–3%. Its build would need a copy per locale of 248 of the 1,080 client chunks, 744 more files, made in 0.4–0.6 s, or 2 more client builds of 15–22 s (`inline-build`).
 
 ## Bytes per page
 
