@@ -20,6 +20,7 @@ import {
 } from "./vite-build.ts";
 import {
 	followedFile,
+	outputFile,
 	type ProjectFiles,
 	patchPrefix,
 	serveMessages,
@@ -147,15 +148,18 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			// the file: in dev every import waits for the first compile, so none, whatever names the
 			// output, looks for it before it exists. A page whose import failed would stay broken.
 			order: "pre",
-			async handler(id) {
+			async handler(id, importer) {
 				if (
 					id.startsWith(keyPrefix) ||
 					id.startsWith(textPrefix) ||
 					id.startsWith(patchPrefix)
 				)
 					return `\0${id}`;
-				if (serving) await first;
-				return null;
+				if (!serving) return null;
+				const compiled = build ?? (await first);
+				return compiled !== undefined && "compilation" in compiled
+					? outputFile(files, compiled, id, importer)
+					: null;
 			},
 		},
 		async load(id) {

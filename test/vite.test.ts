@@ -497,6 +497,50 @@ import.meta.hot.on("test:ping", () => { window.pinged = true; });
 		return { server, sent, browser };
 	}
 
+	it("resolves the output for a page reloaded after the fix, before Vite's watcher has reported it", async () => {
+		const { dir } = project(catalogs);
+		broken(dir);
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { m } from "./out/messages.js";\nexport const title = m.title();\n`,
+		);
+		let reloaded = () => {};
+		const reload = new Promise<void>((resolve) => {
+			reloaded = resolve;
+		});
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			// Vite's watcher leaves the output alone, as before it reports the files: until then, its
+			// resolver keeps the lookup the page made while the compile failed.
+			server: { watch: { ignored: [...fixtures.ignored, "**/out/**"] } },
+			plugins: [
+				grai(),
+				{
+					name: "reload",
+					configureServer(vite) {
+						const hot = vite.environments.client.hot;
+						const send = hot.send.bind(hot);
+						hot.send = (payload: HotPayload | string, data?: unknown) => {
+							if (typeof payload === "string") return send(payload, data);
+							if (payload.type === "full-reload") reloaded();
+							send(payload);
+						};
+					},
+				},
+			],
+		});
+		onTestFinished(() => server.close());
+		const page = () => server.environments.client.transformRequest("/main.js");
+		await expect(page()).rejects.toThrow(/Failed to resolve/);
+
+		fixed(dir, "Überschrift");
+		await reload;
+
+		expect((await page())?.code).toContain('"/out/messages.js"');
+	});
+
 	it("takes the error down for a page that connects after the fix", async () => {
 		const { dir } = project(catalogs);
 		const { server, sent, browser } = await devServer(dir);

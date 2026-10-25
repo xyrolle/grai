@@ -1,3 +1,4 @@
+import { dirname, relative, resolve } from "node:path";
 import {
 	type DevEnvironment,
 	isRunnableDevEnvironment,
@@ -139,6 +140,22 @@ export function followedFile(
 		file.startsWith(`${files.outdir}/`) ||
 		catalogs.includes(file)
 	);
+}
+
+/**
+ * The file of the output an import names, if the build wrote it. The plugin resolves its own output
+ * so that a file a compile has just written is found at once, where Vite's resolver may still
+ * keep an earlier lookup that found nothing.
+ */
+export function outputFile(
+	files: ProjectFiles,
+	build: Build,
+	id: string,
+	importer: string | undefined,
+): string | null {
+	if (importer === undefined) return null;
+	const path = resolve(dirname(importer), id);
+	return build.rendered.files.has(relative(files.outdir, path)) ? path : null;
 }
 
 /** Has an environment take a module again, if it holds it. */
