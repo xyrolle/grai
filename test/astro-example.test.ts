@@ -22,7 +22,10 @@ function built(args: string[]): void {
 	}
 }
 
-/** Starts a server, resolving once it prints a line that says it is listening. */
+/**
+ * Starts a server, resolving once it prints the address it listens on: 127.0.0.1 alone, as
+ * localhost can be ::1 beside another process's server at the same port.
+ */
 async function listening(
 	command: string,
 	args: string[],
@@ -36,7 +39,7 @@ async function listening(
 	await new Promise<void>((resolve, reject) => {
 		server.stdout.on("data", (chunk) => {
 			printed += chunk;
-			if (/localhost:\d+/.test(printed)) resolve();
+			if (/127\.0\.0\.1:\d+/.test(printed)) resolve();
 		});
 		server.on("exit", (code) =>
 			reject(new Error(`the server exited: ${code}\n${printed}`)),
@@ -147,12 +150,14 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 			"preview",
 			"--port",
 			"4826",
+			"--host",
+			"127.0.0.1",
 			"--ignore-lock",
 		]);
 	}, 120_000);
 	afterAll(() => server?.kill());
 
-	aSite("http://localhost:4826");
+	aSite("http://127.0.0.1:4826");
 
 	it("type-checks with astro check, the types grai compiled for it included", () => {
 		const { status, stdout, stderr } = spawnSync(astro, ["check"], {
@@ -167,14 +172,14 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 describe("the Astro example, rendered on demand by the Node adapter", {
 	timeout: 30_000,
 }, () => {
-	const origin = "http://localhost:4827";
+	const origin = "http://127.0.0.1:4827";
 	let server: ChildProcess | undefined;
 	beforeAll(async () => {
 		built(["--config", "astro.server.config.ts"]);
 		server = await listening(
 			process.execPath,
 			["dist-server/server/entry.mjs"],
-			{ PORT: "4827", HOST: "localhost" },
+			{ PORT: "4827", HOST: "127.0.0.1" },
 		);
 	}, 120_000);
 	afterAll(() => server?.kill());
