@@ -217,7 +217,7 @@ The locale is resolved once per request on the server, or once per page on the c
   - `preferredLanguage` (`Accept-Language`);
   - `url`: a non-base locale is the first path segment, and the base locale has no prefix.
 
-  The base locale is always the last resort, so the config does not list it.
+  The base locale is always the last resort, so the config does not list it. `url` can only come last: every path names a locale, the base locale's when it has no prefix, so the config rejects a strategy after it, which would never be read.
 - **The middleware's response lists in `Vary` the request headers its strategy reads:** `Cookie` for `cookie`, `Accept-Language` for `preferredLanguage`, and none for `url` or for the strategies after it, which it never reads. A shared cache then keeps a copy per locale, not one locale's page for every reader. They are appended to the handler's own `Vary` without reading it first, which would cost every request a header read: a header listed twice means the same to a cache. A response from `fetch()` has immutable headers, and no platform can say so in advance, so such a response is copied.
 - **A call reads the bound locale once and indexes its variant with it:** the request keeps the locale's position in `locales`, so there is no search and no strategy per call. `setLocale` in a request changes the locale for the rest of that request, and for no other: it writes the state the middleware binds for the request, as Workers have no `AsyncLocalStorage.enterWith` to bind a new one.
 - **On the server outside a request** (scripts, crons, Node tests), one process-wide value is bound. It starts as the base locale, and `setLocale(locale, { reload: false })` changes it.
