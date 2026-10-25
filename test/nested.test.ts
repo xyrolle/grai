@@ -115,6 +115,22 @@ describe("the commands in a catalog with objects of messages", () => {
 		);
 	});
 
+	it("add a key under an object named __proto__ as under any other, and leave every object's prototype alone", async () => {
+		const name = "__proto__";
+		const { dir, config } = project({
+			en: { title: "Title", cart: JSON.parse(`{"${name}": {"note": "Note"}}`) },
+			de: { title: "Titel" },
+		});
+
+		const added = await add(config, "cart___proto___note", { de: "Notiz" });
+
+		expect(added.errors).toEqual([]);
+		expect(JSON.parse(catalog(dir, "de")).cart).toEqual(
+			JSON.parse(`{"${name}": {"note": "Notiz"}}`),
+		);
+		expect(Object.hasOwn(Object.prototype, "note")).toBe(false);
+	});
+
 	it("merge a translation into the message's place in the locale's object", async () => {
 		const { dir, config } = project({ en: catalogs.en, de: catalogs.en });
 		const exported = await exportLocale(config, "de", {
