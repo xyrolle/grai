@@ -18,8 +18,12 @@ export type Converted = {
 	branches: readonly Branch[];
 };
 
-/** A source message: where it sits in the nested JSON, and its value there. */
-export type SourceEntry = { path: readonly string[]; value: unknown };
+/** A source message: where it sits in the nested JSON, its value there, and what it tells translators. */
+export type SourceEntry = {
+	path: readonly string[];
+	value: unknown;
+	description: string | undefined;
+};
 
 /** One message of the import, converted or with the reason it could not be. */
 export type ImportedMessage = {
@@ -28,7 +32,12 @@ export type ImportedMessage = {
 	result: Converted | MessageProblem;
 	/** What renders differently in grai than in the source library. */
 	notes: string[];
+	/** What the source tells translators of the message, as FormatJS's `description` does. */
+	description: string | undefined;
 };
+
+/** A message converted, before the description of its source is put with it. */
+export type Conversion = Omit<ImportedMessage, "description">;
 
 /** A catalog value in grai's format: a pattern, or one object of declarations, selectors and match. */
 export type CatalogValue =

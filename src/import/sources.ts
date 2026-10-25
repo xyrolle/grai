@@ -104,9 +104,16 @@ function flattened(
 		if (path.length === 0 && name === "$schema") return [];
 		const at = [...path, name];
 		// formatjs extracts a message as { defaultMessage, description }.
-		if (isRecord(item) && typeof item.defaultMessage !== "string") {
-			return flattened(item, at);
-		}
-		return [{ path: at, value: isRecord(item) ? item.defaultMessage : item }];
+		if (!isRecord(item))
+			return [{ path: at, value: item, description: undefined }];
+		if (typeof item.defaultMessage !== "string") return flattened(item, at);
+		const { defaultMessage, description } = item;
+		return [
+			{
+				path: at,
+				value: defaultMessage,
+				description: typeof description === "string" ? description : undefined,
+			},
+		];
 	});
 }
