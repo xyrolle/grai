@@ -233,3 +233,19 @@ console.log(codes, compiling);
 	// Line 4: a code only the compiler reports, which the runtime never throws.
 	expect(errors).toEqual(["4 TS2367"]);
 });
+
+it("types setLocale by the config's switch: nothing under reload, a promise under live", async () => {
+	const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+	const use = `import { setLocale } from "./out/runtime.js";
+const live: Promise<void> = setLocale("de", { reload: false });
+console.log(live);
+`;
+	const reload = project(catalogs);
+	expect((await reload.compile()).errors).toEqual([]);
+	const live = project(catalogs, { switch: "live" });
+	expect((await live.compile()).errors).toEqual([]);
+
+	// Line 2 under reload: setLocale gives back nothing to await.
+	expect(await typeErrors(reload.dir, "use.ts", use)).toEqual(["2 TS2322"]);
+	expect(await typeErrors(live.dir, "use.ts", use)).toEqual([]);
+});
