@@ -2,7 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, sep } from "node:path";
 import { globMatcher } from "./globs.ts";
 
-/** Files that can name a message: JavaScript, TypeScript and the components of Svelte and Vue. */
+/**
+ * Files that can name a message: JavaScript, TypeScript, the components of Svelte, Vue and Astro,
+ * and MDX documents. A file of a kind left out here would name keys that check --fix then deletes.
+ */
 const sourceExtensions = new Set([
 	".js",
 	".mjs",
@@ -14,6 +17,8 @@ const sourceExtensions = new Set([
 	".tsx",
 	".svelte",
 	".vue",
+	".astro",
+	".mdx",
 ]);
 /** Directories of dependencies and of build output, which name no message of the project's own. */
 const skippedDirectories = new Set(["node_modules", "dist", "build"]);

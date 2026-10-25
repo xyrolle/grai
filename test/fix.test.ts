@@ -158,6 +158,21 @@ export const promo = (season: string) => m[\`promo_\${season}\`]();
 		]);
 	});
 
+	it("keeps a key that only an Astro page or an MDX document names", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/pages/promo.astro":
+				'---\nimport { m } from "../../out/messages.js";\n---\n<p>{m.promo_spring()}</p>\n',
+			"src/content/sale.mdx":
+				'import { m } from "../../out/messages.js";\n\n# {m.banner_old()}\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual([]);
+	});
+
 	it("keeps every unused key while a source reads the namespace whole", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
