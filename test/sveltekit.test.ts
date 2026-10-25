@@ -278,11 +278,12 @@ describe("grai/sveltekit/client under vite dev", { timeout: 30_000 }, () => {
 	}
 
 	/**
-	 * Waits until the page's grai/sveltekit/client has loaded, which a server-rendered heading does
-	 * not show, and marks the page, so a reload, which would lose the mark, shows.
+	 * Waits until the page has started, which a server-rendered heading does not show: an edit
+	 * whose loads Kit runs again before its client has started is lost. Then marks the page, so a
+	 * reload, which would lose the mark, shows.
 	 */
 	const mark = async (page: Page) => {
-		await page.waitForFunction(`Symbol.for("grai.read") in globalThis`);
+		await page.waitForLoadState("networkidle");
 		await page.evaluate("window.unreloaded = true");
 	};
 	const marked = (page: Page) => page.evaluate("window.unreloaded");
