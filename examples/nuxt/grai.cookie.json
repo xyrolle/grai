@@ -1,8 +1,0 @@
-{
-	"locales": ["en", "ro", "ar"],
-	"baseLocale": "en",
-	"catalogs": "messages/{locale}.json",
-	"outdir": "app/i18n",
-	"strategy": ["cookie", "preferredLanguage"],
-	"cookieName": "lang"
-}
