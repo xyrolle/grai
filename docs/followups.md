@@ -129,15 +129,15 @@ Done when: the config maps a path to its path in each locale, with named segment
 
 ## A domain per locale
 
-A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads.
+A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads. `grai/astro` refuses Astro's `i18n.domains` until then.
 
 Done when: the config maps hosts to locales, the middleware reads the request's host, `localizeHref` to a locale on another host gives an absolute URL, local development has a documented way in without the production hosts, and a test covers each.
 
 ## The framework's base path
 
-An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`. The framework owns the base path, so the config should not repeat it.
+An app under a base path (SvelteKit's `paths.base`, Next's `basePath`, Astro's `base`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`, and the middleware reads `shop` as the path's locale. The framework owns the base path, so the config should not repeat it. `grai/astro` refuses a `base` with the `url` strategy until then.
 
-Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
+Done when: the Vite, Next and Astro adapters write the framework's base path into `config.js` at build, the URL helpers and the middleware put the locale after it, and a test in each example covers a localized link under a base path.
 
 ## Rename what a module reads off a dynamic import
 
@@ -174,3 +174,15 @@ Done when: `grai migrate` rewrites the calls in a component's script, and lists 
 A compile that stops while it writes, killed or crashed, leaves the output's lock (`docs/design.md`), its temporary files in `.grai/`, and the files named by their content that it wrote before any entry named them. The lock is refused, so a person sees it; the rest stays, as no manifest records it.
 
 Done when: a writer under the lock removes the temporary files in `.grai/`, which only a writer under the lock makes, and retires the files named by their content that neither the manifest nor the output names, with a test that kills a compile between its writes.
+
+## Keep the locale through Astro's client router
+
+Under Astro's `<ClientRouter />`, a link into another locale swaps the page in place. The runtime read `<html lang>` when the page first loaded, and the import map, once read, cannot change, so the new page's islands render in the first page's locale. Until this is done, a link into another locale needs `data-astro-reload`.
+
+Done when: a client-router navigation into another locale loads the page anew, with a browser test in the Astro example.
+
+## Server islands and actions in the page's locale
+
+A server island (`server:defer`) and an Astro action are requests of their own, to paths without the page's locale prefix. Under the `url` strategy they render in the base locale; the `cookie` and `preferredLanguage` strategies find the reader's.
+
+Done when: a server island and an action on a page under `/ro/` render in `ro` under the `url` strategy, with a test in the Astro example.
