@@ -23,6 +23,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
+import { ownChunkBytes } from "../src/vite-build.ts";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -141,9 +142,24 @@ async function built(
 	return { entries: entryCode, sources, entryFiles, chunks };
 }
 
+/** A word repeated into a message whose key's module alone reaches `ownChunkBytes`. */
+const sized = (word: string) =>
+	`${word} `.repeat(Math.ceil(ownChunkBytes / word.length));
+
 describe("the Vite plugin's build", () => {
-	it("gives each entry only the keys its code uses", async () => {
-		const { dir } = project(catalogs);
+	it("gives each entry only the keys its code uses, when each set of them is worth a chunk of its own", async () => {
+		const { dir } = project({
+			en: {
+				title: sized("Title"),
+				greeting: `${sized("Hello")} {name}`,
+				footer: sized("Footer"),
+			},
+			de: {
+				title: sized("Titel"),
+				greeting: `${sized("Hallo")} {name}`,
+				footer: sized("Fußzeile"),
+			},
+		});
 		const { entries } = await built(dir, {
 			a: `import { m } from "./out/messages.js";\nconsole.log(m.title(), m.greeting({ name: "Ana" }));\n`,
 			b: `import { m } from "./out/messages.js";\nconsole.log(m.footer(), m.greeting({ name: "Ana" }));\n`,
@@ -223,6 +239,70 @@ describe("the Vite plugin's build", () => {
 				'a.js:2:41: "caption": m["caption"] names a key no catalog has. Add it with grai add caption --en "…" --de "…", or fix the name.',
 			].join("\n"),
 		);
+	});
+});
+
+describe("the Vite plugin's message chunks", () => {
+	/** The keys each message chunk of a client build holds, by its file name. */
+	const keysOf = (
+		chunks: readonly { fileName: string; moduleIds: string[] }[],
+	) =>
+		new Map(
+			chunks
+				.filter((chunk) => chunk.fileName.startsWith("assets/grai/"))
+				.map((chunk) => [
+					chunk.fileName,
+					chunk.moduleIds.map((id) => id.replace("\0grai:key/", "")).sort(),
+				]),
+		);
+
+	it("gives a set of keys the same entries use a chunk of its own once it reaches ownChunkBytes, and pools the smaller sets apart from it", async () => {
+		const { dir } = project({
+			en: { article: sized("Article"), save: "Save", close: "Close" },
+			de: { article: sized("Artikel"), save: "Speichern", close: "Schließen" },
+		});
+		const { chunks, entries } = await built(dir, {
+			article: `import { m } from "./out/messages.js";\nconsole.log(m.article(), m.save());\n`,
+			dialog: `import { m } from "./out/messages.js";\nconsole.log(m.save(), m.close());\n`,
+		});
+
+		expect([...keysOf(chunks).values()].sort()).toEqual([
+			["article"],
+			["close", "save"],
+		]);
+		expect(entries.dialog?.includes("Artikel")).toBe(false);
+	});
+
+	it("pools sets of keys under ownChunkBytes, so a page of many of them makes few requests, each copy in its locale's words alone", async () => {
+		const pages = Array.from({ length: 12 }, (_, index) => `page${index}`);
+		const catalog = (locale: string) =>
+			Object.fromEntries([
+				["title", `${locale} title`],
+				...pages.map((page) => [page, `${locale} ${page}`]),
+			]);
+		const { dir } = project({ en: catalog("en"), de: catalog("de") });
+		const { chunks, sources } = await built(
+			dir,
+			Object.fromEntries(
+				pages.map((page) => [
+					page,
+					`import { m } from "./out/messages.js";\nconsole.log(m.title(), m.${page}());\n`,
+				]),
+			),
+		);
+		const messageChunks = [...keysOf(chunks).keys()];
+		const words = (file: string, locale: string) =>
+			(sources.get(file) ?? "").includes(`${locale} `);
+
+		expect(messageChunks.length).toBe(1);
+		for (const file of messageChunks) {
+			expect([
+				words(file.replace("grai/", "grai-en/"), "en"),
+				words(file.replace("grai/", "grai-en/"), "de"),
+				words(file.replace("grai/", "grai-de/"), "en"),
+				words(file.replace("grai/", "grai-de/"), "de"),
+			]).toEqual([true, false, false, true]);
+		}
 	});
 });
 
@@ -357,10 +437,10 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 	});
 
 	it("links each copy to the chunks it imports, in a build of many chunks", async () => {
-		// A page per key gives the build enough chunks that the bundler's placeholders for their
-		// hashes run past digits.
+		// A page per key, each worth a chunk of its own, gives the build enough chunks that the
+		// bundler's placeholders for their hashes run past digits.
 		const keys = Array.from({ length: 12 }, (_, index) => `key${index}`);
-		const catalog = Object.fromEntries(keys.map((key) => [key, key]));
+		const catalog = Object.fromEntries(keys.map((key) => [key, sized(key)]));
 		const { dir } = project({ en: catalog, de: catalog });
 		const { sources } = await built(
 			dir,
