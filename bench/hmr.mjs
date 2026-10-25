@@ -294,14 +294,14 @@ async function measure(browser, app, design) {
 		root,
 		configFile: false,
 		logLevel: "silent",
-		server: { port: PORT, strictPort: true },
+		server: { host: "127.0.0.1", port: PORT, strictPort: true },
 		plugins: pluginsFor(design, app, root, locale, timings),
 	});
 	await server.listen();
 	const page = await browser.newPage();
 	page.on("pageerror", (error) => console.error("page error:", error.message));
 	const loadStart = performance.now();
-	await page.goto(`http://localhost:${PORT}/`);
+	await page.goto(server.resolvedUrls.local[0]);
 	await page.waitForFunction(() => window.ready);
 	const load = performance.now() - loadStart;
 
