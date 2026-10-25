@@ -147,7 +147,11 @@ class IcuParser extends IcuPatternReader {
 		scope: PatternScope,
 	): IcuOption[] {
 		const options: IcuOption[] = [];
-		const optionScope = { inTag: scope.inTag, counted: kind !== "select" };
+		const optionScope = {
+			nested: true,
+			inTag: scope.inTag,
+			counted: kind !== "select",
+		};
 		let key = this.key(name, kind);
 		if (kind !== "select" && key === "offset") throw this.offset(name, kind);
 		while (key !== "") {
