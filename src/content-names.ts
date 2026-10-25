@@ -26,20 +26,24 @@ export function withoutContentHash(file: string): string {
 }
 
 /**
- * A runtime module's source, with each import of a sibling module (`from "./config.js"`) naming
- * that module's file in this output instead, so that the module and what it imports are of one
- * output. Every sibling a source imports must be in `files`.
+ * A runtime module's source, with each import of a sibling module naming that module's file in
+ * this output instead, so that the module and what it imports are of one output: a statement's
+ * (`from "./config.js"`) and a JSDoc type's (`import("./runtime.js")`) alike. Every sibling a
+ * source imports must be in `files`.
  */
 export function pinImports(
 	source: string,
 	files: ReadonlyMap<string, string>,
 ): string {
-	return source.replace(/from "(\.\/[\w-]+\.js)"/g, (_, specifier: string) => {
-		const file = files.get(specifier);
-		if (file === undefined)
-			throw new Error(
-				`grai's runtime imports ${specifier}, which it pins to no file`,
-			);
-		return `from "./${file}"`;
-	});
+	return source.replace(
+		/(from |import\()"(\.\/[\w-]+\.js)"/g,
+		(_, by: string, specifier: string) => {
+			const file = files.get(specifier);
+			if (file === undefined)
+				throw new Error(
+					`grai's runtime imports ${specifier}, which it pins to no file`,
+				);
+			return `${by}"./${file}"`;
+		},
+	);
 }
