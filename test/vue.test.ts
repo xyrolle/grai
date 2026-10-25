@@ -1,8 +1,12 @@
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import vue from "@vitejs/plugin-vue";
+import { build } from "vite";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { createSSRApp, defineComponent, h } from "vue";
 import { renderToString } from "vue/server-renderer";
+import { grai } from "../src/vite.ts";
 import {
 	Markup,
 	type MarkupElement,
@@ -153,5 +157,62 @@ describe("a Vue server render through the output's middleware", () => {
 					: "<p>Bună ziua / 2 în coș</p>",
 			),
 		);
+	});
+});
+
+describe("a Vue build", () => {
+	/**
+	 * The JS a production build of a component calling the title gives, with the messages imported
+	 * by `importLine`, and whether it holds the title and the footer, which nothing calls.
+	 */
+	async function builtWith(importLine: string): Promise<boolean[]> {
+		const { dir, load } = project({
+			en: { title: "Your cart", footer: "Delivered by grai" },
+		});
+		await load();
+		// As `vite build` builds it: Vitest's NODE_ENV of test would have Vue compile for dev.
+		vi.stubEnv("NODE_ENV", "production");
+		onTestFinished(() => {
+			vi.unstubAllEnvs();
+		});
+		writeFileSync(
+			join(dir, "App.vue"),
+			`<script setup>\n${importLine}\n</script>\n\n<template><h1>{{ m.title() }}</h1></template>\n`,
+		);
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { createApp } from "vue";\nimport App from "./App.vue";\ncreateApp(App).mount("#app");\n`,
+		);
+		const output = await build({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			plugins: [vue(), grai()],
+			resolve: {
+				alias: {
+					vue: fileURLToPath(new URL("../node_modules/vue", import.meta.url)),
+				},
+			},
+			build: { write: false, rolldownOptions: { input: join(dir, "main.js") } },
+		});
+		const code = (Array.isArray(output) ? output : [output])
+			.flatMap((result) => ("output" in result ? result.output : []))
+			.map((file) => (file.type === "chunk" ? file.code : ""))
+			.join("");
+		return [code.includes("Your cart"), code.includes("Delivered by grai")];
+	}
+
+	it("keeps only the keys a template calls, through a namespace import of keys.js", async () => {
+		expect(await builtWith('import * as m from "./out/keys.js";')).toEqual([
+			true,
+			false,
+		]);
+	});
+
+	it("keeps every key through a named import of m, which Vue's compiler reads as a ref", async () => {
+		expect(await builtWith('import { m } from "./out/messages.js";')).toEqual([
+			true,
+			true,
+		]);
 	});
 });
