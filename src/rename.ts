@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { type FileUses, type Use, usesIn } from "./call-sites.ts";
 import type { Catalog } from "./catalog.ts";
-import { catalogEntries } from "./catalog-entries.ts";
-import { withKeyRenamed } from "./catalog-text.ts";
+import { type MessageEntry, messageEntries } from "./catalog-entries.ts";
+import { keyOf, placedPath } from "./catalog-keys.ts";
+import { layoutOf, tabbedLayout } from "./catalog-layout.ts";
+import { withKeyRenamed, withMessages, withoutKeys } from "./catalog-text.ts";
 import {
 	type CompileResult,
 	compile,
@@ -21,9 +23,11 @@ export type RenameResult = CompileResult & { changed: string[] };
 
 /**
  * Renames a key in every catalog, at every call site under the roots (the project's root by
- * default) and in the config's lists, all of them or none, then compiles. It changes nothing when
- * no catalog has the key, when the new name is no key name or is taken, or when a source writes
- * the key's name where it cannot tell that it means the key; each is an error that names the place.
+ * default) and in the config's lists, all of them or none, then compiles. In an object of
+ * messages, the key keeps its place while its new name still starts with the object's key. It
+ * changes nothing when no catalog has the key, when the new name is no key name or is taken, or
+ * when a source writes the key's name where it cannot tell that it means the key; each is an error
+ * that names the place.
  */
 export async function rename(
 	configFile: string,
@@ -45,12 +49,12 @@ export async function rename(
 	const problems = sites.flatMap((site) => siteProblems(site, from, to));
 	if (problems.length > 0) return unchanged(sortErrors(problems));
 	const texts = new Map<string, string>();
-	for (const { file, bytes } of read.sources) {
+	for (const [index, { file, bytes }] of read.sources.entries()) {
 		const text = bytes.toString("utf8");
-		const entry = catalogEntries(text).find(({ key }) => key === from);
-		if (entry !== undefined) {
-			texts.set(join(config.root, file), withKeyRenamed(text, entry, to));
-		}
+		const entry = messageEntries(text).find(({ path }) => keyOf(path) === from);
+		const value = catalogs[index]?.messages.get(from);
+		if (entry === undefined) continue;
+		texts.set(join(config.root, file), renamedIn(text, entry, value, to, base));
 	}
 	for (const { source, uses } of sites) {
 		texts.set(source.path, renamed(source.text, uses, from, to));
@@ -64,6 +68,32 @@ export async function rename(
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
 	return { ...(await compile(configFile)), changed };
+}
+
+/**
+ * A catalog's text with a message renamed. It keeps its place when the new key still starts with
+ * the key of the object it is in, then `_`, and takes the rest as its name there; else it moves to
+ * where `grai add` puts a new key.
+ */
+function renamedIn(
+	text: string,
+	entry: MessageEntry,
+	value: unknown,
+	to: string,
+	base: Catalog | undefined,
+): string {
+	const object = entry.path.slice(0, -1);
+	const prefix = object.length === 0 ? "" : `${keyOf(object)}_`;
+	if (to.length > prefix.length && to.startsWith(prefix)) {
+		return withKeyRenamed(text, entry, to.slice(prefix.length));
+	}
+	const without = withoutKeys(text, new Set([keyOf(entry.path)]));
+	const placed = placedPath(to, base?.paths.values() ?? []);
+	return withMessages(
+		without,
+		[[placed, value]],
+		layoutOf(without) ?? tabbedLayout,
+	);
 }
 
 function unchanged(errors: GraiError[]): RenameResult {
