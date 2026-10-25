@@ -3,7 +3,9 @@
  * and the counts each is for.
  */
 
-import type { PluralType } from "./plurals.ts";
+import type { IntlOptions } from "./format-functions.ts";
+import { shownDigits } from "./intl-formatters.ts";
+import { categoryOfDigits, type PluralType } from "./plurals.ts";
 import { catchAll, countingRules, type Selector } from "./selection.ts";
 
 /**
@@ -17,15 +19,16 @@ export function baseCategoryOf(
 	baseLocale: string,
 	locale: string,
 	type: PluralType,
+	digits?: IntlOptions,
 ): string {
-	const memo = `${type} ${baseLocale} ${locale} ${category}`;
+	const memo = `${type} ${baseLocale} ${locale} ${category} ${JSON.stringify(digits)}`;
 	const known = baseCategories.get(memo);
 	if (known !== undefined) return known;
-	const rules = pluralRulesOf(locale, type);
-	const base = pluralRulesOf(baseLocale, type);
+	const rules = categoryOfCount(locale, type, digits);
+	const base = categoryOfCount(baseLocale, type, digits);
 	const categories = new Set<string>();
 	for (const count of sampleCounts) {
-		if (rules.select(count) === category) categories.add(base.select(count));
+		if (rules(count) === category) categories.add(base(count));
 	}
 	const [only] = categories;
 	const chosen = categories.size === 1 && only !== undefined ? only : "other";
@@ -41,6 +44,29 @@ function pluralRulesOf(locale: string, type: PluralType): Intl.PluralRules {
 	const rules = pluralRules.get(memo) ?? new Intl.PluralRules(locale, { type });
 	pluralRules.set(memo, rules);
 	return rules;
+}
+
+/**
+ * A count's category in a locale: Intl's, or for a rounding number, that of the digits its
+ * options show, as plurals.js reads them.
+ */
+function categoryOfCount(
+	locale: string,
+	type: PluralType,
+	digits: IntlOptions | undefined,
+): (count: number) => string {
+	if (digits === undefined) {
+		const rules = pluralRulesOf(locale, type);
+		return (count) => rules.select(count);
+	}
+	return (count) => categoryOfDigits(locale, type, shownDigits(digits, count));
+}
+
+/** The options a rounding number selector's digits are shown with, if it rounds. */
+export function digitsOf(
+	selector: Selector | undefined,
+): IntlOptions | undefined {
+	return selector?.kind === "number" ? selector.digits : undefined;
 }
 
 /** Counts that show each category of every locale: the whole numbers to 200, and some fractions. */
@@ -71,7 +97,7 @@ export function noteOf(
 			}
 			return key === catchAll
 				? `${name}: any count`
-				: `${name}: ${key}, as for ${examplesOf(key, locale, rules)}`;
+				: `${name}: ${key}, as for ${examplesOf(key, locale, rules, digitsOf(selectors[index]))}`;
 		})
 		.join("; ");
 }
@@ -80,19 +106,24 @@ function examplesOf(
 	category: string,
 	locale: string,
 	type: PluralType,
+	digits: IntlOptions | undefined,
 ): string {
-	const memo = `${type} ${locale} ${category}`;
+	const memo = `${type} ${locale} ${category} ${JSON.stringify(digits)}`;
 	const known = examples.get(memo);
 	if (known !== undefined) return known;
-	const rules = pluralRulesOf(locale, type);
+	const rules = categoryOfCount(locale, type, digits);
 	const counts: number[] = [];
 	for (let count = 0; count <= 1000 && counts.length < 6; count++) {
-		if (rules.select(count) === category) counts.push(count);
+		if (rules(count) === category) counts.push(count);
 	}
 	const fractions = [0.5, 1.5, 2.5].filter(
-		(count) => rules.select(count) === category,
+		(count) => rules(count) === category,
 	);
-	const written = [...counts, ...fractions].join(", ").concat(", …");
+	const shown = [...counts, ...fractions];
+	const written =
+		shown.length === 0
+			? "no count its options show"
+			: shown.join(", ").concat(", …");
 	examples.set(memo, written);
 	return written;
 }

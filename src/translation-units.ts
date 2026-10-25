@@ -7,7 +7,7 @@
 import type { Catalog } from "./catalog.ts";
 import { parseMessage } from "./message.ts";
 import { type Piece, patternPieces } from "./pattern-pieces.ts";
-import { baseCategoryOf, noteOf } from "./plural-forms.ts";
+import { baseCategoryOf, digitsOf, noteOf } from "./plural-forms.ts";
 import { isSeed } from "./seed.ts";
 import { catchAll, countingRules } from "./selection.ts";
 import {
@@ -96,7 +96,7 @@ function messageUnits(
 			const rules = countingRules(selector, key);
 			return rules === undefined || key === catchAll
 				? key
-				: baseCategoryOf(key, baseLocale, locale, rules);
+				: baseCategoryOf(key, baseLocale, locale, rules, digitsOf(selector));
 		});
 		const source = chosen(sources, inBase) ?? "";
 		const target =
