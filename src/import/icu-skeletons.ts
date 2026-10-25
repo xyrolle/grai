@@ -6,6 +6,7 @@
 
 import { ownEntry } from "../own-entry.ts";
 import { MessageProblem } from "../problem.ts";
+import { invalid } from "./icu-scanner.ts";
 import { dateCall, numberCall } from "./intl-calls.ts";
 
 type Options = Map<string, string>;
@@ -15,6 +16,11 @@ export function numberSkeletonCall(skeleton: string, written: string): string {
 	const options: Options = new Map();
 	for (const token of skeleton.split(/\s+/).filter(Boolean)) {
 		const [stem = "", ...settings] = token.split("/");
+		if (settings.includes("")) {
+			throw invalid(
+				`${written} gives the stem ${stem} an empty option after its /.`,
+			);
+		}
 		if (!readStem(stem, settings, options)) {
 			throw new MessageProblem(
 				"unsupported",

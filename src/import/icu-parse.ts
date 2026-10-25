@@ -107,7 +107,13 @@ class IcuParser extends IcuPatternReader {
 			throw invalid(`{${name}, ${kind} must be closed by }.`);
 		if (style.startsWith("::")) {
 			const written = `{${name}, ${kind}, ${style}}`;
-			const skeleton = style.slice(2);
+			const skeleton = style.slice(2).trimStart();
+			if (skeleton === "") {
+				const example = kind === "number" ? "::percent" : "::yMMMd";
+				throw invalid(
+					`${written} has no skeleton after its ::, such as ${example}.`,
+				);
+			}
 			const format =
 				kind === "number"
 					? numberSkeletonCall(skeleton, written)

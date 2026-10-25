@@ -733,6 +733,9 @@ describe("grai import --from icu", () => {
 					crossed: "<b>{n, plural, other {</b>}}</b>",
 					spelled: "{n, spellout}",
 					tagged: "<b>}</b>",
+					bare_number: "{n, number, ::}",
+					bare_date: "{d, date, :: }",
+					empty_option: "{n, number, ::currency/}",
 				},
 			},
 			["en"],
@@ -754,6 +757,9 @@ describe("grai import --from icu", () => {
 			"crossed: it is not a valid ICU message: the option other of {n} must be closed by }.",
 			"spelled: it is not a valid ICU message: {n, spellout} names no type intl-messageformat reads: number, date, time, plural, selectordinal or select.",
 			"tagged: it is not a valid ICU message: the tag <b> must be closed by </b>.",
+			"bare_number: it is not a valid ICU message: {n, number, ::} has no skeleton after its ::, such as ::percent.",
+			"bare_date: it is not a valid ICU message: {d, date, ::} has no skeleton after its ::, such as ::yMMMd.",
+			"empty_option: it is not a valid ICU message: {n, number, ::currency/} gives the stem currency an empty option after its /.",
 		]);
 	});
 });
