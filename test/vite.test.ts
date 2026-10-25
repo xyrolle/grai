@@ -504,6 +504,74 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		expect(sent).not.toContain("grai:update");
 	});
 
+	/**
+	 * A dev server of the project in a mode, with a server render of two keys imported by their
+	 * paths, which the app maps to keys.js, and what each key's path resolves to.
+	 */
+	async function keyPaths(dir: string, mode: string) {
+		writeFileSync(
+			join(dir, "package.json"),
+			JSON.stringify({ imports: { "#i18n/messages/*": "./out/keys.js" } }),
+		);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { footer } from "#i18n/messages/footer.js";
+import { title } from "#i18n/messages/title.js";
+export const render = () => \`\${title()} \${footer()}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			mode,
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const resolved = async (key: string) =>
+			(
+				await ssr.pluginContainer.resolveId(
+					`#i18n/messages/${key}.js`,
+					join(dir, "render.js"),
+				)
+			)?.id;
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		return { resolved, rendered };
+	}
+
+	it("resolves a page's key paths to keys.js, one module for every key", async () => {
+		const { dir } = project(catalogs);
+		const { resolved, rendered } = await keyPaths(dir, "development");
+		const keys = join(dir, "out", "keys.js");
+
+		expect(await rendered()).toBe("Title Footer");
+		expect([await resolved("title"), await resolved("footer")]).toEqual([
+			keys,
+			keys,
+		]);
+	});
+
+	it("gives each key's path a module of its own in a test run, which an edit still reaches", async () => {
+		const { dir } = project(catalogs);
+		const { resolved, rendered } = await keyPaths(dir, "test");
+
+		expect(await rendered()).toBe("Title Footer");
+		expect([await resolved("title"), await resolved("footer")]).toEqual([
+			"\0grai:key/title",
+			"\0grai:key/footer",
+		]);
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+		await expect.poll(rendered, devWait).toBe("Heading Footer");
+	});
+
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
 		const { dir } = project(catalogs);
 		const server = await createServer({
