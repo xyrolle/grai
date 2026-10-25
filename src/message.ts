@@ -136,6 +136,14 @@ function withInputs(
 	const inputs = new Set(declared);
 	for (const local of plurals.values()) inputs.add(local.input);
 	const isLocal = (name: string) => plurals.has(name) || formatted.has(name);
+	for (const [name, { input }] of [...plurals, ...formatted]) {
+		if (isLocal(input)) {
+			throw new MessageProblem(
+				"unsupported",
+				`${name} is made from ${input}, a local, which grai does not support yet. Make it from the input ${input} is made from.`,
+			);
+		}
+	}
 	const addOptionInput = (format: Format | undefined) => {
 		const name = format?.input?.name;
 		if (name === undefined) return;
