@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { catalogEntries } from "./catalog-entries.ts";
-import { withoutEntries } from "./catalog-text.ts";
+import { withoutKeys } from "./catalog-text.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { withListedKeysChanged } from "./config-file.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
@@ -106,10 +105,7 @@ export async function removeUnusedKeys(
 	const texts = new Map<string, string>();
 	for (const { file, bytes } of read.sources) {
 		const text = bytes.toString("utf8");
-		texts.set(
-			join(config.root, file),
-			withoutEntries(text, catalogEntries(text), removed),
-		);
+		texts.set(join(config.root, file), withoutKeys(text, removed));
 	}
 	const configText = withListedKeysChanged(
 		readFileSync(configFile, "utf8"),

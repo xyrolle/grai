@@ -41,7 +41,7 @@ export async function add(
 	for (const [locale, path] of read.config.catalogs) {
 		const text = texts[locale];
 		if (text !== undefined) {
-			catalogTexts.set(path, catalogWithMessages(path, [[key, text]], path));
+			catalogTexts.set(path, catalogWithMessages(path, [[[key], text]], path));
 		}
 	}
 	writeAll(catalogTexts);

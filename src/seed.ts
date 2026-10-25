@@ -7,6 +7,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import type { Catalog } from "./catalog.ts";
 import { catalogWithMessages } from "./catalog-file.ts";
+import type { KeyPath } from "./catalog-keys.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { isRecord } from "./config.ts";
 import { sameJson } from "./edit.ts";
@@ -161,13 +162,13 @@ export async function seed(
 	const read = await readLocaleCatalogs(configFile, locale, "seed");
 	if ("errors" in read) return read;
 	const { config, path, base, target } = read;
-	const seeded: [string, unknown][] = [];
+	const seeded: [KeyPath, unknown][] = [];
 	const problems: GraiError[] = [];
 	for (const [key, value] of base.messages) {
 		if (target?.messages.has(key)) continue;
 		try {
 			parseMessage(config.baseLocale, value);
-			seeded.push([key, seedValue(value, locale)]);
+			seeded.push([[key], seedValue(value, locale)]);
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
 			const where = { file: base.file, key, locale: config.baseLocale };

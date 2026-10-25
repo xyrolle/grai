@@ -1,6 +1,7 @@
 /** Editing the config file's text, for a command that changes keys the config lists. */
 
-import { layoutOf, tabbedLayout, withMessages } from "./catalog-text.ts";
+import { layoutOf, tabbedLayout } from "./catalog-layout.ts";
+import { withMessages } from "./catalog-text.ts";
 import type { IdenticalToBase } from "./identical-to-base.ts";
 
 /**
@@ -26,7 +27,7 @@ export function withListedKeysChanged(
 		.filter(([, keys]) => keys.length > 0);
 	return withMessages(
 		text,
-		[["identicalToBase", Object.fromEntries(lists)]],
+		[[["identicalToBase"], Object.fromEntries(lists)]],
 		layoutOf(text) ?? tabbedLayout,
 	);
 }

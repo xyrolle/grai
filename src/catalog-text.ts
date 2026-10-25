@@ -1,73 +1,61 @@
 /**
  * Editing a catalog's text, the one way every command writes a catalog: an entry the edit leaves
- * alone keeps every byte, and an entry it writes takes the catalog's own layout.
+ * alone keeps every byte, and an entry it writes takes the layout of the object it is in.
  */
 
 import { type CatalogEntry, catalogEntries } from "./catalog-entries.ts";
+import { type KeyPath, keyOf, schemaKey } from "./catalog-keys.ts";
+import {
+	entryText,
+	innerLayout,
+	type Layout,
+	layoutOf,
+	valueText,
+} from "./catalog-layout.ts";
+import { isRecord } from "./config.ts";
 
 /**
- * How a catalog is laid out, as the bytes it writes around its entries: before the first, between
- * a key and its value, between two entries, and after the last.
- */
-export type Layout = {
-	opening: string;
-	colon: string;
-	separator: string;
-	closing: string;
-};
-
-/** The layout grai writes where no catalog shows one: an entry per line, indented by a tab. */
-export const tabbedLayout: Layout = {
-	opening: "\n\t",
-	colon: ": ",
-	separator: ",\n\t",
-	closing: "\n",
-};
-
-/** The layout of a catalog's text, or undefined for a catalog without entries, which shows none. */
-export function layoutOf(text: string): Layout | undefined {
-	const entries = catalogEntries(text);
-	const [first, second] = entries;
-	const last = entries.at(-1);
-	if (first === undefined || last === undefined) return undefined;
-	const opening = text.slice(text.indexOf("{") + 1, first.keyStart);
-	return {
-		opening,
-		colon: text.slice(first.keyEnd, first.valueStart),
-		separator:
-			second === undefined
-				? `,${opening}`
-				: text.slice(first.valueEnd, second.keyStart),
-		closing: text.slice(last.valueEnd, text.lastIndexOf("}")),
-	};
-}
-
-/**
- * The text with each message set. A key the catalog has takes its new value in place, at its last
- * entry, which is the one JSON reads; a new key goes after the last entry. Every byte the messages
- * do not change stays.
+ * The text with each message set at its path. A message the object has takes its new value in
+ * place, at its last entry, which is the one JSON reads; a new one goes after the last entry of
+ * the object its path names, which is made when there is none. A message whose path runs through
+ * a message, not an object, goes beside it under its whole key. Every byte the messages do not
+ * change stays.
  */
 export function withMessages(
 	text: string,
-	messages: Iterable<readonly [string, unknown]>,
+	messages: Iterable<readonly [KeyPath, unknown]>,
 	layout: Layout,
 ): string {
-	const values = new Map(messages);
 	const entries = catalogEntries(text);
 	const read = new Map(entries.map((entry) => [entry.key, entry]));
+	const { values, inner } = byName(text, read, messages);
+	const replaced = new Map<string, string>();
+	for (const [name, nested] of inner) {
+		const entry = read.get(name);
+		if (entry === undefined) {
+			values.set(name, objectOf(nested));
+			continue;
+		}
+		const object = text.slice(entry.valueStart, entry.valueEnd);
+		const own = layoutOf(object) ?? innerLayout(layout);
+		replaced.set(name, withMessages(object, nested, own));
+	}
+	for (const [name, value] of values) {
+		if (read.has(name)) replaced.set(name, valueText(value, layout));
+	}
 	const added = [...values]
-		.filter(([key]) => !read.has(key))
-		.map(([key, value]) => entryText(key, value, layout));
+		.filter(([name]) => !read.has(name))
+		.map(([name, value]) => entryText(name, value, layout));
 	const last = entries.at(-1);
 	if (last === undefined) return withFirstEntries(text, added, layout);
 	const changed = [...read.values()]
-		.filter(({ key }) => values.has(key))
+		.filter(({ key }) => replaced.has(key))
 		.toSorted((a, b) => a.valueStart - b.valueStart);
 	let result = "";
 	let at = 0;
 	for (const entry of changed) {
-		result += text.slice(at, entry.valueStart);
-		result += valueText(values.get(entry.key), layout);
+		result +=
+			text.slice(at, entry.valueStart) + (replaced.get(entry.key) ?? "");
 		at = entry.valueEnd;
 	}
 	const appended = added.map((entry) => layout.separator + entry).join("");
@@ -79,7 +67,36 @@ export function withMessages(
 	);
 }
 
-/** A catalog without entries, with its first ones between its braces. */
+/**
+ * The messages by the name their path starts with: those this object holds, by their name, and
+ * those of the objects in it, by the object's name with the rest of their paths.
+ */
+function byName(
+	text: string,
+	read: ReadonlyMap<string, CatalogEntry>,
+	messages: Iterable<readonly [KeyPath, unknown]>,
+): {
+	values: Map<string, unknown>;
+	inner: Map<string, [KeyPath, unknown][]>;
+} {
+	const values = new Map<string, unknown>();
+	const inner = new Map<string, [KeyPath, unknown][]>();
+	for (const [path, value] of messages) {
+		const [name = "", ...rest] = path;
+		const entry = read.get(name);
+		if (rest.length === 0) values.set(name, value);
+		else if (entry !== undefined && !isObject(text, entry)) {
+			values.set(keyOf(path), value);
+		} else {
+			const nested = inner.get(name) ?? [];
+			nested.push([rest, value]);
+			inner.set(name, nested);
+		}
+	}
+	return { values, inner };
+}
+
+/** An object without entries, with its first ones between its braces. */
 function withFirstEntries(
 	text: string,
 	entries: readonly string[],
@@ -112,13 +129,40 @@ export function withKeyRenamed(
 }
 
 /**
- * The text without the entries of the keys, each with the separator before it: the entries kept
- * stay as written, each after the separator it had, so the layout and final line break stay too.
+ * The text without the messages of the keys, each entry with the separator before it, and
+ * without an object of messages the removal leaves empty. The entries kept stay as written, each
+ * after the separator it had, so the layout and final line break stay too.
  */
-export function withoutEntries(
+export function withoutKeys(
+	text: string,
+	keys: ReadonlySet<string>,
+	within: KeyPath = [],
+): string {
+	const entries = catalogEntries(text);
+	const removed = new Set<CatalogEntry>();
+	const replaced = new Map<CatalogEntry, string>();
+	for (const entry of entries) {
+		if (within.length === 0 && entry.key === schemaKey) continue;
+		const path = [...within, entry.key];
+		if (!isObject(text, entry)) {
+			if (keys.has(keyOf(path))) removed.add(entry);
+			continue;
+		}
+		const object = text.slice(entry.valueStart, entry.valueEnd);
+		const kept = withoutKeys(object, keys, path);
+		if (kept === object) continue;
+		if (catalogEntries(kept).length === 0) removed.add(entry);
+		else replaced.set(entry, kept);
+	}
+	return withEntriesKept(text, entries, removed, replaced);
+}
+
+/** The text without the `removed` entries, each with the separator before it, some values replaced. */
+function withEntriesKept(
 	text: string,
 	entries: readonly CatalogEntry[],
-	keys: ReadonlySet<string>,
+	removed: ReadonlySet<CatalogEntry>,
+	replaced: ReadonlyMap<CatalogEntry, string>,
 ): string {
 	const [first] = entries;
 	const last = entries.at(-1);
@@ -126,32 +170,39 @@ export function withoutEntries(
 	let kept = 0;
 	let result = text.slice(0, first.keyStart);
 	entries.forEach((entry, index) => {
-		if (keys.has(entry.key)) return;
+		if (removed.has(entry)) return;
 		const previous = entries[index - 1];
 		if (kept > 0 && previous !== undefined) {
 			result += text.slice(previous.valueEnd, entry.keyStart);
 		}
-		result += text.slice(entry.keyStart, entry.valueEnd);
+		const value = replaced.get(entry);
+		result +=
+			value === undefined
+				? text.slice(entry.keyStart, entry.valueEnd)
+				: text.slice(entry.keyStart, entry.valueStart) + value;
 		kept++;
 	});
 	return result + text.slice(last.valueEnd);
 }
 
-function entryText(key: string, value: unknown, layout: Layout): string {
-	return JSON.stringify(key) + layout.colon + valueText(value, layout);
+function isObject(text: string, entry: CatalogEntry): boolean {
+	return text[entry.valueStart] === "{";
 }
 
-/**
- * A value as the layout writes it: on the entry's line and the lines after it, indented one step
- * more than the entry for each level, with the layout's line break; on one line in a catalog that
- * is on one line.
- */
-function valueText(value: unknown, layout: Layout): string {
-	const lineBreak = /\r?\n/.exec(layout.opening)?.[0];
-	if (lineBreak === undefined) return JSON.stringify(value);
-	const indent = layout.opening.slice(layout.opening.lastIndexOf("\n") + 1);
-	return JSON.stringify(value, null, indent).replaceAll(
-		"\n",
-		lineBreak + indent,
-	);
+/** Messages by the rest of their paths, as the object of messages that holds them. */
+function objectOf(
+	messages: readonly (readonly [KeyPath, unknown])[],
+): Record<string, unknown> {
+	const object: Record<string, unknown> = {};
+	for (const [path, value] of messages) {
+		let at = object;
+		for (const name of path.slice(0, -1)) {
+			const next = at[name];
+			const inner = isRecord(next) ? next : {};
+			at[name] = inner;
+			at = inner;
+		}
+		at[path.at(-1) ?? ""] = value;
+	}
+	return object;
 }
