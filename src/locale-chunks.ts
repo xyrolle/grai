@@ -4,16 +4,25 @@ import { parseSync } from "vite";
 export const keyPrefix = "grai:key/";
 export const keyModulePrefix: string = `\0${keyPrefix}`;
 
+/**
+ * How a client build's component imports a message without inputs as the page's string
+ * (`grai/svelte`), and that string's module id.
+ */
+export const textPrefix = "grai:text/";
+export const textModulePrefix: string = `\0${textPrefix}`;
+
 /** The directory a page's message chunks go to, and the one of each locale's copies. */
 export const messageDirectory = "grai";
 export const localeDirectory = (locale: string): string => `grai-${locale}`;
 
+/** Whether a module holds one key's message, as a function or as the page's string. */
+export function isMessageModule(id: string): boolean {
+	return id.startsWith(keyModulePrefix) || id.startsWith(textModulePrefix);
+}
+
 /** Whether a chunk holds message modules and nothing else. */
 export function messageOnly(moduleIds: readonly string[]): boolean {
-	return (
-		moduleIds.length > 0 &&
-		moduleIds.every((id) => id.startsWith(keyModulePrefix))
-	);
+	return moduleIds.length > 0 && moduleIds.every(isMessageModule);
 }
 
 /**

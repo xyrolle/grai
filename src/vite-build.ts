@@ -3,12 +3,14 @@ import { type EnvironmentOptions, minifySync } from "vite";
 import type { Build } from "./compile.ts";
 import {
 	besideDirectory,
+	isMessageModule,
 	keyModulePrefix,
 	keyPrefix,
 	localeCopies,
 	localeDirectory,
 	messageDirectory,
 	messageOnly,
+	textModulePrefix,
 } from "./locale-chunks.ts";
 import { outputImports } from "./output-imports.ts";
 
@@ -36,6 +38,21 @@ export function keyModule(
 }
 
 /**
+ * A text key's string module in a client build: its text in the page's locale, chosen once. Its
+ * variants are the key's, so each locale's copy of its chunk keeps only that locale's words.
+ */
+export function textModule(
+	outdir: string,
+	build: Build,
+	id: string,
+): string | undefined {
+	const name = id.slice(textModulePrefix.length);
+	const key = build.compilation.keys.get(name);
+	if (key?.kind !== "text") return undefined;
+	return `${outputImports(outdir, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
+}
+
+/**
  * The client build's chunking: the runtime in a chunk of its own, and the keys in chunks by the
  * entries that use them, so a message chunk holds keys and nothing else.
  */
@@ -49,7 +66,7 @@ export function messageChunking(outdir: string): EnvironmentOptions {
 		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
 		{
 			name: messageDirectory,
-			test: (id: string) => id.startsWith(keyModulePrefix),
+			test: isMessageModule,
 			entriesAware: true,
 		},
 	];
