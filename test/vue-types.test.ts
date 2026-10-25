@@ -23,16 +23,15 @@ import { m } from "./out/messages.js";
 </template>
 `,
 	"Terms.vue": `<script setup lang="ts">
-import { Markup, type MarkupPart } from "grai/vue";
+import { Markup } from "grai/vue";
 import { h } from "vue";
-
-const parts: MarkupPart<"link">[] = [];
+import { m } from "./out/messages.js";
 </script>
 
 <template>
-	<Markup :parts="parts" :markup="{ link: (children) => h('a', children) }" />
-	<Markup :parts="parts" :markup="{}" />
-	<Markup :parts="parts" :markup="{ link: () => h('a'), b: () => h('b') }" />
+	<Markup :parts="m.terms.parts()" :markup="{ link: (children) => h('a', children) }" />
+	<Markup :parts="m.terms.parts()" :markup="{}" />
+	<Markup :parts="m.terms.parts()" :markup="{ link: () => h('a'), b: () => h('b') }" />
 </template>
 `,
 };
@@ -45,7 +44,11 @@ beforeAll(async () => {
 	mkdirSync(join(dir, "messages"));
 	writeFileSync(
 		join(dir, "messages", "en.json"),
-		JSON.stringify({ title: "Your cart", cart_items: "{count} items" }),
+		JSON.stringify({
+			title: "Your cart",
+			cart_items: "{count} items",
+			terms: "Read the {#link}terms{/link}.",
+		}),
 	);
 	const config = join(dir, "grai.config.json");
 	writeFileSync(
@@ -96,9 +99,9 @@ it("rejects inputs in a template for a message that takes none", () => {
 	]);
 });
 
-it("has Markup's map name exactly the elements its parts do", () => {
+it("has Markup's map name exactly the elements a compiled message writes", () => {
 	expect(errors.filter((error) => error.startsWith("Terms.vue"))).toEqual([
+		"Terms.vue:9",
 		"Terms.vue:10",
-		"Terms.vue:11",
 	]);
 });
