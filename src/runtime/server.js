@@ -54,37 +54,94 @@ function fromCookie(header) {
 	return undefined;
 }
 
+/** The locales the base locale first, as `*` takes them. */
+const baseFirst = [
+	baseLocale,
+	...locales.filter((locale) => locale !== baseLocale),
+];
+/** A language range as RFC 4647 writes one: `*`, or a language and subtags of up to 8 letters or digits. */
+const languageRange = /^(?:\*|[a-z]{1,8}(?:-[a-z0-9]{1,8})*)$/;
+/** A weight as RFC 9110 writes one: 0 to 1, with at most three decimals. */
+const qvalue = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
+
 /**
- * The locale the request prefers most: its tags by their q weights, each matched exactly, then by
- * its language.
+ * The locale the request prefers most: its ranges by weight, each taking the first locale it
+ * reaches that no range refuses with `q=0`. `*` reaches every locale no other range names, the
+ * base locale first.
  *
  * @param {string} header
+ * @returns {string | undefined}
  */
 function fromAcceptLanguage(header) {
-	const tags = header
-		.split(",")
-		.map((entry) => {
-			const [tag = "", ...parameters] = entry
-				.split(";")
-				.map((part) => part.trim());
-			const q = parameters.find((parameter) => parameter.startsWith("q="));
-			return {
-				tag: tag.toLowerCase(),
-				weight: q === undefined ? 1 : Number(q.slice(2)),
-			};
-		})
-		.filter(({ tag, weight }) => tag !== "" && tag !== "*" && weight > 0)
-		.sort((a, b) => b.weight - a.weight);
-	for (const { tag } of tags) {
-		const language = tag.split("-")[0];
-		const locale =
-			locales.find((candidate) => candidate.toLowerCase() === tag) ??
-			locales.find(
-				(candidate) => candidate.toLowerCase().split("-")[0] === language,
-			);
+	const ranges = languageRanges(header);
+	const named = ranges.filter(({ range }) => range !== "*");
+	const refused = named.filter(({ weight }) => weight === 0);
+	const acceptable = (/** @type {string} */ locale) =>
+		!refused.some(({ range }) => covers(range, locale));
+	for (const { range, weight } of ranges) {
+		if (weight === 0) continue;
+		const reached =
+			range === "*"
+				? baseFirst.filter(
+						(locale) => !named.some((other) => covers(other.range, locale)),
+					)
+				: reachedBy(range);
+		const locale = reached.find(acceptable);
 		if (locale !== undefined) return locale;
 	}
 	return undefined;
+}
+
+/**
+ * The header's language ranges, lowercased, with their weights, the heaviest first. An entry whose
+ * range or weight is malformed is left out, as a client could not have meant it.
+ *
+ * @param {string} header
+ */
+function languageRanges(header) {
+	/** @type {{ range: string, weight: number }[]} */
+	const ranges = [];
+	for (const entry of header.split(",")) {
+		const [range = "", ...parameters] = entry
+			.split(";")
+			.map((part) => part.trim());
+		const q = parameters.find((parameter) => /^q=/i.test(parameter))?.slice(2);
+		const lowered = range.toLowerCase();
+		if (!languageRange.test(lowered) || (q !== undefined && !qvalue.test(q))) {
+			continue;
+		}
+		ranges.push({ range: lowered, weight: q === undefined ? 1 : Number(q) });
+	}
+	return ranges.sort((a, b) => b.weight - a.weight);
+}
+
+/**
+ * Whether a range names a locale, as RFC 4647's basic filtering has it: the locale is the range, or
+ * begins with it and a hyphen.
+ *
+ * @param {string} range
+ * @param {string} locale
+ */
+function covers(range, locale) {
+	const tag = locale.toLowerCase();
+	return tag === range || tag.startsWith(`${range}-`);
+}
+
+/**
+ * The locales a range reaches, the nearest first: the range itself, then the locales of its
+ * language.
+ *
+ * @param {string} range
+ * @returns {string[]}
+ */
+function reachedBy(range) {
+	const language = range.split("-")[0];
+	return [
+		...locales.filter((locale) => locale.toLowerCase() === range),
+		...locales.filter(
+			(locale) => locale.toLowerCase().split("-")[0] === language,
+		),
+	];
 }
 
 /** The headers `localeOf` reads: each strategy's but `url`'s, which the config keeps last. */
