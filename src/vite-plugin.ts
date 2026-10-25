@@ -16,8 +16,10 @@ import { moduleOf } from "./message-imports.ts";
 import { shippedMissingKeyCalls } from "./missing-key-calls.ts";
 import { realPath } from "./real-path.ts";
 import {
+	type ChunkingGraph,
 	chunkFileName,
 	keyModule,
+	keyPageChunks,
 	keysModule,
 	messageChunkCopies,
 	messageChunking,
@@ -62,6 +64,18 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	let missingCalls: readonly Error[] | undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
+	/** The client build's chunk of each key it reaches exactly, by the pages that load it. */
+	let pageChunks: Map<string, string> | undefined;
+	const pageChunkOf = (id: string, graph: ChunkingGraph) => {
+		if (build === undefined) return undefined;
+		pageChunks ??= keyPageChunks(
+			build,
+			files.keysFile,
+			(module) => graph.getModuleInfo(module),
+			undefined,
+		);
+		return pageChunks.get(id);
+	};
 	const building = (environment: { name: string } | undefined) =>
 		!serving && environment?.name === "client";
 	/**
@@ -96,7 +110,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		},
 		configEnvironment(name) {
 			return !serving && name === "client"
-				? messageChunking(files.outdir)
+				? messageChunking(files.outdir, pageChunkOf)
 				: undefined;
 		},
 		outputOptions(output) {
@@ -138,6 +152,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		},
 		async buildStart() {
 			if (serving) return;
+			pageChunks = undefined;
 			first ??= recompile(files.configFile, undefined).then(
 				({ result, build: next }) => {
 					build = next;
