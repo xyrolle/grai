@@ -16,10 +16,16 @@ export function keyExports(
 		.map(({ name, value }) => {
 			if (!taken.has(name)) return `export const ${name} = ${value};\n`;
 			bound ??= new Set([...taken, ...keys.map((key) => key.name)]);
-			let own = `$${name}`;
-			while (bound.has(own)) own = `$${own}`;
+			const own = freshName(`$${name}`, bound);
 			bound.add(own);
 			return `const ${own} = ${value};\nexport { ${own} as ${name} };\n`;
 		})
 		.join("");
+}
+
+/** `name`, or `$` before it, again while that is bound too: the first of them `bound` lacks. */
+export function freshName(name: string, bound: ReadonlySet<string>): string {
+	let fresh = name;
+	while (bound.has(fresh)) fresh = `$${fresh}`;
+	return fresh;
 }

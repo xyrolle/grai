@@ -14,7 +14,8 @@ import { project } from "./project.ts";
 
 /**
  * Keys named as what a module of keys calls: the runtime's functions, plurals.js's, a formatter
- * of formats.js, the dev module's own bindings, and globals the compiled code reads. Each of the
+ * of formats.js, the dev module's own bindings, a client build's arrays of variants (`v`, `p`),
+ * and globals the compiled code reads. Each of the
  * messages that reach for one of those has another of them as its key.
  */
 const catalog = {
@@ -67,6 +68,10 @@ const catalog = {
 	live: "Live",
 	location: "Location",
 	window: "Window",
+	variantFor: "Hello {name}",
+	withParts: "Read {#b}this{/b}, {name}",
+	v: "Hello {name}",
+	p: "Read {#b}this{/b}, {name}",
 };
 
 /** Each key's call, as its inputs, and what it should say. */
@@ -87,6 +92,10 @@ const calls: Record<string, [inputs: object | undefined, says: unknown]> = {
 	live: [undefined, "Live"],
 	location: [undefined, "Location"],
 	window: [undefined, "Window"],
+	variantFor: [{ name: "Ana" }, "Hello Ana"],
+	withParts: [{ name: "Ana" }, "Read this, Ana"],
+	v: [{ name: "Ana" }, "Hello Ana"],
+	p: [{ name: "Ana" }, "Read this, Ana"],
 };
 
 const expected = Object.fromEntries(

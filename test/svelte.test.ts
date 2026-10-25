@@ -119,7 +119,7 @@ describe("grai/svelte's client build", () => {
 		expect(code(files)).toContain('pageText("Title", "Titel")');
 		expect(code(files)).toContain('pageText("Footer", "Fußzeile")');
 		expect(code(files)).not.toContain('text("Title", "Titel")');
-		expect(code(files)).toContain("message(");
+		expect(code(files)).toContain("variantFor(");
 		const copy = [...files].find(
 			([file, source]) =>
 				file.startsWith("assets/grai/") && source.includes("pageText"),

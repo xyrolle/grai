@@ -21,8 +21,9 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
-import { localeCopies } from "../src/locale-chunks.ts";
+import { keyModulePrefix, localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
+import { keyModule } from "../src/vite-build.ts";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -185,6 +186,29 @@ describe("the Vite plugin's build", () => {
 		]).toEqual(["Hello Ana", "Hallo Ana"]);
 	});
 
+	it("gives each message with inputs a dispatch of its own for a browser, and keeps the shared one for a server", async () => {
+		const { dir, config } = project({
+			en: { greeting: "Hello {name}", terms: "Read {#b}this{/b}, {name}" },
+			de: { greeting: "Hallo {name}", terms: "Lies {#b}das{/b}, {name}" },
+		});
+		const { build: compiled } = await recompile(config, undefined);
+		if (compiled === undefined) throw new Error("the compile failed");
+		const outdir = join(dir, "out");
+		const module = (key: string, consumer: "client" | "server") =>
+			keyModule(outdir, compiled, `${keyModulePrefix}${key}`, consumer) ?? "";
+
+		expect(module("greeting", "client")).toContain(
+			"export const greeting = (i, o) => variantFor(v, o)(i);",
+		);
+		expect(module("greeting", "client")).toMatch(
+			/^const v = \[\(i\) => `Hello /m,
+		);
+		expect(module("terms", "client")).toContain(
+			"withParts((i, o) => variantFor(v, o)(i), (i, o) => variantFor(p, o)(i))",
+		);
+		expect(module("greeting", "server")).toContain("message(function (i)");
+	});
+
 	it("ships no pseudo-locale, even over the output of a dev server that compiled one", async () => {
 		const { dir, config } = project(catalogs, { pseudoLocale: "en-XA" });
 		await recompile(config, undefined, { pseudoLocale: true });
@@ -281,24 +305,46 @@ describe("grai/vite's module kinds", () => {
 describe("the Vite plugin's locale copies", () => {
 	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
 
-	it("copies a chunk byte for byte, each call keeping only its locale's variants, at their position", () => {
-		const chunk = (calls: string) =>
-			`import { markup, message, text } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
+	it("copies a chunk byte for byte, each call and array keeping only its locale's variants, at their position", () => {
+		const chunk = (keys: string) =>
+			`import { text, variantFor, withParts } from "../grai-runtime.js";\n${keys}\nexport { greeting, terms, title };\n`;
+		const dispatch = (array: string) => `(i, o) => variantFor(${array}, o)(i)`;
+		const keys = (
+			title: string,
+			greeting: string,
+			terms: string,
+			parts: string,
+		) =>
+			chunk(`var title = /*#__PURE__*/ text(${title});
+const v = [${greeting}];
+var greeting = ${dispatch("v")};
+const v$1 = [${terms}];
+const p = [${parts}];
+var terms = /*#__PURE__*/ withParts(${dispatch("v$1")}, ${dispatch("p")});`);
 		const copies = localeCopies(
 			"chunk.js",
-			chunk(`var title = /*#__PURE__*/ text("Title", "Titel");
-var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`, (i) => \`Hallo \${i.name}\`);
-var terms = /*#__PURE__*/ markup([(i) => "Terms", (i) => "AGB"], [(i) => [], (i) => [{ type: "text", value: "AGB" }]]);`),
+			keys(
+				'"Title", "Titel"',
+				`(i) => \`Hello \${i.name}\`, (i) => \`Hallo \${i.name}\``,
+				'() => "Terms", () => "AGB"',
+				'() => [], () => [{ type: "text", value: "AGB" }]',
+			),
 			["en", "de"],
 		);
 
 		expect(Object.fromEntries(copies)).toEqual({
-			en: chunk(`var title = /*#__PURE__*/ text("Title");
-var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`);
-var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
-			de: chunk(`var title = /*#__PURE__*/ text(void 0, "Titel");
-var greeting = /*#__PURE__*/ message(void 0, (i) => \`Hallo \${i.name}\`);
-var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type: "text", value: "AGB" }]]);`),
+			en: keys(
+				'"Title"',
+				`(i) => \`Hello \${i.name}\``,
+				'() => "Terms"',
+				"() => []",
+			),
+			de: keys(
+				'void 0, "Titel"',
+				`void 0, (i) => \`Hallo \${i.name}\``,
+				'void 0, () => "AGB"',
+				'void 0, () => [{ type: "text", value: "AGB" }]',
+			),
 		});
 	});
 
@@ -354,6 +400,37 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 			expect(words(file.replace("grai/", "grai-en/"))).toEqual([true, false]);
 			expect(words(file.replace("grai/", "grai-de/"))).toEqual([false, true]);
 		}
+	});
+
+	it("copies a client build's own dispatches with one locale's variants, for messages with inputs and markup", async () => {
+		const { dir, config } = project({
+			en: { greeting: "Hello {name}", terms: "Read {#b}this{/b}" },
+			de: { greeting: "Hallo {name}", terms: "Lies {#b}das{/b}" },
+			fr: { greeting: "Bonjour {name}", terms: "Lisez {#b}ceci{/b}" },
+		});
+		const { build: compiled } = await recompile(config, undefined);
+		if (compiled === undefined) throw new Error("the compile failed");
+		const outdir = join(dir, "out");
+		const code = ["greeting", "terms"]
+			.map((key) =>
+				(
+					keyModule(outdir, compiled, `${keyModulePrefix}${key}`, "client") ??
+					""
+				)
+					// As a bundler renders the module in a chunk: no imports, and declarations it exports.
+					.replace(/^import .*\n/gm, "")
+					.replace(/^export const /gm, "const "),
+			)
+			.join("");
+		const fr = localeCopies("chunk.js", code, ["en", "de", "fr"]).get("fr");
+
+		expect(fr).toMatch(/const v = \[void 0, void 0, \(i\) => `Bonjour /);
+		expect(fr).toMatch(/const v = \[void 0, void 0, \(\) => "Lisez ceci"\]/);
+		expect(fr).toMatch(/const p = \[void 0, void 0, \(\) => \[/);
+		expect(fr).toContain(
+			"withParts((i, o) => variantFor(v, o)(i), (i, o) => variantFor(p, o)(i))",
+		);
+		expect(fr).not.toMatch(/Hello|Hallo|Read|Lies/);
 	});
 
 	it("links each copy to the chunks it imports, in a build of many chunks", async () => {

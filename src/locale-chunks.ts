@@ -50,47 +50,64 @@ export function besideDirectory(fileName: string, directory: string): string {
 /** Anything the parser gives with its place in the code. */
 type Spanned = { start: number; end: number };
 
+/** A span of the code that holds one variant per locale, and its copy for the locale at an index. */
+type VariantSpan = Spanned & { copy: (index: number) => string };
+
 /**
- * A message-only chunk's code, as rendered before minification, once per locale. Each key is a
- * call of the runtime with one variant per locale (`text(…)`, `message(…)`, or `markup([…], […])`);
- * each copy keeps only its locale's variant, at its locale's position, so the runtime picks it
- * for the page's locale. Imports, exports and every name stay as rendered.
+ * A message-only chunk's code, as rendered before minification, once per locale. Each key holds
+ * one variant per locale: as the strings of a call of the runtime (`text(…)`, `pageText(…)`), or
+ * in an array its own dispatch reads (`const v = […]`). Each copy keeps only its locale's variant,
+ * at its locale's position, so the runtime picks it for the page's locale. Imports, exports and every
+ * name stay as rendered.
  */
 export function localeCopies(
 	fileName: string,
 	code: string,
 	locales: readonly string[],
 ): Map<string, string> {
-	const calls = parseSync(fileName, code).program.body.flatMap((statement) =>
-		statement.type === "VariableDeclaration"
-			? statement.declarations.flatMap((declarator) =>
-					declarator.init?.type === "CallExpression" ? [declarator.init] : [],
-				)
-			: [],
-	);
 	const source = (node: Spanned) => code.slice(node.start, node.end);
 	const only = (variants: readonly (Spanned | null)[], index: number) =>
 		[
 			...Array.from({ length: index }, () => "void 0"),
 			source(variantAt(variants, index, fileName)),
 		].join(", ");
-	const argumentsIn = (call: (typeof calls)[number], index: number) => {
-		const [first, second] = call.arguments;
-		return call.arguments.length === 2 &&
-			first?.type === "ArrayExpression" &&
-			second?.type === "ArrayExpression"
-			? `[${only(first.elements, index)}], [${only(second.elements, index)}]`
-			: only(call.arguments, index);
-	};
-	// One pass over the calls in order, joined once. Rebuilding the code at each call took 8.4 s for a
+	/** Each span of the code that holds one variant per locale, with its copy for a locale. */
+	const spans = parseSync(fileName, code).program.body.flatMap((statement) =>
+		statement.type === "VariableDeclaration"
+			? statement.declarations.flatMap(({ init }): VariantSpan[] => {
+					if (init?.type === "ArrayExpression")
+						return [
+							{
+								start: init.start + 1,
+								end: init.end - 1,
+								copy: (index) => only(init.elements, index),
+							},
+						];
+					// A call of strings, one per locale (`text`, `pageText`). Any other call, such as
+					// `withParts` of a key's own dispatches, holds no variants itself.
+					if (
+						init?.type !== "CallExpression" ||
+						!init.arguments.every((argument) => argument.type === "Literal")
+					)
+						return [];
+					return [
+						{
+							start: init.arguments[0]?.start ?? init.end - 1,
+							end: init.arguments.at(-1)?.end ?? init.end - 1,
+							copy: (index) => only(init.arguments, index),
+						},
+					];
+				})
+			: [],
+	);
+	// One pass over the spans in order, joined once. Rebuilding the code at each call took 8.4 s for a
 	// chunk of 13,000 keys, against 0.14 s.
 	const copyIn = (index: number) => {
 		const pieces: string[] = [];
 		let from = 0;
-		for (const call of calls) {
-			const start = call.arguments[0]?.start ?? call.end - 1;
-			pieces.push(code.slice(from, start), argumentsIn(call, index));
-			from = call.arguments.at(-1)?.end ?? call.end - 1;
+		for (const span of spans) {
+			pieces.push(code.slice(from, span.start), span.copy(index));
+			from = span.end;
 		}
 		pieces.push(code.slice(from));
 		return pieces.join("");

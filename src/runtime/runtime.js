@@ -267,7 +267,7 @@ export function localizeHref(href, options) {
  * @param {{ locale?: string } | undefined} options
  * @returns {Variant}
  */
-function variantFor(variants, options) {
+export function variantFor(variants, options) {
 	const locale = options?.locale;
 	const index = locale === undefined ? bound() : locales.indexOf(locale);
 	const variant = variants[index];
@@ -306,6 +306,19 @@ function noVariant(variants, locale, index) {
  */
 export function message(...variants) {
 	return (inputs, options) => variantFor(variants, options)(inputs);
+}
+
+/**
+ * A message with markup in a client build: the dispatch its own code makes of its text, with the
+ * one it makes of its parts as `.parts`.
+ *
+ * @template {object} Dispatch
+ * @template Parts
+ * @param {Dispatch} dispatch
+ * @param {Parts} parts
+ */
+export function withParts(dispatch, parts) {
+	return Object.assign(dispatch, { parts });
 }
 
 /**

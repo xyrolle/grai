@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { type EnvironmentOptions, minifySync } from "vite";
+import type { CompiledKey } from "./compilation.ts";
 import type { Build } from "./compile.ts";
-import { keyExports } from "./key-exports.ts";
+import { freshName, keyExports } from "./key-exports.ts";
 import {
 	besideDirectory,
 	inDirectory,
@@ -41,9 +42,43 @@ export function keyModule(
 	const name = id.slice(keyModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
+	if (consumer === "client" && key.kind !== "text")
+		return clientDispatch(outdir, name, key);
 	const names = calledNames([key]);
 	const value = consumer === "server" ? key.serverValue : key.value;
 	return `${outputImports(names, inOutdir(outdir))}\n${keyExports([{ name, value }], everyName(names))}`;
+}
+
+/**
+ * A message with inputs or markup in a client build: its variants in an array of the module's
+ * own, and an export that dispatches to them in its own code, `(i, o) => variantFor(v, o)(i)`.
+ * The engine then sees one key's variants where that code calls one, and the call stays
+ * monomorphic; through `message`, which every key shares, it sees every key's and goes
+ * megamorphic. The module calls nothing as it is evaluated, but `withParts` for markup. A server
+ * keeps `message`: it loads every key, and a function of its own per key would cost it load.
+ */
+function clientDispatch(
+	outdir: string,
+	name: string,
+	key: CompiledKey,
+): string {
+	const markup = key.kind === "markup";
+	const names = calledNames(
+		[key],
+		markup ? ["variantFor", "withParts"] : ["variantFor"],
+	);
+	const bound = new Set([...everyName(names), name]);
+	const variants = freshName("v", bound);
+	bound.add(variants);
+	const parts = freshName("p", bound);
+	const dispatch = (array: string) => `(i, o) => variantFor(${array}, o)(i)`;
+	const arrays = [`const ${variants} = [${key.variants.join(", ")}];\n`];
+	if (markup) arrays.push(`const ${parts} = [${key.parts.join(", ")}];\n`);
+	const value = markup
+		? `/*#__PURE__*/ withParts(${dispatch(variants)}, ${dispatch(parts)})`
+		: dispatch(variants);
+	const taken = new Set([...everyName(names), variants, parts]);
+	return `${outputImports(names, inOutdir(outdir))}\n${arrays.join("")}${keyExports([{ name, value }], taken)}`;
 }
 
 /**
