@@ -12,8 +12,13 @@ const builtPerKeyLoad =
 	/\bimport\s*\(\s*(["'`])[^"'`\r\n]*\/messages\/(?:\$\{|\1\s*\+)|\bimport\.meta\.glob\s*\(\s*["'`][^"'`\r\n]*\/messages\//g;
 /** An index that names no key, or names one in full: a number, a string, a template without `${`. */
 const writtenIndex = /^\s*(?:\d+|"[^"\\]*"|'[^'\\]*'|`[^`\\$]*`)\s*$/;
-const templatePrefix = /^\s*`([^`\\$]*)\$\{/;
-const concatenatedPrefix = /^\s*(["'])([^"'\\]*)\1\s*\+/;
+/**
+ * The indexes whose literal start bounds the keys they reach: a template that starts with text, and
+ * text joined to one name or property. Any other, such as a choice or a longer sum, may reach any key.
+ */
+const templatePrefix = /^\s*`([^`\\$]*)\$\{[^`]*`\s*$/;
+const concatenatedPrefix =
+	/^\s*(["'])([^"'\\]*)\1\s*\+\s*[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*\s*$/;
 /** How far an index is read; one longer than that may name any key. */
 const longestIndex = 500;
 
