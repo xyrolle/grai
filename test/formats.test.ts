@@ -38,6 +38,40 @@ describe("a formatted placeholder", () => {
 		}
 	});
 
+	it("groups digits as useGrouping names it: true and false as Paraglide writes them, or Intl's own modes", async () => {
+		const catalog = {
+			always: "{n: number useGrouping=true}",
+			never: "{n: number useGrouping=false}",
+			min2: "{n :number useGrouping=min2}",
+			compact: "{n :number notation=compact useGrouping=true}",
+		};
+		const { m } = await project({ es: catalog, en: catalog }).load();
+
+		for (const locale of ["es", "en"]) {
+			const options = { locale };
+			const format = (value: number, intl: Intl.NumberFormatOptions) =>
+				new Intl.NumberFormat(locale, intl).format(value);
+			expect(m.always?.({ n: 1000 }, options)).toBe(
+				format(1000, { useGrouping: true }),
+			);
+			expect(m.never?.({ n: 1000 }, options)).toBe(
+				format(1000, { useGrouping: false }),
+			);
+			expect(m.min2?.({ n: 1000 }, options)).toBe(
+				format(1000, { useGrouping: "min2" }),
+			);
+			expect(m.compact?.({ n: 1e15 }, options)).toBe(
+				format(1e15, { notation: "compact", useGrouping: true }),
+			);
+		}
+		expect(m.always?.({ n: 1000 })).toBe("1.000");
+		expect(
+			await errorsOf({ en: { grouping: "{n :number useGrouping=yes}" } }),
+		).toEqual([
+			'message-invalid: messages/en.json: "grouping" (en): {n :number useGrouping=yes}: "useGrouping=yes" needs one of always, auto, min2, true, false, never.',
+		]);
+	});
+
 	it("formats a date as Intl.DateTimeFormat does, with MessageFormat 2's defaults when no option shapes it", async () => {
 		const { m } = await project({
 			en: {

@@ -178,6 +178,23 @@ function selectModeOf(text: string, source: string, token: string): SelectMode {
 
 const digits = /^\d+$/;
 
+/**
+ * useGrouping's values as Intl takes them, by how a message writes them: Intl's modes by name,
+ * and true and false as Paraglide writes them, as booleans, since Intl takes the text "true" for
+ * its default. MessageFormat 2 writes false as never.
+ */
+const groupings: ReadonlyMap<string, OptionValue> = new Map<
+	string,
+	OptionValue
+>([
+	["always", "always"],
+	["auto", "auto"],
+	["min2", "min2"],
+	["true", true],
+	["false", false],
+	["never", false],
+]);
+
 /** An option's value, read from its text by how the option is read. */
 function optionValue(
 	kind: OptionKind,
@@ -194,8 +211,10 @@ function optionValue(
 	switch (kind) {
 		case "text":
 			return text;
-		case "grouping":
-			return text === "never" || text === "false" ? false : text;
+		case "grouping": {
+			const grouping = groupings.get(text);
+			return grouping ?? invalid(`one of ${[...groupings.keys()].join(", ")}`);
+		}
 		case "boolean":
 			return text === "true" || text === "false"
 				? text === "true"
