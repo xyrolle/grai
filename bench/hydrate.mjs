@@ -1,16 +1,20 @@
 // Browser: the message-heavy page (page.mjs) server-rendered, then loaded and hydrated in Chromium,
-// with its messages from Paraglide's client runtime, from grai's per-locale module, inlined into
-// the template, or from i18next or use-intl with the locale's whole catalog in the bundle. Each run
-// is a fresh page with the whole bundle inline, so nothing but parsing, evaluating and hydrating
-// is timed; runs alternate between variants. After hydrating, the page mounts itself again, the
-// client work of a locale switch that does not reload.
+// with its messages from Paraglide's client runtime; from grai's client build, its locale's copies
+// or every locale's chunks (browser-bundle.mjs); from i18next or use-intl with the locale's whole
+// catalog in the bundle; or inlined into the template by the prototype. Each run is a fresh page
+// with the whole bundle inline, so nothing but parsing, evaluating and hydrating is timed; runs
+// alternate between variants. After hydrating, the page mounts itself again, the client work of a
+// locale switch that does not reload.
 //   node hydrate.mjs [app...]
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { brotliCompressSync } from "node:zlib";
 import { chromium } from "playwright-core";
-import { rolldown } from "rolldown";
 import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
+import { browserBundle } from "./browser-bundle.mjs";
+import { benchDocument, benchPage } from "./chromium.mjs";
+import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { PAGE_CALLS, pageProps, pageSource, writePage } from "./page.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
@@ -35,37 +39,15 @@ app = mount(Page, { target, props });
 window.bench = { started, evaluated, hydrated, mounted: performance.now() - unmounted, text };
 `;
 
-async function bundle(page) {
-	const build = await rolldown({
-		input: "entry",
-		platform: "browser",
-		resolve: { conditionNames: ["production", "browser", "import", "default"] },
-		plugins: [
-			{
-				name: "entry",
-				resolveId: (id) => (id === "entry" ? id : null),
-				load: (id) => (id === "entry" ? entry(page) : null),
-			},
-		],
-		logLevel: "silent",
-	});
-	const { output } = await build.generate({
-		format: "esm",
-		minify: true,
-		banner: "const started = performance.now();",
-	});
-	await build.close();
-	return output[0].code;
-}
-
 async function variants(app, locale) {
-	const prototype = writePrototype(app);
+	const grai = join((await graiOutput(app)).outdir, "keys.js");
 	const { directory: libraries } = writeLibraryModules(app, locale);
 	return {
 		Paraglide: { from: join(await paraglideOutput(app), "messages/_index.js") },
-		"grai, per-locale module": { from: join(prototype, `${locale}.js`) },
-		"inlined into the template": {
-			from: join(prototype, `${locale}.js`),
+		"grai, the locale's copies": { from: grai, grai: { app, locale } },
+		"grai, every locale's chunks": { from: grai, grai: { app } },
+		"prototype, inlined into the template": {
+			from: join(writePrototype(app), `${locale}.js`),
 			inline: app.messages[locale],
 		},
 		i18next: {
@@ -81,19 +63,27 @@ async function variants(app, locale) {
 }
 
 async function documentFor(app, locale, file, variant, props) {
+	const name = `hydrate-${locale}-${file}`;
 	const source = pageSource(app, variant);
 	const { default: ServerPage } = await import(
-		writePage(app, `hydrate-${locale}-${file}`, source, "server")
+		writePage(app, name, source, "server")
 	);
 	const { body, head } = await inRequest(app, locale, () =>
 		render(ServerPage, { props }),
 	);
-	const code = await bundle(
-		writePage(app, `hydrate-${locale}-${file}`, source, "client"),
-	);
-	const script = code.replaceAll("</script", "<\\/script");
+	const page = writePage(app, name, source, "client");
+	const entryFile = page.replace(/\.client\.js$/, ".entry.js");
+	writeFileSync(entryFile, entry(page));
+	const code = await browserBundle(entryFile, {
+		banner: "const started = performance.now();",
+		grai: variant.grai,
+	});
 	const json = JSON.stringify(props).replaceAll("<", "\\u003c");
-	const html = `<!doctype html><html lang="${locale}"><head><meta charset="utf-8">${head}</head><body><div id="app">${body}</div><script id="props" type="application/json">${json}</script><script type="module">${script}</script></body></html>`;
+	const html = benchDocument(locale, {
+		head,
+		body: `<div id="app">${body}</div><script id="props" type="application/json">${json}</script>`,
+		script: code,
+	});
 	return {
 		html,
 		bytes: {
@@ -115,30 +105,18 @@ async function benchLocale(browser, app, locale) {
 			...(await documentFor(app, locale, documents.length, variant, props)),
 		});
 	}
-	const { strategy, cookieName } = app.compilerOptions;
-	const path =
-		strategy[0] === "url" && locale !== app.baseLocale
-			? `/${locale}/page`
-			: "/page";
 	let expected;
 	for (const rate of THROTTLING) {
 		const samples = documents.map(() => []);
 		for (let run = 0; run < RUNS; run++) {
 			for (const [index, document] of documents.entries()) {
-				const context = await browser.newContext();
-				await context.addCookies([
-					{ name: cookieName, value: locale, url: "https://bench.test/" },
-				]);
-				const page = await context.newPage();
-				const cdp = await context.newCDPSession(page);
-				await cdp.send("Emulation.setCPUThrottlingRate", { rate });
-				await page.route("https://bench.test/**", (route) =>
-					route.fulfill({ contentType: "text/html", body: document.html }),
+				const result = await benchPage(
+					browser,
+					app,
+					locale,
+					document.html,
+					rate,
 				);
-				await page.goto(`https://bench.test${path}`);
-				const result = await page
-					.waitForFunction(() => window.bench)
-					.then((handle) => handle.jsonValue());
 				// Svelte trims the spaces at the edges of an element's text, so the words are compared.
 				const text = result.text.replace(/\s+/g, "");
 				expected ??= text;
@@ -147,7 +125,6 @@ async function benchLocale(browser, app, locale) {
 						`${document.name} hydrates other text than Paraglide in ${locale}`,
 					);
 				samples[index].push(result);
-				await context.close();
 			}
 		}
 		for (const [index, document] of documents.entries()) {
