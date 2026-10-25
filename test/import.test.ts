@@ -400,6 +400,57 @@ describe("grai import --from icu", () => {
 		expect(m.nested?.({ g: "x", n: 3 }, { locale: "ru" })).toBe("их коты");
 	});
 
+	it("chooses on an input in several places of a message, as one selection", async () => {
+		const m = await imported("icu", {
+			"en.json": {
+				agree:
+					"{n, plural, =0 {No} one {# cat} other {# cats}} {n, plural, one {is} other {are}} here",
+				said: "{g, select, male {He} other {They}} said {g, select, male {his} other {their}}",
+				within:
+					"{n, plural, =0 {none} one {one} other {{n, plural, =1 {never} other {#}}}}",
+				crossed:
+					"{g, select, a {A} other {B}} {h, select, x {X} other {{g, select, b {Gb} other {Go}}}}",
+			},
+			"ru.json": {
+				agree:
+					"{n, plural, one {# кот} few {# кота} other {# котов}} {n, plural, one {здесь} other {тут}}",
+				said: "{g, select, male {Он} other {Они}}: {g, select, male {его} other {их}}",
+				within: "{n, plural, other {#}}",
+				crossed: "{g, select, other {B}} {h, select, other {X}}",
+			},
+		}).load();
+
+		expect(counts((n) => m.agree?.({ n }))).toEqual([
+			"No are here",
+			"1 cat is here",
+			"2 cats are here",
+			"5 cats are here",
+			"21 cats are here",
+		]);
+		expect(counts((n) => m.agree?.({ n }, { locale: "ru" }))).toEqual([
+			"0 котов тут",
+			"1 кот здесь",
+			"2 кота тут",
+			"5 котов тут",
+			"21 кот здесь",
+		]);
+		expect(m.said?.({ g: "male" })).toBe("He said his");
+		expect(m.said?.({ g: "x" })).toBe("They said their");
+		expect([0, 1, 2].map((n) => m.within?.({ n }))).toEqual([
+			"none",
+			"one",
+			"2",
+		]);
+		expect(
+			[
+				["a", "x"],
+				["b", "x"],
+				["b", "y"],
+				["c", "y"],
+			].map(([g, h]) => m.crossed?.({ g, h })),
+		).toEqual(["A X", "B X", "B Gb", "B Go"]);
+	});
+
 	it("converts selectordinal with # and =n into an ordinal plural", async () => {
 		const m = await imported("icu", {
 			"en.json": {

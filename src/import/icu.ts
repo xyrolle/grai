@@ -1,32 +1,35 @@
 import { categoriesOf, type PluralType } from "../plurals.ts";
 import { MessageProblem } from "../problem.ts";
 import {
-	type Branch,
 	type Converted,
-	combine,
 	escapeText,
 	type ImportedMessage,
-	plain,
 	pluralLocal,
-	pluralOptionKeys,
 	type SourceEntry,
 	textOf,
-	withKeys,
 } from "./converted.ts";
+import { pluralNeeds, selectNeeds } from "./icu-option-needs.ts";
 import {
 	type ChoiceKind,
 	type IcuNode,
 	type IcuOption,
 	parseIcu,
 } from "./icu-parse.ts";
+import {
+	followed,
+	needing,
+	plainReading,
+	type Reading,
+} from "./icu-readings.ts";
+import { variantsOf } from "./icu-variants.ts";
 
 /**
  * Converts one locale's ICU MessageFormat messages, as next-intl, react-intl and intl-messageformat
- * read them, to grai's format: `plural`, `selectordinal` and `select`, nested or in sequence,
- * become MessageFormat 2 selectors outermost first, `=n` an exact match on the input, `other` the
- * catch-all `*`, `#` the count formatted with `:number`, as ICU formats it, a formatted argument
- * its MessageFormat 2 call, and a tag markup. A message grai cannot express gets the reason as its
- * result.
+ * read them, to grai's format: `plural`, `selectordinal` and `select`, nested, in sequence or on
+ * the same input again, become one selection with MessageFormat 2 selectors outermost first, `=n`
+ * an exact match on the input, `other` the catch-all `*`, `#` the count formatted with `:number`,
+ * as ICU formats it, a formatted argument its MessageFormat 2 call, and a tag markup. A message
+ * grai cannot express gets the reason as its result.
  */
 export function convertIcu(
 	entries: readonly SourceEntry[],
@@ -45,15 +48,21 @@ export function convertIcu(
 function convertMessage(source: string, locale: string): Converted {
 	const nodes = parseIcu(source);
 	const converter = new IcuConverter(locale, nodes);
-	const branches = converter.expand(nodes, undefined);
+	const readings = converter.expand(nodes, undefined);
 	return {
 		declarations: converter.declarations,
 		selectors: converter.selectors,
-		branches,
+		branches: variantsOf(
+			readings,
+			converter.selectors.map((name) => ({
+				name,
+				values: converter.categoriesOf(name),
+			})),
+		),
 	};
 }
 
-/** Expands a message's nodes into its branches, and collects the selectors and declarations they need. */
+/** Expands a message's nodes into the ways it reads, collecting the selectors and declarations. */
 class IcuConverter {
 	readonly declarations: string[] = [];
 	readonly selectors: string[] = [];
@@ -62,52 +71,50 @@ class IcuConverter {
 	private readonly inputs: ReadonlySet<string>;
 	/** Each counted input's plural local of each type, declared once. */
 	private readonly locals = new Map<string, string>();
+	/** The type of each plural local, by its name. */
+	private readonly localTypes = new Map<string, PluralType>();
 
 	constructor(locale: string, nodes: readonly IcuNode[]) {
 		this.locale = locale;
 		this.inputs = new Set(namesIn(nodes));
 	}
 
-	/** Every way the nodes read, each with the selector values it needs; `count` is what `#` shows. */
-	expand(nodes: readonly IcuNode[], count: string | undefined): Branch[] {
-		let branches: Branch[] = [plain("")];
-		const chosen = new Set<string>();
+	/** Every way the nodes read, each with what it needs of the selectors; `#` shows `count`. */
+	expand(nodes: readonly IcuNode[], count: string | undefined): Reading[] {
+		let readings = [plainReading("")];
 		for (const node of nodes) {
-			for (const name of new Set(choicesIn(node))) {
-				if (chosen.has(name)) {
-					throw new MessageProblem(
-						"unsupported",
-						`it chooses on ${name} twice in one sentence, which grai cannot express. Choose once, around the whole sentence.`,
-					);
-				}
-				chosen.add(name);
-			}
-			branches = combine(branches, this.node(node, count));
+			readings = followed(readings, this.node(node, count));
 		}
-		return branches;
+		return readings;
 	}
 
-	private node(node: IcuNode, count: string | undefined): Branch[] {
+	/** The categories a selector takes when it is a plural local, which are all it can take. */
+	categoriesOf(selector: string): readonly string[] | undefined {
+		const type = this.localTypes.get(selector);
+		return type === undefined ? undefined : categoriesOf(this.locale, type);
+	}
+
+	private node(node: IcuNode, count: string | undefined): Reading[] {
 		switch (node.type) {
 			case "text":
-				return [plain(escapeText(node.value))];
+				return [plainReading(escapeText(node.value))];
 			case "argument":
 				return [
-					plain(
+					plainReading(
 						node.format === undefined
 							? `{${node.name}}`
 							: `{${node.name} ${node.format}}`,
 					),
 				];
 			case "pound":
-				return [plain(count === undefined ? "#" : `{${count} :number}`)];
+				return [plainReading(count === undefined ? "#" : `{${count} :number}`)];
 			case "tag":
-				return combine(
-					combine(
-						[plain(`{#${node.name}}`)],
+				return followed(
+					followed(
+						[plainReading(`{#${node.name}}`)],
 						this.expand(node.children, count),
 					),
-					[plain(`{/${node.name}}`)],
+					[plainReading(`{/${node.name}}`)],
 				);
 			case "choice":
 				return node.kind === "select"
@@ -119,12 +126,13 @@ class IcuConverter {
 	private select(
 		node: { name: string; options: IcuOption[] },
 		count: string | undefined,
-	): Branch[] {
+	): Reading[] {
 		this.claim(node.name);
 		for (const { key } of node.options) checkVariantKey(node.name, key);
+		const keys = node.options.map(({ key }) => key);
 		return node.options.flatMap(({ key, nodes }) =>
-			this.expand(nodes, count).map((branch) =>
-				key === "other" ? branch : withKeys(branch, [[node.name, key]]),
+			this.expand(nodes, count).flatMap((reading) =>
+				needing(reading, selectNeeds(node.name, key, keys)),
 			),
 		);
 	}
@@ -132,7 +140,7 @@ class IcuConverter {
 	private plural(
 		node: { name: string; options: IcuOption[] },
 		type: PluralType,
-	): Branch[] {
+	): Reading[] {
 		const local = this.pluralLocal(node.name, type);
 		this.claim(local);
 		if (node.options.some((option) => option.key.startsWith("="))) {
@@ -147,11 +155,13 @@ class IcuConverter {
 		for (const { key } of chosen) {
 			checkVariantKey(node.name, key.replace(/^=/, ""));
 		}
-		return chosen.flatMap(({ key, nodes }) =>
-			this.expand(nodes, node.name).map((branch) =>
-				withKeys(branch, pluralOptionKeys(node.name, local, key)),
-			),
-		);
+		const keys = chosen.map(({ key }) => key);
+		return chosen.flatMap(({ key, nodes }) => {
+			const needs = pluralNeeds(node.name, local, key, keys);
+			return this.expand(nodes, node.name).flatMap((reading) =>
+				needing(reading, needs),
+			);
+		});
 	}
 
 	/** The local that holds an input's category of a type, declared the first time a choice counts it. */
@@ -160,6 +170,7 @@ class IcuConverter {
 		if (known !== undefined) return known;
 		const local = pluralLocal(input, type, this.inputs);
 		this.locals.set(`${type} ${input}`, local.name);
+		this.localTypes.set(local.name, type);
 		this.declarations.push(local.declaration);
 		return local.name;
 	}
@@ -179,19 +190,6 @@ class IcuConverter {
 /** The plural rules each of ICU's counting choices takes. */
 const pluralTypes: Readonly<Record<Exclude<ChoiceKind, "select">, PluralType>> =
 	{ plural: "cardinal", selectordinal: "ordinal" };
-
-/** The inputs a node chooses on, its own choice and the ones nested in it. */
-function* choicesIn(node: IcuNode): Generator<string> {
-	if (node.type === "tag") {
-		for (const child of node.children) yield* choicesIn(child);
-	}
-	if (node.type === "choice") {
-		yield node.name;
-		for (const option of node.options) {
-			for (const child of option.nodes) yield* choicesIn(child);
-		}
-	}
-}
 
 /** Every input the nodes read, in arguments and choices. */
 function* namesIn(nodes: readonly IcuNode[]): Generator<string> {
