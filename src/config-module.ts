@@ -46,7 +46,7 @@ const rightToLeft = new Set([
 ]);
 
 /** The direction a locale's script is written in, from its likely script. */
-function directionOf(locale: string): "ltr" | "rtl" {
+export function directionOf(locale: string): "ltr" | "rtl" {
 	const script = new Intl.Locale(locale).maximize().script;
 	return script !== undefined && rightToLeft.has(script) ? "rtl" : "ltr";
 }
