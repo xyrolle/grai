@@ -9,7 +9,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { messageEntries } from "./catalog-entries.ts";
 import { keyOf } from "./catalog-keys.ts";
-import { withKeyRenamed, withoutKeys } from "./catalog-text.ts";
+import { tabbedLayout } from "./catalog-layout.ts";
+import { withKeyRenamed, withMessages, withoutKeys } from "./catalog-text.ts";
 import { type Config, isRecord } from "./config.ts";
 import { GraiError } from "./error.ts";
 
@@ -48,6 +49,15 @@ export function readDescriptions(config: Config): Descriptions {
 		);
 	}
 	return new Map(texts);
+}
+
+/** The text of a new descriptions file, an entry per line indented by a tab. */
+export function descriptionsText(descriptions: Descriptions): string {
+	return withMessages(
+		"{}\n",
+		[...descriptions].map(([key, text]) => [[key], text]),
+		tabbedLayout,
+	);
 }
 
 /** The descriptions file's text with a key renamed, as `grai rename` renames it; undefined when the file does not describe it. */

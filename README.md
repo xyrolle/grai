@@ -220,7 +220,7 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `identicalToBase` | Optional. Per locale, the keys whose message rightly reads as the base locale's, such as a unit: `{ "de": ["unit_km"] }`. `grai check` and `grai export` take them as translated, and `grai check` reports one whose message is no longer the base text. |
 | `fallbacks` | Optional. Each locale that takes the messages it lacks from another locale of its language: `{ "en-GB": "en" }`. Its catalog may then hold only the messages that differ. |
 | `pseudoLocale` | Optional. A locale, such as `"en-XA"`, made from the base's messages for development and tests: accented, about 35% longer and in brackets. It needs the base's plural categories; `grai watch` and the Vite dev server compile it, and no build does. |
-| `descriptions` | Optional. A JSON file of each key's description for translators, such as `{ "open": "A verb: the button opens the menu" }`. `grai export` writes each as a note of the key's units, and `grai rename` and `grai check --fix` keep it in step. |
+| `descriptions` | Optional. A JSON file of each key's description for translators, such as `{ "open": "A verb: the button opens the menu" }`. `grai export` writes each as a note of the key's units, `grai import` fills it from FormatJS's descriptions, and `grai rename` and `grai check --fix` keep it in step. |
 
 ## Measured
 
@@ -278,6 +278,9 @@ Paraglide's inlang message-format catalogs compile unchanged, and its calls stay
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
 - **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments with their styles and skeletons, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
 - **Left out:** anything else, from every locale, and named in the report.
+- **Kept beside them:** FormatJS's descriptions, in the file the config's `descriptions` names.
+
+From Lingui's PO catalogs, have Lingui write them as JSON instead, with its `@lingui/format-json` format and `style: "minimal"`: each message id then maps to its ICU message, which `--from icu` imports. A message's id becomes its key, so the messages need explicit ids, such as `cart.title`, not ids made from their text.
 
 A key becomes its path joined by `_`, so `t("cart.title")` becomes `m.cart_title()`. The import writes `grai.import.json` beside the config, mapping each key as the source's calls name it, an i18next namespace included (`common:cart.title`), to its grai key and the inputs it takes. `grai migrate` then rewrites each call that names its message plainly, from i18next, react-i18next, next-intl or react-intl, and lists every other call for a person: [docs/migrating.md](docs/migrating.md).
 

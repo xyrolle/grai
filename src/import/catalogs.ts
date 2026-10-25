@@ -25,10 +25,11 @@ export type ImportedKey = {
 	markup: boolean;
 };
 
-/** The catalogs of an import, the keys each holds, and its report. */
+/** The catalogs of an import, the keys each holds, what the sources tell translators of them, and its report. */
 export type ImportedCatalogs = ImportReport & {
 	files: CatalogFile[];
 	keys: ImportedKey[];
+	descriptions: Map<string, string>;
 };
 
 /** A locale's catalog value for a key, the message it compiles to, and how its source calls it. */
@@ -56,6 +57,7 @@ export function catalogsOf(
 			catalog: new Map([["$schema", schema]]),
 		})),
 		keys: [],
+		descriptions: new Map(),
 		leftOut: [],
 		changed: [],
 	};
@@ -66,6 +68,8 @@ export function catalogsOf(
 			const value = values.get(locale)?.value;
 			if (value !== undefined) catalog.set(key, value);
 		}
+		const description = descriptionOf(key, messages, config.baseLocale);
+		if (description !== undefined) imported.descriptions.set(key, description);
 		imported.keys.push(importedKey(key, values));
 	}
 	return imported;
@@ -84,6 +88,17 @@ function importedKey(
 		inputs: [...new Set(inputs)].sort(),
 		markup: inLocales.some(({ compiled }) => compiled.markup),
 	};
+}
+
+/** What the sources tell translators of a key: the base locale's source, or the first locale's that does. */
+function descriptionOf(
+	key: string,
+	messages: MessagesByLocale,
+	baseLocale: string,
+): string | undefined {
+	return [messages.get(baseLocale), ...messages.values()]
+		.map((byKey) => byKey?.get(key)?.description)
+		.find((description) => description !== undefined);
 }
 
 /** Every key, the base locale's in its order first. */
