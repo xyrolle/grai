@@ -8,7 +8,7 @@
 //   node hydrate.mjs [app...]
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { brotliCompressSync } from "node:zlib";
+import { brotliCompressSync, gzipSync } from "node:zlib";
 import { chromium } from "playwright-core";
 import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
@@ -89,6 +89,7 @@ async function documentFor(app, locale, file, variant, props) {
 		bytes: {
 			raw: Buffer.byteLength(code),
 			brotli: brotliCompressSync(code).length,
+			gzip: gzipSync(code).length,
 		},
 	};
 }
@@ -128,7 +129,8 @@ async function benchLocale(browser, app, locale) {
 		for (const [index, document] of documents.entries()) {
 			const runs = samples[index];
 			const cell = (pick) => median(runs.map(pick)).toFixed(1);
-			const kb = `${(document.bytes.brotli / 1024).toFixed(1)} (${(document.bytes.raw / 1024).toFixed(0)})`;
+			const { brotli, gzip, raw } = document.bytes;
+			const kb = `${(brotli / 1024).toFixed(1)} / ${(gzip / 1024).toFixed(1)} (${(raw / 1024).toFixed(0)})`;
 			console.log(
 				`| ${document.name} | ${locale} | ${rate}× | ${kb} | ${cell((r) => r.started)} | ${cell((r) => r.evaluated - r.started)} | ${cell((r) => r.hydrated - r.evaluated)} | ${cell((r) => r.hydrated)} | ${cell((r) => r.mounted)} |`,
 			);
@@ -142,7 +144,7 @@ for (const app of selectedApps()) {
 		`\n### ${app.name}: a page with ${PAGE_CALLS} message calls in Chromium ${browser.version()} (Paraglide ${paraglideVersion}), median of ${RUNS} loads, ms\n`,
 	);
 	console.log(
-		"| variant | locale | CPU slowdown | JS KB brotli (raw) | script starts | evaluates | hydrates | hydrated at | mounts again |",
+		"| variant | locale | CPU slowdown | JS KB brotli / gzip (raw) | script starts | evaluates | hydrates | hydrated at | mounts again |",
 	);
 	console.log("|---|---|---|---|---|---|---|---|---|");
 	for (const locale of [app.baseLocale, otherLocale(app)])
