@@ -64,7 +64,7 @@
 		"build": "tsc -p tsconfig.build.json",
 		"prepack": "pnpm build",
 		"check": "biome check .",
-		"typecheck": "tsc && tsc -p tsconfig.runtime.json && pnpm --filter sveltekit-example typecheck",
+		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
 		"test": "vitest run",
 		"test:performance": "node scripts/performance.ts"
 	},

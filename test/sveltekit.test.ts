@@ -75,6 +75,17 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 	}, 60_000);
 	afterAll(() => server?.kill());
 
+	// As an app's checker sees it: the example's code and output against grai's built declarations.
+	it("type-checks, under Kit's own checkJs", () => {
+		run("svelte-kit", ["sync"]);
+		run("svelte-check", [
+			"--tsconfig",
+			"./tsconfig.json",
+			"--tsgo-experimental-api",
+			"--fail-on-warnings",
+		]);
+	});
+
 	it("renders a page in the locale its prefix names, routed without the prefix", async () => {
 		const page = await open(origin, "/ro/about");
 		expect(await html(page, "lang")).toBe("ro");
