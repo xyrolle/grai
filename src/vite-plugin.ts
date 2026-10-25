@@ -13,6 +13,7 @@ import {
 } from "./locale-chunks.ts";
 import { moduleOf } from "./message-imports.ts";
 import { shippedMissingKeyCalls } from "./missing-key-calls.ts";
+import { realPath } from "./real-path.ts";
 import {
 	chunkFileName,
 	keyModule,
@@ -83,11 +84,12 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 	const plugin: Plugin = {
 		name: "grai",
 		config(config, environment) {
-			const configFile = resolve(
-				config.root ?? "",
-				options.config ?? "grai.config.json",
+			// Real paths, as the bundler names modules: a project reached through a symlink would
+			// otherwise match none of its own module ids.
+			const configFile = realPath(
+				resolve(config.root ?? "", options.config ?? "grai.config.json"),
 			);
-			const { outdir } = readConfig(configFile);
+			const outdir = realPath(readConfig(configFile).outdir);
 			files = { configFile, outdir, keysFile: join(outdir, "keys.js") };
 			serving = environment.command === "serve";
 			testing = environment.mode === "test";
