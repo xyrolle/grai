@@ -20,6 +20,7 @@
 		"url-bytes": "node url-bytes.mjs",
 		"variants": "node variants.mjs",
 		"preload": "node preload.mjs",
+		"page-locale": "node page-locale.mjs",
 		"plurals": "node plurals.mjs",
 		"ordinals": "node ordinals.mjs",
 		"intl": "node intl.mjs",
