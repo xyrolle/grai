@@ -7,6 +7,9 @@ declare module "grai/next/output/runtime.js" {
 	export function setLocale(locale: string): void;
 	export function assertIsLocale(value: unknown): string;
 	export function deLocalizeUrl(url: string | URL): URL;
+}
+
+declare module "grai/next/output/dispatch.js" {
 	/** A request's locale, by its position in `locales`; `setLocale` in the request changes it in place. */
 	export type RequestLocale = { index: number };
 	export function bindRequests(storage: {
