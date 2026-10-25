@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
-import { tabbedLayout, withMessages } from "../catalog-text.ts";
+import type { KeyPath } from "../catalog-keys.ts";
+import { tabbedLayout } from "../catalog-layout.ts";
+import { withMessages } from "../catalog-text.ts";
 import { GraiError } from "../error.ts";
 import { writeAll } from "../write-all.ts";
 import type { CatalogFile } from "./catalogs.ts";
@@ -32,7 +34,14 @@ export function writeCatalogs(
 		mkdirSync(dirname(path), { recursive: true });
 		texts.set(
 			path,
-			withMessages("{}\n", Object.entries(catalog), tabbedLayout),
+			withMessages(
+				"{}\n",
+				Object.entries(catalog).map(([key, value]): [KeyPath, unknown] => [
+					[key],
+					value,
+				]),
+				tabbedLayout,
+			),
 		);
 	}
 	writeAll(texts);

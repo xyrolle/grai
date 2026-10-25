@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, extname, relative } from "node:path";
 import { catalogWithMessages } from "./catalog-file.ts";
+import type { KeyPath } from "./catalog-keys.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { readLocaleCatalogs } from "./locale-catalogs.ts";
@@ -93,7 +94,19 @@ export async function mergeDocument(
 	if (merged.messages.length > 0) {
 		const like = config.catalogs.get(base.locale) ?? path;
 		writeAll(
-			new Map([[path, catalogWithMessages(path, merged.messages, like)]]),
+			new Map([
+				[
+					path,
+					catalogWithMessages(
+						path,
+						merged.messages.map(([key, value]): [KeyPath, unknown] => [
+							[key],
+							value,
+						]),
+						like,
+					),
+				],
+			]),
 		);
 	}
 	return {

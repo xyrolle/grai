@@ -1,6 +1,5 @@
 import { join, relative } from "node:path";
-import { catalogEntries } from "./catalog-entries.ts";
-import { withoutEntries } from "./catalog-text.ts";
+import { withoutKeys } from "./catalog-text.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
@@ -104,10 +103,7 @@ export async function removeUnusedKeys(
 	const texts = new Map<string, string>();
 	for (const { file, bytes } of read.sources) {
 		const text = bytes.toString("utf8");
-		texts.set(
-			join(config.root, file),
-			withoutEntries(text, catalogEntries(text), removed),
-		);
+		texts.set(join(config.root, file), withoutKeys(text, removed));
 	}
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
