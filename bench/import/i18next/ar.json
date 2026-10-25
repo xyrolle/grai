@@ -13,6 +13,7 @@
 	},
 	"braces": "ar {literal} \\\\",
 	"see": "ar $t(cart.title)",
+	"passes": "{{x {{-name}} y}} {{}} $t($t(cart.title)",
 	"friend": "ar friend",
 	"friend_male": "ar boyfriend",
 	"place_ordinal_other": "{{count}}.",

@@ -11,6 +11,7 @@
 	},
 	"braces": "Скобки {literal} и \\\\ слэш",
 	"see": "См. $t(cart.title)",
+	"passes": "{{x {{-name}} y}}, {{}} и $t($t(cart.title)",
 	"friend": "Друг",
 	"friend_male": "Парень",
 	"place_ordinal_other": "{{count}}-й",
