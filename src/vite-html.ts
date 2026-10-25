@@ -5,7 +5,12 @@ import type {
 } from "vite";
 import type { Config } from "./config.ts";
 import { besideDirectory, messageOnly } from "./locale-chunks.ts";
-import { localeScript, type PageChunks } from "./locale-script.ts";
+import {
+	cspHash,
+	importMapText,
+	localeScript,
+	type PageChunks,
+} from "./locale-script.ts";
 import { isMessageChunk, localeDirectory } from "./message-directories.ts";
 
 /**
@@ -42,21 +47,29 @@ export type Site = {
 };
 
 /**
- * A page with its locale script, and in a build that copies the message chunks per locale, the
- * page's chunks for it. A build minifies the script; dev serves it as written.
+ * A page with its locale script, and the Content Security Policy hashes of what the script runs
+ * and writes: itself, and in a build that copies the message chunks per locale, each locale's
+ * import map. A build minifies the script; dev serves it as written.
  */
 export function withPageLocale(
 	html: string,
 	context: IndexHtmlTransformContext,
 	config: Config,
 	site: Site,
-): string {
+): { html: string; hashes: string[] } {
 	const script = localeScript(config, context.bundle !== undefined);
 	const chunks =
 		context.bundle === undefined
 			? undefined
 			: pageChunks(context.bundle, context.chunk, context.path.slice(1), site);
-	return withLocaleScript(html, script, chunks);
+	const maps =
+		chunks === undefined
+			? []
+			: config.locales.map((locale) => importMapText(chunks, locale));
+	return {
+		html: withLocaleScript(html, script, chunks),
+		hashes: [script, ...maps].map(cspHash),
+	};
 }
 
 /** The first module script or module preload of a page, which the locale script goes ahead of. */

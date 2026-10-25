@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { build, createServer, type InlineConfig } from "vite";
+import { build, createLogger, createServer, type InlineConfig } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import type { GraiOptions } from "../src/vite-plugin.ts";
@@ -29,24 +29,34 @@ function site(config: Record<string, unknown>) {
 	return dir;
 }
 
-/** A static build of the site, with each message chunk's copies per locale unless told not to. */
+/**
+ * A static build of the site, with each message chunk's copies per locale unless told not to,
+ * and the lines its log wrote.
+ */
 async function built(
 	dir: string,
 	vite: InlineConfig = {},
 	options: GraiOptions = { localeChunks: true },
 ) {
+	const logged: string[] = [];
+	const customLogger = createLogger("info");
+	customLogger.info = (line) => {
+		logged.push(line);
+	};
 	await build({
 		root: dir,
 		configFile: false,
-		logLevel: "silent",
+		customLogger,
 		plugins: [grai(options)],
 		build: { outDir: join(dir, "dist") },
 		...vite,
 	});
-	return { dist: join(dir, "dist") };
+	return { dist: join(dir, "dist"), logged };
 }
 
 type Visit = {
+	/** The response headers of every file. */
+	headers?: Record<string, string>;
 	/** What a server makes of the built page before sending it. */
 	served?: (html: string) => string;
 	/** What the visitor stored before. */
@@ -55,12 +65,12 @@ type Visit = {
 
 /**
  * A visitor whose browser is in Romanian, as Moldova has it, opening a built site at `url`: what
- * it sees, and the message chunks its browser requested.
+ * it sees, the message chunks its browser requested, and what its Content Security Policy refused.
  */
 async function visit(
 	dist: string,
 	url: string,
-	{ served = (html) => html, stored }: Visit,
+	{ headers = {}, served = (html) => html, stored }: Visit,
 ) {
 	const browser = await chromium.launch();
 	onTestFinished(() => browser.close());
@@ -71,6 +81,11 @@ async function visit(
 		);
 	}
 	const tab = await context.newPage();
+	const refused: string[] = [];
+	tab.on("console", (message) => {
+		if (message.text().includes("Content Security Policy"))
+			refused.push(message.text());
+	});
 	const requested: string[] = [];
 	await tab.route("http://grai.test/**", (route) => {
 		const path = new URL(route.request().url()).pathname;
@@ -81,6 +96,7 @@ async function visit(
 		return route.fulfill({
 			body: html ? served(body) : body,
 			contentType: html ? "text/html" : "text/javascript",
+			headers,
 		});
 	});
 	await tab.goto(`http://grai.test${url}`);
@@ -93,7 +109,7 @@ async function visit(
 	/** The message chunks the browser requested: the shared ones under grai/, and the copies. */
 	const messageFiles = () =>
 		requested.filter((path) => /\/grai(-[^/]+)?\/[^/]+$/.test(path));
-	return { tab, seen, messageFiles };
+	return { tab, seen, messageFiles, refused };
 }
 
 describe("a page's locale, when no server picks it", () => {
@@ -220,6 +236,42 @@ export const show = (title) => { document.body.textContent = title + " " + m.che
 	expect(await seen()).toBe("ro ltr Coșul tău Plata");
 	expect(messageFiles().length).toBeGreaterThan(1);
 	expect(messageFiles().every((path) => path.includes("/grai-ro/"))).toBe(true);
+});
+
+describe("a page's locale script under a Content Security Policy", () => {
+	it("runs, and loads the locale's copies, with the hashes the build's log names", async () => {
+		const { dist, logged } = await built(
+			site({ strategy: ["preferredLanguage"] }),
+		);
+		const hashes = logged
+			.join("\n")
+			.match(/'sha256-[A-Za-z0-9+/=]+'/g)
+			?.join(" ");
+		const { seen, messageFiles, refused } = await visit(dist, "/", {
+			headers: { "content-security-policy": `script-src 'self' ${hashes}` },
+		});
+
+		expect(await seen()).toBe("ro ltr Coșul tău");
+		expect(messageFiles().every((path) => path.includes("/grai-ro/"))).toBe(
+			true,
+		);
+		expect(refused).toEqual([]);
+	});
+
+	it("gives the import map it writes its nonce, under a policy that allows scripts by nonce", async () => {
+		const { dist } = await built(site({ strategy: ["preferredLanguage"] }), {
+			html: { cspNonce: "a-nonce" },
+		});
+		const { seen, messageFiles, refused } = await visit(dist, "/", {
+			headers: { "content-security-policy": "script-src 'nonce-a-nonce'" },
+		});
+
+		expect(await seen()).toBe("ro ltr Coșul tău");
+		expect(messageFiles().every((path) => path.includes("/grai-ro/"))).toBe(
+			true,
+		);
+		expect(refused).toEqual([]);
+	});
 });
 
 it("points a page in a subdirectory, under a relative base, at the copies from its own directory", async () => {

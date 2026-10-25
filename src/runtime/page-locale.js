@@ -37,7 +37,8 @@
  *
  * In a build that copies each message chunk per locale, the script's `data-grai-chunks` names the
  * page's chunks, and it maps them to the locale's copies with an import map, before any module
- * loads, then preloads the copies the page's entry imports.
+ * loads, then preloads the copies the page's entry imports. It gives both its own nonce, for a page
+ * whose Content Security Policy allows scripts by nonce.
  *
  * @param {PageSettings} settings
  * @param {(locales: readonly string[]) => (range: string) => string[]} localeReach
@@ -141,12 +142,14 @@ export function pickPageLocale(settings, localeReach) {
 	const copies = JSON.parse(chunks.replaceAll("{locale}", root.lang));
 	const map = document.createElement("script");
 	map.type = "importmap";
+	map.nonce = script.nonce;
 	map.textContent = JSON.stringify({ imports: copies.imports });
 	document.head.append(map);
 	for (const href of copies.preload) {
 		const link = document.createElement("link");
 		link.rel = "modulepreload";
 		link.crossOrigin = "";
+		link.nonce = script.nonce;
 		link.href = href;
 		document.head.append(link);
 	}
