@@ -12,6 +12,17 @@ const counted = (match: Record<string, string>) => [
 	},
 ];
 
+/** A message with these declarations, selecting on these selectors, with one variant of *. */
+const selecting = (declarations: string[], selectors: string[]) => [
+	{
+		declarations,
+		selectors,
+		match: {
+			[[...new Set(selectors)].map((name) => `${name}=*`).join(",")]: "x",
+		},
+	},
+];
+
 describe("the config", () => {
 	it("is an error when there is none", async () => {
 		const { dir } = project({ en: { title: "Title" } });
@@ -302,6 +313,23 @@ describe("a message", () => {
 			'message-invalid: messages/en.json: "ordinal" (en): "local p = n: plural select=ordinal": plural takes one option, type, which is cardinal (the default) or ordinal, as in "local nOrdinal = n: plural type=ordinal".',
 			'message-invalid: messages/en.json: "twice" (en): two variants have the keys one, so one of them can never be chosen. Remove one.',
 			'message-invalid: messages/en.json: "unnamed" (en): the variant key "" has no value for the selector "countPlural". Give it one, or * for any.',
+		]);
+	});
+
+	it("is an error when a selector is no name, or is listed twice", async () => {
+		expect(
+			await errorsOf({
+				en: {
+					dashed: selecting(["input a"], ["a-b"]),
+					listed: selecting(
+						["input count", "local n = count: number"],
+						["n", "n"],
+					),
+				},
+			}),
+		).toEqual([
+			'message-invalid: messages/en.json: "dashed" (en): "a-b" is not a selector: a selector is the name of an input or a local, such as count.',
+			'message-invalid: messages/en.json: "listed" (en): "selectors" lists n twice, and a second selector on a value chooses nothing the first does not. List it once.',
 		]);
 	});
 
