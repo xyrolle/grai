@@ -286,8 +286,9 @@ async function compiledProject(config: Record<string, unknown>) {
 			localeMiddleware({
 				middleware: server.middleware,
 				getTextDirection: runtime.getTextDirection,
+				localeOfPath: runtime.localeOfPath,
 				configName: "grai.config.json",
-				requestStrategies: [],
+				requestStrategies: { beforeUrl: [], afterUrl: [] },
 				...project,
 			}),
 	};
@@ -410,22 +411,51 @@ describe("the middleware", () => {
 		).toBe(json);
 	});
 
-	it("fails a prerendered page whose locale the strategy finds in each request", async () => {
+	/** What a prerendered page at `path` gives: its response, or what it threw. */
+	const prerendering = (
+		onRequest: ReturnType<typeof localeMiddleware>,
+		m: Messages,
+		path: string,
+	) =>
+		onRequest(
+			context(path, {}, { isPrerendered: true, routePattern: path }),
+			page(m),
+		).catch((thrown: unknown) => thrown);
+
+	it("fails a prerendered page whose locale a strategy ahead of the URL would find in the request", async () => {
 		const { m, middleware } = await compiledProject({
 			strategy: ["cookie", "url"],
 			cookieName: "lang",
 		});
-		const onRequest = middleware({ requestStrategies: ["cookie"] });
+		const onRequest = middleware({
+			requestStrategies: { beforeUrl: ["cookie"], afterUrl: [] },
+		});
 
-		const error = await onRequest(
-			context("/about", {}, { isPrerendered: true, routePattern: "/about" }),
-			page(m),
-		).catch((thrown: unknown) => thrown);
-
-		expect(error).toMatchObject({
+		expect(await prerendering(onRequest, m, "/ro/about")).toMatchObject({
 			name: "GraiError",
 			code: "config-invalid",
-			message: `grai.config.json: the page /about is prerendered, but "strategy" finds the locale in the request (by "cookie"), which a prerendered page does not have: it would show every reader the one locale it was built in. Render the page on demand (export const prerender = false), or find the locale in the URL alone ("strategy": ["url"]).`,
+			message: `grai.config.json: the page /ro/about is prerendered, but "strategy" finds its locale in the request (by "cookie"), which a prerendered page does not have: it would show every reader the one locale it was built in. Render the page on demand (export const prerender = false), or have its URL name its locale, with "url" first in "strategy".`,
+		});
+	});
+
+	it("prerenders a page whose URL names its locale, and fails one whose path names none, under a strategy after the URL", async () => {
+		const { m, middleware } = await compiledProject({
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			unlocalizedPaths: ["/account/**"],
+		});
+		const onRequest = middleware({
+			requestStrategies: { beforeUrl: [], afterUrl: ["cookie"] },
+		});
+
+		expect(await prerendering(onRequest, m, "/ro/about")).toBeInstanceOf(
+			Response,
+		);
+		expect(await prerendering(onRequest, m, "/account/orders")).toMatchObject({
+			name: "GraiError",
+			message: expect.stringContaining(
+				'the page /account/orders is prerendered, but "strategy" finds its locale in the request (by "cookie")',
+			),
 		});
 	});
 });
