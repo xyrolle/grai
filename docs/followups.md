@@ -168,3 +168,9 @@ Done when: `grai migrate` rewrites the calls in a component's script, and lists 
 A compile that stops while it writes, killed or crashed, leaves the output's lock (`docs/design.md`), its temporary files in `.grai/`, and the files named by their content that it wrote before any entry named them. The lock is refused, so a person sees it; the rest stays, as no manifest records it.
 
 Done when: a writer under the lock removes the temporary files in `.grai/`, which only a writer under the lock makes, and retires the files named by their content that neither the manifest nor the output names, with a test that kills a compile between its writes.
+
+## The import map under a CSP of hashes
+
+`handleLocale` gives the import map Kit's nonce, but no hash. Under a `csp` in `hash` mode, and on a prerendered page in `auto` mode, the browser refuses the map: the page then imports the shared message chunks, and its preloads still fetch the locale's copies, so it downloads both.
+
+Done when: the map's hash joins the page's `script-src`, in the `Content-Security-Policy` header and in a prerendered page's `<meta http-equiv>`, with a test of the example in `hash` mode that downloads only the locale's copies.

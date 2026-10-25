@@ -10,6 +10,8 @@ const ENTRY_PRELOAD =
 	/<link href="([^"]*\/immutable\/)entry\/start\.[^"]*" rel="modulepreload">/;
 /** Where Kit's build puts its chunks, within that directory, grai/vite's message chunks among them. */
 const CHUNKS = "chunks/";
+/** The nonce Kit gives its own inline script, under a `csp` whose scripts need one. */
+const KIT_NONCE = /<script nonce="([^"]+)">/;
 /** Kit's preload of a message chunk, with what comes before and after the message directory. */
 const MESSAGE_PRELOAD = new RegExp(
 	`(<link href="[^"]*/immutable/${CHUNKS})${messageDirectory}/([^"]*" rel="modulepreload">)`,
@@ -72,8 +74,9 @@ export function handleLocale({
 /**
  * Points a built page at its locale's copies of the message chunks. One import map entry maps the
  * shared directory to the locale's, for every message chunk the page and its later navigations
- * import, ahead of Kit's preloads. Kit's preloads of the shared chunks name the locale's copies
- * instead, as browsers apply no import map to `modulepreload` and would fetch both. A page without Kit's client entry,
+ * import, ahead of Kit's preloads. It carries Kit's nonce, if Kit's scripts have one, so a CSP
+ * lets it apply. Kit's preloads of the shared chunks name the locale's copies instead, as browsers
+ * apply no import map to `modulepreload` and would fetch both. A page without Kit's client entry,
  * or a dev page, is left as it is.
  */
 function localeChunks(html: string, locale: string, page: URL): string {
@@ -87,9 +90,11 @@ function localeChunks(html: string, locale: string, page: URL): string {
 			[`${at}${CHUNKS}${messageDirectory}/`]: `${at}${CHUNKS}${localeDirectory(locale)}/`,
 		},
 	});
+	const nonce = KIT_NONCE.exec(html)?.[1];
+	const attributes = nonce === undefined ? "" : ` nonce="${nonce}"`;
 	const mapped =
 		html.slice(0, entry.index) +
-		`<script type="importmap">${map}</script>` +
+		`<script type="importmap"${attributes}>${map}</script>` +
 		html.slice(entry.index);
 	return mapped.replaceAll(MESSAGE_PRELOAD, `$1${localeDirectory(locale)}/$2`);
 }
