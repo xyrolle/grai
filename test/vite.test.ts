@@ -218,6 +218,17 @@ describe("the Vite plugin's build", () => {
 		expect(shipped).not.toContain("Ţîţļé");
 	});
 
+	it("refuses the output's testing.js in a build, so a test's locale binding never ships", async () => {
+		const { dir } = project(catalogs);
+		await expect(
+			built(dir, {
+				a: `import { useLocale } from "./out/testing.js";\nuseLocale("de");\n`,
+			}),
+		).rejects.toThrow(
+			/testing\.js binds a test's locale, so a build refuses it/,
+		);
+	});
+
 	it("fails the build with the compiler's errors", async () => {
 		const { dir } = project({ en: { title: "Title" }, de: {} });
 		await expect(
