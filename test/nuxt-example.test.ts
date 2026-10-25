@@ -12,6 +12,7 @@ import {
 	it,
 	onTestFinished,
 } from "vitest";
+import { outsideTests } from "./app-environment.ts";
 
 // The Nuxt example (examples/nuxt), built by `nuxt build` and served by its Node server, by the
 // URL prefix and then by the cookie and Accept-Language, then under `nuxt dev`; its pages in
@@ -19,7 +20,7 @@ import {
 const example = fileURLToPath(new URL("../examples/nuxt/", import.meta.url));
 const nuxt = join(example, "node_modules/.bin/nuxt");
 /** No telemetry, which would phone home and outlive the test in a process of its own. */
-const env = { ...process.env, NUXT_TELEMETRY_DISABLED: "1" };
+const telemetry = { NUXT_TELEMETRY_DISABLED: "1" };
 
 /** Starts `command` in the example until the suite ends, once it prints `ready`. */
 function started(command: string, args: string[], ready: RegExp, extra = {}) {
@@ -27,7 +28,7 @@ function started(command: string, args: string[], ready: RegExp, extra = {}) {
 	beforeAll(async () => {
 		const child = spawn(command, args, {
 			cwd: example,
-			env: { ...env, ...extra },
+			env: outsideTests({ ...telemetry, ...extra }),
 		});
 		server = child;
 		let output = "";
@@ -53,7 +54,7 @@ function built(port: number, config = "grai.config.json"): void {
 	beforeAll(() => {
 		const build = spawnSync(nuxt, ["build"], {
 			cwd: example,
-			env: { ...env, GRAI_CONFIG: config },
+			env: outsideTests({ ...telemetry, GRAI_CONFIG: config }),
 			encoding: "utf8",
 		});
 		if (build.status !== 0) {
