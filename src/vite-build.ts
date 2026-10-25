@@ -94,18 +94,29 @@ export function moduleKindIn(
 }
 
 /**
- * The client build's chunking: the runtime in a chunk of its own, and the keys in chunks by the
- * entries that use them, so a message chunk holds keys and nothing else.
+ * The bytes of key modules' code, every locale's words with them, at which a set of keys the same
+ * entries use is worth a request of its own. Measured on both reference apps (`docs/design.md`).
+ */
+export const ownChunkBytes = 4096;
+
+/**
+ * The client build's chunking. The runtime has a chunk of its own, so a message chunk holds keys and
+ * nothing else. The keys go in chunks by the entries that use them: a set of `ownChunkBytes` or more
+ * has a chunk of its own, which every entry that loads it uses whole, and each smaller set joins the
+ * set nearest it by those entries until it is as large. The larger sets keep their own chunks, so the
+ * words a page loads and does not use come only from sets under `ownChunkBytes`.
  */
 export function messageChunking(outdir: string): EnvironmentOptions {
 	const runtime = runtimeModules(outdir);
+	const keys = {
+		name: messageDirectory,
+		test: isMessageModule,
+		entriesAware: true,
+	};
 	const groups = [
 		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
-		{
-			name: messageDirectory,
-			test: isMessageModule,
-			entriesAware: true,
-		},
+		{ ...keys, minSize: ownChunkBytes },
+		{ ...keys, entriesAwareMergeThreshold: ownChunkBytes },
 	];
 	return {
 		build: { rolldownOptions: { output: { codeSplitting: { groups } } } },
