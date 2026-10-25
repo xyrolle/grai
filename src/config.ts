@@ -1,5 +1,13 @@
 import { readFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	relative,
+	resolve,
+	sep,
+} from "node:path";
+import { type Cookie, cookieFields, readCookie } from "./cookie.ts";
 import { GraiError } from "./error.ts";
 import { readFallbacks } from "./fallbacks.ts";
 import { isGlob } from "./globs.ts";
@@ -25,8 +33,8 @@ export type Config = {
 	outdir: string;
 	/** Where the server's middleware looks for a request's locale, in order, before the base locale. */
 	strategy: readonly Strategy[];
-	/** The cookie the `cookie` strategy reads and `setLocale` writes. */
-	cookieName: string | undefined;
+	/** The cookie the `cookie` strategy reads and `setLocale` writes, if the strategy has it. */
+	cookie: Cookie | undefined;
 	/** How a page changes locale. */
 	switch: LocaleSwitch;
 	/** Which locales' paths the `url` strategy prefixes, each one's prefix, and the paths it leaves alone. */
@@ -39,6 +47,8 @@ export type Config = {
 	fallbacks: ReadonlyMap<string, string>;
 	/** A locale made from the base's messages for development and tests, which no build ships. */
 	pseudoLocale: string | undefined;
+	/** The file of each key's description for translators, if the project keeps them. */
+	descriptions: string | undefined;
 };
 
 /**
@@ -50,40 +60,44 @@ export type LocaleSwitch = "reload" | "live";
 /** A place a request can name its locale in. */
 export type Strategy = "cookie" | "preferredLanguage" | "url";
 
-const strategies: ReadonlySet<string> = new Set([
+/** The strategies, in the order the docs and config.schema.json list them. */
+export const strategies: ReadonlySet<string> = new Set([
 	"cookie",
 	"preferredLanguage",
 	"url",
 ]);
 
-const fields = new Set([
+/** The config's fields, which config.schema.json describes. */
+export const configFields: ReadonlySet<string> = new Set([
 	"locales",
 	"baseLocale",
 	"catalogs",
 	"outdir",
 	"strategy",
-	"cookieName",
+	...cookieFields,
 	"switch",
 	...urlRoutingFields,
 	"tests",
 	"identicalToBase",
 	"fallbacks",
 	"pseudoLocale",
+	"descriptions",
 ]);
 const localePlaceholder = "{locale}";
-/** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
-const cookieNameToken = /^[\w!#$%&'*+\-.^`|~]+$/;
 /**
  * Test files as Vitest and Jest name them, Jest's `__tests__` folders, and the project's own
  * `test` and `tests` folders. A test ships nothing. A folder named `tests` deeper down may ship,
- * as a SvelteKit route at `src/routes/tests/` does, so only the root's are tests.
+ * as a SvelteKit route at `src/routes/tests/` does, so only the root's are tests. The default of
+ * `tests`, which config.schema.json gives too.
  */
-const conventionalTests = [
+export const conventionalTests: readonly string[] = [
 	"**/*.{test,spec}.*",
 	"**/__tests__/**",
 	"test/**",
 	"tests/**",
 ];
+/** The field that names the config's JSON schema, for editors; grai does not read it. */
+const schemaField = "$schema";
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
 export function readConfig(file: string): Config {
@@ -93,9 +107,9 @@ export function readConfig(file: string): Config {
 		new GraiError("config-invalid", where, `${detail}.`);
 
 	for (const field of Object.keys(raw)) {
-		if (!fields.has(field)) {
+		if (field !== schemaField && !configFields.has(field)) {
 			throw invalid(
-				`"${field}" is not a config field; the fields are ${[...fields].join(", ")}`,
+				`"${field}" is not a config field; the fields are ${[...configFields].join(", ")}`,
 			);
 		}
 	}
@@ -105,12 +119,12 @@ export function readConfig(file: string): Config {
 		catalogs,
 		outdir,
 		strategy = [],
-		cookieName,
 		switch: localeSwitch = "reload",
 		tests = conventionalTests,
 		identicalToBase = {},
 		fallbacks = {},
 		pseudoLocale,
+		descriptions,
 	} = raw;
 	if (!isLocaleList(locales)) {
 		throw invalid(
@@ -144,19 +158,7 @@ export function readConfig(file: string): Config {
 		);
 	}
 	const urlRouting = readUrlRouting(raw, strategy, locales, invalid);
-	const readsCookie = strategy.includes("cookie");
-	if (readsCookie !== (typeof cookieName === "string" && cookieName !== "")) {
-		throw invalid(
-			readsCookie
-				? '"cookieName" must name the cookie the "cookie" strategy reads'
-				: '"cookieName" is read only by the "cookie" strategy, which "strategy" does not list',
-		);
-	}
-	if (typeof cookieName === "string" && !cookieNameToken.test(cookieName)) {
-		throw invalid(
-			'"cookieName" must be a cookie name, as RFC 6265 has it: letters, digits and !#$%&\'*+-.^_`|~, without spaces',
-		);
-	}
+	const cookie = readCookie(raw, strategy.includes("cookie"), invalid);
 	if (localeSwitch !== "reload" && localeSwitch !== "live") {
 		throw invalid(
 			'"switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place',
@@ -181,20 +183,38 @@ export function readConfig(file: string): Config {
 		const problem = pseudoLocaleProblem(pseudoLocale, locales, baseLocale);
 		if (problem !== undefined) throw invalid(problem);
 	}
+	if (
+		descriptions !== undefined &&
+		(typeof descriptions !== "string" || !descriptions.endsWith(".json"))
+	) {
+		throw invalid(
+			'"descriptions" must be the path of a JSON file of each key\'s description for translators, such as "messages/descriptions.json"',
+		);
+	}
 	const root = dirname(resolve(file));
+	const catalogPaths = new Map(
+		locales.map((locale) => [
+			locale,
+			resolve(root, catalogs.replaceAll(localePlaceholder, locale)),
+		]),
+	);
+	const out = resolve(root, outdir);
+	const held = [resolve(file), ...catalogPaths.values()].find((path) =>
+		isWithin(path, out),
+	);
+	if (held !== undefined) {
+		throw invalid(
+			`"outdir" must be a directory of grai's own, as all in it is grai's output, but "${outdir}" holds ${relative(root, held)}`,
+		);
+	}
 	return {
 		root,
 		locales,
 		baseLocale,
-		catalogs: new Map(
-			locales.map((locale) => [
-				locale,
-				resolve(root, catalogs.replaceAll(localePlaceholder, locale)),
-			]),
-		),
-		outdir: resolve(root, outdir),
+		catalogs: catalogPaths,
+		outdir: out,
 		strategy,
-		cookieName: typeof cookieName === "string" ? cookieName : undefined,
+		cookie,
 		switch: localeSwitch,
 		urlRouting,
 		tests,
@@ -206,6 +226,8 @@ export function readConfig(file: string): Config {
 		),
 		fallbacks: readFallbacks(fallbacks, locales, baseLocale, invalid),
 		pseudoLocale: typeof pseudoLocale === "string" ? pseudoLocale : undefined,
+		descriptions:
+			descriptions === undefined ? undefined : resolve(root, descriptions),
 	};
 }
 
@@ -234,6 +256,16 @@ function pseudoLocaleProblem(
 		}
 	}
 	return undefined;
+}
+
+/** Whether a path is in a directory, at any depth. */
+function isWithin(path: string, directory: string): boolean {
+	const fromDirectory = relative(directory, path);
+	return (
+		fromDirectory !== ".." &&
+		!fromDirectory.startsWith(`..${sep}`) &&
+		!isAbsolute(fromDirectory)
+	);
 }
 
 function isStrategy(value: unknown): value is Strategy[] {

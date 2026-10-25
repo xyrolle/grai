@@ -9,7 +9,7 @@
 // - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
 	readdirSync,
 	readFileSync,
@@ -22,10 +22,10 @@ import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeNextApps } from "./next-apps.mjs";
+import { startServer, stopServer } from "./servers.mjs";
 
 const EDITS = 7;
 const SAVE_INTERVAL_MS = 1500;
-const PORT = 4772;
 const next = new URL("node_modules/.bin/next", import.meta.url).pathname;
 const nextVersion = JSON.parse(
 	readFileSync(new URL("node_modules/next/package.json", import.meta.url)),
@@ -42,9 +42,12 @@ const now = () => performance.timeOrigin + performance.now();
 /** Next's environment: no telemetry, which would phone home and outlive the run in a process of its own. */
 const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
 
-/** Starts `next <args>` in an app, and resolves once it prints a line matching `ready`. */
-function started(root, args, ready) {
-	const child = spawn(next, args, {
+/**
+ * Starts `next <command>` in an app on a port the system picks, so that runs side by side never
+ * meet, and resolves with the URL it serves once it prints a line matching `ready`.
+ */
+function started(root, command, ready) {
+	const child = startServer(next, [command, "--port", "0"], {
 		cwd: root,
 		env,
 		stdio: ["ignore", "pipe", "pipe"],
@@ -53,14 +56,15 @@ function started(root, args, ready) {
 	const listening = new Promise((resolve, reject) => {
 		const deadline = setTimeout(
 			() =>
-				reject(new Error(`next ${args[0]} was not ready in 120 s:\n${output}`)),
+				reject(new Error(`next ${command} was not ready in 120 s:\n${output}`)),
 			120_000,
 		);
 		const read = (chunk) => {
 			output += chunk;
-			if (ready.test(output)) {
+			const origin = /- Local:\s+(http:\/\/\S+)/.exec(output)?.[1];
+			if (origin !== undefined && ready.test(output)) {
 				clearTimeout(deadline);
-				resolve();
+				resolve(origin);
 			}
 		};
 		child.stdout.on("data", read);
@@ -83,12 +87,6 @@ async function firstResponse(url) {
 	throw new Error(`${url} did not answer in 120 s`);
 }
 
-async function stopped(server) {
-	const exited = new Promise((resolve) => server.child.on("exit", resolve));
-	server.child.kill();
-	await exited;
-}
-
 /** The page's downloads in a built app, brotli-compressed: its document, its scripts, the rest. */
 async function pageBytes(browser, root, path) {
 	const build = spawnSync(next, ["build"], {
@@ -97,12 +95,8 @@ async function pageBytes(browser, root, path) {
 		encoding: "utf8",
 	});
 	if (build.status !== 0) throw new Error(build.stdout + build.stderr);
-	const server = started(
-		root,
-		["start", "--port", String(PORT)],
-		/Ready|started/,
-	);
-	await server.listening;
+	const server = started(root, "start", /Ready|started/);
+	const origin = await server.listening;
 	const page = await browser.newPage();
 	const sizes = { document: 0, script: 0, other: 0 };
 	const bodies = [];
@@ -117,12 +111,12 @@ async function pageBytes(browser, root, path) {
 			),
 		);
 	});
-	await page.goto(`http://localhost:${PORT}${path}`, {
+	await page.goto(`${origin}${path}`, {
 		waitUntil: "networkidle",
 	});
 	await Promise.all(bodies);
 	await page.close();
-	await stopped(server);
+	await stopServer(server.child);
 	return sizes;
 }
 
@@ -154,11 +148,11 @@ process.exit(0);`,
 async function devStart(root, path, { empty }) {
 	if (empty) rmSync(join(root, ".next"), { recursive: true, force: true });
 	const start = performance.now();
-	const server = started(root, ["dev", "--port", String(PORT)], /Ready in/);
-	await server.listening;
+	const server = started(root, "dev", /Ready in/);
+	const origin = await server.listening;
 	const ready = performance.now() - start;
-	const page = await firstResponse(`http://localhost:${PORT}${path}`);
-	return { server, ready, page };
+	const page = await firstResponse(`${origin}${path}`);
+	return { server, url: `${origin}${path}`, ready, page };
 }
 
 /** A message's text in its catalog, as the page shows it, edited and saved; returns when saved. */
@@ -188,9 +182,9 @@ function shardWritten(outdir) {
  * One message edited EDITS times until the dev page shows it: the median, ms, and for grai the
  * median until it wrote the edited shard.
  */
-async function editToPage(browser, path, catalogFile, key, target, outdir) {
+async function editToPage(browser, url, catalogFile, key, target, outdir) {
 	const page = await browser.newPage();
-	await page.goto(`http://localhost:${PORT}${path}`);
+	await page.goto(url);
 	await page.waitForFunction(() => "changes" in window);
 	const original = JSON.parse(readFileSync(catalogFile, "utf8"))[key];
 	const latencies = [];
@@ -266,16 +260,16 @@ for (const app of selectedApps()) {
 		for (const target of ["server", "client"]) {
 			edits[target] = await editToPage(
 				browser,
-				path,
+				empty.url,
 				catalogFile,
 				keys.targets[target],
 				target,
 				outdir,
 			);
 		}
-		await stopped(empty.server);
+		await stopServer(empty.server.child);
 		const kept = await devStart(root, path, { empty: false });
-		await stopped(kept.server);
+		await stopServer(kept.server.child);
 		const edit = ({ shown, written }) =>
 			written === undefined
 				? shown.toFixed(0)

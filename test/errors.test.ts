@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -107,6 +107,17 @@ describe("the config", () => {
 		expect(await fallbackError({ "en-GB": "en-GB" })).toBe(
 			'config-invalid: grai.config.json: "fallbacks" goes round in a circle: "en-GB" → "en-GB". Each chain of fallbacks must end at a locale that has none.',
 		);
+	});
+
+	it("is an error when the outdir holds the config or a catalog, which grai would write over or hide", async () => {
+		const catalogs = { en: { title: "Title" } };
+
+		expect(await errorsOf(catalogs, { outdir: "." })).toEqual([
+			'config-invalid: grai.config.json: "outdir" must be a directory of grai\'s own, as all in it is grai\'s output, but "." holds grai.config.json.',
+		]);
+		expect(await errorsOf(catalogs, { outdir: "messages" })).toEqual([
+			'config-invalid: grai.config.json: "outdir" must be a directory of grai\'s own, as all in it is grai\'s output, but "messages" holds messages/en.json.',
+		]);
 	});
 
 	it("names a strategy it does not know, and a cookie strategy without its cookie", async () => {
@@ -209,6 +220,36 @@ describe("the config", () => {
 			),
 		).toEqual([
 			'config-invalid: grai.config.json: "strategy" lists "cookie", "preferredLanguage" after "url", which never gets to them: a path without a locale prefix is the base locale\'s. Put them before "url", prefix every locale\'s paths with "localePrefix": "always", or name the paths "url" leaves to them in "unlocalizedPaths".',
+		]);
+	});
+
+	it("takes the cookie's options only as a cookie can have them, and only with its strategy", async () => {
+		const catalogs = { en: { title: "Title" } };
+		const errors = (config: Record<string, unknown>) =>
+			errorsOf(catalogs, {
+				strategy: ["cookie"],
+				cookieName: "lang",
+				...config,
+			});
+
+		expect(await errors({ cookieMaxAge: 0 })).toEqual([
+			'config-invalid: grai.config.json: "cookieMaxAge" must be the seconds the cookie lasts, a whole number from 1 to 34560000, as browsers keep a cookie 400 days at most.',
+		]);
+		expect(await errors({ cookieDomain: "https://shop.test" })).toEqual([
+			'config-invalid: grai.config.json: "cookieDomain" must be a host name, such as "example.com", without a scheme, a port, a path or a leading dot.',
+		]);
+		expect(await errors({ cookieSameSite: "None" })).toEqual([
+			'config-invalid: grai.config.json: "cookieSameSite" must be "lax", "strict" or "none".',
+		]);
+		expect(
+			await errors({ cookieName: "__Host-lang", cookieDomain: "shop.test" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "cookieDomain" cannot go with "__Host-lang": a browser keeps a __Host- cookie only for the host that set it, with no Domain.',
+		]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], cookieSameSite: "lax" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "cookieSameSite" is read only by the "cookie" strategy, which "strategy" does not list.',
 		]);
 	});
 
@@ -337,11 +378,11 @@ describe("a message", () => {
 		expect(
 			await errorsOf({
 				en: {
-					formatted: "Total {amount :string}",
+					formatted: "Total {amount :uppercase}",
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "formatted" (en): {amount :string} calls :string, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "formatted" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 		]);
 	});
 
@@ -355,7 +396,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			expect.stringContaining(
 				'"option" (en): {n :number constructor=1}: "constructor=1" is not an option of :number, or is given twice. Its options are select, style,',
 			),
@@ -415,6 +456,31 @@ describe("a message", () => {
 		).toEqual([
 			'message-invalid: messages/en.json: "dashed" (en): "a-b" is not a selector: a selector is the name of an input or a local, such as count.',
 			'message-invalid: messages/en.json: "listed" (en): "selectors" lists n twice, and a second selector on a value chooses nothing the first does not. List it once.',
+		]);
+	});
+
+	it("is an error, naming both, when a local is made from another local", async () => {
+		expect(
+			await errorsOf({
+				en: {
+					rounded: selecting(
+						["input n", "local a = n: number", "local b = a: integer"],
+						["b"],
+					),
+					counted: selecting(
+						["input n", "local a = n: number", "local p = a: plural"],
+						["p"],
+					),
+					texted: selecting(
+						["input g", "local s = g: string", "local t = s: string"],
+						["t"],
+					),
+				},
+			}),
+		).toEqual([
+			'unsupported: messages/en.json: "counted" (en): p is made from a, a local, which grai does not support yet. Make it from the input a is made from.',
+			'unsupported: messages/en.json: "rounded" (en): b is made from a, a local, which grai does not support yet. Make it from the input a is made from.',
+			'unsupported: messages/en.json: "texted" (en): t is made from s, a local, which grai does not support yet. Make it from the input s is made from.',
 		]);
 	});
 

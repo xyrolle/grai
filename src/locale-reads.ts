@@ -4,8 +4,10 @@
  * const for its number, and one for its category when a variant tests it.
  */
 
+import { digitsFormatter } from "./formatters.ts";
+import type { Used } from "./locale-function.ts";
 import type { LocaleMessage } from "./message.ts";
-import { isExactKey } from "./number-select.ts";
+import { isExactKey, type NumberSelector } from "./number-select.ts";
 import { numberReaders, pluralName } from "./plurals.ts";
 import { catchAll } from "./selection.ts";
 
@@ -31,17 +33,19 @@ export function globalCalled(name: string, globals: Set<string>): string {
 }
 
 /**
- * The reads of a message's function, adding the functions of plurals.js they call to `plurals`,
- * and the globals they call to `globals`.
+ * The reads of a message's function, adding the functions of plurals.js, the formatters and the
+ * globals they call to `used`.
  */
 export function localeReads(
 	message: LocaleMessage,
-	{ plurals, globals }: { plurals: Set<string>; globals: Set<string> },
+	{ plurals, formats, globals }: Used,
 ): LocaleReads {
 	const { locale, selectors } = message;
 	const reads = new Set<string>();
 	/** The number selectors, by index, whose category a variant tests. */
 	const categorized = new Set<number>();
+	/** The inputs of the `:string` selectors, by index, whose NFC text a variant tests. */
+	const normalized = new Map<number, string>();
 	const isLocal = (name: string) =>
 		message.plurals.has(name) ||
 		selectors.some(
@@ -60,9 +64,17 @@ export function localeReads(
 			case "plural":
 				return `${value(selector.name)} === ${literal}`;
 			case "input":
-				return `${globalCalled("String", globals)}(${value(selector.name)}) === ${literal}`;
+				if (!selector.normalized) {
+					return `${globalCalled("String", globals)}(${value(selector.input)}) === ${literal}`;
+				}
+				value(selector.input);
+				normalized.set(index, selector.input);
+				return `$${index} === ${JSON.stringify(key.normalize("NFC"))}`;
 			case "number":
-				if (isExactKey(key)) return `${value(selector.name)} === ${key}`;
+				if (isExactKey(key)) {
+					const number = selector.digits === undefined ? key : literal;
+					return `${value(selector.name)} === ${number}`;
+				}
 				value(selector.name);
 				categorized.add(index);
 				return `$${index} === ${literal}`;
@@ -86,10 +98,7 @@ export function localeReads(
 	const numberConsts = () =>
 		selectors.flatMap((selector, index) => {
 			if (selector.kind !== "number" || !reads.has(selector.name)) return [];
-			const reader =
-				selector.number === "number"
-					? globalCalled("Number", globals)
-					: called(numberReaders[selector.number]);
+			const reader = readerOf(selector);
 			const consts = [
 				`const $${selector.name} = ${reader}(${value(selector.input)}); `,
 			];
@@ -99,8 +108,28 @@ export function localeReads(
 			}
 			return consts;
 		});
+	/** What a number selector reads its input through: its digits' formatter, or a number reader. */
+	const readerOf = (selector: NumberSelector) => {
+		if (selector.digits !== undefined) {
+			const formatter = digitsFormatter(selector.digits);
+			formats.set(formatter.name, formatter);
+			return formatter.name;
+		}
+		return selector.number === "number"
+			? globalCalled("Number", globals)
+			: called(numberReaders[selector.number]);
+	};
+	const textConsts = () =>
+		[...normalized].map(
+			([index, input]) =>
+				`const $${index} = ${globalCalled("String", globals)}(${value(input)}).normalize("NFC"); `,
+		);
 	const prologue = () => {
-		const declarations = [...pluralConsts(), ...numberConsts()].join("");
+		const declarations = [
+			...pluralConsts(),
+			...numberConsts(),
+			...textConsts(),
+		].join("");
 		const takesInputs = [...reads].some((name) => message.inputs.has(name));
 		return { parameter: takesInputs ? "i" : "", declarations };
 	};

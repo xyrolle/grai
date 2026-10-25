@@ -1,6 +1,7 @@
 import { categoriesOf, type PluralType } from "../plurals.ts";
 import { MessageProblem } from "../problem.ts";
 import {
+	type Conversion,
 	type Converted,
 	type ImportedMessage,
 	plainMessage,
@@ -14,10 +15,11 @@ const pluralSuffix = /^(.+)_(zero|one|two|few|many|other)$/;
 const ordinalSuffix = /^(.+)_ordinal_(zero|one|two|few|many|other)$/;
 const contextSuffix = /^(.+)_([a-z]+)$/;
 
-/** A message of the source: a text, or the forms of a plural or an ordinal key, by suffix. */
-type Message =
+/** A message of the source, with what it tells translators: a text, or the forms of a plural or an ordinal key, by suffix. */
+type Message = { description: string | undefined } & (
 	| { kind: "text"; path: readonly string[]; value: unknown }
-	| PluralMessage;
+	| PluralMessage
+);
 
 /** A key's plural or ordinal forms, by form. */
 type PluralMessage = {
@@ -39,17 +41,18 @@ export function convertI18next(
 	const texts = new Map(
 		entries.map((entry) => [entry.path.join("."), entry.value]),
 	);
-	return messagesOf(entries).map((message) =>
-		message.kind === "text"
+	return messagesOf(entries).map((message) => ({
+		...(message.kind === "text"
 			? convertText(message.path, message.value, texts)
-			: convertPlural(message, locale, texts),
-	);
+			: convertPlural(message, locale, texts)),
+		description: message.description,
+	}));
 }
 
 /** The entries as messages, in source order: a key's plural forms together, at its first form's place. */
 function messagesOf(entries: readonly SourceEntry[]): Message[] {
 	const messages = new Map<string, Message>();
-	for (const { path, value } of entries) {
+	for (const { path, value, description } of entries) {
 		const name = path.at(-1) ?? "";
 		const ordinal = ordinalSuffix.exec(name);
 		const plural = ordinal ?? pluralSuffix.exec(name);
@@ -58,6 +61,7 @@ function messagesOf(entries: readonly SourceEntry[]): Message[] {
 				kind: "text",
 				path,
 				value,
+				description,
 			});
 			continue;
 		}
@@ -71,8 +75,10 @@ function messagesOf(entries: readonly SourceEntry[]): Message[] {
 		const known = messages.get(id);
 		if (known !== undefined && known.kind !== "text") {
 			known.forms.set(form, value);
+			known.description ??= description;
 		} else {
-			messages.set(id, { kind, path: base, forms: new Map([[form, value]]) });
+			const forms = new Map([[form, value]]);
+			messages.set(id, { kind, path: base, forms, description });
 		}
 	}
 	return [...messages.values()];
@@ -82,7 +88,7 @@ function convertText(
 	path: readonly string[],
 	value: unknown,
 	texts: Texts,
-): ImportedMessage {
+): Conversion {
 	const notes: string[] = [];
 	const context = contextSuffix.exec(path.at(-1) ?? "");
 	if (
@@ -108,7 +114,7 @@ function convertPlural(
 	{ kind, path, forms }: PluralMessage,
 	locale: string,
 	texts: Texts,
-): ImportedMessage {
+): Conversion {
 	const suffix = kind === "cardinal" ? "_" : "_ordinal_";
 	try {
 		if (!forms.has("other")) {

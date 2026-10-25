@@ -145,6 +145,87 @@ describe("selecting on a :number local", () => {
 		]);
 	});
 
+	it("selects on a :number whose options round it by the digits it shows: exactly, then by their category, as Intl.PluralRules does with those options", async () => {
+		const shown = (categories: string[]) =>
+			onNumber("number minimumFractionDigits=1", {
+				"n=1.0": "exact",
+				...Object.fromEntries(
+					categories.map((category) => [`n=${category}`, category]),
+				),
+				"n=*": "other",
+			});
+		const { m } = await project({
+			en: { shown: shown(["one"]) },
+			ru: { shown: shown(["one", "few", "many"]) },
+		}).load();
+		const digits = new Intl.NumberFormat("en", { minimumFractionDigits: 1 });
+
+		for (const locale of ["en", "ru"]) {
+			const rules = new Intl.PluralRules(locale, { minimumFractionDigits: 1 });
+			for (const count of [0, 1, 2, 5, 21, 1.5, 0.999, 1.0004]) {
+				expect(m.shown?.({ count }, { locale })).toBe(
+					digits.format(count) === "1.0" ? "exact" : rules.select(count),
+				);
+			}
+		}
+	});
+
+	it("rounds as each function's options round: :number, :integer and :percent", async () => {
+		const { m } = await project({
+			en: {
+				rounded: onNumber("number maximumFractionDigits=0", {
+					"n=1": "exactly one",
+					"n=one": "one",
+					"n=*": "{n}",
+				}),
+				whole: onNumber("integer maximumSignificantDigits=1", {
+					"n=20": "twenty",
+					"n=*": "{n}",
+				}),
+				share: onNumber("percent maximumFractionDigits=1", {
+					"n=1.5": "one and a half",
+					"n=one": "one",
+					"n=*": "{n}",
+				}),
+			},
+		}).load();
+
+		expect([1.4, 0.6, 1.5, 2].map((count) => m.rounded?.({ count }))).toEqual([
+			"exactly one",
+			"exactly one",
+			"2",
+			"2",
+		]);
+		expect([15, 24, 25].map((count) => m.whole?.({ count }))).toEqual([
+			"twenty",
+			"twenty",
+			"30",
+		]);
+		expect(
+			[0.015, 0.01, 0.0104, 0.016].map((count) => m.share?.({ count })),
+		).toEqual(["one and a half", "one", "one", "1.6%"]);
+	});
+
+	it("is an error for a key the options never show", async () => {
+		expect(
+			await errorsOf({
+				en: {
+					padded: onNumber("number minimumFractionDigits=1", {
+						"n=1": "a",
+						"n=*": "b",
+					}),
+					rounded: onNumber("number maximumFractionDigits=1", {
+						"n=1.25": "a",
+						"n=*": "b",
+					}),
+				},
+			}),
+		).toEqual([
+			'message-invalid: messages/en.json: "padded" (en): the variant n=1 can never be chosen: n shows 1 as 1.0, and no value as 1. Write the key as n shows it.',
+			'message-invalid: messages/en.json: "rounded" (en): the variant n=1.25 can never be chosen: n shows 1.25 as 1.3, and no value as 1.25. Write the key as n shows it.',
+		]);
+	});
+
 	it("is an error for a key no value can match, or for a value no variant has", async () => {
 		expect(
 			await errorsOf({

@@ -1,12 +1,13 @@
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
+import { cookieAttributes } from "./cookie.ts";
 import {
 	type BaseCatalog,
 	type DeclarationLine,
 	shardMap,
 } from "./declaration-maps.ts";
 import { runtimeDeclarations, serverDeclarations } from "./declarations.ts";
-import { formatModule } from "./formatters.ts";
+import { type Formatter, formatModule } from "./formatters.ts";
 import { globPattern } from "./globs.ts";
 import { keyExports } from "./key-exports.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
@@ -22,6 +23,9 @@ export type Rendered = {
 	/** Each shard's keys, with the line of the shard's declarations each one is on. */
 	lines: readonly (readonly DeclarationLine[])[];
 };
+
+/** The output's .gitignore: everything in it is compiled from the catalogs, so none of it is committed. */
+const gitignore = "# grai writes this directory from the catalogs.\n*\n";
 
 /** About how many keys a shard holds, so an edit rewrites one small module and its declarations. */
 const keysPerShard = 512;
@@ -73,13 +77,18 @@ export function renderOutput(
 	const keysIndex = modules
 		.map(([file]) => `export * from "./${file}";\n`)
 		.join("");
+	const formatters = usedFormatters(compilation);
+	const digits = formatters.some(({ shows }) => shows === "digits");
+	const formats: [string, string][] =
+		formatters.length === 0 ? [] : [["formats.js", formatModule(formatters)]];
 	const output: Output = [
 		[
+			[".gitignore", gitignore],
 			["config.js", configModule(config)],
 			["runtime.d.ts", runtimeDeclarations(config)],
 			["server.d.ts", serverDeclarations],
-			["plurals.js", pluralModule(config.locales)],
-			...formatsFile(compilation),
+			["plurals.js", pluralModule(config.locales, { digits })],
+			...formats,
 		],
 		[["runtime.js", runtime.runtime], ...declarations],
 		[["server.js", runtime.server]],
@@ -96,13 +105,11 @@ export function renderOutput(
 	};
 }
 
-/** formats.js, when a message calls a formatter. */
-function formatsFile(compilation: Compilation): [string, string][] {
-	if (compilation.formatted.size === 0) return [];
-	const formatters = [...compilation.formatted].flatMap((key) => [
+/** The formatters the messages call, for formats.js, from the keys that call one. */
+function usedFormatters(compilation: Compilation): Formatter[] {
+	return [...compilation.formatted].flatMap((key) => [
 		...(compilation.keys.get(key)?.formats.values() ?? []),
 	]);
-	return [["formats.js", formatModule(formatters)]];
 }
 
 /** Every key in its shard, each shard's keys sorted. */
@@ -131,7 +138,7 @@ function regroup(
 
 function shardModule(keys: readonly CompiledKey[]): string {
 	const names = calledNames(keys);
-	return `${outputImports(names, (file) => `"../${file}"`)}\n\n${keyExports(keys, everyName(names))}`;
+	return `${outputImports(names, (file) => `../${file}`)}\n\n${keyExports(keys, everyName(names))}`;
 }
 
 /** A shard's module and declarations, and the line each declaration is on. */
@@ -191,7 +198,10 @@ function configModule(config: Config): string {
 		`/** @type {readonly ("cookie" | "preferredLanguage" | "url")[]} */`,
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		"/** @type {string | undefined} */",
-		`export const cookieName = ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};`,
+		`export const cookieName = ${config.cookie === undefined ? "undefined" : JSON.stringify(config.cookie.name)};`,
+		`export const cookieAttributes = ${JSON.stringify(config.cookie === undefined ? "" : cookieAttributes(config.cookie))};`,
+		'/** @type {"always" | "https"} */',
+		`export const cookieSecure = ${JSON.stringify(config.cookie?.secure ?? "https")};`,
 		...routingConstants(config),
 		"/** @type {readonly string[]} */",
 		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,

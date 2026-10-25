@@ -4,15 +4,18 @@
  * CLDR category of the rules `select` names, and an exact match comes before a category.
  */
 
-import type { SelectedNumber } from "./format-functions.ts";
+import type { IntlOptions, SelectedNumber } from "./format-functions.ts";
 import type { SelectMode } from "./format-options.ts";
+import { shownDigits } from "./intl-formatters.ts";
 import type { FormattedLocal } from "./message-declarations.ts";
 import { categoriesOf, type PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
 /**
  * A selector on a number local: the input it reads, the number it compares, and the rules its
- * categories come from, none for `select=exact`.
+ * categories come from, none for `select=exact`. A local whose options round it is read as the
+ * digits those options show (`digits`, the options Intl shows them with), as its exact keys and
+ * its plural category are of what a reader sees.
  */
 export type NumberSelector = {
 	kind: "number";
@@ -20,6 +23,7 @@ export type NumberSelector = {
 	input: string;
 	number: SelectedNumber;
 	rules: PluralType | undefined;
+	digits: IntlOptions | undefined;
 };
 
 /** The rules each `select` mode chooses a category by. */
@@ -34,6 +38,19 @@ const writingOptions: ReadonlySet<string> = new Set([
 	"signDisplay",
 	"useGrouping",
 	"numberingSystem",
+	"minimumIntegerDigits",
+]);
+
+/** Options that round a number, which Intl.PluralRules takes too: they choose the digits shown. */
+const roundingOptions: ReadonlySet<string> = new Set([
+	"minimumFractionDigits",
+	"maximumFractionDigits",
+	"minimumSignificantDigits",
+	"maximumSignificantDigits",
+	"roundingPriority",
+	"roundingIncrement",
+	"roundingMode",
+	"trailingZeroDisplay",
 ]);
 
 /** The rules a number local's categories come from, none for select=exact or a date. */
@@ -54,20 +71,36 @@ export function numberSelector(
 			`it selects on ${name}, a :${local.fn} value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.`,
 		);
 	}
-	const digits = local.given.filter((option) => !writingOptions.has(option));
-	if (digits.length > 0) {
+	const shaping = local.given.filter(
+		(option) => !writingOptions.has(option) && !roundingOptions.has(option),
+	);
+	if (shaping.length > 0) {
+		const them = shaping.length === 1 ? "it" : "them";
 		throw new MessageProblem(
 			"unsupported",
-			`it selects on ${name}, a :${local.fn} with ${digits.join(", ")}, whose category would depend on the digits shown, which grai does not support yet. Select on a local without ${digits.length === 1 ? "it" : "them"}, and format with ${digits.length === 1 ? "it" : "them"} in the pattern.`,
+			`it selects on ${name}, a :${local.fn} with ${shaping.join(", ")}, which shows more than digits, and Intl.PluralRules has no category for that. Select on a local without ${them}, and format with ${them} in the pattern.`,
 		);
 	}
+	const rounds = local.given.some((option) => roundingOptions.has(option));
 	return {
 		kind: "number",
 		name,
 		input: local.input,
 		number: local.selection.number,
 		rules: selectRules(local),
+		digits: rounds ? digitOptions(local.format.options) : undefined,
 	};
+}
+
+/**
+ * The options a rounding local's digits are shown with: its own, but those that only change how
+ * they are written, and without grouping, so that plural rules read them and keys match them.
+ */
+function digitOptions(options: IntlOptions): IntlOptions {
+	const kept = Object.entries(options).filter(
+		([option]) => !writingOptions.has(option),
+	);
+	return { ...Object.fromEntries(kept), useGrouping: false };
 }
 
 /** MessageFormat 2's number-literal, such as `0`, `-2`, `1.5` or `1e+21`. */
@@ -82,12 +115,31 @@ export function isExactKey(key: string): boolean {
 	return numberLiteral.test(key);
 }
 
+/** The value an exact key stands for: its number, or for `:percent` the hundredth it shows. */
+function keyValue(selector: NumberSelector, key: string): number {
+	if (selector.number !== "percent") return Number(key);
+	const [digits, exponent = "0"] = key.toLowerCase().split("e");
+	return Number(`${digits}e${Number(exponent) - 2}`);
+}
+
 /** Checks that a variant's key can be chosen for some value of the selector in the locale. */
 export function checkNumberKey(
 	selector: NumberSelector,
 	key: string,
 	locale: string,
 ): void {
+	if (isExactKey(key) && selector.digits !== undefined) {
+		// Rounding a number its options already show leaves it as it is, so a key no value shows is
+		// one its own number is not shown as: for a percent, the hundredth it is the percent of.
+		const shown = shownDigits(selector.digits, keyValue(selector, key));
+		if (shown !== key) {
+			throw new MessageProblem(
+				"message-invalid",
+				`the variant ${selector.name}=${key} can never be chosen: ${selector.name} shows ${key} as ${shown}, and no value as ${key}. Write the key as ${selector.name} shows it.`,
+			);
+		}
+		return;
+	}
 	if (isExactKey(key)) {
 		const shortest = String(Number(key));
 		if (shortest !== key) {

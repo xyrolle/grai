@@ -252,7 +252,7 @@ describe("a formatted placeholder's errors", () => {
 		expect(
 			await errorsOf({
 				en: {
-					a_function: "{amount :string}",
+					a_function: "{amount :uppercase}",
 					no_currency: "{amount :currency currencyDisplay=code}",
 					a_usage: "{distance :unit unit=meter usage=road}",
 					fraction_digits:
@@ -267,7 +267,7 @@ describe("a formatted placeholder's errors", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "a_function" (en): {amount :string} calls :string, which grai does not support; the formatting functions are :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "a_function" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			'message-invalid: messages/en.json: "a_unit" (en): {days :relativetime unit=fortnight}: "unit=fortnight" needs a unit of time: year, years, quarter, quarters, month, months, week, weeks, day, days, hour, hours, minute, minutes, second, seconds.',
 			'unsupported: messages/en.json: "a_usage" (en): {distance :unit unit=meter usage=road}: usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.',
 			'message-invalid: messages/en.json: "a_value" (en): {amount :number minimumFractionDigits=two}: "minimumFractionDigits=two" needs a whole number.',
@@ -299,7 +299,7 @@ describe("a formatted placeholder's errors", () => {
 		]);
 	});
 
-	it("is an error to select on a date or on a number its options round, or to format a local", async () => {
+	it("is an error to select on a date or on a number in another notation, or to format a local", async () => {
 		expect(
 			await errorsOf({
 				en: {
@@ -314,7 +314,7 @@ describe("a formatted placeholder's errors", () => {
 						{
 							declarations: [
 								"input amount",
-								"local price = amount: number maximumFractionDigits=0 signDisplay=always",
+								"local price = amount: number notation=compact signDisplay=always",
 							],
 							selectors: ["price"],
 							match: { "price=*": "{price}" },
@@ -332,7 +332,7 @@ describe("a formatted placeholder's errors", () => {
 		).toEqual([
 			'unsupported: messages/en.json: "a_date" (en): it selects on day, a :date value, which MessageFormat 2 does not select on. Select on the input, or on a :number local of it.',
 			'unsupported: messages/en.json: "reformatted" (en): it formats price, a local, which grai does not support. Format the input it is made from.',
-			'unsupported: messages/en.json: "rounded" (en): it selects on price, a :number with maximumFractionDigits, whose category would depend on the digits shown, which grai does not support yet. Select on a local without it, and format with it in the pattern.',
+			'unsupported: messages/en.json: "rounded" (en): it selects on price, a :number with notation, which shows more than digits, and Intl.PluralRules has no category for that. Select on a local without it, and format with it in the pattern.',
 		]);
 	});
 });

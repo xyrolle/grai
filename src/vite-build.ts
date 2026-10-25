@@ -12,14 +12,10 @@ import {
 	localeDirectory,
 	messageDirectory,
 	messageOnly,
+	outputPrefix,
 	textModulePrefix,
 } from "./locale-chunks.ts";
-import {
-	calledNames,
-	everyName,
-	inOutdir,
-	outputImports,
-} from "./output-imports.ts";
+import { calledNames, everyName, outputImports } from "./output-imports.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
 export function keysModule(build: Build): string {
@@ -28,12 +24,14 @@ export function keysModule(build: Build): string {
 		.join("\n");
 }
 
+/** An output file as a build's key and text modules import it. */
+const outputModule = (file: string) => `${outputPrefix}${file}`;
+
 /**
  * A key's module in a build, from the compiler's model, or nothing for an id that is no key's: the
  * key's value for the browser, or for a server, exported under the key.
  */
 export function keyModule(
-	outdir: string,
 	build: Build,
 	id: string,
 	consumer: "client" | "server",
@@ -43,24 +41,20 @@ export function keyModule(
 	if (key === undefined) return undefined;
 	const names = calledNames([key]);
 	const value = consumer === "server" ? key.serverValue : key.value;
-	return `${outputImports(names, inOutdir(outdir))}\n${keyExports([{ name, value }], everyName(names))}`;
+	return `${outputImports(names, outputModule)}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 
 /**
  * A text key's string module in a client build: its text in the page's locale, chosen once. Its
  * variants are the key's, so each locale's copy of its chunk keeps only that locale's words.
  */
-export function textModule(
-	outdir: string,
-	build: Build,
-	id: string,
-): string | undefined {
+export function textModule(build: Build, id: string): string | undefined {
 	const name = id.slice(textModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key?.kind !== "text") return undefined;
 	const names = calledNames([key], ["pageText"]);
 	const value = `/*#__PURE__*/ pageText(${key.variants.join(", ")})`;
-	return `${outputImports(names, inOutdir(outdir))}\n${keyExports([{ name, value }], everyName(names))}`;
+	return `${outputImports(names, outputModule)}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 
 /**
@@ -104,18 +98,38 @@ export function moduleKindIn(
 }
 
 /**
- * The client build's chunking: the runtime in a chunk of its own, and the keys in chunks by the
- * entries that use them, so a message chunk holds keys and nothing else.
+ * The bytes of key modules' code, every locale's words with them, at which a set of keys the same
+ * entries use is worth a request of its own. Measured on both reference apps (`docs/design.md`).
+ */
+export const ownChunkBytes = 4096;
+
+/**
+ * The client build's chunking. The runtime has a chunk of its own, so a message chunk holds keys and
+ * nothing else. The keys a first paint needs (Rolldown's `$initial`) are chunked before the keys only
+ * a later import needs, so no chunk holds both. Among each, keys go in chunks by the entries that use
+ * them: a set of `ownChunkBytes` or more has a chunk of its own, which every entry that loads it uses
+ * whole, and each smaller set joins the set nearest it by those entries until it is as large. The
+ * larger sets keep their own chunks, so the words a page loads and does not use come only from sets
+ * under `ownChunkBytes`.
  */
 export function messageChunking(outdir: string): EnvironmentOptions {
 	const runtime = runtimeModules(outdir);
-	const groups = [
-		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
-		{
+	const keyChunks = (modules: { tags?: "$initial"[] }) => {
+		const keys = {
 			name: messageDirectory,
 			test: isMessageModule,
 			entriesAware: true,
-		},
+			...modules,
+		};
+		return [
+			{ ...keys, minSize: ownChunkBytes },
+			{ ...keys, entriesAwareMergeThreshold: ownChunkBytes },
+		];
+	};
+	const groups = [
+		{ name: "grai-runtime", test: (id: string) => runtime.has(id) },
+		...keyChunks({ tags: ["$initial"] }),
+		...keyChunks({}),
 	];
 	return {
 		build: { rolldownOptions: { output: { codeSplitting: { groups } } } },

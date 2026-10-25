@@ -109,6 +109,30 @@ it("compiles a save that leaves the catalog whole on its first event, without wa
 		.toEqual(["keys/0.js"]);
 });
 
+it("reports no compile that changed nothing, as one that an event late from a save starts", async () => {
+	const { dir, config } = project(catalogs);
+	const reported = watched(config);
+	await expect.poll(() => reported.length).toBe(1);
+	const catalog = join(dir, "messages", "de.json");
+	const state = join(dir, "out", ".grai");
+
+	// Another writer holds the output, so the compile an event starts waits where the test sees it,
+	// having read the catalogs as they are: an event that changes nothing.
+	writeFileSync(join(state, "lock"), String(process.pid));
+	utimesSync(catalog, new Date(), new Date());
+	await expect
+		.poll(() => existsSync(join(state, `lock.${process.pid}`)))
+		.toBe(true);
+	rmSync(join(state, "lock"));
+	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
+
+	await expect.poll(() => reported.at(-1)?.written).toEqual(["keys/0.js"]);
+	expect(reported.map((result) => result.written.length > 0)).toEqual([
+		true,
+		true,
+	]);
+});
+
 it("reports a broken catalog after its save, without waiting for another", async () => {
 	const { dir, config } = project(catalogs);
 	const reported = watched(config);

@@ -1,6 +1,6 @@
 import { isRecord } from "./config.ts";
 import type { Format } from "./format-options.ts";
-import { markupVariables } from "./markup.ts";
+import { type MarkupValue, markupVariables } from "./markup.ts";
 import { parseMatch } from "./match.ts";
 import {
 	type FormattedLocal,
@@ -8,7 +8,7 @@ import {
 	parseDeclarations,
 } from "./message-declarations.ts";
 import { numberSelector } from "./number-select.ts";
-import { identifier, parsePattern } from "./pattern.ts";
+import { identifier, type Part, parsePattern } from "./pattern.ts";
 import { MessageProblem } from "./problem.ts";
 import { type Selector, selectionOf, type Variant } from "./selection.ts";
 
@@ -93,7 +93,7 @@ function parseVariants(
 			);
 		}
 	}
-	const { declared, plurals, formatted } = parseDeclarations(
+	const { declared, plurals, formatted, strings } = parseDeclarations(
 		stringList(value.declarations ?? [], "declarations"),
 	);
 	const selectors = selectorNames(value.selectors ?? []).map(
@@ -101,16 +101,19 @@ function parseVariants(
 			const number = formatted.get(name);
 			if (number !== undefined) return numberSelector(name, number);
 			const local = plurals.get(name);
-			return local === undefined
-				? { kind: "input", name }
-				: { kind: "plural", name, ...local };
+			if (local !== undefined) return { kind: "plural", name, ...local };
+			const text = strings.get(name);
+			return text === undefined
+				? { kind: "input", name, input: name, normalized: false }
+				: { kind: "input", name, input: text, normalized: true };
 		},
 	);
-	const variants = parseMatch(value.match, selectors);
+	const variants = shownAsInputs(parseMatch(value.match, selectors), strings);
 	return withInputs(locale, {
 		declared,
 		plurals,
 		formatted,
+		strings,
 		selectors,
 		variants,
 	});
@@ -123,19 +126,38 @@ function withInputs(
 		declared,
 		plurals,
 		formatted,
+		strings,
 		selectors,
 		variants,
 	}: {
 		declared: readonly string[];
 		plurals: ReadonlyMap<string, PluralLocal>;
 		formatted: ReadonlyMap<string, FormattedLocal>;
+		strings: ReadonlyMap<string, string>;
 		selectors: readonly Selector[];
 		variants: readonly Variant[];
 	},
 ): LocaleMessage {
 	const inputs = new Set(declared);
 	for (const local of plurals.values()) inputs.add(local.input);
-	const isLocal = (name: string) => plurals.has(name) || formatted.has(name);
+	const isLocal = (name: string) =>
+		plurals.has(name) || formatted.has(name) || strings.has(name);
+	const madeFrom = new Map<string, string>([
+		...[...plurals, ...formatted].map(([name, { input }]): [string, string] => [
+			name,
+			input,
+		]),
+		...strings,
+	]);
+	for (const [name, input] of madeFrom) {
+		if (isLocal(input)) {
+			throw new MessageProblem(
+				"unsupported",
+				`${name} is made from ${input}, a local, which grai does not support yet. Make it from the input ${input} is made from.`,
+			);
+		}
+	}
+	for (const input of strings.values()) inputs.add(input);
 	const addOptionInput = (format: Format | undefined) => {
 		const name = format?.input?.name;
 		if (name === undefined) return;
@@ -152,7 +174,7 @@ function withInputs(
 		addOptionInput(local.format);
 	}
 	for (const selector of selectors) {
-		if (selector.kind === "input") inputs.add(selector.name);
+		if (selector.kind === "input") inputs.add(selector.input);
 	}
 	let markup = false;
 	for (const { pattern } of variants) {
@@ -205,6 +227,36 @@ function withInputs(
 		closed,
 		markup,
 	};
+}
+
+/**
+ * The variants with each `:string` local they show, as text or as a markup option, shown as the
+ * input it is the text of, which is the value MessageFormat 2 gives it.
+ */
+function shownAsInputs(
+	variants: readonly Variant[],
+	strings: ReadonlyMap<string, string>,
+): Variant[] {
+	if (strings.size === 0) return [...variants];
+	const shown = (name: string) => strings.get(name) ?? name;
+	return variants.map(({ keys, pattern }) => ({
+		keys,
+		pattern: pattern.map((part): Part => {
+			if (part.type === "variable") {
+				return part.format === undefined
+					? { ...part, name: shown(part.name) }
+					: part;
+			}
+			if (part.type === "text") return part;
+			const options = [...part.options].map(
+				([option, value]): [string, MarkupValue] => [
+					option,
+					"variable" in value ? { variable: shown(value.variable) } : value,
+				],
+			);
+			return { ...part, options: new Map(options) };
+		}),
+	}));
 }
 
 /** The names `selectors` lists, each a name and each once: a second selector on a value adds nothing. */

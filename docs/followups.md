@@ -8,6 +8,12 @@ The Vite plugin writes each message chunk once per locale under `grai-<locale>/`
 
 Done when: `grai/sveltekit` does both, with a browser test that a page of the example loads no other locale's words and no shared message chunk.
 
+## Chunk messages by the entries a page loads together
+
+A SvelteKit page loads its layouts with it, but the bundler sees each layout and page as an entry of its own: a set of keys that a layout and a few of its pages use is a set apart from the layout's own, though every page under the layout loads both. On app B, whose 60 pages share one layout, the layout's first paint loads 8 message chunks, and the app's tuned setup on Paraglide, which grouped keys by the routes that reach them and the layout's keys in one chunk, loads 21 a page (median) against grai's 26, in 10% fewer bytes. Simulated on app B's build, sets by the pages that load them rather than by entries give 13% fewer requests and 6% fewer bytes. Rolldown's sets cannot say which entries load together, and its merge picks the nearest set by the count of entries apart, not by the bytes a page would load.
+
+Done when: the message chunking knows which entries a page loads together, from the framework's adapter or from the bundler, and both reference apps measure it.
+
 ## Switch locale in place: `"switch": "live"`
 
 The config accepts `"live"`, and `grai/svelte` then keeps every message a call, but no page switches in place yet. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
@@ -41,12 +47,17 @@ Done when: such a server loads function expressions while the browser keeps arro
 ## Support the MessageFormat 2 constructs that are still compile errors
 
 These are compile errors today:
-- selecting on a `:number` local whose options change its digits (`maximumFractionDigits`, significant digits, rounding, `notation`, `style`), which MessageFormat 2 selects on by the number those digits show;
 - `:unit`'s `usage`, which converts the value into the locale's preferred units and which Intl cannot do.
 
 Neither reference app uses them, but they are common in MessageFormat 2 catalogs, so other adopters will meet these errors first.
 
 Done when: each compiles, with a test, and the design lists it among the constructs.
+
+## Locals made from other locals
+
+MessageFormat 2 lets a local be made from another, as in `local a = n: number` then `local b = a: integer`, and its functions compose: `b` takes `a`'s value and options, then its own. grai refuses such a local with an error naming both, and its message says to make it from the input instead.
+
+Done when: a plural, formatted or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
 
 ## Bind the locale in Next's server actions and route handlers
 
@@ -86,7 +97,7 @@ Done when: a local branch of app B on grai passes its own checks and tests, and 
 
 ## Import what `grai import` leaves out
 
-It leaves out ICU's currency and skeleton styles, which need their options mapped one by one. vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it.
+vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing reads it. ICU's skeleton stems and date fields that Intl has no option for (`scale`, `integer-width`, weeks, quarters) are left out, as no import can express them.
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
 

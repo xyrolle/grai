@@ -1,20 +1,23 @@
 /**
  * Writing translation units as XLIFF 2.0, the OASIS standard translation tools exchange. A
- * placeholder is a `<ph>`, a pair of tags a `<pc>` around its words, so a tool keeps a translator
- * from breaking either. A plural form's unit has a note of the counts it is for.
+ * placeholder is a `<ph>`, a pair of tags a `<pc>` around its words, or an `<sc>` and an `<ec>`
+ * where it crosses another, so a tool keeps a translator from breaking either. A unit has a note of
+ * its key's description for translators, and a plural form's another of the counts it is for.
  */
 
-import type { Piece } from "./pattern-pieces.ts";
+import type { Descriptions } from "./descriptions.ts";
+import type { Code, Piece } from "./pattern-pieces.ts";
 import type { Unit } from "./translation-units.ts";
 import { escapeAttribute, escapeText } from "./xml-text.ts";
 
 export const xliffNamespace = "urn:oasis:names:tc:xliff:document:2.0";
 
-/** A locale's units as an XLIFF 2.0 document. */
+/** A locale's units as an XLIFF 2.0 document, each with its key's description, if it has one. */
 export function writeXliff(
 	srcLang: string,
 	trgLang: string,
 	units: readonly Unit[],
+	descriptions: Descriptions,
 ): string {
 	const lines = [
 		'<?xml version="1.0" encoding="UTF-8"?>',
@@ -29,11 +32,15 @@ export function writeXliff(
 		lines.push(
 			`\t\t<unit id="${escapeAttribute(unit.id)}" name="${escapeAttribute(name)}">`,
 		);
-		if (unit.note !== undefined) {
-			lines.push(
-				`\t\t\t<notes><note category="variant">${escapeText(unit.note)}</note></notes>`,
-			);
-		}
+		const notes = [
+			["description", descriptions.get(unit.key)],
+			["variant", unit.note],
+		].flatMap(([category, note]) =>
+			note === undefined
+				? []
+				: [`<note category="${category}">${escapeText(note)}</note>`],
+		);
+		if (notes.length > 0) lines.push(`\t\t\t<notes>${notes.join("")}</notes>`);
 		const state = unit.target === undefined ? "initial" : "translated";
 		lines.push(`\t\t\t<segment state="${state}">`);
 		lines.push(`\t\t\t\t<source>${inline(unit.source)}</source>`);
@@ -47,8 +54,9 @@ export function writeXliff(
 }
 
 /**
- * Pieces as XLIFF inline content: a tag pair that nests properly as a `<pc>`, every other code as
- * a `<ph>`, and a character XML cannot hold as a `<cp>`.
+ * Pieces as XLIFF inline content: a tag pair that nests properly as a `<pc>`, one that crosses
+ * another as an `<sc>` and an `<ec>`, every other code as a `<ph>`, and a character XML cannot
+ * hold as a `<cp>`.
  */
 function inline(pieces: readonly Piece[]): string {
 	let content = "";
@@ -61,7 +69,7 @@ function inline(pieces: readonly Piece[]): string {
 		}
 		const end = piece.kind === "open" ? closingIndex(pieces, index) : -1;
 		if (end === -1) {
-			content += `<ph id="${escapeAttribute(piece.id)}" disp="${escapeAttribute(piece.source)}"/>`;
+			content += codeElement(piece, pieces);
 			continue;
 		}
 		const close = pieces[end];
@@ -70,6 +78,20 @@ function inline(pieces: readonly Piece[]): string {
 		index = end;
 	}
 	return content;
+}
+
+/** A code as an element of its own: a tag of a pair as an `<sc>` or its `<ec>`, any other as a `<ph>`. */
+function codeElement(code: Code, pieces: readonly Piece[]): string {
+	const id = escapeAttribute(code.id);
+	const disp = escapeAttribute(code.source);
+	const paired = pieces.some(
+		(piece) =>
+			"id" in piece && piece.id === code.id && piece.kind !== code.kind,
+	);
+	if (paired && code.kind === "open") return `<sc id="${id}" disp="${disp}"/>`;
+	if (paired && code.kind === "close")
+		return `<ec startRef="${id}" disp="${disp}"/>`;
+	return `<ph id="${id}" disp="${disp}"/>`;
 }
 
 /** Where the tag opened at `index` closes, if what lies between nests properly; else -1. */

@@ -44,13 +44,22 @@
 		"./react": {
 			"types": "./dist/react/markup.d.ts",
 			"default": "./dist/react/markup.js"
+		},
+		"./sveltekit": {
+			"types": "./dist/sveltekit.d.ts",
+			"default": "./dist/sveltekit.js"
+		},
+		"./sveltekit/client": {
+			"types": "./dist/sveltekit-client.d.ts",
+			"default": "./dist/sveltekit-client.js"
 		}
 	},
 	"bin": {
 		"grai": "./dist/cli.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"config.schema.json"
 	],
 	"packageManager": "pnpm@12.15.0",
 	"engines": {
@@ -60,11 +69,12 @@
 		"build": "tsc -p tsconfig.build.json",
 		"prepack": "pnpm build",
 		"check": "biome check .",
-		"typecheck": "tsc && tsc -p tsconfig.runtime.json",
+		"typecheck": "tsc && tsc -p tsconfig.runtime.json && tsc -p tsconfig.browser.json",
 		"test": "vitest run",
 		"test:performance": "node scripts/performance.ts"
 	},
 	"peerDependencies": {
+		"@sveltejs/kit": "^3.1.0",
 		"magic-string": ">=1",
 		"next": ">=16.3",
 		"react": ">=19",
@@ -72,6 +82,9 @@
 		"vite": ">=8"
 	},
 	"peerDependenciesMeta": {
+		"@sveltejs/kit": {
+			"optional": true
+		},
 		"magic-string": {
 			"optional": true
 		},
@@ -90,6 +103,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.2",
+		"@sveltejs/kit": "3.1.0",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
 		"@types/node": "24.19.2",
 		"@types/react": "19.3.0",

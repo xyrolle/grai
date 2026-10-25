@@ -138,6 +138,41 @@ describe("a recompile after an edit", () => {
 		expect(replaced.deref()).toBeUndefined();
 	});
 
+	it("writes plurals.js to read shown digits when an edit selects on a rounding number, and back when none does", async () => {
+		const { dir, config } = project(catalogs);
+		const first = await recompile(config, undefined);
+		const write = (en: unknown, de: unknown) => {
+			writeFileSync(
+				join(dir, "messages", "en.json"),
+				laidOut({ ...catalogs.en, greeting: en }),
+			);
+			writeFileSync(
+				join(dir, "messages", "de.json"),
+				laidOut({ ...catalogs.de, greeting: de }),
+			);
+		};
+		const rounded = [
+			{
+				declarations: [
+					"input count",
+					"local n = count: number minimumFractionDigits=1",
+				],
+				selectors: ["n"],
+				match: { "n=one": "{n} one", "n=*": "{n}" },
+			},
+		];
+		const plurals = () => readFileSync(join(dir, "out", "plurals.js"), "utf8");
+		write(rounded, rounded);
+		const selecting = await recompile(config, first.build);
+		const digits = plurals();
+		write("Hello {name}", "Hallo {name}");
+		await recompile(config, selecting.build);
+
+		expect(selecting.result.written).toContain("plurals.js");
+		expect(digits).toContain("const countOperands = ");
+		expect(plurals()).not.toContain("countOperands");
+	});
+
 	it("starts again from the last good build after a compile that failed", async () => {
 		const { dir, config } = project(catalogs);
 		const good = await recompile(config, undefined);

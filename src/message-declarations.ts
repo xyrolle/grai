@@ -4,6 +4,7 @@
  */
 
 import { type Call, parseCall } from "./format-options.ts";
+import { takesNoOptions } from "./pattern.ts";
 import type { PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
@@ -13,11 +14,15 @@ export type PluralLocal = { input: string; type: PluralType };
 /** A local such as `local price = amount: number style=currency currency=EUR`: its input, and the call. */
 export type FormattedLocal = { input: string } & Call;
 
-/** A message's declarations: its inputs, and its plural and formatted locals by name. */
+/**
+ * A message's declarations: its inputs, and its plural, formatted and `:string` locals by name,
+ * a `:string` local by the input whose text it is.
+ */
 export type Declarations = {
 	declared: readonly string[];
 	plurals: ReadonlyMap<string, PluralLocal>;
 	formatted: ReadonlyMap<string, FormattedLocal>;
+	strings: ReadonlyMap<string, string>;
 };
 
 const inputDeclaration = /^input\s+([A-Za-z_$][\w$]*)$/;
@@ -29,6 +34,7 @@ export function parseDeclarations(texts: readonly string[]): Declarations {
 	const declared: string[] = [];
 	const plurals = new Map<string, PluralLocal>();
 	const formatted = new Map<string, FormattedLocal>();
+	const strings = new Map<string, string>();
 	const declarers = new Map<string, string>();
 	for (const text of texts) {
 		const declaration = parseDeclaration(text);
@@ -43,9 +49,11 @@ export function parseDeclarations(texts: readonly string[]): Declarations {
 		if (declaration.kind === "input") declared.push(declaration.name);
 		else if (declaration.kind === "plural")
 			plurals.set(declaration.name, declaration);
+		else if (declaration.kind === "string")
+			strings.set(declaration.name, declaration.input);
 		else formatted.set(declaration.name, declaration);
 	}
-	return { declared, plurals, formatted };
+	return { declared, plurals, formatted, strings };
 }
 
 /** The name a declaration, such as `local price = amount: number`, gives its value. */
@@ -53,10 +61,11 @@ export function declaredName(declaration: string): string {
 	return parseDeclaration(declaration).name;
 }
 
-/** A declaration: an input, a plural local of an input, or a formatted local of one. */
+/** A declaration: an input, or a plural, `:string` or formatted local of one. */
 type Declaration =
 	| { kind: "input"; name: string }
 	| ({ kind: "plural"; name: string } & PluralLocal)
+	| { kind: "string"; name: string; input: string }
 	| ({ kind: "format"; name: string } & FormattedLocal);
 
 function parseDeclaration(declaration: string): Declaration {
@@ -69,6 +78,10 @@ function parseDeclaration(declaration: string): Declaration {
 		if (fn === "plural") {
 			const type = pluralTypeOf(options.trim(), declaration);
 			return { kind: "plural", name, input: operand, type };
+		}
+		if (fn === "string") {
+			if (options.trim() !== "") throw takesNoOptions(`"${declaration}"`);
+			return { kind: "string", name, input: operand };
 		}
 		const call = parseCall(fn, options, `"${declaration}"`);
 		return { kind: "format", name, input: operand, ...call };

@@ -1,4 +1,5 @@
 import {
+	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -23,6 +24,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
+import { ownChunkBytes } from "../src/vite-build.ts";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -141,9 +143,24 @@ async function built(
 	return { entries: entryCode, sources, entryFiles, chunks };
 }
 
+/** A word repeated into a message whose key's module alone reaches `ownChunkBytes`. */
+const sized = (word: string) =>
+	`${word} `.repeat(Math.ceil(ownChunkBytes / word.length));
+
 describe("the Vite plugin's build", () => {
-	it("gives each entry only the keys its code uses", async () => {
-		const { dir } = project(catalogs);
+	it("gives each entry only the keys its code uses, when each set of them is worth a chunk of its own", async () => {
+		const { dir } = project({
+			en: {
+				title: sized("Title"),
+				greeting: `${sized("Hello")} {name}`,
+				footer: sized("Footer"),
+			},
+			de: {
+				title: sized("Titel"),
+				greeting: `${sized("Hallo")} {name}`,
+				footer: sized("Fußzeile"),
+			},
+		});
 		const { entries } = await built(dir, {
 			a: `import { m } from "./out/messages.js";\nconsole.log(m.title(), m.greeting({ name: "Ana" }));\n`,
 			b: `import { m } from "./out/messages.js";\nconsole.log(m.footer(), m.greeting({ name: "Ana" }));\n`,
@@ -223,6 +240,114 @@ describe("the Vite plugin's build", () => {
 				'a.js:2:41: "caption": m["caption"] names a key no catalog has. Add it with grai add caption --en "…" --de "…", or fix the name.',
 			].join("\n"),
 		);
+	});
+});
+
+describe("the Vite plugin's message chunks", () => {
+	/** The keys each message chunk of a client build holds, by its file name. */
+	const keysOf = (
+		chunks: readonly { fileName: string; moduleIds: string[] }[],
+	) =>
+		new Map(
+			chunks
+				.filter((chunk) => chunk.fileName.startsWith("assets/grai/"))
+				.map((chunk) => [
+					chunk.fileName,
+					chunk.moduleIds.map((id) => id.replace("\0grai:key/", "")).sort(),
+				]),
+		);
+
+	it("gives a set of keys the same entries use a chunk of its own once it reaches ownChunkBytes, and pools the smaller sets apart from it", async () => {
+		const { dir } = project({
+			en: { article: sized("Article"), save: "Save", close: "Close" },
+			de: { article: sized("Artikel"), save: "Speichern", close: "Schließen" },
+		});
+		const { chunks, entries } = await built(dir, {
+			article: `import { m } from "./out/messages.js";\nconsole.log(m.article(), m.save());\n`,
+			dialog: `import { m } from "./out/messages.js";\nconsole.log(m.save(), m.close());\n`,
+		});
+
+		expect([...keysOf(chunks).values()].sort()).toEqual([
+			["article"],
+			["close", "save"],
+		]);
+		expect(entries.dialog?.includes("Artikel")).toBe(false);
+	});
+
+	it("keeps the keys a first paint needs apart from the keys only a later import needs", async () => {
+		const { dir } = project({
+			en: { now: "Now", later: "Later" },
+			de: { now: "Jetzt", later: "Später" },
+		});
+		writeFileSync(
+			join(dir, "later.js"),
+			`import { m } from "./out/messages.js";\nexport const later = m.later();\n`,
+		);
+		const { chunks, entries } = await built(dir, {
+			page: `import { m } from "./out/messages.js";\nconsole.log(m.now());\nimport("./later.js");\n`,
+		});
+
+		expect([...keysOf(chunks).values()].sort()).toEqual([["later"], ["now"]]);
+		expect(entries.page?.includes("Später")).toBe(false);
+	});
+
+	it("pools sets of keys under ownChunkBytes, so a page of many of them makes few requests, each copy in its locale's words alone", async () => {
+		const pages = Array.from({ length: 12 }, (_, index) => `page${index}`);
+		const catalog = (locale: string) =>
+			Object.fromEntries([
+				["title", `${locale} title`],
+				...pages.map((page) => [page, `${locale} ${page}`]),
+			]);
+		const { dir } = project({ en: catalog("en"), de: catalog("de") });
+		const { chunks, sources } = await built(
+			dir,
+			Object.fromEntries(
+				pages.map((page) => [
+					page,
+					`import { m } from "./out/messages.js";\nconsole.log(m.title(), m.${page}());\n`,
+				]),
+			),
+		);
+		const messageChunks = [...keysOf(chunks).keys()];
+		const words = (file: string, locale: string) =>
+			(sources.get(file) ?? "").includes(`${locale} `);
+
+		expect(messageChunks.length).toBe(1);
+		for (const file of messageChunks) {
+			expect([
+				words(file.replace("grai/", "grai-en/"), "en"),
+				words(file.replace("grai/", "grai-en/"), "de"),
+				words(file.replace("grai/", "grai-de/"), "en"),
+				words(file.replace("grai/", "grai-de/"), "de"),
+			]).toEqual([true, false, false, true]);
+		}
+	});
+
+	it("chunks a project alike wherever it lives", async () => {
+		// Enough keys on one page, and a directory deep enough, that the directory's path in each key
+		// module's code would alone lift the page's keys past ownChunkBytes.
+		const deep = join(...Array.from({ length: 4 }, () => "d".repeat(200)));
+		const keys = Array.from(
+			{ length: Math.ceil(ownChunkBytes / deep.length) + 1 },
+			(_, index) => `key${index}`,
+		);
+		const catalog = Object.fromEntries(
+			[...keys, "other"].map((key) => [key, key]),
+		);
+		const near = project({ en: catalog, de: catalog }).dir;
+		const root = realpathSync(mkdtempSync(join(tmpdir(), "grai-")));
+		onTestFinished(() => rmSync(root, { recursive: true }));
+		const far = join(root, deep);
+		cpSync(near, far, { recursive: true });
+		const entries = {
+			page: `import { m } from "./out/messages.js";\nconsole.log(${keys.map((key) => `m.${key}()`).join(", ")});\n`,
+			other: `import { m } from "./out/messages.js";\nconsole.log(m.other());\n`,
+		};
+
+		const nearChunks = keysOf((await built(near, entries)).chunks);
+
+		expect(keysOf((await built(far, entries)).chunks)).toEqual(nearChunks);
+		expect(nearChunks.size).toBe(1);
 	});
 });
 
@@ -357,10 +482,10 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 	});
 
 	it("links each copy to the chunks it imports, in a build of many chunks", async () => {
-		// A page per key gives the build enough chunks that the bundler's placeholders for their
-		// hashes run past digits.
+		// A page per key, each worth a chunk of its own, gives the build enough chunks that the
+		// bundler's placeholders for their hashes run past digits.
 		const keys = Array.from({ length: 12 }, (_, index) => `key${index}`);
-		const catalog = Object.fromEntries(keys.map((key) => [key, key]));
+		const catalog = Object.fromEntries(keys.map((key) => [key, sized(key)]));
 		const { dir } = project({ en: catalog, de: catalog });
 		const { sources } = await built(
 			dir,
@@ -799,6 +924,30 @@ export const render = () => \`\${title()} \${footer()}\`;
 			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
 		);
 		await expect.poll(rendered, devWait).toBe("Heading Footer");
+	});
+
+	it("gives the dev module no source map, which Vite would inline at several times its size", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		await ssr.runner.import("/render.js");
+
+		const keys = await ssr.transformRequest(join(dir, "out", "keys.js"));
+
+		expect(keys?.code).toContain("export");
+		expect(keys?.code).not.toContain("sourceMappingURL=data:");
 	});
 
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {

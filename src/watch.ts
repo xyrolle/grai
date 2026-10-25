@@ -20,8 +20,12 @@ const settleMilliseconds = 20;
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. A change is compiled on its first event. A compile that finds a catalog that does not
  * parse, as a read in the middle of a save does, is not reported: the files are read again once
- * they have been quiet for `settleMilliseconds`, and that compile's result stands. Changes that
- * come during a compile are taken together by the next one. Each result is reported with
+ * they have been quiet for `settleMilliseconds`, and that compile's result stands. A compile reads
+ * after an event, so it sees at least the save's first write, and part of a JSON object never
+ * parses: a read that parses sees a catalog whole, before a save starts or after it ends. A compile
+ * that changed nothing since the last one reported, as one that an event late from a save already
+ * read starts, is not reported either. Changes that come during a compile are taken together by
+ * the next one. Each result is reported with
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
  * the outdir cannot be written, goes to `failed`, and the next change compiles again. It watches
  * until the process ends or `close` is called, whose promise settles once the compile under way,
@@ -45,6 +49,11 @@ export function watch(
 	let settling: ReturnType<typeof setTimeout> | undefined;
 	/** Whether the next compile reads files that have been quiet, so its result stands. */
 	let settled = false;
+	/**
+	 * Whether the last compile reported built the output, so a compile after it that changes nothing
+	 * has nothing to tell. A compile that throws clears it, so the next one is reported.
+	 */
+	let reportedBuild = false;
 
 	/**
 	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
@@ -93,9 +102,11 @@ export function watch(
 					return;
 				}
 				build = next.build ?? build;
-				if (!closed)
-					report(next.result, performance.now() - started, next.build);
+				if (closed || (reportedBuild && unchanged(next))) continue;
+				report(next.result, performance.now() - started, next.build);
+				reportedBuild = next.build !== undefined;
 			} catch (error) {
+				reportedBuild = false;
 				failed(error);
 			}
 		} while (again && !closed);
@@ -120,6 +131,15 @@ export function watch(
 			await running;
 		},
 	};
+}
+
+/** Whether a compile succeeded without changing a key or writing a file. */
+function unchanged(next: { result: CompileResult; build?: Build }): boolean {
+	return (
+		next.build !== undefined &&
+		next.result.written.length === 0 &&
+		next.build.compilation.changed.size === 0
+	);
 }
 
 /** Whether a compile found a catalog that does not parse, as a read in the middle of a save does. */

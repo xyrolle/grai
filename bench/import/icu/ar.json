@@ -15,5 +15,16 @@
 		"shipped": "شحن {d, date, medium} في {d, time, short}",
 		"dated": "{d, date} {d, time}"
 	},
-	"app.title": "ar shop"
+	"app.title": "ar shop",
+	"skeletons": {
+		"euro": "{value, number, ::currency/EUR}",
+		"yen": "{value, number, ::currency/JPY .00 sign-always}",
+		"share": "{value, number, ::percent .0}",
+		"speed": "{value, number, ::unit/speed-kilometer-per-hour unit-width-full-name}",
+		"short": "{value, number, ::compact-short}",
+		"plain": "{value, number, ::.00# group-off}",
+		"digits": "{value, number, ::@@@}",
+		"day": "{d, date, ::yMMMd}",
+		"clock": "{d, time, ::Hmm}"
+	}
 }

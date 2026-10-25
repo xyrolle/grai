@@ -6,7 +6,7 @@ import { build, type InlineConfig, parseSync } from "vite";
 import { describe, expect, it } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { devModule } from "../src/dev-module.ts";
-import { textModulePrefix } from "../src/locale-chunks.ts";
+import { outputPrefix, textModulePrefix } from "../src/locale-chunks.ts";
 import { calledNames, everyName } from "../src/output-imports.ts";
 import { grai } from "../src/vite.ts";
 import { textModule } from "../src/vite-build.ts";
@@ -166,8 +166,9 @@ describe("a key named as something the output's code calls", () => {
 		if (compiled === undefined) throw new Error("the compile failed");
 		const outdir = join(dir, "out");
 		const file = join(outdir, "page-text.js");
-		const code = textModule(outdir, compiled, `${textModulePrefix}pageText`);
-		writeFileSync(file, code ?? "");
+		const code = textModule(compiled, `${textModulePrefix}pageText`) ?? "";
+		// Its imports of the output by grai's prefix, as the plugin resolves them.
+		writeFileSync(file, code.replaceAll(outputPrefix, `${outdir}/`));
 		expect(said(file, ["pageText"])).toEqual({ pageText: "Page text" });
 	});
 });

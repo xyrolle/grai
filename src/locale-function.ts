@@ -103,7 +103,8 @@ function unmatchedCode(
 			message.variants.every((variant) => variant.keys[index] !== catchAll),
 	);
 	const name = closed?.name ?? "";
-	return `unmatched(${JSON.stringify(key)}, ${JSON.stringify(message.locale)}, ${JSON.stringify(name)}, ${value(name)})`;
+	const input = closed?.kind === "input" ? closed.input : name;
+	return `unmatched(${JSON.stringify(key)}, ${JSON.stringify(message.locale)}, ${JSON.stringify(name)}, ${value(input)})`;
 }
 
 type VariablePart = Extract<Part, { type: "variable" }>;

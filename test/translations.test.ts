@@ -229,6 +229,83 @@ describe("grai export", () => {
 		]);
 		expect(units[0]?.note).toBe("n: 0");
 	});
+
+	it("notes the counts each form of a rounding number is for, as its options show them", async () => {
+		const weights = [
+			{
+				declarations: [
+					"input kg",
+					"local n = kg: number minimumFractionDigits=1",
+				],
+				selectors: ["n"],
+				match: { "n=one": "{n} kilogram", "n=*": "{n} kilograms" },
+			},
+		];
+		const { config } = project({ en: { weights }, ru: { weights } });
+
+		const result = await exportLocale(config, "ru", {
+			json: true,
+			untranslated: false,
+		});
+		const units: { id: string; source: string; note: string }[] =
+			"document" in result ? JSON.parse(result.document).units : [];
+
+		expect(units.map(({ id, source, note }) => [id, source, note])).toEqual([
+			[
+				"weights.n.one",
+				"{n} kilograms",
+				"n: one, as for no count its options show",
+			],
+			[
+				"weights.n.few",
+				"{n} kilograms",
+				"n: few, as for no count its options show",
+			],
+			[
+				"weights.n.many",
+				"{n} kilograms",
+				"n: many, as for no count its options show",
+			],
+			[
+				"weights.n.other",
+				"{n} kilograms",
+				"n: other, as for 0, 1, 2, 3, 4, 5, 0.5, 1.5, 2.5, …",
+			],
+		]);
+	});
+
+	it("gives each code of a unit an id of its own that XML can hold, whatever its tag is named", async () => {
+		const legend = "{#dot/} {#dot/} {#dot.2/} {#a&b/}";
+		const { config } = project({ en: { legend }, de: { legend } });
+
+		const xliff = await exported(config, "de");
+		const ids = [...xliff.matchAll(/<ph id="([^"]+)"/g)].map(([, id]) => id);
+
+		expect(ids).toEqual(["tag-dot", "tag-dot.2", "tag-dot-2e-2", "tag-a-26-b"]);
+	});
+
+	it("writes tags that cross as a start and an end code each, which a merge reads back", async () => {
+		const styles = "{#b}bold {#i}both{/b} italic{/i}";
+		const { dir, config, load } = project({ en: { styles }, de: { styles } });
+		const xliff = await exported(config, "de");
+		const file = join(dir, "de.xlf");
+		writeFileSync(
+			file,
+			translated(xliff, {
+				styles:
+					'<sc id="tag-b"/>fett <sc id="tag-i"/>beides<ec startRef="tag-b"/> kursiv<ec startRef="tag-i"/>',
+			}),
+		);
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(xliff).toContain(
+			'<source><sc id="tag-b" disp="{#b}"/>bold <sc id="tag-i" disp="{#i}"/>both<ec startRef="tag-b" disp="{/b}"/> italic<ec startRef="tag-i" disp="{/i}"/></source>',
+		);
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(m.styles?.({}, { locale: "de" })).toBe("fett beides kursiv");
+	});
 });
 
 describe("grai merge", () => {
@@ -270,6 +347,69 @@ describe("grai merge", () => {
 		expect(m.cart_title?.({}, { locale: "ru" })).toBe("Корзина & <ещё>");
 	});
 
+	it("keeps each variant's own formatter where two placeholders of a message share a name", async () => {
+		const price = [
+			{
+				declarations: ["input precision", "input amount"],
+				selectors: ["precision"],
+				match: {
+					"precision=whole":
+						"Rounded: {amount :number maximumFractionDigits=0}",
+					"precision=*":
+						"Exact: {amount :number minimumFractionDigits=2 maximumFractionDigits=2}",
+				},
+			},
+		];
+		const { dir, config, load } = project({ en: { price }, de: { price } });
+		const file = join(dir, "de.xlf");
+		const xliff = await exported(config, "de");
+		const [whole, exact] = [...xliff.matchAll(/<ph id="([^"]+)"/g)].map(
+			([, id]) => id,
+		);
+		writeFileSync(
+			file,
+			translated(xliff, {
+				"price.precision.whole": `Gerundet: <ph id="${whole}"/>`,
+				"price.precision.-2a-": `Genau: <ph id="${exact}"/>`,
+			}),
+		);
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(
+			["whole", "exact"].map((precision) =>
+				m.price?.({ precision, amount: 1.234 }, { locale: "de" }),
+			),
+		).toEqual(["Gerundet: 1", "Genau: 1,23"]);
+	});
+
+	it("gives back a translation's own formatter unchanged, where the base formats its placeholder otherwise", async () => {
+		const { dir, config } = project({
+			en: { cart_total: "Total {amount}", cart_title: "Your cart" },
+			de: {
+				cart_total: "Summe {amount :number minimumFractionDigits=2}",
+				cart_title: "Your cart",
+			},
+		});
+		const file = join(dir, "de.xlf");
+		writeFileSync(
+			file,
+			translated(await exported(config, "de"), {
+				cart_title: "Ihr Warenkorb",
+			}),
+		);
+		const catalog = join(dir, "messages", "de.json");
+
+		const merged = await mergeDocument(config, file);
+
+		expect(merged).toMatchObject({ messages: 1, units: 1, refused: [] });
+		expect(JSON.parse(readFileSync(catalog, "utf8")).cart_total).toBe(
+			"Summe {amount :number minimumFractionDigits=2}",
+		);
+	});
+
 	it("refuses a stale unit, an invalid one and an incomplete plural, merges the rest, and skips units without a target", async () => {
 		const { dir, config } = project({ en: english, ru: english });
 		const xliff = await exported(config, "ru");
@@ -299,6 +439,31 @@ describe("grai merge", () => {
 			'ru.xlf: "cart_total" (ru): unit cart_total: the translation places a code its message does not have. Use only the source\'s codes.',
 			'ru.xlf: "cart_terms" (ru): the translation shows no input, where the base shows {name}.',
 			'ru.xlf: "cart_items" (ru): the message needs a translation of every form, and lacks cart_items.count.0.countPlural.-2a-, cart_items.count.-2a-.countPlural.few, cart_items.count.-2a-.countPlural.many, cart_items.count.-2a-.countPlural.other.',
+		]);
+	});
+
+	it("refuses a unit a file gives twice, rather than take either translation", async () => {
+		const { dir, config } = project({
+			en: { cart_title: "Your cart" },
+			de: { cart_title: "Your cart" },
+		});
+		const units = [
+			{ id: "cart_title", source: "Your cart", target: "Ihr Warenkorb" },
+			{ id: "cart_title", source: "Your cart", target: "Dein Warenkorb" },
+		];
+		const file = join(dir, "de.json");
+		writeFileSync(
+			file,
+			JSON.stringify({ srcLang: "en", trgLang: "de", units }),
+		);
+
+		const merged = await mergeDocument(config, file);
+
+		expect(merged).toMatchObject({ messages: 0, units: 0 });
+		expect(
+			"refused" in merged ? merged.refused.map((error) => error.message) : [],
+		).toEqual([
+			'de.json: "cart_title" (de): unit cart_title: the file gives the unit 2 times. Keep one.',
 		]);
 	});
 

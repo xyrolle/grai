@@ -8,6 +8,7 @@ import {
 	isMessageModule,
 	keyModulePrefix,
 	keyPrefix,
+	outputPrefix,
 	textModulePrefix,
 	textPrefix,
 } from "./locale-chunks.ts";
@@ -72,13 +73,12 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		compiled: Build,
 		consumer: "client" | "server",
 	) => {
-		if (id.startsWith(textModulePrefix))
-			return textModule(files.outdir, compiled, id);
+		if (id.startsWith(textModulePrefix)) return textModule(compiled, id);
 		if (id === files.keysFile)
 			return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
 		return serving
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
-			: keyModule(files.outdir, compiled, id, consumer);
+			: keyModule(compiled, id, consumer);
 	};
 
 	const plugin: Plugin = {
@@ -179,6 +179,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			// output, looks for it before it exists. A page whose import failed would stay broken.
 			order: "pre",
 			async handler(id, importer, options) {
+				if (id.startsWith(outputPrefix))
+					return join(files.outdir, id.slice(outputPrefix.length));
 				if (
 					id.startsWith(keyPrefix) ||
 					id.startsWith(textPrefix) ||
@@ -218,7 +220,13 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			// Without side effects, a build leaves out every key a chunk's code does not use, so a key
 			// lands in the chunks of the entries that use it.
 			const code = moduleCode(id, compiled, this.environment.config.consumer);
-			return code === undefined ? null : { code, moduleSideEffects: false };
+			if (code === undefined) return null;
+			// No source map in dev: the module is the compiler's, with no source of its own to map back
+			// to, and Vite would inline a map of every line it rewrites, several times the module's size.
+			// A build keeps its maps, which tools read to tell what each chunk holds.
+			return serving
+				? { code, moduleSideEffects: false, map: { mappings: "" } }
+				: { code, moduleSideEffects: false };
 		},
 		hotUpdate({ file }) {
 			// The plugin follows the catalogs and the config itself, and its output is its own.

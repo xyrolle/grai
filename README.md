@@ -18,6 +18,7 @@ Catalogs are the inlang message format, one JSON file per locale, as Paraglide r
 
 ```json
 {
+	"$schema": "./node_modules/grai/config.schema.json",
 	"locales": ["en", "de"],
 	"baseLocale": "en",
 	"catalogs": "messages/{locale}.json",
@@ -32,7 +33,7 @@ Catalogs are the inlang message format, one JSON file per locale, as Paraglide r
 }
 ```
 
-`grai compile` writes the output; `grai watch` writes it again on each edit. Each message becomes a typed function:
+`grai compile` writes the output; `grai watch` writes it again on each edit. The output has a `.gitignore` of its own, so Git, Prettier and Biome skip it; ESLint needs the outdir in its `ignores`. Each message becomes a typed function:
 
 ```ts
 import { m } from "./src/lib/i18n/messages.js";
@@ -60,7 +61,7 @@ import { grai } from "grai/vite";
 export default { plugins: [grai()] };
 ```
 
-The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, each chunk holds only the keys its code uses, once per locale.
+The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, a page loads the keys its code uses in few chunks, each copied once per locale: keys the same pages use share a chunk, and small sets of them are pooled (`docs/design.md`).
 
 A tool that reads a client build's chunks can ask which of grai's modules an id is, rather than spell grai's module ids:
 
@@ -87,7 +88,41 @@ It is `grai/vite`'s plugin, and in the client build a component's call of a mess
 
 ### SvelteKit
 
-`grai/sveltekit` is in review (#11).
+`grai/sveltekit`'s `handleLocale` renders each request in its locale, from the output's middleware and text direction. `examples/sveltekit` is a complete app.
+
+```ts
+// src/hooks.server.ts
+import { handleLocale } from "grai/sveltekit";
+import { getTextDirection } from "#lib/i18n/runtime.js";
+import { middleware } from "#lib/i18n/server.js";
+
+export const handle = handleLocale({ middleware, getTextDirection });
+```
+
+It resolves the locale by `grai.config.json`'s `strategy` and binds it while the request renders. It writes the locale into `src/app.html`'s `%grai.lang%` and `%grai.dir%`:
+
+```html
+<html lang="%grai.lang%" dir="%grai.dir%">
+```
+
+The browser takes the page's `<html lang>` as its locale, so it hydrates in the words the server drew. With the `url` strategy, Kit routes a path without its locale prefix:
+
+```ts
+// src/hooks.ts
+import type { Reroute } from "@sveltejs/kit/hooks";
+import { deLocalizeUrl } from "#lib/i18n/runtime.js";
+
+export const reroute: Reroute = ({ url }) => deLocalizeUrl(url).pathname;
+```
+
+Links then name their locale with `localizeHref("/about")`.
+
+In dev, an edited message shows in the open page without a reload once `src/hooks.client.ts` imports `grai/sveltekit/client`. Svelte draws again only what read the edited keys, and the page's loads and remote functions run again for the text they return. A build leaves the module out.
+
+```ts
+// src/hooks.client.ts
+import "grai/sveltekit/client";
+```
 
 ### Next.js
 
@@ -181,7 +216,10 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `catalogs` | Each locale's catalog, a path with `{locale}` in it. |
 | `outdir` | Where the compiled output goes. |
 | `strategy` | Optional. Where the server looks for a request's locale, in order: `cookie`, `preferredLanguage` (its `Accept-Language`), `url` (its first path segment; the base locale has no prefix). |
-| `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. |
+| `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. A `__Secure-` or `__Host-` name makes the cookie Secure. |
+| `cookieMaxAge` | Optional. The seconds a browser keeps the cookie, 400 days by default, which is the most a browser keeps one. |
+| `cookieDomain` | Optional. A host whose subdomains share the cookie, such as `example.com`. Not with a `__Host-` name, which a browser keeps for one host. |
+| `cookieSameSite` | Optional. `"lax"`, the default, `"strict"`, or `"none"` for a page embedded in another site's, which makes the cookie Secure. |
 | `localePrefix` | Optional, with the `url` strategy. `"as-needed"`, the default: the base locale's paths have no prefix, so `url` comes last. `"always"`: every locale's paths have one, an unprefixed page is sent to the locale the strategies after `url` find, and `url` may come first. |
 | `localePrefixes` | Optional, with the `url` strategy. A locale's prefix of its own, one lowercase path segment, such as `{ "en-US": "us" }`; a locale's prefix is otherwise its tag. |
 | `unlocalizedPaths` | Optional, with the `url` strategy. Globs of the paths `url` leaves alone, such as `["/api/**"]`: they have no prefix, and the strategies after `url` find their locale. |
@@ -190,6 +228,7 @@ A browser test sets the locale it expects in `beforeEach`, with `setLocale(local
 | `identicalToBase` | Optional. Per locale, the keys whose message rightly reads as the base locale's, such as a unit: `{ "de": ["unit_km"] }`. `grai check` and `grai export` take them as translated, and `grai check` reports one whose message is no longer the base text. |
 | `fallbacks` | Optional. Each locale that takes the messages it lacks from another locale of its language: `{ "en-GB": "en" }`. Its catalog may then hold only the messages that differ. |
 | `pseudoLocale` | Optional. A locale, such as `"en-XA"`, made from the base's messages for development and tests: accented, about 35% longer and in brackets. It needs the base's plural categories; `grai watch` and the Vite dev server compile it, and no build does. |
+| `descriptions` | Optional. A JSON file of each key's description for translators, such as `{ "open": "A verb: the button opens the menu" }`. `grai export` writes each as a note of the key's units, `grai import` fills it from FormatJS's descriptions, and `grai rename` and `grai check --fix` keep it in step. |
 
 ## Measured
 
@@ -230,7 +269,6 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
 - **A SvelteKit page still loads every locale's message chunks.** That lasts until the adapter writes the import map that points each page at its own locale's copies.
 - **Not supported yet:**
-  - selecting on a `:number` whose options round it, such as `maximumFractionDigits`;
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, other than a currency, a unit and a time zone (`currency=$code` and `:relativetime`'s `unit=$unit` work), such as `style=$style`.
 
@@ -246,8 +284,11 @@ Paraglide's inlang message-format catalogs compile unchanged, and its calls stay
 - **A nested key is called by its names joined by `_`:** `m.cart_title()` for `{ "cart": { "title": … } }`. Paraglide exports that name too, beside `m["cart.title"]`, which grai doesn't.
 
 From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
-- **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
+- **Converted:** plurals, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments with their styles and skeletons, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
 - **Left out:** anything else, from every locale, and named in the report.
+- **Kept beside them:** FormatJS's descriptions, in the file the config's `descriptions` names.
+
+From Lingui's PO catalogs, have Lingui write them as JSON instead, with its `@lingui/format-json` format and `style: "minimal"`: each message id then maps to its ICU message, which `--from icu` imports. A message's id becomes its key, so the messages need explicit ids, such as `cart.title`, not ids made from their text.
 
 A key becomes its path joined by `_`, so `t("cart.title")` becomes `m.cart_title()`. The import writes `grai.import.json` beside the config, mapping each key as the source's calls name it, an i18next namespace included (`common:cart.title`), to its grai key and the inputs it takes. `grai migrate` then rewrites each call that names its message plainly, from i18next, react-i18next, next-intl or react-intl, and lists every other call for a person: [docs/migrating.md](docs/migrating.md).
 

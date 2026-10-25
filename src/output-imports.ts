@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import type { CompiledKey } from "./compilation.ts";
 
 /**
@@ -47,21 +46,15 @@ export function everyName(names: CalledNames): Set<string> {
 	]);
 }
 
-/** The imports of `names` from the output, each file named as `from` names it. */
+/** The imports of `names` from the output, each file named by `specifier`. */
 export function outputImports(
 	names: CalledNames,
-	from: (file: string) => string,
+	specifier: (file: string) => string,
 ): string {
 	const line = (imported: ReadonlySet<string>, file: string) =>
-		`import { ${[...imported].sort().join(", ")} } from ${from(file)};`;
+		`import { ${[...imported].sort().join(", ")} } from ${JSON.stringify(specifier(file))};`;
 	const lines = [line(names.runtime, "runtime.js")];
 	if (names.plurals.size > 0) lines.push(line(names.plurals, "plurals.js"));
 	if (names.formats.size > 0) lines.push(line(names.formats, "formats.js"));
 	return lines.join("\n");
 }
-
-/** A file of the output by its path in `outdir`, as a module outside the output imports it. */
-export const inOutdir =
-	(outdir: string) =>
-	(file: string): string =>
-		JSON.stringify(join(outdir, file));

@@ -1,4 +1,4 @@
-/** Text as XML holds it: escaped for content and for attributes, and the characters it can hold at all. */
+/** Text as XML holds it: escaped for content and for attributes, as an id, and the characters it can hold at all. */
 
 /** Whether a code point can be written in XML 1.0, as itself or as a character reference. */
 export function isXmlCharacter(code: number): boolean {
@@ -27,4 +27,15 @@ export function escapeAttribute(text: string): string {
 		.replaceAll('"', "&quot;")
 		.replaceAll("\t", "&#9;")
 		.replaceAll("\n", "&#10;");
+}
+
+/**
+ * Text as an id, which XML holds as a name token: letters, digits and _ as they are, any other
+ * character as -hex-. Neither `.` nor a lone `-` is then part of the text, so either can join it.
+ */
+export function idText(text: string): string {
+	return text.replaceAll(
+		/[^A-Za-z0-9_]/gu,
+		(character) => `-${(character.codePointAt(0) ?? 0).toString(16)}-`,
+	);
 }

@@ -4,10 +4,11 @@
  */
 
 import { type Part, parsePattern, placeholderEnd } from "./pattern.ts";
+import { idText } from "./xml-text.ts";
 
 /** A code a translator places but does not edit: a placeholder, or markup. */
 export type Code = {
-	/** Unique within its unit, and the same for the same code in every export. */
+	/** The same for the same code in every unit of its message, and in every export. */
 	id: string;
 	kind: "placeholder" | "open" | "close" | "standalone";
 	/** The code as the catalog writes it, braces included. */
@@ -18,19 +19,76 @@ export type Code = {
 export type Piece = { text: string } | Code;
 
 /**
- * A pattern's pieces: its text, unescaped, and each placeholder and markup as a code. A code's id
- * is its name, with `tag-` before a markup's, and `.2`, `.3` after a repeat; an opening tag and the
- * tag that closes it share one id.
+ * The ids of one message's codes, the same in all its units, so that an id names one code wherever
+ * a file places it. A code gets an id of its own for each way it is written, and for each time one
+ * pattern repeats it: its name as an id holds it, with `tag-` before a markup's, then `.2`, `.3`
+ * for the name's next ones.
  */
-export function patternPieces(source: string): Piece[] {
-	const pieces: Piece[] = [];
-	const seen = new Map<string, number>();
-	const open: string[] = [];
-	const idOf = (name: string) => {
-		const count = (seen.get(name) ?? 0) + 1;
-		seen.set(name, count);
-		return count === 1 ? name : `${name}.${count}`;
-	};
+export class CodeIds {
+	private readonly ids = new Map<string, string>();
+	private readonly names = new Map<string, number>();
+
+	/** The id of a pattern's `nth` code written as `writing`, which is named `name`. */
+	idOf(name: string, writing: string, nth: number): string {
+		const identity = `${nth} ${writing}`;
+		const known = this.ids.get(identity);
+		if (known !== undefined) return known;
+		const count = (this.names.get(name) ?? 0) + 1;
+		this.names.set(name, count);
+		const id = count === 1 ? name : `${name}.${count}`;
+		this.ids.set(identity, id);
+		return id;
+	}
+}
+
+type CodePart = Exclude<Part, { type: "text" }>;
+
+/** A piece as the pattern writes it: its text, unescaped, or a code before it has an id. */
+type Written = { text: string } | { part: CodePart; source: string };
+
+/**
+ * A pattern's pieces: its text, unescaped, and each placeholder and markup as a code, its id taken
+ * from the message's `ids`. An opening tag and the tag that closes it are one code, written as
+ * both, and share its id.
+ */
+export function patternPieces(
+	source: string,
+	ids: CodeIds = new CodeIds(),
+): Piece[] {
+	const written = writtenPieces(source);
+	const closers = closingTags(written);
+	const closed = new Map<number, string>();
+	const repeats = new Map<string, number>();
+	return written.map((piece, index): Piece => {
+		if ("text" in piece) return piece;
+		const kind = kinds[piece.part.type];
+		const pair = closed.get(index);
+		if (pair !== undefined) return { id: pair, kind, source: piece.source };
+		const closer = closers.get(index);
+		const writing = piece.source + (closer?.source ?? "");
+		const nth = (repeats.get(writing) ?? 0) + 1;
+		repeats.set(writing, nth);
+		const id = ids.idOf(nameOf(piece.part), writing, nth);
+		if (closer !== undefined) closed.set(closer.index, id);
+		return { id, kind, source: piece.source };
+	});
+}
+
+const kinds: Readonly<Record<CodePart["type"], Code["kind"]>> = {
+	variable: "placeholder",
+	"markup-start": "open",
+	"markup-end": "close",
+	"markup-standalone": "standalone",
+};
+
+/** A code's name as its ids begin, written as an id holds text, so that a `.2` follows only its repeats. */
+function nameOf(part: CodePart): string {
+	const name = idText(part.name);
+	return part.type === "variable" ? name : `tag-${name}`;
+}
+
+function writtenPieces(source: string): Written[] {
+	const pieces: Written[] = [];
 	let text = "";
 	const flush = () => {
 		if (text !== "") pieces.push({ text: plain(text) });
@@ -51,41 +109,38 @@ export function patternPieces(source: string): Piece[] {
 		flush();
 		const written = source.slice(index, close + 1);
 		const [part] = parsePattern(written);
-		pieces.push(codeOf(part, written, idOf, open));
+		if (part === undefined || part.type === "text") {
+			throw new Error(
+				`grai read ${written} as text, where a placeholder or markup was expected`,
+			);
+		}
+		pieces.push({ part, source: written });
 		index = close;
 	}
 	flush();
 	return pieces;
 }
 
-function codeOf(
-	part: Part | undefined,
-	source: string,
-	idOf: (name: string) => string,
-	open: string[],
-): Code {
-	if (part === undefined || part.type === "text") {
-		throw new Error(
-			`grai read ${source} as text, where a placeholder or markup was expected`,
-		);
-	}
-	if (part.type === "variable")
-		return { id: idOf(part.name), kind: "placeholder", source };
-	const tag = `tag-${part.name}`;
-	if (part.type === "markup-start") {
-		const id = idOf(tag);
-		open.push(id);
-		return { id, kind: "open", source };
-	}
-	if (part.type === "markup-end") {
-		const opened = open.findLastIndex(
-			(id) => id === tag || id.startsWith(`${tag}.`),
-		);
-		const id =
-			opened === -1 ? idOf(tag) : (open.splice(opened, 1)[0] ?? idOf(tag));
-		return { id, kind: "close", source };
-	}
-	return { id: idOf(tag), kind: "standalone", source };
+/**
+ * The tag that closes each opening tag, by the opening tag's index: the next one of its name that
+ * no later opening tag takes first.
+ */
+function closingTags(
+	pieces: readonly Written[],
+): Map<number, { index: number; source: string }> {
+	const closers = new Map<number, { index: number; source: string }>();
+	const open: { index: number; name: string }[] = [];
+	pieces.forEach((piece, index) => {
+		if ("text" in piece) return;
+		const { type, name } = piece.part;
+		if (type === "markup-start") open.push({ index, name });
+		if (type !== "markup-end") return;
+		const at = open.findLastIndex((tag) => tag.name === name);
+		const [opened] = at === -1 ? [] : open.splice(at, 1);
+		if (opened !== undefined)
+			closers.set(opened.index, { index, source: piece.source });
+	});
+	return closers;
 }
 
 /** Text as parsePattern reads it, its escapes undone. */
