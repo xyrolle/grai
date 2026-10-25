@@ -63,6 +63,16 @@ App B gives the same picture. The plural column uses compiled rules without the 
 - A module variable bound per request is not safe: of 200 renders that await between two messages, 50 render another request's locale, and none through `AsyncLocalStorage` (`interleave`).
 - In a Svelte server render of a page of 2,000 messages (`ssr`), messages are 76–80% of 0.10–0.17 ms.
 
+What each library's middleware adds to a request, resolving its locale by the same strategy from the same catalogs, and binding it (`middleware`). The range is three runs:
+
+| request | grai, Node | Paraglide, Node | grai, workerd | Paraglide, workerd |
+|---|---|---|---|---|
+| a locale cookie | 0.70–0.91 µs | 4.0–5.5 µs | 2.0–2.5 µs | 6.2–7.7 µs |
+| `Accept-Language`, no locale cookie | 1.2–1.5 µs | 5.4–7.0 µs | 3.9–4.6 µs | 8.6–10.4 µs |
+| a URL prefix | 0.62–0.85 µs | 6.6–8.9 µs | 1.4–1.9 µs | 7.2–8.4 µs |
+
+A handler alone takes 1.1–1.6 µs in Node and 0.6–1.0 µs in workerd. grai's figures include listing the headers it read in `Vary`. Paraglide's copy the request for the handler, and decide whether to redirect. Reading `Accept-Language` costs grai 0.5 µs more than the cookie in Node, and 2.5 µs more in workerd, where the same code runs about 2.5 times slower: a message call inside a request takes 8.7–10.5 ns in Node and 24–28 ns in workerd.
+
 ## Browser
 
 A server-rendered Svelte page of 2,000 message calls, hydrated, then mounted again, the client's part of a locale switch without a reload (`hydrate`). App A, `ro`, at full CPU speed and at a 4× slowdown:
