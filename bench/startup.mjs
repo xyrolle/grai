@@ -6,7 +6,7 @@
 // with Node's compile cache warm, then a new workerd (startup-workerd.mjs); medians of five.
 //   node startup.mjs [app...]
 import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { rolldown } from "rolldown";
 import { build } from "vite";
@@ -97,6 +97,7 @@ const median = (values) =>
 async function benchApp(app) {
 	const locale = otherLocale(app);
 	const sample = sampleCalls(app, CALLS);
+	mkdirSync(cacheDir, { recursive: true });
 	const callsFile = (name, values) => {
 		const path = join(cacheDir, `startup-${app.id}-${name}.json`);
 		writeFileSync(
