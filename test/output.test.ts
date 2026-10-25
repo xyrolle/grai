@@ -23,6 +23,12 @@ const catalogs = {
 	de: { title: "Titel", greeting: "Hallo {name}" },
 };
 
+/**
+ * A test's budget when it starts compiler processes: on a loaded machine each new process takes a
+ * second or more to load grai, so a test of several outlasts Vitest's 5 s.
+ */
+const processTest = { timeout: 60_000 };
+
 /** Compiles a project in a process of its own, as another grai would, and gives its errors' codes. */
 async function compileElsewhere(config: string): Promise<string[]> {
 	const { stdout } = await promisify(execFile)(process.execPath, [
@@ -198,38 +204,46 @@ it("lets two compiles in one process write one outdir, one after the other", asy
 	}
 });
 
-it("lets one writer at a time write, when several processes compile at once", async () => {
-	for (let trial = 0; trial < 3; trial++) {
-		const { config, load } = project(catalogs);
+it(
+	"lets one writer at a time write, when several processes compile at once",
+	processTest,
+	async () => {
+		for (let trial = 0; trial < 3; trial++) {
+			const { config, load } = project(catalogs);
+			const errors = await Promise.all(
+				[1, 2, 3].map(() => compileElsewhere(config)),
+			);
+
+			expect(errors).toEqual([[], [], []]);
+			expect((await load()).m.title?.()).toBe("Title");
+		}
+	},
+);
+
+it(
+	"refuses a lock whose writer is gone, in every process, and says which file to delete",
+	processTest,
+	async () => {
+		const { dir, config, compile } = project(catalogs);
+		const lock = join(dir, "out", ".grai", "lock");
+		mkdirSync(dirname(lock), { recursive: true });
+		const gone = String(spawnSync(process.execPath, ["-e", ""]).pid);
+		writeFileSync(lock, gone);
+
 		const errors = await Promise.all(
 			[1, 2, 3].map(() => compileElsewhere(config)),
 		);
+		const [refused] = (await compile()).errors;
 
-		expect(errors).toEqual([[], [], []]);
-		expect((await load()).m.title?.()).toBe("Title");
-	}
-});
-
-it("refuses a lock whose writer is gone, in every process, and says which file to delete", async () => {
-	const { dir, config, compile } = project(catalogs);
-	const lock = join(dir, "out", ".grai", "lock");
-	mkdirSync(dirname(lock), { recursive: true });
-	const gone = String(spawnSync(process.execPath, ["-e", ""]).pid);
-	writeFileSync(lock, gone);
-
-	const errors = await Promise.all(
-		[1, 2, 3].map(() => compileElsewhere(config)),
-	);
-	const [refused] = (await compile()).errors;
-
-	expect(errors).toEqual([
-		["output-locked"],
-		["output-locked"],
-		["output-locked"],
-	]);
-	expect(refused?.message).toContain(`delete ${lock}`);
-	expect(readFileSync(lock, "utf8")).toBe(gone);
-});
+		expect(errors).toEqual([
+			["output-locked"],
+			["output-locked"],
+			["output-locked"],
+		]);
+		expect(refused?.message).toContain(`delete ${lock}`);
+		expect(readFileSync(lock, "utf8")).toBe(gone);
+	},
+);
 
 it("removes the claims of writers no longer running as it takes the lock", async () => {
 	const { dir, compile } = project(catalogs);
