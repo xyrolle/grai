@@ -76,9 +76,10 @@ export function parseCall(
 	if (spec === undefined) {
 		throw new MessageProblem(
 			"unsupported",
-			`${source} calls :${name}, which grai does not support; the formatting functions are ${Object.keys(
-				functions,
-			)
+			`${source} calls :${name}, which grai does not support; the formatting functions are ${[
+				"string",
+				...Object.keys(functions),
+			]
 				.map((known) => `:${known}`)
 				.join(", ")}.`,
 		);

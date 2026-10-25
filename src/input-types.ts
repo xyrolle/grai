@@ -128,7 +128,7 @@ function usesOf(name: string, message: LocaleMessage): Use[] {
 		if (local.input === name) take("number", "is counted by a plural");
 	}
 	for (const [index, selector] of message.selectors.entries()) {
-		if (selector.kind !== "input" || selector.name !== name) continue;
+		if (selector.kind !== "input" || selector.input !== name) continue;
 		const keys = new Set(
 			message.variants.map((variant) => variant.keys[index] ?? catchAll),
 		);
