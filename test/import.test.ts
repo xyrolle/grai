@@ -449,3 +449,111 @@ describe("grai import --from icu", () => {
 		]);
 	});
 });
+
+describe("grai import's mapping, grai.import.json", () => {
+	const mappingOf = (dir: string): unknown =>
+		JSON.parse(readFileSync(join(dir, "grai.import.json"), "utf8"));
+
+	it("maps each key i18next calls, its namespace included, to the grai key and the inputs it takes", () => {
+		const { dir } = imported(
+			"i18next",
+			{
+				"en/common.json": {
+					title: "Shop",
+					cart: { items_one: "{{count}} item", items_other: "{{count}} items" },
+					place_ordinal_one: "{{count}}st",
+					place_ordinal_two: "{{count}}nd",
+					place_ordinal_few: "{{count}}rd",
+					place_ordinal_other: "{{count}}th",
+					friend: "A friend",
+					friend_male: "{{name}}, a boyfriend",
+				},
+				"en/home.json": { welcome: "Welcome, {{name}}" },
+				"de/common.json": {
+					title: "Laden",
+					cart: {
+						items_one: "{{count}} Artikel",
+						items_other: "{{count}} Artikel",
+					},
+					place_ordinal_other: "{{count}}.",
+					friend: "Ein Freund",
+					friend_male: "{{name}}, ein Freund",
+				},
+				"de/home.json": { welcome: "Willkommen, {{name}}" },
+			},
+			["en", "de"],
+		);
+
+		expect(mappingOf(dir)).toEqual({
+			from: "i18next",
+			keys: {
+				"common:title": { key: "common_title", inputs: [] },
+				"common:cart.items": { key: "common_cart_items", inputs: ["count"] },
+				"common:place_ordinal": {
+					key: "common_place_ordinal",
+					inputs: ["count"],
+				},
+				"common:friend": { key: "common_friend", inputs: [] },
+				"common:friend_male": { key: "common_friend_male", inputs: ["name"] },
+				"home:welcome": { key: "home_welcome", inputs: ["name"] },
+			},
+		});
+	});
+
+	it("names a file's namespace even when the grai keys leave it out, as the only one", () => {
+		const { dir } = imported("i18next", {
+			"en/common.json": { title: "Shop" },
+			"ru/common.json": { title: "Магазин" },
+		});
+
+		expect(mappingOf(dir)).toEqual({
+			from: "i18next",
+			keys: { "common:title": { key: "title", inputs: [] } },
+		});
+	});
+
+	it("maps each ICU id, flat or nested, and marks a message with markup, one entry per line", () => {
+		const { dir } = imported(
+			"icu",
+			{
+				"en.json": {
+					"app.title": "Shop",
+					nav: { home: "Home" },
+					intro: "Read <b>{name}</b>",
+					items: "{n, plural, one {# item} other {# items}}",
+				},
+			},
+			["en"],
+		);
+		const expected = {
+			from: "icu",
+			keys: {
+				"app.title": { key: "app_title", inputs: [] },
+				"nav.home": { key: "nav_home", inputs: [] },
+				intro: { key: "intro", inputs: ["name"], markup: true },
+				items: { key: "items", inputs: ["n"] },
+			},
+		};
+
+		expect(readFileSync(join(dir, "grai.import.json"), "utf8")).toBe(
+			`${JSON.stringify(expected, null, "\t")}\n`,
+		);
+	});
+
+	it("leaves out the keys the import left out, and writes no mapping when it writes no catalog", () => {
+		const { dir } = imported("i18next", {
+			"en.json": { ok: "Fine", ago: "{{p, uppercase}}" },
+			"ru.json": { ok: "Хорошо", ago: "{{p, uppercase}}" },
+		});
+		const collision = imported("i18next", {
+			"en.json": { a: { b: "nested" }, a_b: "flat" },
+			"ru.json": { a: { b: "вложенный" }, a_b: "плоский" },
+		});
+
+		expect(mappingOf(dir)).toEqual({
+			from: "i18next",
+			keys: { ok: { key: "ok", inputs: [] } },
+		});
+		expect(existsSync(join(collision.dir, "grai.import.json"))).toBe(false);
+	});
+});

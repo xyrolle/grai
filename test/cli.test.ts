@@ -350,7 +350,7 @@ describe("grai add", () => {
 });
 
 describe("grai import", () => {
-	it("prints what it left out, then what it wrote, and needs --from", async () => {
+	it("prints what it left out, then what it wrote with the mapping, and needs --from", async () => {
 		const { dir } = project({ en: {}, de: {} });
 		rmSync(join(dir, "messages"), { recursive: true });
 		mkdirSync(join(dir, "i18n"));
@@ -373,6 +373,7 @@ describe("grai import", () => {
 			[
 				'left out: i18n/en.json: "ago" (en, de): {{p, uppercase}} formats the value as uppercase, which grai import does not convert. Write it with one of grai\'s formatting functions.',
 				"grai: imported 1 key into messages/en.json, messages/de.json, and left 1 out",
+				"grai: grai.import.json maps each key the source's calls name to its grai key",
 				"",
 			].join("\n"),
 		);

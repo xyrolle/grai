@@ -1,13 +1,15 @@
-import { relative } from "node:path";
+import { join, relative } from "node:path";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { catalogsOf } from "./import/catalogs.ts";
 import { convertSources, type ImportFormat } from "./import/convert.ts";
+import { mappingFile, mappingText } from "./import/mapping.ts";
 import type { ImportReport } from "./import/report.ts";
 import { findSources } from "./import/sources.ts";
 import { existingCatalogs, writeCatalogs } from "./import/write.ts";
 
 export { type ImportFormat, importFormats } from "./import/convert.ts";
+export { mappingFile } from "./import/mapping.ts";
 export {
 	type ImportNotice,
 	type ImportReport,
@@ -24,7 +26,8 @@ export type ImportResult = ImportReport & {
 };
 
 /**
- * Converts another library's catalogs into the project's grai catalogs, which must not exist yet.
+ * Converts another library's catalogs into the project's grai catalogs, which must not exist yet,
+ * and writes the mapping from each key the library's calls name to its grai key beside the config.
  * A message that cannot be converted in some locale is left out of every locale and reported, so
  * the catalogs compile. An unreadable source, a file whose locale is unclear, two keys that become
  * one, or a catalog that exists already is an error, and then nothing is written.
@@ -46,7 +49,7 @@ export function importCatalogs(
 	const messages = convertSources(sources, format, config.locales, errors);
 	const { files, keys, leftOut, changed } = catalogsOf(messages, config);
 	errors.push(...existingCatalogs(files, config.root));
-	if (keys === 0 && errors.length === 0) {
+	if (keys.length === 0 && errors.length === 0) {
 		errors.push(
 			new GraiError(
 				"catalog-empty",
@@ -55,9 +58,13 @@ export function importCatalogs(
 			),
 		);
 	}
+	const report = { keys: keys.length, leftOut, changed };
 	if (errors.length > 0) {
-		return { written: [], keys, leftOut, changed, errors: sortErrors(errors) };
+		return { ...report, written: [], errors: sortErrors(errors) };
 	}
-	const written = writeCatalogs(files, config.root);
-	return { written, keys, leftOut, changed, errors: [] };
+	const mapping = new Map([
+		[join(config.root, mappingFile), mappingText(format, keys)],
+	]);
+	const written = writeCatalogs(files, mapping, config.root);
+	return { ...report, written, errors: [] };
 }
