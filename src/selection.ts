@@ -22,7 +22,19 @@ export const catchAll = "*";
 export type Selector =
 	| { kind: "plural"; name: string; input: string; type: PluralType }
 	| NumberSelector
-	| { kind: "input"; name: string };
+	| InputSelector;
+
+/**
+ * A selector on an input's text: its name, the input it reads, and whether keys and value are
+ * compared in Unicode's NFC, as MessageFormat 2's `:string` compares them. A selector on the input
+ * itself, the inlang format's own, compares them as written.
+ */
+export type InputSelector = {
+	kind: "input";
+	name: string;
+	input: string;
+	normalized: boolean;
+};
 
 export type Variant = { keys: readonly string[]; pattern: readonly Part[] };
 
@@ -103,6 +115,7 @@ function domainOf(
 ): Value[] {
 	switch (selector.kind) {
 		case "input":
+			if (selector.normalized) checkNormalizedKeys(selector, keys);
 			return listsAny ? [...keys.map(named), anyOther] : keys.map(named);
 		case "plural": {
 			const categories = categoriesOf(locale, selector.type);
@@ -137,6 +150,24 @@ function domainOf(
 				? [...exact, anyOther]
 				: [...exact, ...categoriesOf(locale, rules).map(named)];
 		}
+	}
+}
+
+/** Checks that no two of a `:string` selector's keys are one key in NFC, where one would never be chosen. */
+function checkNormalizedKeys(
+	selector: InputSelector,
+	keys: readonly string[],
+): void {
+	const seen = new Map<string, string>();
+	for (const key of keys) {
+		const first = seen.get(key.normalize("NFC"));
+		if (first !== undefined) {
+			throw new MessageProblem(
+				"message-invalid",
+				`the variants ${selector.name}=${first} and ${selector.name}=${key} are one key, as Unicode's NFC writes them, so one of them can never be chosen. Remove one.`,
+			);
+		}
+		seen.set(key.normalize("NFC"), key);
 	}
 }
 

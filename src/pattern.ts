@@ -70,6 +70,11 @@ function placeholder(body: string): Part {
 	const markup = parseMarkup(body);
 	if (markup !== undefined) return markup;
 	const [, name, fn, options = ""] = call.exec(body) ?? [];
+	if (name !== undefined && fn === "string") {
+		// MessageFormat 2's :string formats a value as its text, as a placeholder does.
+		if (options.trim() !== "") throw takesNoOptions(`{${body}}`);
+		return { type: "variable", name };
+	}
 	if (name !== undefined && fn !== undefined) {
 		return {
 			type: "variable",
@@ -86,6 +91,14 @@ function placeholder(body: string): Part {
 	throw new MessageProblem(
 		"message-invalid",
 		`{${body}} is not a placeholder: a placeholder is a name such as {count}. Write a literal brace as \\{.`,
+	);
+}
+
+/** The error for options given to `:string`, which takes none. */
+export function takesNoOptions(source: string): MessageProblem {
+	return new MessageProblem(
+		"message-invalid",
+		`${source}: :string takes no options.`,
 	);
 }
 
