@@ -138,6 +138,7 @@ describe("grai import --from i18next", () => {
 			empty: "a {{}} b",
 			across: "{{x {{-name}} y}}",
 			nested: "$t($t(title)",
+			refilled: "{{'{{- name}}{{name}}{{name}}",
 		};
 		const { result, load } = imported("i18next", {
 			"en.json": messages,
@@ -152,6 +153,7 @@ describe("grai import --from i18next", () => {
 			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
 		).toEqual([
 			"spaced: {{ -name}} reads an input whose name is not a JavaScript identifier, which grai does not support. Pass it as one input, such as {{name}}.",
+			"refilled: {{name}} stands earlier too, in text i18next leaves as written, and i18next fills that one instead. Write the earlier text another way.",
 		]);
 	});
 
