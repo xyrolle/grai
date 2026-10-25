@@ -25,7 +25,7 @@ export function devModule(outdir: string, build: Build): string {
 				`${JSON.stringify(key)}:{"v":[${compiled.variants.join(",")}]}`,
 		)
 		.join(",");
-	return `${outputImports((file) => join(outdir, file), build.compilation.keys.values(), ["markup", "message"])}
+	return `${outputImports((file) => join(outdir, file), build.rendered.modules, build.compilation.keys.values(), ["markup", "message"])}
 const T = Object.assign(JSON.parse(${JSON.stringify(`{${textRows}}`)}), {
 ${calls.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
 });
@@ -72,7 +72,7 @@ export function patchModule(
 	const rows = changed.map(
 		(key) => `\t${key}: ${row(build.compilation.keys.get(key))},`,
 	);
-	return `${outputImports((file) => join(outdir, file), keys, [])}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
+	return `${outputImports((file) => join(outdir, file), build.rendered.modules, keys, [])}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }
 
 /** A key's row in the dev table: its locales' variants, and their parts for markup. */

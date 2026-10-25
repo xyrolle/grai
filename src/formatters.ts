@@ -63,9 +63,13 @@ export function digitsFormatter(options: IntlOptions): Formatter {
 
 /**
  * formats.js: each formatter the messages call, as a function of the value. The Intl formatter is
- * made the first time it formats, so a locale nobody reads makes none.
+ * made the first time it formats, so a locale nobody reads makes none. A formatter whose option
+ * an input gives takes it from `runtime`, the file of the runtime beside it.
  */
-export function formatModule(formatters: Iterable<Formatter>): string {
+export function formatModule(
+	formatters: Iterable<Formatter>,
+	runtime: string,
+): string {
 	const byName = new Map<string, Formatter>();
 	for (const formatter of formatters) {
 		const named = byName.get(formatter.name);
@@ -88,7 +92,7 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 	const imports =
 		imported.length === 0
 			? ""
-			: `import { ${imported.join(", ")} } from "./runtime.js";\n\n`;
+			: `import { ${imported.join(", ")} } from "./${runtime}";\n\n`;
 	const definitions = sorted.map(({ name, locale, format, shows }) =>
 		shows === "digits"
 			? digitsCode(name, format.options)

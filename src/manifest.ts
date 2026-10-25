@@ -5,12 +5,17 @@ import { replaceFile } from "./replace-file.ts";
 
 /**
  * What the outdir holds, as the compile that wrote it last recorded it: what the output was
- * compiled from, and its files, each with a hash of what it holds.
+ * compiled from, its files, and the files of earlier outputs that readers may still load.
  */
 export type Manifest = {
 	/** A hash of the compiler, the config and the catalogs the output was compiled from. */
 	inputs: string;
-	files: Record<string, string>;
+	/** The files named by their content. */
+	immutable: string[];
+	/** The files with names of their own, each with the hash of what it holds. */
+	mutable: Record<string, string>;
+	/** The files no output names any more, each with when it stopped being named, in ms. */
+	retired: Record<string, number>;
 };
 
 /** The manifest's file in the outdir's state directory. */
@@ -57,7 +62,11 @@ function isManifest(value: unknown): value is Manifest {
 	return (
 		isRecord(value) &&
 		typeof value.inputs === "string" &&
-		isRecord(value.files) &&
-		Object.values(value.files).every((hash) => typeof hash === "string")
+		Array.isArray(value.immutable) &&
+		value.immutable.every((file) => typeof file === "string") &&
+		isRecord(value.mutable) &&
+		Object.values(value.mutable).every((hash) => typeof hash === "string") &&
+		isRecord(value.retired) &&
+		Object.values(value.retired).every((at) => typeof at === "number")
 	);
 }

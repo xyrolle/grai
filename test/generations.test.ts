@@ -1,0 +1,88 @@
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { expect, it, onTestFinished, vi } from "vitest";
+import { type Messages, project } from "./project.ts";
+import { loadedCopy } from "./reader.ts";
+
+/** What a copy's `price` says, or the error its import or call threw. */
+async function priceIn(copy: string): Promise<string> {
+	try {
+		const { m }: { m: Messages } = await import(pathToFileURL(copy).href);
+		return m.price?.({ n: 1.234 }) ?? "no price";
+	} catch (error) {
+		return String(error);
+	}
+}
+
+it("lets a reader load the output while compiles change its formatters, and it loads one output whole", async () => {
+	const price = (digits: number) => ({
+		en: { price: `Price {n :number maximumFractionDigits=${digits}}` },
+		de: { price: `Preis {n :number maximumFractionDigits=${digits}}` },
+	});
+	const { dir, compile } = project(price(1));
+	await compile();
+	const out = join(dir, "out");
+	let compiling = true;
+	const writer = (async () => {
+		for (let edit = 0; edit < 40; edit++) {
+			const catalogs = price(edit % 2 === 0 ? 2 : 1);
+			for (const [locale, catalog] of Object.entries(catalogs))
+				writeFileSync(
+					join(dir, "messages", `${locale}.json`),
+					JSON.stringify(catalog),
+				);
+			expect((await compile()).errors).toEqual([]);
+		}
+		compiling = false;
+	})();
+	const copies: (string | Error)[] = [];
+	while (compiling) copies.push(await loadedCopy(out));
+	await writer;
+	const prices = await Promise.all(
+		copies.map((copy) =>
+			typeof copy === "string" ? priceIn(copy) : String(copy),
+		),
+	);
+
+	expect(prices.length).toBeGreaterThan(40);
+	expect(
+		prices.filter((said) => said !== "Price 1.2" && said !== "Price 1.23"),
+	).toEqual([]);
+});
+
+const catalogs = {
+	en: { title: "Title", greeting: "Hello {name}" },
+	de: { title: "Titel", greeting: "Hallo {name}" },
+};
+
+it("keeps the files the output stops naming while a reader may still load them, then removes them", async () => {
+	vi.useFakeTimers({ toFake: ["Date"] });
+	onTestFinished(() => {
+		vi.useRealTimers();
+	});
+	const { dir, compile } = project(catalogs);
+	const out = join(dir, "out");
+	const shards = () =>
+		readdirSync(join(out, "keys")).filter((file) => file.endsWith(".js"));
+	const edit = (title: string) =>
+		writeFileSync(
+			join(dir, "messages", "de.json"),
+			JSON.stringify({ ...catalogs.de, title }),
+		);
+	await compile();
+	const [first] = shards();
+	edit("Kopf");
+	await compile();
+	const [second] = shards().filter((file) => file !== first);
+	vi.setSystemTime(Date.now() + 10_000);
+	edit("Titelzeile");
+	await compile();
+
+	expect(shards()).not.toContain(first);
+	expect(shards()).toContain(second);
+	expect(shards()).toHaveLength(2);
+	expect(readFileSync(join(out, "keys.js"), "utf8")).not.toContain(
+		second?.replace(".js", ""),
+	);
+});
