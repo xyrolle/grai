@@ -1,6 +1,7 @@
 // What a request pays for its locale: the time grai's middleware and Paraglide's add to a handler
 // alone, each resolving the locale from the same request by the same strategy and binding it, and
-// grai's listing the headers it read in Vary; and a message call inside a request and outside any.
+// grai's listing the headers it read in Vary and reading the body in the request's binding, each
+// response's body read to its end; and a message call inside a request and outside any.
 // middleware.mjs runs this in Node, and middleware-worker.js inside workerd, on the projects it
 // compiles from the Workers example's catalogs: one reading the cookie, then Accept-Language, and
 // one reading the URL.
@@ -49,6 +50,10 @@ const requests = [
 
 /** The handler every request runs, alone and through each middleware. */
 const handler = () => new Response("Coșul tău");
+
+/** The body of `response`, read to its end, as the server that sends it does. */
+const read = async (/** @type {Response | Promise<Response>} */ response) =>
+	(await response).arrayBuffer();
 
 /**
  * Nanoseconds per request of `serve`, over `count` requests awaited one after another, then a turn
@@ -109,8 +114,11 @@ async function timeRequests() {
 				throw new Error(`${name}: a middleware resolved ${resolved}, not ro`);
 		}
 		const [alone, byGrai, byParaglide] = await timeAgainst(
-			async () => handler(),
-			[() => grai(request, handler), () => paraglide(request, handler)],
+			() => read(handler()),
+			[
+				() => read(grai(request, handler)),
+				() => read(paraglide(request, handler)),
+			],
 		);
 		timings.push({ name, alone, grai: byGrai, paraglide: byParaglide });
 	}
