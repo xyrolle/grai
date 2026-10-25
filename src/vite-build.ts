@@ -170,8 +170,11 @@ export function messageChunkCopies(): MessageChunkCopies {
 	};
 }
 
-/** The bundler's placeholder for a chunk's hash, which its file name has until the bundle is written. */
-const placeholder = /!~\{\d+\}~/g;
+/**
+ * The bundler's placeholder for a chunk's hash, which its file name has until the bundle is written:
+ * letters, digits, `_` or `$` between `!~{` and `}~`, as `!~{00c}~` in a build of a dozen chunks.
+ */
+const placeholder = /!~\{[\w$]+\}~/g;
 
 /** Each chunk's hash by its placeholder, from its file name before and after hashing. */
 function hashesOf(chunks: readonly ChunkNames[]): Map<string, string> {

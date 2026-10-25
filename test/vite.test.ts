@@ -267,6 +267,34 @@ describe("the Vite plugin's locale copies", () => {
 		}
 	});
 
+	it("links each copy to the chunks it imports, in a build of many chunks", async () => {
+		// A page per key gives the build enough chunks that the bundler's placeholders for their
+		// hashes run past digits.
+		const keys = Array.from({ length: 12 }, (_, index) => `key${index}`);
+		const catalog = Object.fromEntries(keys.map((key) => [key, key]));
+		const { dir } = project({ en: catalog, de: catalog });
+		const { sources } = await built(
+			dir,
+			Object.fromEntries(
+				keys.map((key) => [
+					key,
+					`import { m } from "./out/messages.js";\nconsole.log(m.${key}());\n`,
+				]),
+			),
+		);
+		const copies = [...sources.keys()].filter((file) =>
+			/^assets\/grai-(en|de)\//.test(file),
+		);
+		const imported = copies.flatMap((file) =>
+			[...(sources.get(file) ?? "").matchAll(/from\s*"([^"]+)"/g)].map(
+				([, path = ""]) => join(dirname(file), path),
+			),
+		);
+
+		expect(copies.length).toBe(2 * keys.length);
+		expect(imported.filter((file) => !sources.has(file))).toEqual([]);
+	});
+
 	it("serves a page its locale's words alone through an import map", async () => {
 		const { dir } = project(catalogs);
 		const { entryFiles } = await built(dir, { page }, { write: true });
