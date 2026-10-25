@@ -23,7 +23,12 @@ The compiler, for a build script or a bundler grai has no adapter for.
 
 ## `grai/sveltekit`
 
-- `handleLocale({ middleware, getTextDirection }): Handle`: the `handle` that renders each request in its locale, from the output's `server.js` and `runtime.js`. It resolves the locale by the config's `strategy`, binds it for everything the request renders and loads, and writes it and its direction into `src/app.html`'s `%grai.lang%` and `%grai.dir%`.
+- `handleLocale({ middleware, getTextDirection, localeCopies }): Handle`: the `handle` that renders each request in its locale, from the output's `server.js` and `runtime.js`. It resolves the locale by the config's `strategy`, binds it for everything the request renders and loads, and writes it and its direction into `src/app.html`'s `%grai.lang%` and `%grai.dir%`. A built page loads only its locale's copies of the message chunks, when the build wrote them (`localeCopies`).
+
+## `grai/sveltekit/vite`
+
+- `grai(options?: { config?: string }): Plugin[]`: `grai/svelte`'s plugin, which also writes a copy of each message chunk per locale for `handleLocale`'s pages. List it before `sveltekit()`.
+- `type SvelteKitGraiOptions`: its options.
 
 ## `grai/sveltekit/client`
 
@@ -143,5 +148,6 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 ### `server.js`
 
 - `middleware(request: Request, handler: (resolved: { request: Request; locale: Locale }) => Response | Promise<Response>): Promise<Response>`: resolves the request's locale by the config's `strategy`, binds it for the handler and everything it calls, and gives back the handler's response, its `Vary` listing the request headers the strategy reads.
+- `localeCopies: boolean`: whether the build that compiled the output wrote a copy of each message chunk per locale, which `grai/sveltekit`'s `handleLocale` reads.
 
 Everything else in `outdir` is internal: `config.js`, `internal.js`, the modules named by their content (`runtime-<hash>.js`, `config-<hash>.js`, `plurals-<hash>.js`, `formats-<hash>.js`), the shards under `keys/`, and `.grai/`.

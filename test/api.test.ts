@@ -50,19 +50,25 @@ it("exports from the output's runtime.js only the API apps call", async () => {
 	]);
 });
 
-it("exports the middleware from server.js, m from messages.js and each key from keys.js", async () => {
+it("exports the middleware and localeCopies from server.js, m from messages.js and each key from keys.js", async () => {
 	const { dir, compile } = project(catalogs);
 	await compile();
 	const output = (file: string) =>
 		import(pathToFileURL(join(dir, "out", file)).href);
 
-	expect(Object.keys(await output("server.js"))).toEqual(["middleware"]);
+	expect(Object.keys(await output("server.js")).sort()).toEqual([
+		"localeCopies",
+		"middleware",
+	]);
 	expect(Object.keys(await output("messages.js"))).toEqual(["m"]);
 	expect(Object.keys(await output("keys.js")).sort()).toEqual([
 		"cart_items",
 		"cart_title",
 	]);
-	expect(await importableNames(dir, "./out/server.js")).toEqual(["middleware"]);
+	expect(await importableNames(dir, "./out/server.js")).toEqual([
+		"localeCopies",
+		"middleware",
+	]);
 	expect(await importableNames(dir, "./out/messages.js")).toEqual(["m"]);
 	expect(await importableNames(dir, "./out/keys.js")).toEqual([
 		"cart_items",
@@ -96,7 +102,7 @@ it("exports from grai, grai/vite and grai/svelte only their API", async () => {
 	expect(await importableNames(dir, "grai/svelte")).toEqual(["grai"]);
 });
 
-it("exports from grai/sveltekit, grai/next, grai/next/config, grai/next/proxy and grai/react only their API", async () => {
+it("exports from grai/sveltekit, grai/sveltekit/vite, grai/next, grai/next/config, grai/next/proxy and grai/react only their API", async () => {
 	const { dir } = project(catalogs);
 
 	expect(Object.keys(await import("../src/sveltekit.ts"))).toEqual([
@@ -104,6 +110,13 @@ it("exports from grai/sveltekit, grai/next, grai/next/config, grai/next/proxy an
 	]);
 	expect(await importableNames(dir, "grai/sveltekit")).toEqual([
 		"handleLocale",
+	]);
+	expect(Object.keys(await import("../src/sveltekit-vite.ts"))).toEqual([
+		"grai",
+	]);
+	expect(await importableNames(dir, "grai/sveltekit/vite")).toEqual([
+		"SvelteKitGraiOptions",
+		"grai",
 	]);
 
 	expect(Object.keys(await import("../src/next/config.ts"))).toEqual([
