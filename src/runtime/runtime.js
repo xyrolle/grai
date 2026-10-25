@@ -3,29 +3,36 @@
 import {
 	baseLocale,
 	cookieName,
+	customPrefixes,
 	directions,
-	localePrefix,
+	leavesPathsAlone,
 	locales,
 	prefixes,
+	prefixesEveryLocale,
+	readsUrl,
 	strategy,
 	unlocalizedPaths,
 } from "./config.js";
 
 export { baseLocale, cookieName, locales };
 
-/** Whether a URL names its locale: only under the `url` strategy, else every path is the app's own. */
-const urlsNameLocales = strategy.includes("url");
-/** Whether a locale has a prefix: every one's with `localePrefix: "always"`, else all but the base's. */
-const prefixed = (/** @type {string} */ locale) =>
-	localePrefix === "always" || locale !== baseLocale;
+// Each of the url strategy's options is a constant in config.js, which a bundler folds, so the code
+// an option needs is checked by its constant where it runs, and a page carries none of it for an
+// option its config does not use.
+
 /**
  * The locale a path segment is the prefix of, if it is one: a locale's tag, or the segment the
  * config gives it, and never the base locale's unless every locale's paths are prefixed.
  */
 const localeOfPrefix = (/** @type {string | undefined} */ segment) => {
-	const locale = locales[prefixes.indexOf(segment ?? "")];
-	return locale !== undefined && prefixed(locale) ? locale : undefined;
+	const locale = customPrefixes
+		? locales[prefixes.indexOf(segment ?? "")]
+		: segment;
+	return isPrefixed(locale) ? locale : undefined;
 };
+/** Whether a value is a locale whose paths have a prefix. */
+const isPrefixed = (/** @type {unknown} */ locale) =>
+	isLocale(locale) && (prefixesEveryLocale || locale !== baseLocale);
 /** Whether a path is one the `url` strategy leaves alone, which never has a prefix. */
 const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
@@ -123,7 +130,7 @@ export function setLocale(locale, options) {
 		document.cookie = `${cookieName}=${locale}; path=/; max-age=34560000; samesite=lax`;
 	}
 	if (options?.reload === false) return;
-	if (strategy.includes("url")) {
+	if (readsUrl) {
 		location.href = localizeUrl(location.href, { locale }).href;
 	} else {
 		location.reload();
@@ -188,10 +195,10 @@ export function extractLocaleFromUrl(url) {
  * @returns {string | undefined}
  */
 export function localeOfPath(pathname) {
-	if (!urlsNameLocales || leftAlone(pathname)) return undefined;
+	if (!readsUrl || (leavesPathsAlone && leftAlone(pathname))) return undefined;
 	const named = localeOfPrefix(pathname.split("/")[1]);
 	if (named !== undefined) return named;
-	return localePrefix === "always" ? undefined : baseLocale;
+	return prefixesEveryLocale ? undefined : baseLocale;
 }
 
 /**
@@ -203,7 +210,7 @@ export function localeOfPath(pathname) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (urlsNameLocales && localeOfPrefix(first) !== undefined) {
+	if (readsUrl && localeOfPrefix(first) !== undefined) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -220,11 +227,18 @@ export function deLocalizeUrl(url) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
-	if (urlsNameLocales && prefixed(locale) && !leftAlone(copy.pathname)) {
+	if (
+		readsUrl &&
+		(prefixesEveryLocale || locale !== baseLocale) &&
+		!(leavesPathsAlone && leftAlone(copy.pathname))
+	) {
 		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
 		// redirect to drop it.
 		const path = copy.pathname === "/" ? "" : copy.pathname;
-		copy.pathname = `/${prefixes[locales.indexOf(locale)] ?? locale}${path}`;
+		const prefix = customPrefixes
+			? (prefixes[locales.indexOf(locale)] ?? locale)
+			: locale;
+		copy.pathname = `/${prefix}${path}`;
 	}
 	return copy;
 }

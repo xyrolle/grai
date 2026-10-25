@@ -17,6 +17,7 @@
 		"hydrate": "node hydrate.mjs",
 		"svelte-texts": "node svelte-texts.mjs",
 		"bytes": "node bytes.mjs",
+		"url-bytes": "node url-bytes.mjs",
 		"variants": "node variants.mjs",
 		"preload": "node preload.mjs",
 		"plurals": "node plurals.mjs",
