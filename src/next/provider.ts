@@ -3,13 +3,12 @@
 // a browser the runtime keeps the page's <html lang>, which the server wrote.
 "use client";
 
+import { bindRequests, type RequestLocale } from "grai/next/output/internal.js";
 import {
 	assertIsLocale,
-	bindRequests,
 	GraiError,
 	getLocale,
 	locales,
-	type RequestLocale,
 	setLocale,
 } from "grai/next/output/runtime.js";
 import {
