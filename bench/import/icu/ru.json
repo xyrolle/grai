@@ -6,6 +6,7 @@
 		"owner": "{g, select, male {Он} female {Она} other {Они}} нашли {n, plural, one {# кота} few {# кота} many {# котов} other {# кота}}.",
 		"nested": "{g, select, male {{n, plural, =0 {ни одного его} one {его # кот} few {его # кота} many {его # котов} other {его # кота}}} other {их коты}}",
 		"quote": "Это {name}, скобка '{brace}' и '' кавычки",
+		"grammar": "<b >{name}</b > } <br /> {n, plural, =+1 {никогда} =-1 {минус один} other {осталось #}}",
 		"apostrophes": "Выбор '|x', коты' {n, plural, other {'#' — #}}",
 		"bold": "Привет, <b>{name}</b>, у вас <i>{n, plural, one {# кот} few {# кота} many {# котов} other {# кота}}</i>",
 		"price": "{value, number}",
