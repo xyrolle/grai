@@ -47,6 +47,7 @@ it.each([
 						"Read the {#link href=|/terms| rel=$rel @translate=no}terms{/link}",
 					cart_total: "Total {amount :number style=currency currency=EUR}",
 					cart_shipped: "Shipped {when :date}",
+					cart_converted: "In {amount :currency currency=$code}",
 					cart_guests: "With {names :list}, {days :relativetime unit=day}",
 					cart_place: [
 						{
@@ -100,6 +101,7 @@ it.each([
 					cart_terms: "اقرأ {#link href=|/terms| rel=$rel}الشروط{/link}",
 					cart_total: "المجموع {amount :number style=currency currency=EUR}",
 					cart_shipped: "شحن {when :date}",
+					cart_converted: "بعملة {amount :currency currency=$code}",
 					cart_guests: "مع {names :list}، {days :relativetime unit=day}",
 					cart_place: [
 						{

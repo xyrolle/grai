@@ -302,3 +302,31 @@ export function unmatched(key, locale, selector, value) {
 		`"${key}" (${locale}) has no variant for ${selector}=${String(value)}. Pass one of the values its type lists.`,
 	);
 }
+
+/**
+ * The formatter for a call with the value an input gives one of its options, such as its
+ * currency: made the first time that value formats, and kept by it. A value Intl refuses is the
+ * caller's mistake, and the error names it.
+ *
+ * @template {Intl.NumberFormat | Intl.DateTimeFormat} Made
+ * @param {Map<unknown, Made>} made the formatters made, by the value
+ * @param {new (locale: string, options: object) => Made} IntlFormat
+ * @param {string} locale
+ * @param {object} written the options the message writes
+ * @param {string} option the option the input gives
+ * @param {unknown} value
+ * @returns {Made}
+ */
+export function formatterFor(made, IntlFormat, locale, written, option, value) {
+	let formatter;
+	try {
+		formatter = new IntlFormat(locale, { ...written, [option]: value });
+	} catch (error) {
+		throw new GraiError(
+			"format-option-invalid",
+			`An input gave ${option} ${JSON.stringify(value)}, which Intl cannot format with in "${locale}": ${error instanceof Error ? error.message : String(error)}. Pass a currency's ISO 4217 code, a unit's name or an IANA time zone.`,
+		);
+	}
+	made.set(value, formatter);
+	return formatter;
+}

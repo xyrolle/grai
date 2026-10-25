@@ -1,4 +1,5 @@
 import { isRecord } from "./config.ts";
+import type { Format } from "./format-options.ts";
 import { markupVariables } from "./markup.ts";
 import { parseMatch } from "./match.ts";
 import {
@@ -57,14 +58,19 @@ const noInputs: ReadonlySet<string> = new Set();
 const noPlurals: ReadonlyMap<string, PluralLocal> = new Map();
 const noFormatted: ReadonlyMap<string, FormattedLocal> = new Map();
 
-/** A message that is one pattern: its inputs are its placeholders and its markup's variables. */
+/**
+ * A message that is one pattern: its inputs are its placeholders, the inputs that give their
+ * formatters an option, and its markup's variables.
+ */
 function patternMessage(locale: string, source: string): LocaleMessage {
 	const pattern = parsePattern(source);
 	let inputs = noInputs;
 	let markup = false;
 	for (const part of pattern) {
-		if (part.type === "variable") inputs = new Set([...inputs, part.name]);
-		else if (part.type !== "text") {
+		if (part.type === "variable") {
+			const given = part.format?.input?.name;
+			inputs = new Set([...inputs, part.name, ...(given ? [given] : [])]);
+		} else if (part.type !== "text") {
 			markup = true;
 			inputs = new Set([...inputs, ...markupVariables(part)]);
 		}
@@ -135,11 +141,25 @@ function withInputs(
 ): LocaleMessage {
 	const inputs = new Set(declared);
 	for (const local of plurals.values()) inputs.add(local.input);
-	for (const local of formatted.values()) inputs.add(local.input);
+	const isLocal = (name: string) => plurals.has(name) || formatted.has(name);
+	const addOptionInput = (format: Format | undefined) => {
+		const name = format?.input?.name;
+		if (name === undefined) return;
+		if (isLocal(name)) {
+			throw new MessageProblem(
+				"message-invalid",
+				`an option takes ${name}, a local. An option takes an input: name the input itself.`,
+			);
+		}
+		inputs.add(name);
+	};
+	for (const local of formatted.values()) {
+		inputs.add(local.input);
+		addOptionInput(local.format);
+	}
 	for (const selector of selectors) {
 		if (selector.kind === "input") inputs.add(selector.name);
 	}
-	const isLocal = (name: string) => plurals.has(name) || formatted.has(name);
 	let markup = false;
 	for (const { pattern } of variants) {
 		for (const part of pattern) {
@@ -151,6 +171,7 @@ function withInputs(
 					);
 				}
 				if (!isLocal(part.name)) inputs.add(part.name);
+				addOptionInput(part.format);
 			} else if (part.type !== "text") {
 				markup = true;
 				for (const name of markupVariables(part)) {
