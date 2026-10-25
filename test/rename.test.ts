@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { rename } from "../src/rename.ts";
 import { project } from "./project.ts";
@@ -158,5 +159,38 @@ describe("grai rename", () => {
 		).toEqual([
 			'src/Cart.svelte: "cart_total": the file imports cart_total by its own name, and already names basket_total, which the renamed import would clash with. Rename that first.',
 		]);
+	});
+
+	it("renames the key in the config's identicalToBase too, listing it once, and leaves the rest of the config as written", async () => {
+		const { dir, config } = app();
+		writeFileSync(
+			config,
+			`{
+	"locales": ["en", "de"],
+	"baseLocale": "en",
+	"catalogs": "messages/{locale}.json",
+	"outdir": "out",
+	"identicalToBase": {
+		"de": ["cart_title", "basket_title"]
+	}
+}
+`,
+		);
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.changed).toContain("grai.config.json");
+		expect(readText(dir, "grai.config.json")).toBe(`{
+	"locales": ["en", "de"],
+	"baseLocale": "en",
+	"catalogs": "messages/{locale}.json",
+	"outdir": "out",
+	"identicalToBase": {
+		"de": [
+			"basket_title"
+		]
+	}
+}
+`);
 	});
 });

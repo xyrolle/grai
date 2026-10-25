@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { check } from "../src/check.ts";
 import { fixLines, removeUnusedKeys } from "../src/fix.ts";
@@ -172,5 +173,38 @@ export const promo = (season: string) => m[\`promo_\${season}\`]();
 			"kept: src/all.ts:2:33: m may name 2 unused keys, so they stay",
 		]);
 		expect(fixed.changed).toEqual([]);
+	});
+
+	it("removes a key it removes from the config's identicalToBase too", async () => {
+		const { dir, config } = project({
+			en: { ...catalogs.en, unit_km: "km" },
+			de: { ...catalogs.de, banner_old: "Sale!", unit_km: "km" },
+		});
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.tsx":
+				"export const Promo = () => <p>{promo_spring()} {unit_km()}</p>;\n",
+		});
+		writeFileSync(
+			config,
+			`{
+	"locales": ["en", "de"],
+	"baseLocale": "en",
+	"catalogs": "messages/{locale}.json",
+	"outdir": "out",
+	"identicalToBase": {
+		"de": ["banner_old", "unit_km"]
+	}
+}
+`,
+		);
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.changed).toContain("grai.config.json");
+		expect(readText(dir, "grai.config.json")).toContain(
+			'\t"identicalToBase": {\n\t\t"de": [\n\t\t\t"unit_km"\n\t\t]\n\t}\n}\n',
+		);
+		expect((await check(config)).problems).toEqual([]);
 	});
 });

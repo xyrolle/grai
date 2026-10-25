@@ -1,7 +1,9 @@
-import { join, relative } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { catalogEntries } from "./catalog-entries.ts";
 import { withoutEntries } from "./catalog-text.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
+import { withListedKeysChanged } from "./config-file.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
@@ -26,18 +28,18 @@ export type FixResult = {
 	inTests: Map<string, string>;
 	/** The unused keys kept, because a read by a computed name may reach them. */
 	kept: KeptBy[];
-	/** The catalogs written, relative to the project's root. */
+	/** The files written, relative to the project's root: catalogs, and the config if it listed one. */
 	changed: string[];
 	errors: GraiError[];
 };
 
 /**
- * Removes from every catalog each key that no shipped source file under the roots names, as
- * `check` counts a key named, and that no read by a computed name (`m[name]`, `m` used whole) in
- * one may reach. The tests that still name a removed key are reported, to change with it.
- * A key that is no key name stays, since the scan finds only names and so cannot tell whether a
- * source writes it (`m["sign-in"]`); check reports it as invalid. It writes every catalog or none,
- * and none when one would be left without messages.
+ * Removes from every catalog and from the config's lists each key that no shipped source file
+ * under the roots names, as `check` counts a key named, and that no read by a computed name
+ * (`m[name]`, `m` used whole) in one may reach. The tests that still name a removed key are
+ * reported, to change with it. A key that is no key name stays, since the scan finds only names
+ * and so cannot tell whether a source writes it (`m["sign-in"]`); check reports it as invalid. It
+ * writes every file or none, and none when a catalog would be left without messages.
  */
 export async function removeUnusedKeys(
 	configFile: string,
@@ -109,6 +111,12 @@ export async function removeUnusedKeys(
 			withoutEntries(text, catalogEntries(text), removed),
 		);
 	}
+	const configText = withListedKeysChanged(
+		readFileSync(configFile, "utf8"),
+		config.identicalToBase,
+		(key) => (removed.has(key) ? undefined : key),
+	);
+	if (configText !== undefined) texts.set(resolve(configFile), configText);
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
 	return { ...result, changed };
