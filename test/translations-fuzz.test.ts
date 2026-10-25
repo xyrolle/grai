@@ -46,6 +46,7 @@ const characters = [
 ];
 const codes = [
 	"{name}",
+	"{n}",
 	"{n :number}",
 	"{when :date dateStyle=long}",
 	"{#br/}",

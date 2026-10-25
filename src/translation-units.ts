@@ -6,7 +6,7 @@
 
 import type { Catalog } from "./catalog.ts";
 import { parseMessage } from "./message.ts";
-import { type Piece, patternPieces } from "./pattern-pieces.ts";
+import { CodeIds, type Piece, patternPieces } from "./pattern-pieces.ts";
 import { isSeed } from "./seed.ts";
 import { catchAll, countingRules } from "./selection.ts";
 import {
@@ -63,6 +63,12 @@ export function exportUnits(
 	return units;
 }
 
+/** A unit's texts as the catalogs write them, before their codes have ids. */
+type UnitText = Omit<Unit, "source" | "target"> & {
+	source: string;
+	target: string | undefined;
+};
+
 function messageUnits(
 	key: string,
 	value: unknown,
@@ -75,52 +81,65 @@ function messageUnits(
 		const source =
 			typeof value === "string" ? value : (rawVariants(value)[0]?.[1] ?? "");
 		const target = typeof translation === "string" ? translation : undefined;
-		return [unit(key, [], source, target, undefined)];
+		return withCodes([unitText(key, [], source, target, undefined)]);
 	}
 	const sources = alignedVariants(value, message.selectors);
 	const targets = translatedVariants(translation, locale, message.selectors);
-	return combinations(message.selectors, sources, locale).map((combination) => {
-		const variant = message.selectors.map(
-			(selector, index): [string, string] => [
-				selector.name,
-				combination[index] ?? catchAll,
-			],
-		);
-		const inBase = combination.map((key, index) => {
-			const rules = countingRules(message.selectors[index], key);
-			return rules === undefined || key === catchAll
-				? key
-				: baseCategoryOf(key, baseLocale, locale, rules);
-		});
-		const source = chosen(sources, inBase) ?? "";
-		const target =
-			targets === undefined ? undefined : chosen(targets, combination);
-		return unit(
-			key,
-			variant,
-			source,
-			target,
-			noteOf(variant, message.selectors, locale),
-		);
-	});
+	const texts = combinations(message.selectors, sources, locale).map(
+		(combination) => {
+			const variant = message.selectors.map(
+				(selector, index): [string, string] => [
+					selector.name,
+					combination[index] ?? catchAll,
+				],
+			);
+			const inBase = combination.map((key, index) => {
+				const rules = countingRules(message.selectors[index], key);
+				return rules === undefined || key === catchAll
+					? key
+					: baseCategoryOf(key, baseLocale, locale, rules);
+			});
+			const source = chosen(sources, inBase) ?? "";
+			const target =
+				targets === undefined ? undefined : chosen(targets, combination);
+			return unitText(
+				key,
+				variant,
+				source,
+				target,
+				noteOf(variant, message.selectors, locale),
+			);
+		},
+	);
+	return withCodes(texts);
 }
 
-function unit(
+function unitText(
 	key: string,
 	variant: readonly (readonly [string, string])[],
 	source: string,
 	target: string | undefined,
 	note: string | undefined,
-): Unit {
+): UnitText {
 	const id = [key, ...variant.flat()].map(idPart).join(".");
-	return {
-		id,
-		key,
-		variant,
-		source: patternPieces(source),
-		target: target === undefined ? undefined : patternPieces(target),
-		note,
-	};
+	return { id, key, variant, source, target, note };
+}
+
+/**
+ * A message's units, their texts read into pieces with the message's code ids. The base's codes
+ * take theirs first, so a code a translation alone writes never moves them.
+ */
+function withCodes(texts: readonly UnitText[]): Unit[] {
+	const ids = new CodeIds();
+	const read = texts.map((text) => ({
+		...text,
+		source: patternPieces(text.source, ids),
+	}));
+	return read.map((text) => ({
+		...text,
+		target:
+			text.target === undefined ? undefined : patternPieces(text.target, ids),
+	}));
 }
 
 /** Text as a unit id may hold it: letters, digits and _ as they are, any other character as -hex-. */
