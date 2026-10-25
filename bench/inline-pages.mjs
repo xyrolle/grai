@@ -1,31 +1,43 @@
-// Real pages of a SvelteKit app built as it is and with text inlined into its templates
-// (inline-build.mjs), served side by side. Each page is first compared exactly, as the server
-// draws it and as hydration leaves it: its text, whitespace included, its elements and attributes,
-// and Svelte's hydration markers, so the server draws the same document in both builds. Then each
-// page is loaded in Chromium until SvelteKit has hydrated it, at full speed and at a 4× slowdown,
-// each load in a fresh context and alternating between the servers, and its JS is weighed. Pages
-// behind a sign-in take a Playwright storage state.
-//   node inline-pages.mjs <origin as built> <origin inlined> [--storage <state.json>] <path>...
+// Real pages of a SvelteKit app, served side by side by builds that draw its messages in different
+// ways (inline-build.mjs builds them). Each page is first compared exactly with the first build's:
+// its text, whitespace included, its elements and their attributes, as the server draws it and as
+// hydration leaves it. Beside that, each build reports whether its server drew the first build's
+// hydration markers, and how many of the server's elements hydration kept: Svelte draws again
+// what it cannot hydrate. Then each page is loaded in Chromium until SvelteKit has hydrated it, at
+// full speed and at a 4× slowdown, each load in a fresh context and alternating between the
+// builds, and the JS it loads until then is weighed. Pages behind a sign-in take a Playwright
+// storage state.
+//   node inline-pages.mjs [--storage <state.json>] <name>=<origin>... <path>...
 import { brotliCompressSync } from "node:zlib";
 import { chromium } from "playwright-core";
 
 const RUNS = 15;
 const THROTTLING = [1, 4];
+
 const args = process.argv.slice(2);
 const storageAt = args.indexOf("--storage");
 const storageState = storageAt < 0 ? undefined : args[storageAt + 1];
-const [built, inlined, ...paths] = args.filter(
-	(_, index) =>
-		storageAt < 0 || (index !== storageAt && index !== storageAt + 1),
+const servers = new Map(
+	args
+		.filter((arg) => arg.includes("=") && arg.includes("://"))
+		.map((arg) => [
+			arg.slice(0, arg.indexOf("=")),
+			arg.slice(arg.indexOf("=") + 1),
+		]),
 );
-const servers = { "as built": built, "text inlined": inlined };
+const paths = args.filter(
+	(arg, index) => arg.startsWith("/") && index !== storageAt + 1,
+);
 
 // SvelteKit's boot script starts the app with `kit.start(app, …)`, whose promise settles once the
-// page is hydrated; the document is served with that promise handed to the page's clock.
+// page is hydrated. The document is served with that promise handed to the page, which notes the
+// time and the server's elements as SvelteKit starts, and the time once it has hydrated.
 const BOOT = "kit.start(app, ";
 const watchHydration = () => {
 	Object.defineProperty(window, "__graiHydration", {
 		set(started) {
+			window.__graiStarted = performance.now();
+			window.__graiServed = [...document.body.querySelectorAll("*")];
 			started.then(() => {
 				window.__graiHydrated = performance.now();
 			});
@@ -34,12 +46,30 @@ const watchHydration = () => {
 };
 
 /**
- * The document's elements, attributes, text and comments (Svelte's hydration markers) as a list, so
- * two pages compare exactly. Scripts, styles and links to the build's assets are left out.
+ * The document's elements, their attributes and its text, and apart its comments, the markers. The
+ * attributes that hold an element's id or name one are left out: a framework numbers the ids it
+ * makes in the order it renders, which a build may change.
  */
 const pageText = () => {
 	const left = ["SCRIPT", "LINK", "STYLE", "NOSCRIPT", "TEMPLATE"];
+	const ids = [
+		"id",
+		"for",
+		"form",
+		"list",
+		"headers",
+		"popovertarget",
+		"aria-activedescendant",
+		"aria-controls",
+		"aria-describedby",
+		"aria-details",
+		"aria-errormessage",
+		"aria-flowto",
+		"aria-labelledby",
+		"aria-owns",
+	];
 	const items = [];
+	const markers = [];
 	let text = "";
 	const flush = () => {
 		if (text !== "") items.push(JSON.stringify(text));
@@ -48,15 +78,17 @@ const pageText = () => {
 	const walk = (node) => {
 		for (const child of node.childNodes) {
 			if (child.nodeType === Node.TEXT_NODE) text += child.data;
-			if (child.nodeType === Node.COMMENT_NODE) {
-				flush();
-				items.push(`<!--${child.data}-->`);
-			}
+			if (child.nodeType === Node.COMMENT_NODE) markers.push(child.data);
 			if (child.nodeType !== Node.ELEMENT_NODE || left.includes(child.tagName))
 				continue;
 			flush();
 			const attributes = [...child.attributes]
-				.filter((a) => a.name !== "nonce" && !a.value.includes("/_app/"))
+				.filter(
+					(a) =>
+						a.name !== "nonce" &&
+						!ids.includes(a.name) &&
+						!a.value.includes("/_app/"),
+				)
 				.map((a) => `${a.name}=${JSON.stringify(a.value)}`)
 				.sort();
 			items.push(`<${child.localName} ${attributes.join(" ")}>`);
@@ -67,7 +99,7 @@ const pageText = () => {
 	};
 	walk(document.documentElement);
 	flush();
-	return items;
+	return { items, markers: markers.join("|") };
 };
 
 async function open(browser, url, { rate = 1, javaScript = true } = {}) {
@@ -102,18 +134,22 @@ async function open(browser, url, { rate = 1, javaScript = true } = {}) {
 	return { context, page, scripts: [...scripts] };
 }
 
-/** The page's text as served, then as hydrated, and the brotli bytes of the JS it loads until then. */
+/** The page as served and as hydrated, the server's elements hydration kept, and its JS. */
 async function inspect(browser, url) {
 	const served = await open(browser, url, { javaScript: false });
 	const before = await served.page.evaluate(pageText);
 	await served.context.close();
 	const { context, page, scripts } = await open(browser, url);
 	const after = await page.evaluate(pageText);
+	const kept = await page.evaluate(() => {
+		const served = window.__graiServed;
+		return `${served.filter((element) => element.isConnected).length} of ${served.length}`;
+	});
 	let js = 0;
 	for (const script of scripts)
 		js += brotliCompressSync(await script.body()).length;
 	await context.close();
-	return { before, after, js };
+	return { before, after, kept, js };
 }
 
 /** Where two lists first differ, with the items around it, or undefined when they are the same. */
@@ -127,47 +163,56 @@ function difference(a, b) {
 
 async function timedLoad(browser, url, rate) {
 	const { context, page } = await open(browser, url, { rate });
-	const result = await page.evaluate(() => {
-		const [navigation] = performance.getEntriesByType("navigation");
-		return {
-			hydrated: window.__graiHydrated,
-			client: window.__graiHydrated - navigation.responseEnd,
-		};
-	});
+	const times = await page.evaluate(() => ({
+		at: window.__graiHydrated,
+		in: window.__graiHydrated - window.__graiStarted,
+	}));
 	await context.close();
-	return result;
+	return times;
 }
 
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 const browser = await chromium.launch();
-const inspected = new Map();
+const [first] = servers.keys();
+console.log(`\n### ${paths.length} pages in Chromium ${browser.version()}\n`);
+console.log(
+	`| page | build | JS KB brotli | server elements hydration kept | text as ${first}'s, served / hydrated | markers as ${first}'s |`,
+);
+console.log("|---|---|---|---|---|---|");
 for (const path of paths) {
-	const pages = {};
-	for (const [name, origin] of Object.entries(servers))
-		pages[name] = await inspect(browser, new URL(path, origin).href);
-	const [plain, text] = Object.values(pages);
-	const differs =
-		difference(plain.before, text.before) ??
-		difference(plain.after, text.after);
-	if (differs !== undefined)
-		throw new Error(`${path}: the inlined page's text differs, ${differs}`);
-	inspected.set(path, pages);
+	const pages = new Map();
+	for (const [name, origin] of servers)
+		pages.set(name, await inspect(browser, new URL(path, origin).href));
+	const reference = pages.get(first);
+	for (const [name, page] of pages) {
+		const same = (stage) => {
+			const differs = difference(reference[stage].items, page[stage].items);
+			if (differs === undefined) return "yes";
+			console.error(`${path}, ${name}, ${stage}: ${differs}`);
+			return "no";
+		};
+		const markers =
+			page.before.markers === reference.before.markers ? "yes" : "no";
+		console.log(
+			`| ${path} | ${name} | ${(page.js / 1024).toFixed(1)} | ${page.kept} | ${same("before")} / ${same("after")} | ${markers} |`,
+		);
+	}
 }
 
 console.log(
-	`\n### ${paths.length} pages in Chromium ${browser.version()}, median of ${RUNS} loads, ms; the text of each is identical in both builds\n`,
+	`\nUntil SvelteKit has hydrated the page, median of ${RUNS} loads, ms:\n`,
 );
 console.log(
-	"| page | build | CPU slowdown | JS KB brotli | hydrated at | after the document arrived |",
+	"| page | build | CPU slowdown | hydrated at | from SvelteKit's start |",
 );
-console.log("|---|---|---|---|---|---|");
+console.log("|---|---|---|---|---|");
 for (const rate of THROTTLING) {
 	const samples = new Map();
 	for (let run = 0; run < RUNS; run++)
 		for (const path of paths)
-			for (const [name, origin] of Object.entries(servers)) {
+			for (const [name, origin] of servers) {
 				const key = `${path} ${name}`;
 				if (!samples.has(key)) samples.set(key, []);
 				samples
@@ -175,12 +220,11 @@ for (const rate of THROTTLING) {
 					.push(await timedLoad(browser, new URL(path, origin).href, rate));
 			}
 	for (const path of paths)
-		for (const name of Object.keys(servers)) {
+		for (const name of servers.keys()) {
 			const runs = samples.get(`${path} ${name}`);
 			const cell = (pick) => median(runs.map(pick)).toFixed(1);
-			const js = (inspected.get(path)[name].js / 1024).toFixed(1);
 			console.log(
-				`| ${path} | ${name} | ${rate}× | ${js} | ${cell((r) => r.hydrated)} | ${cell((r) => r.client)} |`,
+				`| ${path} | ${name} | ${rate}× | ${cell((r) => r.at)} | ${cell((r) => r.in)} |`,
 			);
 		}
 }
