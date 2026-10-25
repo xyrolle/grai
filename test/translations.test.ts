@@ -442,6 +442,31 @@ describe("grai merge", () => {
 		]);
 	});
 
+	it("refuses a unit a file gives twice, rather than take either translation", async () => {
+		const { dir, config } = project({
+			en: { cart_title: "Your cart" },
+			de: { cart_title: "Your cart" },
+		});
+		const units = [
+			{ id: "cart_title", source: "Your cart", target: "Ihr Warenkorb" },
+			{ id: "cart_title", source: "Your cart", target: "Dein Warenkorb" },
+		];
+		const file = join(dir, "de.json");
+		writeFileSync(
+			file,
+			JSON.stringify({ srcLang: "en", trgLang: "de", units }),
+		);
+
+		const merged = await mergeDocument(config, file);
+
+		expect(merged).toMatchObject({ messages: 0, units: 0 });
+		expect(
+			"refused" in merged ? merged.refused.map((error) => error.message) : [],
+		).toEqual([
+			'de.json: "cart_title" (de): unit cart_title: the file gives the unit 2 times. Keep one.',
+		]);
+	});
+
 	it("reads a file as a translation tool writes it back", async () => {
 		const { dir, config, load } = project({ en: english, ru: english });
 		const file = join(dir, "ru.xlf");

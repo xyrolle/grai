@@ -55,7 +55,16 @@ export function mergeUnits(
 	const keyCodes = codesByKey(current);
 	const refused: Refusal[] = [];
 	const accepted = new Map<string, Piece[]>();
-	for (const unit of returned) {
+	const { once, repeated } = givenOnce(returned);
+	for (const [id, times] of repeated) {
+		refused.push({
+			key: byId.get(id)?.key ?? "",
+			unit: id,
+			code: "translation-invalid",
+			detail: `the file gives the unit ${times} times. Keep one.`,
+		});
+	}
+	for (const unit of once) {
 		const now = byId.get(unit.id);
 		const refuse = (code: Refusal["code"], detail: string) =>
 			refused.push({ key: now?.key ?? "", unit: unit.id, code, detail });
@@ -120,6 +129,19 @@ export function mergeUnits(
 		units += given.length;
 	}
 	return { messages, units, refused };
+}
+
+/** The units a file gives once, and how many times it gives each other one, which is neither's to take. */
+function givenOnce(returned: readonly ReturnedUnit[]): {
+	once: ReturnedUnit[];
+	repeated: Map<string, number>;
+} {
+	const times = new Map<string, number>();
+	for (const { id } of returned) times.set(id, (times.get(id) ?? 0) + 1);
+	return {
+		once: returned.filter(({ id }) => times.get(id) === 1),
+		repeated: new Map([...times].filter(([, count]) => count > 1)),
+	};
 }
 
 /** Whether a unit's accepted translation differs from its current one. */
