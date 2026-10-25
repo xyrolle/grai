@@ -4,7 +4,7 @@ import { readConfig } from "./config.ts";
 import { type GraiModuleKind, moduleKindIn } from "./vite-build.ts";
 import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
 
-export type { GraiModuleKind, GraiOptions };
+export type { GraiModuleKind };
 
 /**
  * grai's Vite plugin. In dev it compiles the catalogs when the server starts and whenever one
