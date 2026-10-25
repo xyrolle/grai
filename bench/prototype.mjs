@@ -1,9 +1,11 @@
-// The runtime shapes grai could take, compiled from the same catalogs as Paraglide's output so
-// every bench runs both on equal inputs. Each locale is one module of plain functions, with no
-// lookup and no dispatch, and a plural selects through the locale's CLDR rule compiled into a
-// function. Server entries put the locales of each key in one table. It covers what the two apps'
-// catalogs use: text, {placeholders}, markup (dropped from the string, as Paraglide does), and
-// selectors on inputs or on a plural of an input.
+// Runtime shapes grai measured and did not adopt, or has not yet, compiled from the same catalogs
+// as Paraglide's output so every bench runs both on equal inputs. Each locale is one module of
+// plain functions, with no lookup and no dispatch, and a plural selects through the locale's CLDR
+// rule compiled into a function: the shape text inlined at its call site takes. The server
+// entries dispatch each key through a function of its own, reading the request's locale from
+// AsyncLocalStorage or from a module variable. It covers what the two apps' catalogs use: text,
+// {placeholders}, markup (dropped from the string, as Paraglide does), and selectors on inputs or
+// on a plural of an input.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as makePlural from "make-plural/cardinals";
@@ -151,29 +153,6 @@ function perKeyDispatchModule(app, read, bind) {
 	return `${lines.join("\n")}\n`;
 }
 
-/**
- * The same tables behind one shared dispatcher: `text(...strings)` and `message(...functions)`
- * return each key's message, so every call runs the same dispatcher code.
- */
-function sharedDispatchModule(app) {
-	const { imports, tables } = keyTables(app);
-	const lines = [
-		`import { AsyncLocalStorage } from "node:async_hooks";`,
-		...imports,
-		`const locales = ${JSON.stringify(app.locales)};`,
-		`const storage = new AsyncLocalStorage();`,
-		`export const withLocale = (locale, render) => storage.run(locales.indexOf(locale), render);`,
-		`const index = (options) => (options?.locale === undefined ? storage.getStore() : locales.indexOf(options.locale));`,
-		`const text = (...strings) => (_, options) => strings[index(options)];`,
-		`const message = (...variants) => (inputs, options) => variants[index(options)](inputs);`,
-		...tables.map(
-			({ key, literal, table }) =>
-				`export const ${key} = /* @__PURE__ */ ${literal ? "text" : "message"}(...${table});`,
-		),
-	];
-	return `${lines.join("\n")}\n`;
-}
-
 const written = new Set();
 
 /** Writes each locale's module and the server entries, once per run, and returns the directory. */
@@ -202,7 +181,6 @@ export function writePrototype(app) {
 			"((current = locales.indexOf(locale)), render())",
 		),
 	);
-	writeFileSync(join(directory, "server-shared.js"), sharedDispatchModule(app));
 	written.add(directory);
 	return directory;
 }
