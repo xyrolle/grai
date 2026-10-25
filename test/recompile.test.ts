@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
@@ -17,6 +17,14 @@ const catalogs = {
 /** A full garbage collection, for a test that a value is no longer held. */
 setFlagsFromString("--expose-gc");
 const collect: () => void = runInNewContext("gc");
+
+/** Every file of a project's output but its state, by its path in the output. */
+const outputOf = (dir: string) =>
+	new Map(
+		readdirSync(join(dir, "out"), { recursive: true, encoding: "utf8" })
+			.filter((file) => !file.startsWith(".grai") && file.includes("."))
+			.map((file) => [file, readFileSync(join(dir, "out", file), "utf8")]),
+	);
 
 /** A catalog as editors write it: one entry per line, indented by a tab. */
 const laidOut = (messages: Record<string, unknown>) =>
@@ -86,6 +94,25 @@ describe("a recompile after an edit", () => {
 		expect(formatted.result.written).toContain("formats.js");
 		expect(formats).toContain("export const number_de = ");
 		expect(existsSync(join(dir, "out", "formats.js"))).toBe(false);
+	});
+
+	it("writes after a run of edits what a compile from nothing writes", async () => {
+		const { dir, config } = project(catalogs);
+		const edits = [
+			{ ...catalogs.de, title: "Überschrift" },
+			{ ...catalogs.de, title: "Überschrift", footer: "Fuß" },
+			{ ...catalogs.de, footer: "Fuß" },
+		];
+		let { build } = await recompile(config, undefined);
+		for (const edit of edits) {
+			writeFileSync(join(dir, "messages", "de.json"), laidOut(edit));
+			({ build } = await recompile(config, build));
+		}
+		const fresh = project({ en: catalogs.en, de: edits.at(-1) });
+		await recompile(fresh.config, undefined);
+
+		expect([...outputOf(dir).keys()]).toContain("keys/0.js");
+		expect(outputOf(dir)).toEqual(outputOf(fresh.dir));
 	});
 
 	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
