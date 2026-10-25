@@ -14,6 +14,7 @@ import {
 	dispatchDeclarations,
 	runtimeDeclarations,
 	serverDeclarations,
+	testingDeclarations,
 } from "./runtime-declarations.ts";
 
 /** The output's files, level by level: a file imports only files of earlier levels. */
@@ -36,7 +37,12 @@ const keysPerShard = 512;
  */
 export function renderOutput(
 	config: Config,
-	runtime: { dispatch: string; runtime: string; server: string },
+	runtime: {
+		dispatch: string;
+		runtime: string;
+		server: string;
+		testing: string;
+	},
 	compilation: Compilation,
 	base: BaseCatalog,
 	previous?: Rendered,
@@ -83,11 +89,17 @@ export function renderOutput(
 			["runtime.d.ts", runtimeDeclarations(config)],
 			["dispatch.d.ts", dispatchDeclarations],
 			["server.d.ts", serverDeclarations],
+			["testing.d.ts", testingDeclarations],
 			["plurals.js", pluralModule(config.locales)],
 			...formatsFile(compilation),
 		],
 		[["dispatch.js", runtime.dispatch], ...declarations],
-		[["runtime.js", runtime.runtime], ...modules, ["keys.d.ts", keysIndex]],
+		[
+			["runtime.js", runtime.runtime],
+			["testing.js", runtime.testing],
+			...modules,
+			["keys.d.ts", keysIndex],
+		],
 		[
 			["server.js", runtime.server],
 			["keys.js", keysIndex],
