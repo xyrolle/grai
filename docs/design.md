@@ -327,6 +327,18 @@ Next runs the proxy apart from the render, renders a request's layouts and pages
 
 `grai/react`'s `Markup` draws a markup message's `.parts()` with the app's function for each element. It is React's, not Next's, so a React app on Vite uses it too, and it renders in server and client components alike. An element the message names and the app does not draw throws, naming it.
 
+## Astro
+
+Astro runs a request's middleware around the page's render, renders islands on the server inside that render, and builds one client for every locale. `grai/astro` is an integration, so an app adds one line to `astro.config` and writes no middleware.
+
+- **The integration does the setup:** it adds `grai/vite` and the middleware, compiles for `astro sync` so `astro check` sees the types, and checks the two configs once Astro's is done. In dev, an edit reloads the open pages (`reloadOnEdit`), since Astro draws a page on the server, islands aside.
+- **The middleware binds the locale around Astro's render, through the output's `middleware`.** Astro starts rendering a page inside the middleware's `next()` and streams it after, so the `AsyncLocalStorage` binding reaches every component and island the page renders. Interleaved requests keep their own locales, rendered on demand and prerendered four at a time alike (`test/astro-example.test.ts`). Paraglide's static Astro setup sets a process-wide locale per page instead, which holds only while pages render one at a time.
+- **Astro's i18n routing owns the URL, and grai reads it.** grai rewrites no path: pages live under their locale's path, so a static build prerenders each locale's pages in that locale, and `getRelativeLocaleUrl` and Astro's fallbacks work as they do without grai. With Astro's routing on, the build checks that grai finds the same locale in the URL: the `url` strategy alone, the same locales, as tags, the same default, without a prefix, and no `base` or `domains`, which grai's URL helpers do not know. `getLocale()` is then `Astro.currentLocale` on every route. Binding `Astro.currentLocale` directly would skip that check, and the output's middleware is still needed for the cookie and `Accept-Language` strategies.
+- **The middleware writes `<html lang>` and `dir`:** the browser's runtime reads `<html lang>` as the page's locale, so it must be the one the server rendered in. A layout may write `lang={Astro.currentLocale}`, Astro's idiom, and the middleware keeps it and adds the direction. It reads only the document's start, up to the `<head>` start tag, and passes every byte after it on as it comes, so a page streams as before.
+- **A built page loads only its locale's words, through an import map** that the middleware writes first in the head: from `/_astro/grai/` to `/_astro/grai-<locale>/`, under Astro's `base` or assets prefix. Astro writes no `modulepreload` for islands, so the map is the whole job. With Astro's CSP on, the middleware adds the map's hash to the page's policy. Paraglide's per-locale build has to own Vite's `buildApp`, which Astro owns, so on Astro it ships every locale's words to each island.
+- **A strategy that reads the request (`cookie`, `preferredLanguage`) fails a prerendered page at the build.** Such a page would show every reader the one locale it was built in.
+- **The middleware module is the project's own:** the integration writes it, importing the output's `server.js` and `runtime.js` by path and handing them to `grai/astro/middleware`, since Astro has no hook file for the app to write that in. The output's functions are the app's own instances, so the middleware binds the locale the app's messages read.
+
 ## Package
 
 - **One package, `grai`.** A project installs one thing, and the adapters version with the compiler they wrap. Subpath exports, each added with its code:
@@ -335,5 +347,6 @@ Next runs the proxy apart from the render, renders a request's layouts and pages
   - `grai/svelte`: the Vite plugin for a Svelte app, whose client build also reads a call without inputs as its string;
   - `grai/next`, `grai/next/config` and `grai/next/proxy`: the Next adapter, also thin, which finds the project's generated modules through `withGrai`;
   - `grai/react`: the `Markup` component;
+  - `grai/astro`: the Astro integration, and `grai/astro/middleware`, the middleware it adds;
   - the `grai` binary: the CLI.
-- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next and React are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
+- **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next, React and Astro are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.

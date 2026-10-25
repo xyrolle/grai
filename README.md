@@ -143,6 +143,32 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
 
 On a page of 400 messages in a server component and 100 in a client component, the browser downloads 129.8 KB brotli against next-intl's 230.3 KB, or its 134.4 KB with the client's keys picked, and an edit to a catalog is written in about 27 ms, 20 of them waiting for the save to settle; the rest of the edit is Next's refresh (`bench/nextjs.mjs`, `docs/runtime.md`).
 
+### Astro
+
+`grai/astro` is an Astro integration. It adds `grai/vite`, compiles the catalogs for `astro build`, and for `astro sync`, which `astro check` runs. It adds a middleware that renders each request in its locale, islands included. `examples/astro` is a complete site, static and rendered on demand.
+
+```ts
+// astro.config.ts
+import { defineConfig } from "astro/config";
+import { grai } from "grai/astro";
+
+export default defineConfig({
+	i18n: { locales: ["en", "ro", "ar"], defaultLocale: "en" },
+	integrations: [grai()],
+});
+```
+
+The middleware resolves the locale by `grai.config.json`'s `strategy` and binds it while the page renders. It writes the locale and its text direction to `<html lang>` and `dir`. The browser's runtime takes `<html lang>` as the page's locale, so a Svelte or React island hydrates in the words the server drew. In a build, each page loads only its own locale's copies of the message chunks, through an import map.
+
+With Astro's i18n routing, the URL names each page's locale and Astro routes it. The pages live under `src/pages/[...locale]/`, or a folder per locale. `Astro.currentLocale` is the locale grai renders in, and `getRelativeLocaleUrl` links to each locale's page. The two configs must agree, and the build stops on any difference, naming it:
+- grai's `"strategy"` is `["url"]`;
+- Astro's `locales` are grai's, as their tags, and its `defaultLocale` is grai's `baseLocale`;
+- the base locale has no prefix (Astro's default), and the site has no `base` and no `domains`.
+
+Without Astro's i18n routing, the `cookie` and `preferredLanguage` strategies render one URL in each reader's locale. Those pages are rendered on demand: the build stops on a prerendered one, which would show every reader the one locale it was built in.
+
+Under `<ClientRouter />`, a link into another locale needs `data-astro-reload`, so the page loads in its locale (`docs/followups.md`).
+
 ### Workers, Bun, Deno and Node
 
 The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:

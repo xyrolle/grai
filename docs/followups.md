@@ -105,15 +105,15 @@ Done when: the config maps a path to its path in each locale, with named segment
 
 ## A domain per locale
 
-A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads.
+A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads. `grai/astro` refuses Astro's `i18n.domains` until then.
 
 Done when: the config maps hosts to locales, the middleware reads the request's host, `localizeHref` to a locale on another host gives an absolute URL, local development has a documented way in without the production hosts, and a test covers each.
 
 ## The framework's base path
 
-An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`. The framework owns the base path, so the config should not repeat it.
+An app under a base path (SvelteKit's `paths.base`, Next's `basePath`, Astro's `base`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`, and the middleware reads `shop` as the path's locale. The framework owns the base path, so the config should not repeat it. `grai/astro` refuses a `base` with the `url` strategy until then.
 
-Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
+Done when: the Vite, Next and Astro adapters write the framework's base path into `config.js` at build, the URL helpers and the middleware put the locale after it, and a test in each example covers a localized link under a base path.
 
 ## Paths the `url` strategy leaves alone
 
@@ -123,7 +123,7 @@ Done when: the config can name the paths `url` does not cover, the strategies af
 
 ## Custom locale prefixes
 
-A locale's prefix is its tag (`/en-US/…`). A site that wants `/us/…` cannot have it. Neither reference app needs it, so it waits for an adopter who does.
+A locale's prefix is its tag (`/en-US/…`). A site that wants `/us/…` cannot have it, nor Astro's `{ path, codes }` locales, which `grai/astro` refuses. Neither reference app needs it, so it waits for an adopter who does.
 
 Done when: the config maps a locale to its prefix, and the URL helpers and the middleware follow it, with a test.
 
@@ -138,3 +138,21 @@ Done when: a rename changes them, with a test of each.
 `grai export en-GB --untranslated` lists every key en-GB takes from en as untranslated, so a translator is asked for all of en again; `grai seed en-GB` copies en's text into en-GB, which then no longer follows en. Both should treat a key a locale takes from its fallback as covered, and still let a translator give the locale its own text.
 
 Done when: `export --untranslated` leaves out a key the locale takes from its fallback, a full export offers it with the fallback's text as its source, `seed` refuses a locale that falls back or seeds nothing it takes from its fallback, and a test covers each.
+
+## A prefix for the base locale
+
+The `url` strategy gives the base locale no prefix, so a site whose every URL names its locale (`/en/about`, Astro's `prefixDefaultLocale: true`) cannot say so, and `grai/astro` refuses that setting.
+
+Done when: the config can prefix the base locale, the URL helpers and the middleware follow it, `grai/astro` accepts `prefixDefaultLocale: true` with it, and a test covers both.
+
+## Keep the locale through Astro's client router
+
+Under Astro's `<ClientRouter />`, a link into another locale swaps the page in place. The runtime read `<html lang>` when the page first loaded, and the import map, once read, cannot change, so the new page's islands render in the first page's locale. Until this is done, a link into another locale needs `data-astro-reload`.
+
+Done when: a client-router navigation into another locale loads the page anew, with a browser test in the Astro example.
+
+## Server islands and actions in the page's locale
+
+A server island (`server:defer`) and an Astro action are requests of their own, to paths without the page's locale prefix. Under the `url` strategy they render in the base locale; the `cookie` and `preferredLanguage` strategies find the reader's.
+
+Done when: a server island and an action on a page under `/ro/` render in `ro` under the `url` strategy, with a test in the Astro example.
