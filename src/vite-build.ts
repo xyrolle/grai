@@ -71,6 +71,7 @@ export type GraiModuleKind =
  */
 const runtimeFiles = new Map<string, GraiModuleKind>([
 	["runtime.js", "runtime"],
+	["internal.js", "runtime"],
 	["config.js", "config"],
 	["plurals.js", "plurals"],
 	["formats.js", "formats"],
