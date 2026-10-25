@@ -251,10 +251,11 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
-- `grai check` runs every compile check (lockstep, plural categories) without writing, and adds two of its own:
+- `grai check` runs every compile check (lockstep, plural categories) without writing, and adds three of its own:
   - keys no shipped source file names. A key counts as named when it is an identifier anywhere in a JavaScript, TypeScript, Svelte, Vue or Astro file or an MDX document under the project, or under `--source`, outside dependencies, build output and the outdir. That counts `m.key` and per-key imports alike, and never calls a key unused that shipped code names;
     - **a test ships nothing, so a key that only tests name is unused,** and the report names those tests, which must change with it. Tests are the files the config's `tests` globs match, by path from the root: by default Vitest's and Jest's names (`*.test.*`, `*.spec.*`), Jest's `__tests__` folders, and the root's `test` and `tests`. A folder named `tests` deeper down may ship, as a SvelteKit route at `src/routes/tests/` does, and calling its keys unused would have `--fix` delete them. `[]` makes no file a test;
   - inputs one locale shows and another never does: a placeholder a translation lost or invented. An input a locale only chooses a variant by, such as the gender French agrees `invitée` with, is that language's grammar, and another locale need not read it; an `input gender` declared only to quiet the check would prove nothing.
+  - each place a source names a key no catalog has, `m.foo`, `m["foo"]`, a per-key path or a named import of keys.js, with the `grai add` that adds it. TypeScript sees these only in TypeScript; in JavaScript and in a Svelte or Vue template such a call ships as a call of nothing. A Vite build fails on the same places in the shipped sources, where Rolldown only warns that a namespace's member is undefined (it fails a named import of one already).
 
   It also lists, per locale, the keys still untranslated: those whose message equals its seed, but the keys `identicalToBase` lists. This is a report, not an error, since a text can rightly read as the base locale's. `--json` prints the problems and the untranslated keys for scripts.
 - `grai seed <locale>` gives a locale's catalog the base text of every key it lacks, and creates the catalog if there is none.
