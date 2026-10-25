@@ -5,7 +5,7 @@
 
 import { isRecord } from "./config.ts";
 import { parseVariantKey } from "./match.ts";
-import { parseMessage } from "./message.ts";
+import { type LocaleMessage, parseMessage } from "./message.ts";
 import { categoriesOf } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 import { catchAll, countingRules, type Selector } from "./selection.ts";
@@ -37,25 +37,33 @@ export function alignedVariants(
 	]);
 }
 
-/** A translation's variants, aligned to the base message's selectors, if it has the same ones. */
-export function translatedVariants(
+/** A locale's message for a key, parsed, if it has one that compiles; the compile names one that does not. */
+export function ownMessage(
 	translation: unknown,
 	locale: string,
-	selectors: readonly Selector[],
-): Variants | undefined {
+): LocaleMessage | undefined {
 	if (translation === undefined) return undefined;
 	try {
-		const names = parseMessage(locale, translation).selectors.map(
-			(selector) => selector.name,
-		);
-		if (names.join() !== selectors.map((selector) => selector.name).join())
-			return undefined;
-		return alignedVariants(translation, selectors);
+		return parseMessage(locale, translation);
 	} catch (error) {
-		// A translation that does not compile is exported as untranslated; the compile names it.
 		if (error instanceof MessageProblem) return undefined;
 		throw error;
 	}
+}
+
+/** Variants with their keys moved onto other selectors: each one's key for the selector of its name, else `*`. */
+export function onto(
+	variants: Variants,
+	from: readonly Selector[],
+	to: readonly Selector[],
+): Variants {
+	const at = to.map((selector) =>
+		from.findIndex(({ name }) => name === selector.name),
+	);
+	return variants.map(([keys, pattern]) => [
+		at.map((index) => keys[index] ?? catchAll),
+		pattern,
+	]);
 }
 
 /**
