@@ -2,8 +2,6 @@ import type { Plugin } from "vite";
 import { svelteTexts } from "./svelte-texts.ts";
 import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
 
-export type { GraiOptions };
-
 /**
  * grai's Vite plugin for a Svelte app: `grai/vite`'s, plus a client build that reads each call of
  * a message without inputs, such as `{m.title()}`, as that message's string in the page's locale.
