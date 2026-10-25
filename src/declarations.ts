@@ -168,7 +168,10 @@ export declare function isLocale(value: unknown): value is Locale;
 export declare function assertIsLocale(value: unknown): Locale;
 /** The cookie the server's "cookie" strategy reads, and \`setLocale\` writes. */
 export declare const cookieName: ${config.cookieName === undefined ? "undefined" : JSON.stringify(config.cookieName)};
-/** The locale messages render in: the request's on the server, the page's in a browser. */
+/**
+ * The locale messages render in: the request's on the server, the page's in a browser. On a server
+ * outside every request the middleware binds, it throws a \`locale-unbound\` GraiError.
+ */
 export declare function getLocale(): Locale;
 /**
  * Sets the locale: for the rest of the request on the server, for the process in a script. In a
@@ -186,7 +189,10 @@ export declare function deLocalizeUrl(url: string | URL): URL;
 export declare function localizeUrl(url: string | URL, options?: { locale?: Locale }): URL;
 /** A path such as \`/cart\` with a locale's prefix under the \`url\` strategy; any other href as it is. */
 export declare function localizeHref(href: string, options?: { locale?: Locale }): string;
-/** A message called in a locale it cannot render in, or with a value its variants do not take. */
+/**
+ * A message called in a locale it cannot render in, with a value its variants do not take, or on a
+ * server outside every request the middleware binds (\`locale-unbound\`).
+ */
 export declare class GraiError extends Error {
 	readonly code: string;
 }

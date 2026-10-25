@@ -7,18 +7,20 @@ import { type Runtime, serve } from "./serve.ts";
 
 // The Workers example (examples/workers), compiled, then served by each runtime that runs a
 // Worker's module as it is: workerd, Cloudflare's runtime, through Wrangler's test harness, Bun and
-// Deno. Beside it, each serves a Worker that interleaves requests on the example's output.
+// Deno. Beside it, each serves two Workers on the example's output: one interleaves requests, and
+// one streams its body as SvelteKit streams a page.
 const example = fileURLToPath(new URL("../examples/workers/", import.meta.url));
 const interleaving = fileURLToPath(
 	new URL("workers-interleave.js", import.meta.url),
 );
+const streaming = fileURLToPath(new URL("workers-stream.js", import.meta.url));
 const locales = ["en", "ro", "ar"] as const;
 const titleOf = (locale: string): string =>
 	JSON.parse(readFileSync(`${example}messages/${locale}.json`, "utf8")).title;
 /** 30 requests, ten in each locale, in turn. */
 const sent = Array.from({ length: 10 }, () => locales).flat();
 
-/** A request to one of the two Workers, and what the tests read of its response. */
+/** A request to one of the Workers, and what the tests read of its response. */
 type Fetch = (
 	path: string,
 	init: { headers: Record<string, string> },
@@ -28,34 +30,38 @@ type Fetch = (
 	json(): Promise<unknown>;
 }>;
 
-/** A runtime serving the example and the interleaving Worker. */
+/** A runtime serving the example, the interleaving Worker and the streaming one. */
 type Servers = {
 	listen(): Promise<void>;
 	close(): Promise<void>;
 	example: Fetch;
 	interleave: Fetch;
+	stream: Fetch;
 };
 
 /**
- * workerd, with the example at Workers' default Node.js compatibility, and the interleaving Worker
- * at the last date before it, with only the flag that adds AsyncLocalStorage: the least a Worker
+ * workerd, with the example at Workers' default Node.js compatibility, and the test's Workers at
+ * the last date before it, with only the flag that adds AsyncLocalStorage: the least a Worker
  * needs for grai's middleware.
  */
 function workerd(): Servers {
+	const leastCompatible = (name: string, main: string) => ({
+		config: {
+			name,
+			main,
+			compatibility_date: "2026-08-03",
+			compatibility_flags: ["nodejs_als"],
+		},
+	});
 	const harness = createTestHarness({
 		workers: [
 			{ configPath: `${example}wrangler.jsonc` },
-			{
-				config: {
-					name: "interleave",
-					main: interleaving,
-					compatibility_date: "2026-08-03",
-					compatibility_flags: ["nodejs_als"],
-				},
-			},
+			leastCompatible("interleave", interleaving),
+			leastCompatible("stream", streaming),
 		],
 	});
 	const interleave = harness.getWorker("interleave");
+	const stream = harness.getWorker("stream");
 	return {
 		listen: async () => {
 			await harness.listen();
@@ -63,6 +69,7 @@ function workerd(): Servers {
 		close: () => harness.close(),
 		example: (path, init) => harness.fetch(path, init),
 		interleave: (path, init) => interleave.fetch(path, init),
+		stream: (path, init) => stream.fetch(path, init),
 	};
 }
 
@@ -71,17 +78,19 @@ function servedBy(runtime: Runtime): Servers {
 	const workers = {
 		example: serve(runtime, `${example}src/worker.js`),
 		interleave: serve(runtime, interleaving),
+		stream: serve(runtime, streaming),
 	};
-	const both = Object.values(workers);
+	const all = Object.values(workers);
 	return {
 		listen: async () => {
-			await Promise.all(both.map((worker) => worker.listen()));
+			await Promise.all(all.map((worker) => worker.listen()));
 		},
 		close: async () => {
-			await Promise.all(both.map((worker) => worker.close()));
+			await Promise.all(all.map((worker) => worker.close()));
 		},
 		example: workers.example.fetch,
 		interleave: workers.interleave.fetch,
+		stream: workers.stream.fetch,
 	};
 }
 
@@ -126,6 +135,14 @@ describe.each([
 
 			expect(response.headers.get("vary")).toBe("Cookie, Accept-Language");
 		});
+	});
+
+	it("streams every line its start() pushes after awaits in the request's locale, as SvelteKit's pages", async () => {
+		const response = await servers.stream("/", {
+			headers: { cookie: "lang=ro" },
+		});
+
+		expect(await response.text()).toBe(`${titleOf("ro")}\n`.repeat(4));
 	});
 
 	describe("30 requests interleaved, ten in each locale", () => {
