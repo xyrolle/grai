@@ -1,6 +1,8 @@
-// Serves a Worker's module as Bun and Deno run one as it is, `bun <module>` and
-// `deno serve <module>`, on a port the system picks and the runtime prints once it listens. Both
-// come from the devDependencies, which install them through pnpm's runtime protocol.
+// Serves a Worker's module under Bun and Deno, on 127.0.0.1 alone and a port the system picks, and
+// fetches the URL the runtime prints once it listens. On every address, as `bun <module>` and
+// `deno serve <module>` listen, another process may hold 127.0.0.1 at that port beside it, which
+// macOS allows, and answer in its place. Both runtimes come from the devDependencies, which install
+// them through pnpm's runtime protocol.
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -13,28 +15,34 @@ export type Served = {
 	fetch(path: string, init?: RequestInit): Promise<Response>;
 };
 
-/** Each runtime's arguments to serve a module, and the environment it reads its port from. */
-const commands: Record<
-	Runtime,
-	(module: string) => { args: string[]; env: Record<string, string> }
-> = {
-	bun: (module) => ({ args: [module], env: { PORT: "0" } }),
-	deno: (module) => ({ args: ["serve", "--port", "0", module], env: {} }),
+/** Each runtime's arguments to serve a module on 127.0.0.1 at `port`. */
+const commands: Record<Runtime, (module: string, port: number) => string[]> = {
+	bun: (module, port) => [
+		fileURLToPath(new URL("bun-serve.js", import.meta.url)),
+		module,
+		String(port),
+	],
+	deno: (module, port) => [
+		"serve",
+		"--host",
+		"127.0.0.1",
+		"--port",
+		String(port),
+		module,
+	],
 };
 
-export function serve(runtime: Runtime, module: string): Served {
+export function serve(runtime: Runtime, module: string, port = 0): Served {
 	let origin = "";
 	let stop = async () => {};
 	return {
 		async listen() {
-			const { args, env } = commands[runtime](module);
+			const args = commands[runtime](module, port);
 			const binary = new URL(
 				`../node_modules/.bin/${runtime}`,
 				import.meta.url,
 			);
-			const child = spawn(fileURLToPath(binary), args, {
-				env: { ...process.env, ...env },
-			});
+			const child = spawn(fileURLToPath(binary), args);
 			const exited = new Promise((resolve) => child.once("exit", resolve));
 			// kill() is false when the process is gone already, or never started.
 			stop = async () => {
@@ -47,7 +55,7 @@ export function serve(runtime: Runtime, module: string): Served {
 	};
 }
 
-/** The origin of the server `child` starts: the port of the first URL it prints, on loopback. */
+/** The origin of the server `child` starts: the first URL it prints, once its line is whole. */
 function listening(
 	runtime: Runtime,
 	child: ChildProcessWithoutNullStreams,
@@ -56,8 +64,8 @@ function listening(
 		let output = "";
 		const read = (chunk: Buffer) => {
 			output += chunk;
-			const port = /http:\/\/[^\s/]+:(\d+)/.exec(output)?.[1];
-			if (port !== undefined) resolve(`http://127.0.0.1:${port}`);
+			const url = /(http:\/\/\S+)\s/.exec(output)?.[1];
+			if (url !== undefined) resolve(new URL(url).origin);
 		};
 		child.stdout.on("data", read);
 		child.stderr.on("data", read);
