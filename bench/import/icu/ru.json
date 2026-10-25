@@ -11,7 +11,7 @@
 		"bold": "Привет, <b>{name}</b>, у вас <i>{n, plural, one {# кот} few {# кота} many {# котов} other {# кота}}</i>",
 		"price": "{value, number}",
 		"rank": "{n, selectordinal, other {#-й}}",
-		"offset": "{n, plural, offset:1 =0 {никого} other {# других}}",
+		"offset": "{n, plural, offset:1 =0 {никого} one {вы и # другой} few {вы и # других} other {вы и # другого}}",
 		"both": "{n, plural, one {{g, select, male {его один} other {их один}}} few {{g, select, male {его #} other {их #}}} other {{g, select, male {его # (other)} other {их # (other)}}}}",
 		"split": "{g, select, male {{n, plural, one {у него один} other {у него #}}} other {{n, plural, =0 {у них нет} one {у них один} many {у них # (many)} other {у них #}}}}",
 		"shipped": "Отправлено {d, date, medium} в {d, time, short}",
