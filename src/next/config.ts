@@ -4,7 +4,7 @@ import {
 	PHASE_DEVELOPMENT_SERVER,
 	PHASE_PRODUCTION_BUILD,
 } from "next/constants.js";
-import { type CompileResult, compile } from "../compile.ts";
+import { type CompileResult, compile, isCompiled } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import type { GraiError } from "../error.ts";
 import { watch } from "../watch.ts";
@@ -35,21 +35,34 @@ export function withGrai(
 /** The watch of this process: Next asks for its config more than once, and it starts once. */
 let watched: Promise<void> | undefined;
 
-/**
- * Compiles when the output is not current, so that Next can start at once, then watches. The
- * watch's first compile, which builds what each edit after it starts from, runs while Next
- * starts, writes nothing new, and reports any errors.
- */
 function watching(configFile: string): Promise<void> {
-	watched ??= compile(configFile).then(() => {
+	watched ??= startWatching(configFile);
+	return watched;
+}
+
+/**
+ * Watches, and settles once the output can be read: at once when it is current, so that Next
+ * starts while the watch's first compile builds what each edit after it starts from, and else
+ * once that compile has written it. Either way the catalogs compile once. The check comes first:
+ * started beside it, the watch's compile would hold it back.
+ */
+async function startWatching(configFile: string): Promise<void> {
+	const compiled = await isCompiled(configFile);
+	const firstCompile = new Promise<void>((settled) => {
 		watch(
 			configFile,
-			(result) => reportErrors(result.errors),
+			(result) => {
+				reportErrors(result.errors);
+				settled();
+			},
 			// A compile that throws, as when the outdir cannot be written: the next save compiles again.
-			(error) => console.error(error),
+			(error) => {
+				console.error(error);
+				settled();
+			},
 		);
 	});
-	return watched;
+	if (!compiled) await firstCompile;
 }
 
 function built(result: CompileResult): void {

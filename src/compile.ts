@@ -80,7 +80,7 @@ function hashOfModules(directory: string): string {
 export async function compile(configFile: string): Promise<CompileResult> {
 	const read = await readProject(configFile);
 	if ("errors" in read) return { written: [], errors: read.errors };
-	const hashes = read.sources.map((source) => hash("sha1", source.bytes));
+	const hashes = hashesOf(read.sources);
 	if (
 		await isUpToDate(read.config.outdir, inputsOf(read.config, hashes, false))
 	) {
@@ -88,6 +88,23 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	}
 	const { result } = await build(read.config, read.sources, hashes);
 	return result;
+}
+
+/**
+ * Whether the output is already that of the project's config and catalogs, which `compile` would
+ * leave as it is. A project that cannot be read has no such output.
+ */
+export async function isCompiled(configFile: string): Promise<boolean> {
+	const read = await readProject(configFile);
+	if ("errors" in read) return false;
+	return isUpToDate(
+		read.config.outdir,
+		inputsOf(read.config, hashesOf(read.sources), false),
+	);
+}
+
+function hashesOf(sources: readonly CatalogSource[]): string[] {
+	return sources.map((source) => hash("sha1", source.bytes));
 }
 
 /**

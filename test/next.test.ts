@@ -1,8 +1,9 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+	PHASE_DEVELOPMENT_SERVER,
 	PHASE_PRODUCTION_BUILD,
 	PHASE_PRODUCTION_SERVER,
 } from "next/constants.js";
@@ -28,6 +29,58 @@ function inProject(dir: string): void {
 	const before = process.cwd();
 	process.chdir(dir);
 	onTestFinished(() => process.chdir(before));
+}
+
+/**
+ * withGrai for `next dev` in a process of its own, as Next runs it, from a project's directory: it
+ * prints "configured" once the config is back, and keeps watching until the test ends, or until
+ * its stdin closes, as when the test's own process ends first.
+ */
+function nextDev(dir: string): ChildProcess {
+	const config = new URL("../src/next/config.ts", import.meta.url).href;
+	const dev = spawn(
+		process.execPath,
+		[
+			"--input-type=module",
+			"-e",
+			`process.stdin.on("end", () => process.exit()).resume();
+const { withGrai } = await import(${JSON.stringify(config)});
+await withGrai()(${JSON.stringify(PHASE_DEVELOPMENT_SERVER)});
+console.log("configured");`,
+		],
+		{ cwd: dir },
+	);
+	onTestFinished(
+		() =>
+			new Promise<void>((exited) => {
+				dev.on("exit", () => exited());
+				dev.kill();
+			}),
+	);
+	return dev;
+}
+
+/** Resolves once a process has printed `text`, and fails if it exits first. */
+function printed(child: ChildProcess, text: string): Promise<void> {
+	return new Promise((resolve, reject) => {
+		let output = "";
+		child.stdout?.on("data", (chunk) => {
+			output += chunk;
+			if (output.includes(text)) resolve();
+		});
+		child.on("exit", (code) =>
+			reject(new Error(`exited with ${code} before printing ${text}`)),
+		);
+	});
+}
+
+/** The output's message shards, as one text. */
+function shards(dir: string): string {
+	const keys = join(dir, "out", "keys");
+	return readdirSync(keys)
+		.filter((name) => name.endsWith(".js"))
+		.map((name) => readFileSync(join(keys, name), "utf8"))
+		.join("");
 }
 
 describe("withGrai", () => {
@@ -61,6 +114,19 @@ describe("withGrai", () => {
 			],
 			["grai: 1 error"],
 		]);
+	});
+
+	it("comes back for next dev once an empty outdir is written, then compiles each edit", async () => {
+		const { dir } = project({ en: { title: "Your cart" } });
+		const dev = nextDev(dir);
+
+		await printed(dev, "configured");
+		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+		writeFileSync(
+			join(dir, "messages", "en.json"),
+			JSON.stringify({ title: "Your basket" }),
+		);
+		await expect.poll(() => shards(dir)).toContain("Your basket");
 	});
 
 	it("gives a command that bundles nothing, such as next start, the config as it is, without reading grai's", async () => {
