@@ -11,9 +11,10 @@ const vitest = join(nodeModules, "vitest", "vitest.mjs");
 const plugin = fileURLToPath(new URL("../src/vite.ts", import.meta.url));
 
 /** The environment of a Vitest run of its own, without this run's variables. */
-const ownEnvironment = Object.fromEntries(
-	Object.entries(process.env).filter(([name]) => !name.startsWith("VITEST")),
-);
+const ownEnvironment = { ...process.env };
+for (const name of Object.keys(ownEnvironment)) {
+	if (name.startsWith("VITEST")) delete ownEnvironment[name];
+}
 
 describe("the Vite plugin under Vitest", { timeout: 60_000 }, () => {
 	it("gives each key's path a module of its own, so a test mocks one key and no other", async () => {

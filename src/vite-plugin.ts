@@ -195,7 +195,7 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 				// alone, so a test that mocks the path mocks that key and no other. A page keeps keys.js
 				// as one module, since a module per key costs it a request each.
 				const key =
-					testing && "compilation" in compiled
+					testing && compiled !== undefined && "compilation" in compiled
 						? pathKey(compiled, id)
 						: undefined;
 				return key === undefined ? resolved : `\0${keyPrefix}${key}`;
