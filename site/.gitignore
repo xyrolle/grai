@@ -1,0 +1,4 @@
+# What pages.ts writes, and what Astro builds from it.
+src/content/docs/
+.astro/
+dist/

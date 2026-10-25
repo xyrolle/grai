@@ -24,6 +24,7 @@ jobs:
       - run: pnpm check:package
       - run: pnpm size
       - run: pnpm test:performance
+      - run: pnpm --filter grai-site build
 
   # The tests on the oldest Node the package accepts, the LTS and the current release, on each
   # system: paths differ on Windows, and how files are watched differs on each.

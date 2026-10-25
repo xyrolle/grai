@@ -1,6 +1,8 @@
 engineStrict: true
 packages:
   - examples/*
+  - site
 allowBuilds:
   esbuild: true
+  sharp: true
   workerd: true

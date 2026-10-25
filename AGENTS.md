@@ -67,3 +67,4 @@ The owner publishes; nothing else does.
 ### Docs
 - Docs record decisions and their reasons, not implementation retellings.
 - Open follow-ups go in `docs/followups.md`, each with "done when"; delete an entry in the change that resolves it.
+- The docs site (`site/`, Starlight) is built from the README's sections and the docs they point to, by `site/pages.ts`: nothing is written there by hand. `pnpm --filter grai-site build` fails on a dead link.

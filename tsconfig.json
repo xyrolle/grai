@@ -16,7 +16,7 @@
 		"skipLibCheck": true,
 		"noEmit": true
 	},
-	"include": ["src", "test", "scripts"],
+	"include": ["src", "test", "scripts", "site/pages.ts"],
 	// The page's modules see the DOM, so tsconfig.browser.json checks them.
 	"exclude": ["src/sveltekit-client.ts"]
 }
