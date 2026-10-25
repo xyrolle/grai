@@ -13,7 +13,7 @@ The compiler, for a build script or a bundler grai has no adapter for.
 
 ## `grai/vite`
 
-- `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin`: compiles when Vite starts, patches an edited message into the open page in dev, and in a build puts in each chunk only the keys its code uses, once per locale. `config` is the path of `grai.config.json`, from Vite's root; `reloadOnEdit` reloads the open pages after an edit rather than patch them, for a framework whose pages only the server draws, such as Astro.
+- `grai(options?: { config?: string; reloadOnEdit?: boolean; localeChunks?: boolean }): Plugin`: compiles when Vite starts, patches an edited message into the open page in dev, and in a build puts in each chunk only the keys its code uses, once per locale. Each page it builds or serves gets a locale script, which picks the page's locale where no server did. `config` is the path of `grai.config.json`, from Vite's root; `reloadOnEdit` reloads the open pages after an edit rather than patch them, for a framework whose pages only the server draws, such as Astro; `localeChunks` writes a copy of each message chunk per locale, with only its words, which the locale script then points each page at.
 - `graiModules(options?: { config?: string }): (id: string) => GraiModuleKind | undefined`: for a tool that reads a client build's chunks, the kind of grai's module an id is, or `undefined` for any other. `config` is the path of `grai.config.json`, from the working directory.
 - `type GraiModuleKind = "runtime" | "config" | "plurals" | "formats" | "key" | "text"`: the first four go to the `grai-runtime` chunk, `key` and `text` to the message chunks under `grai/`.
 
@@ -90,11 +90,13 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `baseLocale: string`: one of `locales`; the locale a call renders in when nothing binds another.
 - `catalogs: string`: each locale's catalog, as a path with `{locale}` in it, such as `"messages/{locale}.json"`. A catalog may nest keys in objects; a nested key is called by its names joined by `_`.
 - `outdir: string`: the directory the output goes to.
-- `strategy?: ("cookie" | "preferredLanguage" | "url")[]`: where the server looks for a request's locale, in order, before the base locale.
+- `strategy?: ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[]`: where the server and a page no server draws look for the locale, in order, before the base locale. Each reads the places it can see: the server no `localStorage`.
 - `cookieName?: string`: the cookie the `cookie` strategy reads and `setLocale` writes, a name RFC 6265 allows; required with it, refused without it.
 - `cookieMaxAge?: number`: the seconds a browser keeps the cookie, 400 days by default.
 - `cookieDomain?: string`: a host whose subdomains share the cookie, such as `example.com`.
 - `cookieSameSite?: "lax" | "strict" | "none"`: the cookie's SameSite, `"lax"` by default; `"none"`, for a page embedded in another site's, makes it Secure.
+- `localStorageKey?: string`: the key in `localStorage` the `localStorage` strategy reads and `setLocale` writes; required with it, refused without it.
+- `queryParameter?: string`: the URL's query parameter the `query` strategy reads and `setLocale` names the locale in; required with it, refused without it.
 - `switch?: "reload"`: how a page changes locale. `"reload"`, the default, reloads or navigates. `"live"`, where a page would switch in place, is refused until grai does it (`docs/followups.md`).
 - `localePrefix?: "as-needed" | "always"`: with the `url` strategy, whether the base locale's paths have a prefix too; `"as-needed"`, the default, leaves them without one.
 - `localePrefixes?: Record<string, string>`: with the `url` strategy, a locale's own prefix, one path segment, such as `{ "en-US": "us" }`.
