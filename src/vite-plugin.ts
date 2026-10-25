@@ -1,5 +1,10 @@
 import { join, resolve } from "node:path";
 import type { Plugin } from "vite";
+import {
+	type KeyReading,
+	keyReading,
+	missingKeyReads,
+} from "./build-key-reads.ts";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
@@ -13,7 +18,6 @@ import {
 	textPrefix,
 } from "./locale-chunks.ts";
 import { moduleOf } from "./message-imports.ts";
-import { shippedMissingKeyCalls } from "./missing-key-calls.ts";
 import { realPath } from "./real-path.ts";
 import {
 	chunkFileName,
@@ -52,6 +56,9 @@ export type GraiOptions = {
 /** grai's Vite plugin, and the build its last compile made, for the adapters built on it. */
 export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
 
+/** The modules a build's check reads: scripts, and the components that compile to them. */
+const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro)$/;
+
 /** grai's Vite plugin (`vite.ts` says what it does), with its build. */
 export function graiPlugin(options: GraiOptions): GraiPlugin {
 	let files: ProjectFiles = { configFile: "", outdir: "", keysFile: "" };
@@ -66,8 +73,8 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		_key: string,
 		_importer: string,
 	): string | undefined => undefined;
-	/** The places the shipped sources name a key no catalog has, found once for every environment. */
-	let missingCalls: readonly Error[] | undefined;
+	/** How the build's modules are followed to keys.js, to check the keys they name. */
+	let reading: KeyReading | undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	const building = (environment: { name: string } | undefined) =>
@@ -157,8 +164,30 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 			});
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
-			missingCalls ??= shippedMissingKeyCalls(compiled);
-			if (missingCalls.length > 0) this.error(messagesOf(missingCalls));
+		},
+		// A module's code as the last plugins see it, a component's compiled, names the keys it ships.
+		transform: {
+			order: "post",
+			filter: { id: { exclude: [/\/node_modules\//, /^\0/] } },
+			async handler(code, id) {
+				if (serving || build === undefined) return null;
+				if (
+					id.startsWith(files.outdir) ||
+					!scanned.test(id.split("?")[0] ?? id)
+				)
+					return null;
+				if (reading?.build !== build)
+					reading = keyReading(build, files.keysFile);
+				const missing = await missingKeyReads(
+					code,
+					id,
+					reading,
+					async (source, importer) =>
+						(await this.resolve(source, importer))?.id,
+				);
+				if (missing.length > 0) this.error(messagesOf(missing));
+				return null;
+			},
 		},
 		configureServer(server) {
 			let ready: (compiled: Build | readonly Error[]) => void = () => {};

@@ -6,7 +6,7 @@ import type { Config } from "./config.ts";
 import { descriptionProblems } from "./descriptions.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
-import { missingKeyCalls } from "./missing-key-calls.ts";
+import { missingKeyCalls, type Unchecked } from "./missing-key-calls.ts";
 import { MessageProblem } from "./problem.ts";
 import { isSeed, untranslatedKeys } from "./seed.ts";
 import { shownInputs } from "./shown-inputs.ts";
@@ -22,6 +22,8 @@ import {
 export type Checked = {
 	problems: GraiError[];
 	untranslated: Map<string, string[]>;
+	/** The files whose reads of a namespace the check left out, as they declare its name again. */
+	unchecked: Unchecked[];
 };
 
 /**
@@ -39,9 +41,10 @@ export async function check(
 ): Promise<Checked> {
 	const read = await readProject(configFile);
 	if ("errors" in read)
-		return { problems: read.errors, untranslated: new Map() };
+		return { problems: read.errors, untranslated: new Map(), unchecked: [] };
 	const { catalogs, errors } = parseCatalogs(read.sources);
-	if (errors.length > 0) return { problems: errors, untranslated: new Map() };
+	if (errors.length > 0)
+		return { problems: errors, untranslated: new Map(), unchecked: [] };
 	const { config } = read;
 	const compilation = compileCatalogs(config, catalogs);
 	const roots = sources ?? [config.root];
@@ -51,10 +54,8 @@ export async function check(
 	const keys = new Set(
 		catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);
-	const problems = [
-		...compilation.errors,
-		...missingKeyCalls(files, keys, config.locales),
-	];
+	const missing = missingKeyCalls(files, keys, config);
+	const problems = [...compilation.errors, ...missing.errors];
 	for (const key of compilation.keys.keys()) {
 		if (!names.has(key)) {
 			problems.push(unused(key, config, catalogs, roots, tests));
@@ -72,6 +73,7 @@ export async function check(
 			config.baseLocale,
 			config.identicalToBase,
 		),
+		unchecked: missing.unchecked,
 	};
 }
 

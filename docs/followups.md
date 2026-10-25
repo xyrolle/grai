@@ -60,6 +60,12 @@ MessageFormat 2 lets a local be made from another, as in `local a = n: number` t
 
 Done when: a plural, formatted, `:offset` or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
 
+## Read every source by scope in `grai check` (the owner's decision)
+
+`grai check` reads sources as text, so where a file declares the namespace's name again, as `rows.map((m) => m.id)` does, it cannot tell which reads are grai's, and leaves that file's reads of the name out, saying so. A Vite build reads each module by scope through Vite's parser, but a project without Vite, such as a Next.js one, has only check. Depending on `oxc-parser`, the parser Vite 8 uses, would make check exact there too, for JavaScript, TypeScript and a component's scripts: its 0.155.0 is 2.9 MB unpacked, plus one native binding per platform (1.8 MB on macOS arm64, 2.1 MB on Linux x64, 1.6 MB on Windows x64, 1.7 MB as WebAssembly). It would be grai's first runtime dependency, which is the owner's to decide; templates would still be read as text.
+
+Done when: the owner has decided, and, if yes, check reads JavaScript, TypeScript and component scripts with the same scope reading as the build, with no file left unchecked for a redeclared name.
+
 ## Bind the locale in Next's server actions and route handlers
 
 React keeps no `cache` in a server action or a route handler, so there a message names its locale (`docs/design.md`). A form's error messages are the common case.
