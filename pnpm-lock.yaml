@@ -175,9 +175,15 @@ importers:
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
+      bun:
+        specifier: runtime:1.4.4
+        version: runtime:1.4.4
       cldr-core:
         specifier: 48.0.0
         version: 48.0.0
+      deno:
+        specifier: runtime:2.9.6
+        version: runtime:2.9.6
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -966,6 +972,115 @@ packages:
   blake3-wasm@2.1.5:
     resolution: {integrity: sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g==}
 
+  bun@runtime:1.4.4:
+    resolution:
+      type: variations
+      variants:
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-wkDX8My5DCY6hJ/NsJt+5iYw2SE0jtaq/ahrnVd7xRA=
+            prefix: bun-darwin-aarch64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-aarch64.zip
+          targets:
+            - cpu: arm64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-UKNJH3Orwv6BZzFxqFdi07wswWgMzsrdmD3pmt93l34=
+            prefix: bun-darwin-x64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-x64.zip
+          targets:
+            - cpu: x64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-sfPJXYLB+sOMzDytPaGoDjApjr/ZmSGNak/AWzQyUzc=
+            prefix: bun-freebsd-aarch64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-freebsd-aarch64.zip
+          targets:
+            - cpu: arm64
+              os: freebsd
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-mPdnLV0GBBYUFPiwW6Aa+cF89av803Ric3BGv3aDmuk=
+            prefix: bun-freebsd-x64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-freebsd-x64.zip
+          targets:
+            - cpu: x64
+              os: freebsd
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-V/AbAqxxE8Yck18o84wuq4SePJcNqyH4tkCoex72UAk=
+            prefix: bun-linux-aarch64-musl
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64-musl.zip
+          targets:
+            - cpu: arm64
+              os: linux
+              libc: musl
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-uqa7NvUdblhWHgK76oJQOKnfRU9nPW13bou/hvjHhQ4=
+            prefix: bun-linux-aarch64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip
+          targets:
+            - cpu: arm64
+              os: linux
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-pajMxedNy4g/6XTxJae9s7QeUZXtG4cOc/F+/9PrKy0=
+            prefix: bun-linux-x64-musl
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-musl.zip
+          targets:
+            - cpu: x64
+              os: linux
+              libc: musl
+        - resolution:
+            archive: zip
+            bin: bun
+            integrity: sha256-v4zL+ysLgBWeD5ptFcVTF63YB3U028YTCj7bUvzLOVw=
+            prefix: bun-linux-x64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64.zip
+          targets:
+            - cpu: x64
+              os: linux
+        - resolution:
+            archive: zip
+            bin: bun.exe
+            integrity: sha256-LVeg7sDLRNlckYw/lzT2BFWhMGrlCF12/Gj0Tj7jDQk=
+            prefix: bun-windows-aarch64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-windows-aarch64.zip
+          targets:
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin: bun.exe
+            integrity: sha256-zSwPzMePPt4fUMqCehXwY+2hPU0VCj0GdPT24yPYZKU=
+            prefix: bun-windows-x64
+            type: binary
+            url: https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-windows-x64.zip
+          targets:
+            - cpu: x64
+              os: win32
+    version: 1.4.4
+    hasBin: true
+
   chai@6.3.0:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
     engines: {node: '>=18'}
@@ -984,6 +1099,69 @@ packages:
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
+
+  deno@runtime:2.9.6:
+    resolution:
+      type: variations
+      variants:
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-ITovME8E08nLUiBmmvrROPYKWqsf6Aliq96481gHpHI=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-aarch64-apple-darwin.zip
+          targets:
+            - cpu: arm64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: deno.exe
+            integrity: sha256-rLAUr+IpmEd2TiMrSZPhYuOUbN7sNmA+PxoLVIzR6lU=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-aarch64-pc-windows-msvc.zip
+          targets:
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-mkavxsOSx80v9xoxVYk1VFtGQI0Oh/eoaQjHEnIcBG4=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-aarch64-unknown-linux-gnu.zip
+          targets:
+            - cpu: arm64
+              os: linux
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-fUUkuCvMVX/gIKGltWlW7UK5kq5bKAJuitXRcylTP18=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-apple-darwin.zip
+          targets:
+            - cpu: x64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: deno.exe
+            integrity: sha256-FeUwCwujw2ladiHZAWCnRuyecQIozuY5r6nVgPbjzRE=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-pc-windows-msvc.zip
+          targets:
+            - cpu: x64
+              os: win32
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-OU8H9Nor6+bObx584PoWQpspsIw14/rD/iWXJnbf9LI=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-unknown-linux-gnu.zip
+          targets:
+            - cpu: x64
+              os: linux
+    version: 2.9.6
+    hasBin: true
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -1822,6 +2000,8 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
+  bun@runtime:1.4.4: {}
+
   chai@6.3.0: {}
 
   cldr-core@48.0.0: {}
@@ -1831,6 +2011,8 @@ snapshots:
   cookie@1.1.1: {}
 
   deepmerge@4.3.1: {}
+
+  deno@runtime:2.9.6: {}
 
   detect-libc@2.1.2: {}
 
