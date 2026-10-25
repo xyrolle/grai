@@ -22,9 +22,9 @@ Done when: under `"live"`, a page re-renders in the locale it switches to, and a
 
 ## `setLocale(locale, { reload: false })` as its type says
 
-`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. The runtime still sets `<html lang>` and `dir` under both, renders the messages called next in the new locale, and returns nothing.
+`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. Under `"live"` the runtime still only keeps the choice too, and returns nothing.
 
-Done when: under `"reload"`, `{ reload: false }` keeps the choice and leaves the page's messages as they are; under `"live"`, it returns that promise (the entry above); and a browser test shows each.
+Done when: under `"live"`, it returns that promise (the entry above), with a browser test.
 
 ## A dispatcher per key for a message with inputs
 
