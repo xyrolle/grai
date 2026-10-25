@@ -188,7 +188,7 @@ describe("grai export", () => {
 				},
 			},
 		];
-		const { config } = project({ en: { place }, sv: { place: "{n}" } });
+		const { config } = project({ en: { place }, sv: { place } });
 
 		const xliff = await exported(config, "sv");
 
@@ -297,7 +297,7 @@ describe("grai merge", () => {
 		).toEqual([
 			'ru.xlf: "cart_title" (ru): unit cart_title: the unit\'s source is not the base text any more: Your basket & <more>. Export again.',
 			'ru.xlf: "cart_total" (ru): unit cart_total: the translation places a code its message does not have. Use only the source\'s codes.',
-			'ru.xlf: "cart_terms" (ru): the translation reads no input, where the base reads {name}.',
+			'ru.xlf: "cart_terms" (ru): the translation shows no input, where the base shows {name}.',
 			'ru.xlf: "cart_items" (ru): the message needs a translation of every form, and lacks cart_items.count.0.countPlural.-2a-, cart_items.count.-2a-.countPlural.few, cart_items.count.-2a-.countPlural.many, cart_items.count.-2a-.countPlural.other.',
 		]);
 	});
@@ -543,5 +543,154 @@ describe("a translation whose declarations differ from the base's", () => {
 		expect(m.price?.({ amount: 1234.5 }, { locale: "de" })).toBe(
 			"Preis: 1.234,5",
 		);
+	});
+});
+
+describe("a translation whose selectors differ from the base's", () => {
+	/** The locale's JSON units, as export writes them. */
+	async function units(config: string, locale: string) {
+		const result = await exportLocale(config, locale, {
+			json: true,
+			untranslated: false,
+		});
+		return "document" in result ? JSON.parse(result.document).units : [];
+	}
+
+	/** Merges the locale's units with the given targets, by unit id. */
+	async function merge(
+		dir: string,
+		config: string,
+		locale: string,
+		targets: Record<string, string>,
+	) {
+		const given = (await units(config, locale))
+			.filter((unit: { id: string }) => targets[unit.id] !== undefined)
+			.map((unit: { id: string }) => ({ ...unit, target: targets[unit.id] }));
+		const file = join(dir, `${locale}.json`);
+		writeFileSync(
+			file,
+			JSON.stringify({ srcLang: "en", trgLang: locale, units: given }),
+		);
+		return mergeDocument(config, file);
+	}
+
+	const invited = [
+		{
+			declarations: ["input name", "input gender"],
+			selectors: ["gender"],
+			match: {
+				"gender=female": "Vous êtes invitée, {name}",
+				"gender=*": "Vous êtes invité, {name}",
+			},
+		},
+	];
+
+	it("exports a unit per form of the locale's own selection, each from the base text", async () => {
+		const { config } = project({
+			en: { invited: "You're invited, {name}" },
+			fr: { invited },
+		});
+
+		expect(
+			(await units(config, "fr")).map(
+				({ id, source, target }: Record<string, string>) => [
+					id,
+					source,
+					target,
+				],
+			),
+		).toEqual([
+			[
+				"invited.gender.female",
+				"You're invited, {name}",
+				"Vous êtes invitée, {name}",
+			],
+			[
+				"invited.gender.-2a-",
+				"You're invited, {name}",
+				"Vous êtes invité, {name}",
+			],
+		]);
+	});
+
+	it("merges a form into the locale's own selection, keeping its others", async () => {
+		const { dir, config, load } = project({
+			en: { invited: "You're invited, {name}" },
+			fr: { invited },
+		});
+
+		const merged = await merge(dir, config, "fr", {
+			"invited.gender.female": "Bienvenue, {name}, vous êtes invitée",
+		});
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(
+			["female", "male"].map((gender) =>
+				m.invited?.({ name: "Ana", gender }, { locale: "fr" }),
+			),
+		).toEqual(["Bienvenue, Ana, vous êtes invitée", "Vous êtes invité, Ana"]);
+	});
+
+	it("keeps a form the locale writes for a value the base has no form of", async () => {
+		const files = (match: Record<string, string>) => [
+			{
+				declarations: ["input count", "local countPlural = count: plural"],
+				selectors: ["count", "countPlural"],
+				match,
+			},
+		];
+		const { dir, config, load } = project({
+			en: {
+				files: files({
+					"count=0,countPlural=*": "No files",
+					"count=*,countPlural=one": "{count} file",
+					"count=*,countPlural=*": "{count} files",
+				}),
+			},
+			de: {
+				files: files({
+					"count=0,countPlural=*": "Keine Dateien",
+					"count=1,countPlural=*": "Eine Datei",
+					"count=*,countPlural=*": "{count} Dateien",
+				}),
+			},
+		});
+
+		const merged = await merge(dir, config, "de", {
+			"files.count.0.countPlural.-2a-": "Gar keine Dateien",
+		});
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(
+			[0, 1, 2].map((count) => m.files?.({ count }, { locale: "de" })),
+		).toEqual(["Gar keine Dateien", "Eine Datei", "2 Dateien"]);
+	});
+
+	it("exports a locale's message without the base's selection as one unit, from the base text for any count", async () => {
+		const files = [
+			{
+				declarations: ["input count", "local countPlural = count: plural"],
+				selectors: ["countPlural"],
+				match: {
+					"countPlural=one": "One file",
+					"countPlural=*": "{count} files",
+				},
+			},
+		];
+		const { config } = project({
+			en: { files },
+			ja: { files: "{count} ファイル" },
+		});
+
+		expect(await units(config, "ja")).toEqual([
+			{
+				id: "files",
+				key: "files",
+				source: "{count} files",
+				target: "{count} ファイル",
+			},
+		]);
 	});
 });

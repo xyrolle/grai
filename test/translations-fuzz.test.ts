@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Catalog, parseCatalog } from "../src/catalog.ts";
 import { type Piece, piecesPattern } from "../src/pattern-pieces.ts";
 import type { ReturnedUnit } from "../src/returned-units.ts";
+import { isSeed } from "../src/seed.ts";
 import { readUnitsJson, writeUnitsJson } from "../src/translation-json.ts";
 import { mergeUnits } from "../src/translation-merge.ts";
 import { exportUnits, type Unit } from "../src/translation-units.ts";
@@ -110,6 +111,22 @@ function project(seed: number): { base: Catalog; target: Catalog } {
 			german[key] = piecesPattern(translation(source, next));
 			continue;
 		}
+		if (shape < 0.65) {
+			// German agrees with a gender English does not tell apart.
+			const source = pieces(next);
+			english[key] = piecesPattern(source);
+			german[key] = [
+				{
+					declarations: ["input g"],
+					selectors: ["g"],
+					match: {
+						"g=f": piecesPattern(translation(source, next)),
+						"g=*": piecesPattern(translation(source, next)),
+					},
+				},
+			];
+			continue;
+		}
 		if (shape < 0.7) {
 			const source = pieces(next);
 			const declared = (pattern: readonly Piece[]) => [
@@ -167,7 +184,15 @@ describe("translation files, fuzzed", () => {
 			const units = exportUnits(base, target, "de", new Set());
 			const xliff = readXliff(writeXliff("en", "de", units)).units;
 			const json = readUnitsJson(writeUnitsJson("en", "de", units)).units;
+			const translated = units.filter(
+				({ key }) =>
+					!isSeed(target.messages.get(key), base.messages.get(key), "de"),
+			);
 
+			expect(
+				translated.filter((unit) => unit.target === undefined),
+				`seed ${seed}`,
+			).toEqual([]);
 			expect(targets(roundTrip(base, target, xliff)), `seed ${seed}`).toEqual(
 				targets(units),
 			);
