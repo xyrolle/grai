@@ -17,6 +17,7 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
+import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { type Messages, project } from "./project.ts";
 
@@ -232,6 +233,27 @@ describe("grai/vite's module kinds", () => {
 
 describe("the Vite plugin's locale copies", () => {
 	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
+
+	it("copies a chunk byte for byte, each call keeping only its locale's variants, at their position", () => {
+		const chunk = (calls: string) =>
+			`import { markup, message, text } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
+		const copies = localeCopies(
+			"chunk.js",
+			chunk(`var title = /*#__PURE__*/ text("Title", "Titel");
+var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`, (i) => \`Hallo \${i.name}\`);
+var terms = /*#__PURE__*/ markup([(i) => "Terms", (i) => "AGB"], [(i) => [], (i) => [{ type: "text", value: "AGB" }]]);`),
+			["en", "de"],
+		);
+
+		expect(Object.fromEntries(copies)).toEqual({
+			en: chunk(`var title = /*#__PURE__*/ text("Title");
+var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`);
+var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
+			de: chunk(`var title = /*#__PURE__*/ text(void 0, "Titel");
+var greeting = /*#__PURE__*/ message(void 0, (i) => \`Hallo \${i.name}\`);
+var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type: "text", value: "AGB" }]]);`),
+		});
+	});
 
 	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
 		const { dir } = project(catalogs);
