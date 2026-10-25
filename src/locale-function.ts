@@ -1,9 +1,15 @@
+import type { Format } from "./format-options.ts";
 import { type Formatter, formatterOf } from "./formatters.ts";
 import { localeReads } from "./locale-reads.ts";
 import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
-import { type Part, plainText } from "./pattern.ts";
+import {
+	formatsLiteral,
+	type LiteralPart,
+	type Part,
+	plainText,
+} from "./pattern.ts";
 import { catchAll } from "./selection.ts";
 
 type Mode = "string" | "parts";
@@ -63,17 +69,26 @@ export function localeFunction(
 ): LocaleFunction {
 	const { variants, closed } = message;
 	const { value, condition, prologue } = localeReads(message, used);
-	/** A placeholder's code: its value, through its formatter if it has one, with the option an input gives. */
-	const placeholder = (part: VariablePart) => {
-		const local = message.formatted.get(part.name);
-		const format = part.format ?? local?.format;
-		const operand = value(local?.input ?? part.name);
-		if (format === undefined) return operand;
+	/** An operand's code through a format's formatter, with the option an input gives it. */
+	const formatted = (format: Format, operand: string) => {
 		const formatter = formatterOf(message.locale, format);
 		used.formats.set(formatter.name, formatter);
 		const given =
 			format.input === undefined ? "" : `, ${value(format.input.name)}`;
 		return `${formatter.name}(${operand}${given})`;
+	};
+	/** A placeholder's or a literal's code: its value, through its formatter if it has one. */
+	const placeholder = (part: VariablePart | LiteralPart) => {
+		if (part.type === "literal") {
+			const literal = JSON.stringify(part.value);
+			return part.format === undefined
+				? literal
+				: formatted(part.format, literal);
+		}
+		const local = message.formatted.get(part.name);
+		const format = part.format ?? local?.format;
+		const operand = value(local?.input ?? part.name);
+		return format === undefined ? operand : formatted(format, operand);
 	};
 	const branches = variants.map((variant) => ({
 		condition: condition(variant.keys),
@@ -108,8 +123,8 @@ function unmatchedCode(
 
 type VariablePart = Extract<Part, { type: "variable" }>;
 
-/** The code of a placeholder, given its part. */
-type Placeholder = (part: VariablePart) => string;
+/** The code of a placeholder or a literal, given its part. */
+type Placeholder = (part: VariablePart | LiteralPart) => string;
 
 function patternCode(
 	pattern: readonly Part[],
@@ -119,13 +134,20 @@ function patternCode(
 	if (mode === "parts") {
 		return `[${pattern.map((part) => partCode(part, placeholder)).join(", ")}]`;
 	}
-	if (!pattern.some((part) => part.type === "variable")) {
+	if (
+		!pattern.some((part) => part.type === "variable") &&
+		!formatsLiteral(pattern)
+	) {
 		return JSON.stringify(plainText(pattern));
 	}
 	let template = "";
 	for (const part of pattern) {
 		if (part.type === "text") template += templateText(part.value);
-		else if (part.type === "variable") template += `\${${placeholder(part)}}`;
+		else if (part.type === "literal" && part.format === undefined) {
+			template += templateText(part.value);
+		} else if (part.type === "variable" || part.type === "literal") {
+			template += `\${${placeholder(part)}}`;
+		}
 	}
 	return `\`${template}\``;
 }
@@ -136,6 +158,8 @@ function partCode(part: Part, placeholder: Placeholder): string {
 			return `{ type: "text", value: ${JSON.stringify(part.value)} }`;
 		case "variable":
 			return `{ type: "text", value: \`\${${placeholder(part)}}\` }`;
+		case "literal":
+			return `{ type: "text", value: ${placeholder(part)} }`;
 		default:
 			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${JSON.stringify(Object.fromEntries(part.attributes))} }`;
 	}

@@ -8,6 +8,7 @@ import type { IntlOptions, SelectedNumber } from "./format-functions.ts";
 import type { SelectMode } from "./format-options.ts";
 import { shownDigits } from "./intl-formatters.ts";
 import type { FormattedLocal } from "./message-declarations.ts";
+import { isNumberLiteral } from "./pattern.ts";
 import { categoriesOf, type PluralType } from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
@@ -103,16 +104,13 @@ function digitOptions(options: IntlOptions): IntlOptions {
 	return { ...Object.fromEntries(kept), useGrouping: false };
 }
 
-/** MessageFormat 2's number-literal, such as `0`, `-2`, `1.5` or `1e+21`. */
-const numberLiteral = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][-+]?\d+)?$/;
-
 /**
  * Whether a key is a number, which matches a value equal to it. MessageFormat 2 compares the key
  * with the value written as a number literal, and JavaScript writes a number one way, so `1.0`
  * or `01` can never match.
  */
 export function isExactKey(key: string): boolean {
-	return numberLiteral.test(key);
+	return isNumberLiteral(key);
 }
 
 /** The value an exact key stands for: its number, or for `:percent` the hundredth it shows. */

@@ -1,6 +1,7 @@
 import type { Config } from "./config.ts";
 import { inputTypes } from "./input-types.ts";
 import type { LocaleMessage } from "./message.ts";
+import { isMarkup } from "./pattern.ts";
 
 /**
  * A key's declaration in keys.d.ts, written as text: its type and the base locale's words. Throws
@@ -25,8 +26,7 @@ function tagsType(messages: readonly LocaleMessage[]): string {
 	for (const { variants } of messages) {
 		for (const { pattern } of variants) {
 			for (const part of pattern) {
-				if (part.type !== "text" && part.type !== "variable")
-					names.add(part.name);
+				if (isMarkup(part)) names.add(part.name);
 			}
 		}
 	}

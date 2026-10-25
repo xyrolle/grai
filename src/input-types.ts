@@ -150,18 +150,24 @@ function usesOf(name: string, message: LocaleMessage): Use[] {
 	return uses;
 }
 
-/** Each value a message formats, with its input and its format: in a placeholder, or through a local. */
-function formatsOf(
-	message: LocaleMessage,
-): { input: string; format: Format }[] {
+type Formatted = { input: string | undefined; format: Format };
+
+/**
+ * Each value a message formats, with its input and its format: in a placeholder, through a local,
+ * or a literal's, which has no input but may take an option from one.
+ */
+function formatsOf(message: LocaleMessage): Formatted[] {
 	return [
 		...message.formatted.values(),
 		...message.variants.flatMap(({ pattern }) =>
-			pattern.flatMap((part) =>
-				part.type === "variable" && part.format
-					? [{ input: part.name, format: part.format }]
-					: [],
-			),
+			pattern.flatMap((part): Formatted[] => {
+				if (part.type === "variable" && part.format) {
+					return [{ input: part.name, format: part.format }];
+				}
+				return part.type === "literal" && part.format
+					? [{ input: undefined, format: part.format }]
+					: [];
+			}),
 		),
 	];
 }
