@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { pseudoPattern } from "../src/pseudo-text.ts";
-import { errorsOf, project } from "./project.ts";
+import { errorsOf, outputFile, project } from "./project.ts";
 
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}" },
@@ -82,9 +82,12 @@ describe("a pseudo-locale", () => {
 		const { build } = await recompile(config, undefined);
 
 		expect(build?.config.locales).toEqual(["en", "de"]);
-		expect(readFileSync(join(dir, "out", "config.js"), "utf8")).not.toContain(
-			"en-XA",
+		const configModule = readFileSync(
+			await outputFile(dir, "config.js"),
+			"utf8",
 		);
+		expect(configModule).toContain('"de"');
+		expect(configModule).not.toContain("en-XA");
 	});
 
 	it("must be a locale of its own, with the base's plural categories", async () => {
