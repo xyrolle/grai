@@ -72,16 +72,16 @@ class IcuConverter {
 		this.locals = new IcuLocals(locale, new Set(namesIn(nodes)));
 	}
 
-	/** Every way the nodes read, each with what it needs of the selectors; `#` shows `count`. */
-	expand(nodes: readonly IcuNode[], count: string | undefined): Reading[] {
+	/** Every way the nodes read, each with what it needs of the selectors; `#` shows `pound`. */
+	expand(nodes: readonly IcuNode[], pound: string | undefined): Reading[] {
 		let readings = [plainReading("")];
 		for (const node of nodes) {
-			readings = followed(readings, this.node(node, count));
+			readings = followed(readings, this.node(node, pound));
 		}
 		return readings;
 	}
 
-	private node(node: IcuNode, count: string | undefined): Reading[] {
+	private node(node: IcuNode, pound: string | undefined): Reading[] {
 		switch (node.type) {
 			case "text":
 				return [plainReading(escapeText(node.value))];
@@ -94,41 +94,51 @@ class IcuConverter {
 					),
 				];
 			case "pound":
-				return [plainReading(count === undefined ? "#" : `{${count} :number}`)];
+				return [plainReading(pound ?? "#")];
 			case "tag":
 				return followed(
 					followed(
 						[plainReading(`{#${node.name}}`)],
-						this.expand(node.children, count),
+						this.expand(node.children, pound),
 					),
 					[plainReading(`{/${node.name}}`)],
 				);
 			case "choice":
 				return node.kind === "select"
-					? this.select(node, count)
+					? this.select(node, pound)
 					: this.plural(node, pluralTypes[node.kind]);
 		}
 	}
 
 	private select(
 		node: { name: string; options: IcuOption[] },
-		count: string | undefined,
+		pound: string | undefined,
 	): Reading[] {
 		this.claim(node.name);
 		for (const { key } of node.options) checkVariantKey(node.name, key);
 		const keys = node.options.map(({ key }) => key);
 		return node.options.flatMap(({ key, nodes }) =>
-			this.expand(nodes, count).flatMap((reading) =>
+			this.expand(nodes, pound).flatMap((reading) =>
 				needing(reading, selectNeeds(node.name, key, keys)),
 			),
 		);
 	}
 
 	private plural(
-		node: { name: string; options: IcuOption[] },
+		node: { name: string; offset: number; options: IcuOption[] },
 		type: PluralType,
 	): Reading[] {
-		const local = this.locals.plural(node.name, type);
+		if (node.offset !== 0 && type === "ordinal") {
+			throw new MessageProblem(
+				"unsupported",
+				`{${node.name}, selectordinal, offset:${node.offset}} subtracts an offset from an ordinal's count, which grai does not support. Pass the count less the offset, and leave it out.`,
+			);
+		}
+		const local =
+			node.offset === 0
+				? this.locals.plural(node.name, type)
+				: this.locals.offset(node.name, node.offset);
+		const pound = node.offset === 0 ? `{${node.name} :number}` : `{${local}}`;
 		this.claim(local);
 		if (node.options.some((option) => option.key.startsWith("="))) {
 			this.claim(node.name, local);
@@ -145,7 +155,7 @@ class IcuConverter {
 		const keys = chosen.map(({ key }) => key);
 		return chosen.flatMap(({ key, nodes }) => {
 			const needs = pluralNeeds(node.name, local, key, keys);
-			return this.expand(nodes, node.name).flatMap((reading) =>
+			return this.expand(nodes, pound).flatMap((reading) =>
 				needing(reading, needs),
 			);
 		});

@@ -1,9 +1,9 @@
 import { categoriesOf, type PluralType } from "../plurals.ts";
-import { pluralLocal } from "./converted.ts";
+import { pluralLocal, untaken } from "./converted.ts";
 
 /**
  * The locals an ICU message's choices count with, each declared the first time a choice needs it,
- * under a name the message's inputs do not take.
+ * under a name the message's inputs and other locals do not take.
  */
 export class IcuLocals {
 	readonly declarations: string[] = [];
@@ -21,14 +21,45 @@ export class IcuLocals {
 
 	/** The local that holds an input's category of a type. */
 	plural(input: string, type: PluralType): string {
-		const id = `${type} ${input}`;
+		return (
+			this.names.get(`${type} ${input}`) ??
+			this.declareLocal(
+				`${type} ${input}`,
+				pluralLocal(input, type, this.taken()),
+				type,
+			)
+		);
+	}
+
+	/**
+	 * The local that holds an input less an ICU plural's offset, which its categories and `#` read:
+	 * MessageFormat 2's `:offset`, such as `local countOffset = count: offset subtract=1`. A
+	 * negative offset adds.
+	 */
+	offset(input: string, offset: number): string {
+		const id = `offset ${offset} ${input}`;
 		const known = this.names.get(id);
 		if (known !== undefined) return known;
-		const local = pluralLocal(input, type, this.inputs);
+		const name = untaken(`${input}Offset`, this.taken());
+		const option = offset > 0 ? `subtract=${offset}` : `add=${-offset}`;
+		const declaration = `local ${name} = ${input}: offset ${option}`;
+		return this.declareLocal(id, { name, declaration }, "cardinal");
+	}
+
+	/** Declares a local, which chooses by the rules of a type. */
+	private declareLocal(
+		id: string,
+		local: { name: string; declaration: string },
+		type: PluralType,
+	): string {
 		this.names.set(id, local.name);
 		this.types.set(local.name, type);
 		this.declarations.push(local.declaration);
 		return local.name;
+	}
+
+	private taken(): ReadonlySet<string> {
+		return new Set([...this.inputs, ...this.types.keys()]);
 	}
 
 	/** The categories a selector takes when it is a local, which are all it can take. */
