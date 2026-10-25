@@ -45,6 +45,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   runtime.js    runtime.d.ts     the runtime's API, the same for every project
   dispatch.js   dispatch.d.ts    the runtime's code, which the output's modules import; apps never do
   server.js     server.d.ts      the request middleware; client code never imports it
+  testing.js    testing.d.ts     the locale a test renders in; a build refuses it
   keys.js       keys.d.ts        every message, as the re-exports of its shards
   keys/<n>.js   keys/<n>.d.ts    a shard: about 512 keys
   keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
@@ -250,6 +251,8 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
 
 **`runtime.js` exports only that API.** It re-exports it from `dispatch.js`, the runtime's code, which also holds what the output's own modules call: the dispatcher the shards call and the request binding `server.js` sets. An editor then offers an app nothing it should not call. A bundle drops a re-export, so a page holds the same code as when one module held it all. Splitting the code itself in two would put a call between the API and the bound locale, which a bundle keeps.
+
+**A test binds its locale with `testing.js`'s `useLocale`, which the output carries.** It binds the bound locale that `dispatch.js` holds, which no module of the package can reach, and it takes the project's `Locale`. A component test can then render in any locale, since a test holds every locale's messages. A page keeps its rule, one locale at a time, so a test still fails where a production page would. `grai/vite` refuses the module in a build, so it never ships.
 
 ## Servers
 
