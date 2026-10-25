@@ -381,4 +381,5 @@ Next runs the proxy apart from the render, renders a request's layouts and pages
   - `grai/next`, `grai/next/config` and `grai/next/proxy`: the Next adapter, also thin, which finds the project's generated modules through `withGrai`;
   - `grai/react`: the `Markup` component;
   - the `grai` binary: the CLI.
+- **Node 22.18 or later.** The compiler needs 22.12, Vite 8's floor, but the floor is the oldest Node the tests run on, and they start Node on the TypeScript sources, which 22.x runs without a flag from 22.18. CI runs them there, on the LTS and on the current release, on Linux, macOS and Windows.
 - **No dependencies.** The generated output needs only the platform, and `AsyncLocalStorage` on the server. Each locale's text direction is worked out when grai compiles, so the runtime looks it up by index. The compiler needs only Node. Vite, Svelte, magic-string, Next and React are optional peer dependencies of the adapters that use them, as SvelteKit will be of its own.
