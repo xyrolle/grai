@@ -10,7 +10,8 @@ import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
  *
  *     plugins: [grai(), sveltekit()]
  *
- * The server build, dev and `"switch": "live"` keep every call as it is.
+ * The server build reads the same calls as a property, in the request's locale, so that Svelte
+ * compiles the same blocks on both sides. Dev and `"switch": "live"` keep every call as it is.
  */
 export function grai(options: GraiOptions = {}): Plugin[] {
 	const core = graiPlugin(options);

@@ -42,13 +42,22 @@ export function keyModule(
 }
 
 /**
- * A text key's string module in a client build: its text in the page's locale, chosen once. Its
- * variants are the key's, so each locale's copy of its chunk keeps only that locale's words.
+ * A text key's string module. In a client build, its text in the page's locale, chosen once; its
+ * variants are the key's, so each locale's copy of its chunk keeps only that locale's words. On a
+ * server, an object whose `text` calls the key, in the request's locale, each time it is read.
  */
-export function textModule(build: Build, id: string): string | undefined {
+export function textModule(
+	build: Build,
+	id: string,
+	consumer: "client" | "server",
+): string | undefined {
 	const name = id.slice(textModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key?.kind !== "text") return undefined;
+	if (consumer === "server") {
+		const message = `grai_${name}`;
+		return `import { ${name} as ${message} } from "${keyPrefix}${name}";\nexport const ${name} = { get text() { return ${message}(); } };\n`;
+	}
 	return `${outputImports(outputModule, build.rendered.modules, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
 }
 
