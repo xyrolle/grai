@@ -142,17 +142,21 @@ export function graiPlugin(options: GraiOptions): GraiPlugin {
 		async buildEnd() {
 			await closeMessages();
 		},
-		async resolveId(id) {
-			if (
-				id.startsWith(keyPrefix) ||
-				id.startsWith(textPrefix) ||
-				id.startsWith(patchPrefix)
-			)
-				return `\0${id}`;
-			// Until the first compile has written the output, an import of it waits rather than fails:
-			// a page that failed to import it would be reloaded once the file appears.
-			if (serving) await first;
-			return null;
+		resolveId: {
+			// Ahead of Vite's resolver, which keeps a lookup that found nothing until its watcher reports
+			// the file: in dev every import waits for the first compile, so none, whatever names the
+			// output, looks for it before it exists. A page whose import failed would stay broken.
+			order: "pre",
+			async handler(id) {
+				if (
+					id.startsWith(keyPrefix) ||
+					id.startsWith(textPrefix) ||
+					id.startsWith(patchPrefix)
+				)
+					return `\0${id}`;
+				if (serving) await first;
+				return null;
+			},
 		},
 		async load(id) {
 			const patch = patchOf(id);
