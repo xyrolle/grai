@@ -284,6 +284,117 @@ export function Prefixed() {
 	});
 });
 
+const icuCatalogs = {
+	"en.json": {
+		Home: {
+			title: "Welcome",
+			greeting: "Hello, {name}",
+			items: "{count, plural, one {# item} other {# items}}",
+		},
+		About: { title: "About us", intro: "Read <b>this</b>" },
+	},
+	"de.json": {
+		Home: {
+			title: "Willkommen",
+			greeting: "Hallo, {name}",
+			items: "{count, plural, one {# Artikel} other {# Artikel}}",
+		},
+		About: { title: "Über uns", intro: "Lies <b>das</b>" },
+	},
+};
+
+describe("grai migrate, from next-intl", () => {
+	it("rewrites the t of useTranslations and getTranslations under their namespace, with getTranslations' locale", async () => {
+		const project = migrated("icu", icuCatalogs, {
+			"src/home.tsx": `import { useTranslations } from "next-intl";
+
+export function Home({ name, count }: { name: string; count: number }) {
+	const t = useTranslations("Home");
+	return (
+		<main>
+			<h1>{t("title")}</h1>
+			<p>{t("greeting", { name })}</p>
+			<p>{t("items", { count })}</p>
+		</main>
+	);
+}
+`,
+			"src/about.ts": `import { getTranslations } from "next-intl/server";
+
+export async function aboutTitle(locale: string) {
+	const t = await getTranslations({ locale, namespace: "About" });
+	return t("title");
+}
+
+export async function homeTitle() {
+	const t = await getTranslations();
+	return t("Home.title");
+}
+`,
+		});
+		const about = await project.load("src/about.ts");
+
+		expect(project.left()).toEqual([]);
+		expect(
+			project.text("src/home.tsx"),
+		).toBe(`import { m } from "../out/messages.js";
+
+export function Home({ name, count }: { name: string; count: number }) {
+	return (
+		<main>
+			<h1>{m.Home_title()}</h1>
+			<p>{m.Home_greeting({ name })}</p>
+			<p>{m.Home_items({ count })}</p>
+		</main>
+	);
+}
+`);
+		expect(
+			project.text("src/about.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+
+export async function aboutTitle(locale: string) {
+	return m.About_title({}, { locale });
+}
+
+export async function homeTitle() {
+	return m.Home_title();
+}
+`);
+		expect(
+			await Promise.all([about.aboutTitle?.("de"), about.homeTitle?.()]),
+		).toEqual(["Über uns", "Welcome"]);
+	});
+
+	it("reports t.rich, t.raw, a message with markup and a namespace that is an expression", () => {
+		const project = migrated("icu", icuCatalogs, {
+			"src/about.tsx": `import { useTranslations } from "next-intl";
+
+export function About({ section }: { section: string }) {
+	const t = useTranslations("About");
+	const s = useTranslations(section);
+	return (
+		<>
+			{t.rich("intro", { b: (chunks) => <b>{chunks}</b> })}
+			{t("intro")}
+			{t.raw("title")}
+			{s("title")}
+		</>
+	);
+}
+`,
+		});
+
+		expect(project.left()).toEqual([
+			"src/about.tsx:8:5: t.rich renders markup: render the message's .parts() instead.",
+			"src/about.tsx:9:5: the message has markup: render its .parts() instead.",
+			"src/about.tsx:10:5: t.raw is next-intl's own: grai's messages are functions, never raw text.",
+			"src/about.tsx:11:5: its namespace is an expression: call the message by name, as m.<key>().",
+		]);
+		expect(project.result.changed).toEqual([]);
+	});
+});
+
 describe("grai migrate", () => {
 	it("reports a component it does not parse and a module whose m is another name, and changes neither", () => {
 		const project = migrated("i18next", i18nextCatalogs, {

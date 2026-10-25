@@ -11,6 +11,7 @@ import {
 	type Migration,
 	migrateModule,
 } from "./migrate/module.ts";
+import { nextIntlModules } from "./migrate/next-intl.ts";
 import { positionOf, type SourceFile, sourceFiles } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
@@ -19,7 +20,7 @@ const librariesOf: Readonly<
 	Record<ImportFormat, Readonly<Record<string, LibraryModule>>>
 > = {
 	i18next: i18nextModules,
-	icu: {},
+	icu: nextIntlModules,
 };
 
 /** Components grai migrate reports but does not parse: their markup calls messages too. */
