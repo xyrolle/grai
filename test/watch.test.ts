@@ -1,4 +1,4 @@
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
@@ -88,6 +88,25 @@ it("reads a catalog that a save truncates and then writes once the save has sett
 
 	await expect.poll(() => reported.length).toBe(2);
 	expect(reported[1]).toMatchObject({ errors: [], written: ["keys/0.js"] });
+});
+
+it("compiles a save that leaves the catalog whole on its first event, without waiting for the files to be quiet", async () => {
+	const { dir, config } = project(catalogs);
+	const reported = watched(config);
+	await expect.poll(() => reported.length).toBe(1);
+	const catalog = join(dir, "messages", "de.json");
+
+	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
+	// Events keep coming for a second, as a slow save's do: waiting for quiet would wait it out.
+	const touched = setInterval(
+		() => utimesSync(catalog, new Date(), new Date()),
+		5,
+	);
+	onTestFinished(() => clearInterval(touched));
+
+	await expect
+		.poll(() => reported[1]?.written, { timeout: 500 })
+		.toEqual(["keys/0.js"]);
 });
 
 it("reports a broken catalog after its save, without waiting for another", async () => {

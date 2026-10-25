@@ -5,12 +5,12 @@ import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 
 /**
- * How long the followed files must be quiet before a compile reads them. A save that truncates a
- * file and then writes it can come as several events, and a read between them sees part of the
- * file. Saving a 689 KB catalog from another process on macOS, by `writeFile` or in 16 KB
- * writes, gave events at most 5.4 ms apart, and writing went on for at most 2.5 ms after the
- * last one: 20 ms covers both with room, and a broken catalog is still reported 20 ms after its
- * save.
+ * How long the followed files must be quiet before a catalog that did not parse is read again. A
+ * save that truncates a file and then writes it can come as several events, and a read between
+ * them sees part of the file, which never parses: a part of a JSON object is not one. Saving a
+ * 689 KB catalog from another process on macOS, by `writeFile` or in 16 KB writes, gave events
+ * at most 5.4 ms apart, and writing went on for at most 2.5 ms after the last one: 20 ms covers
+ * both with room, and a broken catalog is still reported 20 ms after its save.
  */
 const settleMilliseconds = 20;
 
@@ -18,8 +18,10 @@ const settleMilliseconds = 20;
  * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
  * whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
- * changed. A change is read once the files have been quiet for `settleMilliseconds`, and changes
- * that come during a compile are taken together by the next one. Each result is reported with
+ * changed. A change is compiled on its first event. A compile that finds a catalog that does not
+ * parse, as a read in the middle of a save does, is not reported: the files are read again once
+ * they have been quiet for `settleMilliseconds`, and that compile's result stands. Changes that
+ * come during a compile are taken together by the next one. Each result is reported with
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
  * the outdir cannot be written, goes to `failed`, and the next change compiles again. It watches
  * until the process ends or `close` is called, whose promise settles once the compile under way,
@@ -39,7 +41,10 @@ export function watch(
 	let build: Build | undefined;
 	let running: Promise<void> | undefined;
 	let again = false;
+	/** The wait for the files to be quiet, after a catalog that did not parse. */
 	let settling: ReturnType<typeof setTimeout> | undefined;
+	/** Whether the next compile reads files that have been quiet, so its result stands. */
+	let settled = false;
 
 	/**
 	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
@@ -55,22 +60,38 @@ export function watch(
 		watchers = paths.flatMap((path) => watchedFile(path, changed) ?? []);
 	};
 
-	/** A file's event: the compile waits until the files have been quiet for `settleMilliseconds`. */
+	/** A file's event: a compile now, or, while the files are settling, a longer wait for them. */
 	const changed = () => {
+		if (settling === undefined) {
+			run();
+			return;
+		}
 		clearTimeout(settling);
-		settling = setTimeout(run, settleMilliseconds);
+		settling = setTimeout(settle, settleMilliseconds);
+	};
+	const settle = () => {
+		settling = undefined;
+		settled = true;
+		run();
 	};
 
 	/** Compiles until no change came during the last compile, or until closed. */
 	const compileChanges = async () => {
 		do {
 			again = false;
+			const quiet = settled;
+			settled = false;
 			const started = performance.now();
 			try {
 				follow();
 				const next = await recompile(configFile, build, {
 					pseudoLocale: true,
 				});
+				if (!quiet && unparsed(next.result)) {
+					again = false;
+					settling = setTimeout(settle, settleMilliseconds);
+					return;
+				}
 				build = next.build ?? build;
 				if (!closed)
 					report(next.result, performance.now() - started, next.build);
@@ -99,6 +120,11 @@ export function watch(
 			await running;
 		},
 	};
+}
+
+/** Whether a compile found a catalog that does not parse, as a read in the middle of a save does. */
+function unparsed(result: CompileResult): boolean {
+	return result.errors.some((error) => error.code === "catalog-invalid");
 }
 
 /**
