@@ -206,6 +206,17 @@ export function followedFile(
 	);
 }
 
+/** The key a per-key path names by its last segment, `…/<key>.js`, if the build has that key. */
+export function pathKey(build: Build, id: string): string | undefined {
+	const key = /([^/]+)\.js$/.exec(id)?.[1];
+	return key !== undefined && build.compilation.keys.has(key) ? key : undefined;
+}
+
+/** A key's own module in dev: the key, from keys.js, so an edit's patch still reaches it. */
+export function keyFromKeys(files: ProjectFiles, key: string): string {
+	return `export { ${key} } from ${JSON.stringify(files.keysFile)};\n`;
+}
+
 /** Has an environment take a module again, if it holds it. */
 async function reload(environment: DevEnvironment, id: string): Promise<void> {
 	const module = environment.moduleGraph.getModuleById(id);
