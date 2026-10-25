@@ -179,6 +179,31 @@ The server component's messages cost grai nothing beyond their HTML. The 6.7 KB 
 - **An edit** reaches the shard grai rewrites in 27–28 ms, 20 of them waiting for the save to settle (`watch.ts`). The rest is Next noticing the shard and refreshing the page, as it notices and refreshes next-intl's catalog.
 - **The page's first response** from an empty `.next` is slower on grai, here by 85 ms, and by 198 ms with `.next` kept: Turbopack compiles the output's 1.8 MB of message functions in each layer that imports them, where next-intl's catalog is JSON (`docs/followups.md`).
 
+## Astro
+
+One static Astro site, on grai, on Paraglide 2.29.1 in the setup its Astro guide gives for static sites, and with its words written in (`astro`, from `bench/astro-apps.mjs`). Each locale's page renders 400 messages in the page and 100 in a Svelte island, chosen evenly across the synthetic catalog, so it has the catalog's share of plurals and inputs; the page measured is `ru`'s. Astro 7.4.2, Chromium 156. The bench installs grai from the repository's build, so it runs after `pnpm build` at the root. One run, under a load of 10–18 from other work, so the times are rough.
+
+`astro build` from a clean checkout, the median of 3, then what the page downloads, brotli:
+
+| | build | document | scripts | total | more than the words written in |
+|---|---|---|---|---|---|
+| grai | 1,743 ms | 7.4 KB | 14.7 KB | 22.1 KB | 3.5 KB |
+| Paraglide | 5,968 ms | 7.3 KB | 18.1 KB | 25.4 KB | 6.8 KB |
+| words written in | 664 ms | 7.3 KB | 11.3 KB | 18.6 KB | |
+
+The page's 400 messages cost grai nothing beyond their HTML. The 3.5 KB is the runtime and the island's 100 messages in `ru` alone, from their locale's copies of the message chunks through the import map. Paraglide's island holds every locale's words, as its per-locale build needs to own Vite's `buildApp`, which Astro owns.
+
+`astro dev` from a clean checkout: until ready, then until the page's first response, then one message edited in its catalog until the open page shows it, the median of 7 edits, ms:
+
+| | ready | first response | edit, in the page | edit, in the island |
+|---|---|---|---|---|
+| grai | 523 | 1,133 | 84 | 84 |
+| Paraglide | 4,487 | 1,424 | not shown in 30 s | 3,797 |
+| words written in | 813 | 631 | | |
+
+- **grai** patches the dev server's messages and reloads the open page (`reloadOnEdit`), whose server render then has the edit.
+- **Paraglide's edit in the page is never shown to the open page:** it recompiles the catalogs, about 5 s after the save, and a fresh request then renders the edit, but nothing reloads the page, so its words stay as they were until a reload by hand. Its island takes the edit through Vite's update of the island's module.
+
 ## Runtime size
 
 The runtime the apps call (`getLocale`, `setLocale`, `locales`, `baseLocale`, `isLocale`, `localizeHref`, `deLocalizeUrl`), bundled for the browser (`runtime-size`): Paraglide's is 2,132 bytes min+gzip with a cookie strategy and 1,881 with a URL strategy, and a sketch with the locale fixed per bundle is 378.

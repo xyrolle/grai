@@ -212,6 +212,8 @@ A page whose locale comes from the request, through `cookie` or `preferredLangua
 
 Under `<ClientRouter />`, a link into another locale needs `data-astro-reload`, so the page loads in its locale (`docs/followups.md`).
 
+On a static site whose page renders 400 messages and a Svelte island 100, `astro build` takes 1.7 s against Paraglide's 6.0 s. The page downloads 22.1 KB against 25.4 KB, as its island loads only its own locale's words. In `astro dev`, an edited message the server renders shows in 84 ms. With Paraglide, the open page keeps its words until a reload by hand (`bench/astro.mjs`, `docs/runtime.md`).
+
 ### Workers, Bun, Deno and Node
 
 The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
