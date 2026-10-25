@@ -37,14 +37,16 @@ export async function inRequest(app, locale, work) {
 				`${library} resolved ${resolved} for ${path}, expected ${locale}`,
 			);
 	};
+	// Each middleware's handler answers with a Response, as a server's does; the work's own result
+	// is kept beside it.
 	let result;
 	await paraglideMiddleware(request, ({ locale: resolved }) => {
 		resolvedAs("Paraglide", resolved);
-		result = middleware(request, ({ locale: graiLocale }) => {
+		return middleware(request, ({ locale: graiLocale }) => {
 			resolvedAs("grai", graiLocale);
-			return withLocale(locale, () => withVariable(locale, work));
+			result = withLocale(locale, () => withVariable(locale, work));
+			return new Response("");
 		});
-		return new Response("");
 	});
 	return result;
 }
