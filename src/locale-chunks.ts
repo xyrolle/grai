@@ -18,10 +18,6 @@ export const textModulePrefix: string = `\0${textPrefix}`;
  */
 export const outputPrefix = "grai:output/";
 
-/** The directory a page's message chunks go to, and the one of each locale's copies. */
-export const messageDirectory = "grai";
-export const localeDirectory = (locale: string): string => `grai-${locale}`;
-
 /** Whether a module holds one key's message, as a function or as the page's string. */
 export function isMessageModule(id: string): boolean {
 	return id.startsWith(keyModulePrefix) || id.startsWith(textModulePrefix);

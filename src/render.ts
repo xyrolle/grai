@@ -69,12 +69,14 @@ export function renderOutput(
 	runtime: RuntimeSources,
 	compilation: Compilation,
 	base: BaseCatalog,
+	{ localeCopies }: { localeCopies: boolean },
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
 	const { modules, immutable, entries } = renderModules(
 		config,
 		runtime,
 		compilation,
+		localeCopies,
 	);
 	const count = shardCount(compilation.keys.size);
 	const before =

@@ -12,8 +12,8 @@ import {
 	onTestFinished,
 } from "vitest";
 
-// The SvelteKit example (examples/sveltekit), built as an app builds it, with grai/svelte's plugin,
-// served by adapter-node, and its pages in a real browser.
+// The SvelteKit example (examples/sveltekit), built as an app builds it, with grai/sveltekit/vite's
+// plugin, served by adapter-node, and its pages in a real browser.
 const example = fileURLToPath(
 	new URL("../examples/sveltekit/", import.meta.url),
 );
@@ -122,6 +122,78 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		await page.getByText("Desenat în browser").waitFor();
 		expect(await page.locator("h1").textContent()).toBe("Bună ziua");
 		expect(await page.getByRole("link").getAttribute("href")).toBe("/ro/about");
+		await page.context().close();
+	});
+
+	it("downloads only its locale's copies of the message chunks", async () => {
+		const page = await (await browser.newContext()).newPage();
+		const messages = messageChunks(page);
+		await page.goto(`${origin}/ro/`);
+		await page.getByText("Desenat în browser").waitFor();
+
+		expect(messages.length).toBeGreaterThan(0);
+		expect(notRomanian(messages)).toEqual([]);
+		// Each copy is smaller than the shared chunk it stands for, which holds every locale.
+		for (const path of messages) {
+			const shared = path.replace("/grai-ro/", "/grai/");
+			expect(await bytesOf(origin + path)).toBeLessThan(
+				await bytesOf(origin + shared),
+			);
+		}
+		await page.context().close();
+	});
+});
+
+/** The paths of the message chunks the page downloads, as it downloads them. */
+function messageChunks(page: Page): string[] {
+	const paths: string[] = [];
+	page.on("response", (response) => {
+		const { pathname } = new URL(response.url());
+		if (pathname.includes("/immutable/chunks/grai")) paths.push(pathname);
+	});
+	return paths;
+}
+
+/** The paths that are not Romanian copies. */
+const notRomanian = (paths: string[]) =>
+	paths.filter((path) => !path.startsWith("/_app/immutable/chunks/grai-ro/"));
+
+/** The size of the file served at `url`. */
+async function bytesOf(url: string): Promise<number> {
+	return (await (await fetch(url)).arrayBuffer()).byteLength;
+}
+
+describe("handleLocale, in a build without the locale copies", {
+	timeout: 30_000,
+}, () => {
+	const origin = "http://localhost:4753";
+	let server: ChildProcess;
+	beforeAll(async () => {
+		// The same app, built with grai/svelte's plugin, which writes no copies.
+		server = await served(4753, "svelte");
+	}, 60_000);
+	afterAll(() => stopped(server));
+
+	it("writes no import map, and the page loads the shared message chunks", async () => {
+		const html = await (await fetch(`${origin}/ro/`)).text();
+		expect(html).not.toContain("importmap");
+
+		const page = await (await browser.newContext()).newPage();
+		const messages = messageChunks(page);
+		const failed: string[] = [];
+		page.on("response", (response) => {
+			if (response.status() >= 400) failed.push(response.url());
+		});
+		await page.goto(`${origin}/ro/`);
+		await page.getByText("Desenat în browser").waitFor();
+
+		expect(failed).toEqual([]);
+		expect(messages.length).toBeGreaterThan(0);
+		expect(
+			messages.filter(
+				(path) => !path.startsWith("/_app/immutable/chunks/grai/"),
+			),
+		).toEqual([]);
 		await page.context().close();
 	});
 });

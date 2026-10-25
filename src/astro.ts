@@ -8,7 +8,7 @@ import type { ImportMap, LocaleProject } from "./astro/middleware.ts";
 import { compile } from "./compile.ts";
 import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
-import { localeDirectory, messageDirectory } from "./locale-chunks.ts";
+import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { grai as graiVite } from "./vite.ts";
 
 /** The integration's options. `config` is the path of the project's grai.config.json, from Astro's root. */
