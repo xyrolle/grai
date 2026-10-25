@@ -43,7 +43,7 @@ grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageforma
 | That page's JS, brotli (`hydrate`) | 22.9–24.9 KB | 38.0–40.5 KB | 125.1–133.3 KB | 124.6–132.5 KB |
 | A new server process: loading every locale's messages, then the first render (`startup`) | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms |
 | Heap the messages hold (`startup`) | 5.2 MB | 8.3 MB | 3.4 MB | 10.3 MB |
-| The runtime in the browser, brotli (`library-bytes`) | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB |
+| The runtime in the browser, its whole API, brotli (`library-bytes`) | 1.0 KB | 3.6 KB | 12.1 KB | 10.2 KB |
 | The messages a page downloads (`bytes`) | its own keys, in its locale: 24.5 KB on the largest page | its own keys, in every locale: 51.5 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
 | A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
 | One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
