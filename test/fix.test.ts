@@ -70,6 +70,20 @@ describe("grai check --fix", () => {
 		expect(readText(dir, "messages/de.json")).toBe(handLaid(...kept));
 	});
 
+	it("keeps a key that a shipped route in a folder named tests names", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/routes/tests/+page.svelte":
+				'<script>\n\timport { m } from "$lib/i18n";\n</script>\n<p>{m.promo_spring()}</p>\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual(["banner_old"]);
+		expect((await check(config)).problems).toEqual([]);
+	});
+
 	it("removes a key that only a test names, and says the test names it still", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {

@@ -50,10 +50,16 @@ const fields = new Set([
 const localePlaceholder = "{locale}";
 /** A cookie's name: an HTTP token, the characters RFC 6265 allows in it. */
 const cookieNameToken = /^[\w!#$%&'*+\-.^`|~]+$/;
-/** Test files as Vitest and Jest name them, and folders of tests. A test ships nothing. */
+/**
+ * Test files as Vitest and Jest name them, Jest's `__tests__` folders, and the project's own
+ * `test` and `tests` folders. A test ships nothing. A folder named `tests` deeper down may ship,
+ * as a SvelteKit route at `src/routes/tests/` does, so only the root's are tests.
+ */
 const conventionalTests = [
 	"**/*.{test,spec}.*",
-	"**/{test,tests,__tests__}/**",
+	"**/__tests__/**",
+	"test/**",
+	"tests/**",
 ];
 
 /** Reads a config file, or throws a `GraiError` naming what is missing or wrong. */
