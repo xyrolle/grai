@@ -67,6 +67,8 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"config.js",
 		"runtime.js",
 		"runtime.d.ts",
+		"internal.js",
+		"internal.d.ts",
 		"server.js",
 		"server.d.ts",
 		"keys.js",

@@ -19,7 +19,7 @@ import {
 	localizeUrl,
 } from "./runtime.js";
 
-/** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
+/** @type {AsyncLocalStorage<import("./internal.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 

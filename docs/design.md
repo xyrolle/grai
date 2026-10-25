@@ -43,7 +43,8 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 <outdir>/
   messages.js   messages.d.ts    `m`, the namespace of keys.js
   keys.js       keys.d.ts        every message, as the re-exports of the shards
-  runtime.js    runtime.d.ts     the runtime apps import: a re-export of runtime-<hash>.js
+  runtime.js    runtime.d.ts     the runtime's API, which apps import: re-exported from runtime-<hash>.js
+  internal.js   internal.d.ts    all of runtime-<hash>.js, for the adapters that bind the locale; apps never import it
   server.js     server.d.ts      the request middleware; client code never imports it
   config.js                      the project's locales and strategy: a re-export of config-<hash>.js
 
@@ -280,6 +281,8 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - `runtime.js`: `getLocale`, `setLocale`, `locales`, `baseLocale`, `Locale`, `isLocale`, `assertIsLocale`, `cookieName`, `getTextDirection`, `MessagePart`;
 - for the `url` strategy: `localizeHref`, `localizeUrl`, `deLocalizeUrl`, `extractLocaleFromUrl`. Without it they leave every URL as it is, since no URL then names a locale: in an app that keeps the locale in a cookie, `/de/…` is a path of its own, and a prefix would lead to a page it does not have;
 - `server.js`: `middleware(request, ({ request, locale }) => response)`.
+
+**`runtime.js` exports only that API.** It re-exports it from `runtime-<hash>.js`, the runtime's module, which also holds what the output's own modules call: the dispatcher the shards call and the request binding `server.js` sets. Those modules import it by its own name, and an adapter that binds the locale takes the binding from `internal.js`. An editor then offers an app nothing it should not call. A bundle drops a re-export, so a page holds the same code as when one module gave it all.
 
 ## Servers
 
