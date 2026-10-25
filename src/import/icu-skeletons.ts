@@ -4,6 +4,7 @@
  * A stem or a field Intl has no option for leaves the message out, with the reason.
  */
 
+import { ownEntry } from "../own-entry.ts";
 import { MessageProblem } from "../problem.ts";
 import { dateCall, numberCall } from "./intl-calls.ts";
 
@@ -108,7 +109,7 @@ function readStem(
 	settings: readonly string[],
 	options: Options,
 ): boolean {
-	const setting = settingStems[stem];
+	const setting = ownEntry(settingStems, stem);
 	if (setting !== undefined && settings.length === 0) {
 		for (const [key, value] of setting) options.set(key, value);
 		return true;

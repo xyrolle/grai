@@ -553,6 +553,7 @@ describe("grai import --from icu", () => {
 				"en.json": {
 					price: "{value, number, currency}",
 					inherited: "{value, number, constructor}",
+					inherited_stem: "{value, number, ::constructor}",
 					scaled: "{value, number, ::scale/100}",
 					week: "{d, date, ::yw}",
 					others: "{n, plural, offset:1 other {# others}}",
@@ -566,6 +567,7 @@ describe("grai import --from icu", () => {
 		).toEqual([
 			"price: {value, number, currency} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
 			"inherited: {value, number, constructor} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
+			"inherited_stem: {value, number, ::constructor} uses the skeleton stem constructor, which grai import does not convert. Write the call with the Intl options it needs.",
 			"scaled: {value, number, ::scale/100} uses the skeleton stem scale/100, which grai import does not convert. Write the call with the Intl options it needs.",
 			"week: {d, date, ::yw} uses the date field w, which grai import does not convert. Write the call with the Intl options it needs.",
 			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
