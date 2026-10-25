@@ -131,6 +131,7 @@ function astroRouting(
 	return {
 		base: "/",
 		i18n: { locales, defaultLocale: "en", routing: unprefixed, ...more },
+		image: { endpoint: { route: "/_image" } },
 	};
 }
 
@@ -150,12 +151,17 @@ describe("grai's config beside Astro's", () => {
 		expect(
 			disagreements(graiConfig({ strategy: ["cookie"], cookieName: "lang" }), {
 				base: "/shop",
+				image: { endpoint: { route: "/_image" } },
 			}),
 		).toEqual([]);
 	});
 
 	it('maps Astro\'s prefixed default locale to "localePrefix": "always", and says which to set', () => {
-		const always = graiConfig({ strategy: ["url"], localePrefix: "always" });
+		const always = graiConfig({
+			strategy: ["url"],
+			localePrefix: "always",
+			unlocalizedPaths: ["/_image", "/_server-islands/**", "/404", "/500"],
+		});
 		const asNeeded = graiConfig({ strategy: ["url"] });
 
 		expect(
@@ -171,6 +177,21 @@ describe("grai's config beside Astro's", () => {
 		]);
 		expect(disagreements(always, astroRouting(["en", "ro"]))).toEqual([
 			`grai prefixes every locale's URLs ("localePrefix": "always"). Set Astro's i18n.routing.prefixDefaultLocale to true.`,
+		]);
+	});
+
+	it('leaves Astro\'s own routes alone under "localePrefix": "always", and says which paths to set', () => {
+		expect(
+			disagreements(
+				graiConfig({
+					strategy: ["url"],
+					localePrefix: "always",
+					unlocalizedPaths: ["/api/**", "/404"],
+				}),
+				astroRouting(["en", "ro"], { routing: prefixed }),
+			),
+		).toEqual([
+			`With "localePrefix": "always", grai sends a request without a locale prefix to its locale's path, and Astro's own /_image, /_server-islands/**, /500 have none. Set "unlocalizedPaths": ["/api/**","/404","/_image","/_server-islands/**","/500"] in grai's config.`,
 		]);
 	});
 

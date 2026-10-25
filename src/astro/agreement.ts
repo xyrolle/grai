@@ -1,8 +1,11 @@
 import type { AstroConfig } from "astro";
 import type { Config } from "../config.ts";
+import { globMatcher } from "../globs.ts";
 
 /** What of Astro's config grai's has to agree with. */
-export type AstroRouting = Pick<AstroConfig, "base" | "i18n">;
+export type AstroRouting = Pick<AstroConfig, "base" | "i18n"> & {
+	image: { endpoint: { route: string } };
+};
 type I18n = NonNullable<AstroRouting["i18n"]>;
 
 /** A locale Astro routes: as grai names it, which is `Astro.currentLocale`, and its URLs' prefix. */
@@ -17,10 +20,13 @@ type RoutedLocale = { locale: string; prefix: string };
  *   `unlocalizedPaths`, whose locale the strategies after `url` find.
  * - grai's `url` strategy finds the locale in the path's first segment, so the site has no base,
  *   and no locale has a domain of its own.
+ * - With every locale's paths prefixed, grai sends a request without a prefix to its locale's path,
+ *   so Astro's own routes, which have none, are `unlocalizedPaths`.
  */
 export function disagreements(grai: Config, astro: AstroRouting): string[] {
 	return [
 		...(grai.strategy.includes("url") ? baseDisagreements(astro.base) : []),
+		...ownRouteDisagreements(grai, astro),
 		...(astro.i18n === undefined ? [] : routingDisagreements(grai, astro.i18n)),
 	];
 }
@@ -31,6 +37,29 @@ function baseDisagreements(base: string): string[] {
 		: [
 				`The "url" strategy reads the locale from the path's first segment, which Astro's base ${JSON.stringify(base)} takes. Serve the site from Astro's base "/" ("The framework's base path" in grai's docs/followups.md).`,
 			];
+}
+
+/**
+ * Astro's own routes, each as a glob of its paths and one path it serves: its image endpoint, its
+ * server islands, and its error pages, which Astro renders at their own paths when it prerenders them.
+ */
+const ownRoutes = (astro: AstroRouting) => [
+	{ glob: astro.image.endpoint.route, path: astro.image.endpoint.route },
+	{ glob: "/_server-islands/**", path: "/_server-islands/island" },
+	{ glob: "/404", path: "/404" },
+	{ glob: "/500", path: "/500" },
+];
+
+function ownRouteDisagreements(grai: Config, astro: AstroRouting): string[] {
+	const { localePrefix, unlocalizedPaths } = grai.urlRouting;
+	if (!grai.strategy.includes("url") || localePrefix !== "always") return [];
+	const leftAlone = globMatcher(unlocalizedPaths);
+	const missing = ownRoutes(astro).filter(({ path }) => !leftAlone(path));
+	if (missing.length === 0) return [];
+	const globs = [...unlocalizedPaths, ...missing.map(({ glob }) => glob)];
+	return [
+		`With "localePrefix": "always", grai sends a request without a locale prefix to its locale's path, and Astro's own ${missing.map(({ glob }) => glob).join(", ")} have none. Set "unlocalizedPaths": ${JSON.stringify(globs)} in grai's config.`,
+	];
 }
 
 function routingDisagreements(grai: Config, i18n: I18n): string[] {
