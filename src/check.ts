@@ -7,6 +7,7 @@ import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
 import { isSeed, untranslatedKeys } from "./seed.ts";
+import { shownInputs } from "./shown-inputs.ts";
 import {
 	namesIn,
 	sourceFiles,
@@ -23,7 +24,7 @@ export type Checked = {
 
 /**
  * Every problem of a project, without writing anything: each error a compile would report, each
- * key no shipped source file names, each input one locale reads and another never does, and each
+ * key no shipped source file names, each input one locale shows and another never does, and each
  * key `identicalToBase` lists that the catalogs no longer bear out. Source files are those under
  * the project's root, or under `sources` when given, outside the outdir, dependencies, build
  * output and dot-directories; those the config's `tests` match ship nothing. Beside them, the keys
@@ -131,7 +132,10 @@ function staleness(
 		: `but its message is not ${baseLocale}'s any more`;
 }
 
-/** An error for each locale that never reads an input another locale reads. */
+/**
+ * An error for each locale that never shows an input another locale shows: a placeholder a
+ * translation lost, or one another invented. An input a locale only chooses by is its grammar.
+ */
 function differingInputs(
 	key: string,
 	catalogs: readonly Catalog[],
@@ -142,7 +146,7 @@ function differingInputs(
 		try {
 			inputs.set(
 				catalog,
-				parseMessage(catalog.locale, catalog.messages.get(key)).inputs,
+				shownInputs(parseMessage(catalog.locale, catalog.messages.get(key))),
 			);
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
@@ -160,7 +164,7 @@ function differingInputs(
 			new GraiError(
 				"inputs-differ",
 				{ file: catalog.file, key, locale: catalog.locale },
-				`the message never reads ${missing.map((name) => `{${name}}`).join(", ")}, which ${readers.join(", ")} read${readers.length === 1 ? "s" : ""}. Read it here too, or drop it everywhere.`,
+				`the message never shows ${missing.map((name) => `{${name}}`).join(", ")}, which ${readers.join(", ")} show${readers.length === 1 ? "s" : ""}. Show it here too, or drop it everywhere.`,
 			),
 		];
 	});

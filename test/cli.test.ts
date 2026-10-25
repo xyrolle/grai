@@ -83,7 +83,7 @@ describe("grai check", () => {
 		expect(code).toBe(1);
 		expect(stderr).toBe(
 			[
-				'messages/de.json: "cart_greeting" (de): the message never reads {name}, which en reads. Read it here too, or drop it everywhere.',
+				'messages/de.json: "cart_greeting" (de): the message never shows {name}, which en shows. Show it here too, or drop it everywhere.',
 				'messages/en.json: "cart_title": no source file under . names the key. Remove it from every catalog, or use it.',
 				"grai: 2 errors",
 				"",
