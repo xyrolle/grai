@@ -163,12 +163,15 @@ describe("the proxy", () => {
 // `next start`, and its pages in Chromium: under Turbopack, Next's default, and under webpack.
 const example = fileURLToPath(new URL("../examples/next/", import.meta.url));
 const next = join(example, "node_modules/.bin/next");
-const origin = "http://localhost:4771";
 /** Next's environment: no telemetry, which would phone home and outlive the test in a process of its own. */
 const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
 
-/** Builds the example with the given bundler flags and serves it until the suite ends. */
-function servedWith(flags: string[]): void {
+/**
+ * Builds the example with the given bundler flags and serves it until the suite ends, on a port the
+ * system picks, so that runs of this file side by side never meet. The origin is set once it serves.
+ */
+function servedWith(flags: string[]): { origin: string } {
+	const served = { origin: "" };
 	let server: ChildProcess | undefined;
 	beforeAll(async () => {
 		const build = spawnSync(next, ["build", ...flags], {
@@ -180,22 +183,30 @@ function servedWith(flags: string[]): void {
 			throw new Error(`next build failed:\n${build.stdout}${build.stderr}`);
 		}
 		// The leader of a process group of its own, so that stopping it stops what it forks.
-		const started = spawn(next, ["start", "--port", "4771"], {
+		server = spawn(next, ["start", "--port", "0"], {
 			cwd: example,
 			env,
 			detached: true,
 		});
-		server = started;
-		await new Promise<void>((resolve, reject) => {
-			started.stdout.on("data", (chunk) => {
-				if (String(chunk).includes("Ready")) resolve();
-			});
-			started.on("exit", (code) =>
-				reject(new Error(`next start exited: ${code}`)),
-			);
-		});
+		served.origin = await servedAt(server);
 	}, 120_000);
 	afterAll(() => (server ? stopped(server) : undefined));
+	return served;
+}
+
+/** The URL `next start` prints as it listens, once it has also printed that it is ready. */
+function servedAt(server: ChildProcess): Promise<string> {
+	return new Promise((resolve, reject) => {
+		let output = "";
+		server.stdout?.on("data", (chunk) => {
+			output += chunk;
+			const url = /- Local:\s+(http:\/\/\S+)/.exec(output)?.[1];
+			if (url !== undefined && output.includes("Ready")) resolve(url);
+		});
+		server.on("exit", (code) =>
+			reject(new Error(`next start exited: ${code}\n${output}`)),
+		);
+	});
 }
 
 /** Stops a server's whole process group, and resolves once the server has exited. */
@@ -242,10 +253,10 @@ const mark = () =>
 const marked = () => page.evaluate(() => "marked" in globalThis);
 
 describe("the Next example, built with Turbopack", () => {
-	servedWith([]);
+	const served = servedWith([]);
 
 	it("renders the base locale unprefixed, in server and client components, and hydrates without an error", async () => {
-		await page.goto(`${origin}/`);
+		await page.goto(`${served.origin}/`);
 
 		expect(await page.getAttribute("html", "lang")).toBe("en");
 		expect(await text("h1")).toBe("A shop that speaks your language");
@@ -258,7 +269,7 @@ describe("the Next example, built with Turbopack", () => {
 	});
 
 	it("renders a prefixed locale, with its own plural categories in a client component", async () => {
-		await page.goto(`${origin}/ro`);
+		await page.goto(`${served.origin}/ro`);
 
 		expect(await page.getAttribute("html", "lang")).toBe("ro");
 		expect(await text("h1")).toBe("Un magazin care îți vorbește limba");
@@ -286,7 +297,9 @@ describe("the Next example, built with Turbopack", () => {
 			index % 2 === 0 ? "/delivery" : "/ro/delivery",
 		);
 		const pages = await Promise.all(
-			paths.map((path) => fetch(origin + path).then((page) => page.text())),
+			paths.map((path) =>
+				fetch(served.origin + path).then((page) => page.text()),
+			),
 		);
 
 		const every = Object.values(expected).flat();
@@ -296,11 +309,11 @@ describe("the Next example, built with Turbopack", () => {
 	});
 
 	it("navigates in place within a locale, and the page and its metadata bind the locale themselves", async () => {
-		await page.goto(`${origin}/ro`);
+		await page.goto(`${served.origin}/ro`);
 		await mark();
 
 		await page.click("#about");
-		await page.waitForURL(`${origin}/ro/about`);
+		await page.waitForURL(`${served.origin}/ro/about`);
 
 		expect(await text("h1")).toBe("Despre magazin");
 		expect(await page.title()).toBe("Despre magazin");
@@ -309,23 +322,23 @@ describe("the Next example, built with Turbopack", () => {
 	});
 
 	it("loads the page anew when a link leads into another locale", async () => {
-		await page.goto(`${origin}/about`);
+		await page.goto(`${served.origin}/about`);
 		await mark();
 
 		const loaded = page.waitForEvent("load");
 		await page.click("#translation");
 		await loaded;
 
-		expect(page.url()).toBe(`${origin}/ro/about`);
+		expect(page.url()).toBe(`${served.origin}/ro/about`);
 		expect(await text("h1")).toBe("Despre magazin");
 		expect(await marked()).toBe(false);
 	});
 
 	it("switches locale with setLocale, which goes to the page's URL in that locale", async () => {
-		await page.goto(`${origin}/ro`);
+		await page.goto(`${served.origin}/ro`);
 
 		await page.click("#language");
-		await page.waitForURL(`${origin}/`);
+		await page.waitForURL(`${served.origin}/`);
 
 		expect(await text("h1")).toBe("A shop that speaks your language");
 		expect(await text("#cart")).toBe("1 item in your cart");
@@ -333,15 +346,15 @@ describe("the Next example, built with Turbopack", () => {
 });
 
 describe("the Next example, built with webpack", () => {
-	servedWith(["--webpack"]);
+	const served = servedWith(["--webpack"]);
 
 	it("renders a prefixed locale in server and client components, hydrates, and navigates in place", async () => {
-		await page.goto(`${origin}/ro`);
+		await page.goto(`${served.origin}/ro`);
 		await page.getByRole("button", { name: "Adaugă un produs" }).click();
 		expect(await text("#cart")).toBe("2 produse în coș");
 		await mark();
 		await page.click("#about");
-		await page.waitForURL(`${origin}/ro/about`);
+		await page.waitForURL(`${served.origin}/ro/about`);
 
 		expect(await text("h1")).toBe("Despre magazin");
 		expect(await marked()).toBe(true);
