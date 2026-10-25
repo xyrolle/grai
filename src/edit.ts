@@ -7,10 +7,11 @@ import { isRecord } from "./config.ts";
  * touched. A catalog laid out one entry per line (as editors and formatters write them) has a
  * line break and the same indent before each top-level key, and nowhere else, since a JSON string
  * holds no raw line break. The bytes the edit changed lie between two such entry starts, so only
- * that span is parsed, in the old file and in the new. Returns undefined whenever that cannot be
- * shown exactly, for the caller to parse the whole file. With the messages and their paths come
- * the keys whose message the edit added, changed or removed, and whether any key now starts on
- * another line.
+ * that span is parsed, in the old file and in the new, and the separators around it are checked:
+ * a comma or the opening brace before it, and a comma at its end unless it closes the object.
+ * Returns undefined whenever that cannot be shown exactly, for the caller to parse the whole file.
+ * With the messages and their paths come the keys whose message the edit added, changed or
+ * removed, and whether any key now starts on another line.
  */
 export function editedMessages(
 	previousBytes: Buffer,
@@ -25,14 +26,15 @@ export function editedMessages(
 	if (prefix === 0) return undefined;
 	const suffix = commonSuffix(previousBytes, bytes, prefix);
 	const from = bytes.lastIndexOf(marker, prefix - 1);
-	if (from === -1) return undefined;
-	const to = spanEnd(bytes, marker, bytes.length - suffix);
-	if (to === undefined) return undefined;
+	if (from === -1 || !separatedBefore(bytes, from)) return undefined;
+	const end = spanEnd(bytes, marker, bytes.length - suffix);
+	if (end === undefined) return undefined;
+	const { to, closesObject } = end;
 	const grown = bytes.length - previousBytes.length;
 	const before = previousBytes.subarray(from + 1, to - grown);
 	const after = bytes.subarray(from + 1, to);
-	const removed = spanKeys(before, where);
-	const added = spanKeys(after, where);
+	const removed = spanKeys(before, closesObject, where);
+	const added = spanKeys(after, closesObject, where);
 	if (removed === undefined || added === undefined) return undefined;
 	const isPreviousSpan = [...removed.messages].every(
 		([key, value]) =>
@@ -77,29 +79,50 @@ function entryIndent(bytes: Buffer): string | undefined {
 	return /^\{\r?\n([ \t]*)"/.exec(text)?.[1];
 }
 
-/** Where the span of whole entries ends: at the next entry's start, or at the object's closing brace. */
+const comma = ",".charCodeAt(0);
+const openingBrace = "{".charCodeAt(0);
+/** JSON's whitespace, by byte. */
+const whitespace = new Set(
+	[" ", "\t", "\n", "\r"].map((char) => char.charCodeAt(0)),
+);
+
+/** Whether the entry at a line break follows a comma or the object's opening brace. */
+function separatedBefore(bytes: Buffer, lineBreak: number): boolean {
+	let at = lineBreak - 1;
+	while (at >= 0 && whitespace.has(bytes[at] ?? 0)) at--;
+	return bytes[at] === comma || bytes[at] === openingBrace;
+}
+
+/**
+ * Where the span of whole entries ends: at the next entry's start, or at the object's closing
+ * brace, which `closesObject` tells.
+ */
 function spanEnd(
 	bytes: Buffer,
 	marker: Buffer,
 	unchangedFrom: number,
-): number | undefined {
+): { to: number; closesObject: boolean } | undefined {
 	const next = bytes.indexOf(marker, unchangedFrom);
-	if (next !== -1) return next;
+	if (next !== -1) return { to: next, closesObject: false };
 	const close = bytes.lastIndexOf("}");
-	return close >= unchangedFrom ? close : undefined;
+	return close >= unchangedFrom ? { to: close, closesObject: true } : undefined;
 }
 
 /**
  * The keys of a span such as `\t"a": "x",\n\t"b": {...},`, or undefined if it is not whole
- * entries, or its keys are not valid ones, which a parse of the whole file reports.
+ * entries, or its keys are not valid ones, which a parse of the whole file reports. A span the
+ * next entry follows ends with the comma between them; one that closes the object ends without.
  */
 function spanKeys(
 	span: Buffer,
+	closesObject: boolean,
 	where: { file: string; locale: string },
 ): CatalogKeys | undefined {
-	const text = span.toString("utf8").trim().replace(/,$/, "");
+	const text = span.toString("utf8").trim();
+	if (text.endsWith(",") === closesObject) return undefined;
+	const entries = closesObject ? text : text.slice(0, -1);
 	try {
-		const value: unknown = JSON.parse(`{${text}}`);
+		const value: unknown = JSON.parse(`{${entries}}`);
 		return isRecord(value) ? catalogKeys(value, where) : undefined;
 	} catch {
 		return undefined;
