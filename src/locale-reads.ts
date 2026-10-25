@@ -4,8 +4,10 @@
  * const for its number, and one for its category when a variant tests it.
  */
 
+import { digitsFormatter } from "./formatters.ts";
+import type { Used } from "./locale-function.ts";
 import type { LocaleMessage } from "./message.ts";
-import { isExactKey } from "./number-select.ts";
+import { isExactKey, type NumberSelector } from "./number-select.ts";
 import { numberReaders, pluralName } from "./plurals.ts";
 import { catchAll } from "./selection.ts";
 
@@ -21,10 +23,13 @@ export type LocaleReads = {
 	prologue: () => { parameter: string; declarations: string };
 };
 
-/** The reads of a message's function, adding the functions of plurals.js they call to `plurals`. */
+/**
+ * The reads of a message's function, adding the functions of plurals.js and the formatters they
+ * call to `used`.
+ */
 export function localeReads(
 	message: LocaleMessage,
-	plurals: Set<string>,
+	{ plurals, formats }: Used,
 ): LocaleReads {
 	const { locale, selectors } = message;
 	const reads = new Set<string>();
@@ -50,7 +55,10 @@ export function localeReads(
 			case "input":
 				return `String(${value(selector.name)}) === ${literal}`;
 			case "number":
-				if (isExactKey(key)) return `${value(selector.name)} === ${key}`;
+				if (isExactKey(key)) {
+					const number = selector.digits === undefined ? key : literal;
+					return `${value(selector.name)} === ${number}`;
+				}
 				value(selector.name);
 				categorized.add(index);
 				return `$${index} === ${literal}`;
@@ -74,10 +82,7 @@ export function localeReads(
 	const numberConsts = () =>
 		selectors.flatMap((selector, index) => {
 			if (selector.kind !== "number" || !reads.has(selector.name)) return [];
-			const reader =
-				selector.number === "number"
-					? "Number"
-					: called(numberReaders[selector.number]);
+			const reader = readerOf(selector);
 			const consts = [
 				`const $${selector.name} = ${reader}(${value(selector.input)}); `,
 			];
@@ -87,6 +92,17 @@ export function localeReads(
 			}
 			return consts;
 		});
+	/** What a number selector reads its input through: its digits' formatter, or a number reader. */
+	const readerOf = (selector: NumberSelector) => {
+		if (selector.digits !== undefined) {
+			const formatter = digitsFormatter(selector.digits);
+			formats.set(formatter.name, formatter);
+			return formatter.name;
+		}
+		return selector.number === "number"
+			? "Number"
+			: called(numberReaders[selector.number]);
+	};
 	const prologue = () => {
 		const declarations = [...pluralConsts(), ...numberConsts()].join("");
 		const takesInputs = [...reads].some((name) => message.inputs.has(name));

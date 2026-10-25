@@ -1,11 +1,24 @@
 /** The output's formatters: each format's name in a locale, and formats.js, which makes them. */
 
 import { hash } from "node:crypto";
+import type { IntlOptions } from "./format-functions.ts";
 import type { Format } from "./format-options.ts";
-import { formatterCode, runtimeImports } from "./intl-formatters.ts";
+import {
+	digitsCode,
+	formatterCode,
+	runtimeImports,
+} from "./intl-formatters.ts";
 
-/** A formatter of the output: a format in a locale, under the name formats.js exports it by. */
-export type Formatter = { name: string; locale: string; format: Format };
+/**
+ * A formatter of the output: a format in a locale, under the name formats.js exports it by, and
+ * whether it gives the text a reader sees or the digits a rounding selector reads.
+ */
+export type Formatter = {
+	name: string;
+	locale: string;
+	format: Format;
+	shows: "text" | "digits";
+};
 
 /**
  * What sets a format's formatter apart: its options, sorted, and the option an input gives, but
@@ -34,7 +47,18 @@ export function formatterOf(locale: string, format: Format): Formatter {
 		name: `${format.formatter}_${locale.replaceAll("-", "_")}${suffix}`,
 		locale,
 		format,
+		shows: "text",
 	};
+}
+
+/**
+ * The formatter of a rounding number selector's digits, the same in every locale, as the digits
+ * do not depend on it.
+ */
+export function digitsFormatter(options: IntlOptions): Formatter {
+	const format: Format = { formatter: "number", options, input: undefined };
+	const digest = hash("sha1", JSON.stringify(identity(format))).slice(0, 8);
+	return { name: `digits_${digest}`, locale: "en", format, shows: "digits" };
 }
 
 /**
@@ -65,8 +89,10 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 		imported.length === 0
 			? ""
 			: `import { ${imported.join(", ")} } from "./runtime.js";\n\n`;
-	const definitions = sorted.map(({ name, locale, format }) =>
-		formatterCode(name, locale, format),
+	const definitions = sorted.map(({ name, locale, format, shows }) =>
+		shows === "digits"
+			? digitsCode(name, format.options)
+			: formatterCode(name, locale, format),
 	);
 	return `// The Intl formatters the messages call, each made the first time it formats.\n\n${imports}${definitions.join("\n")}`;
 }

@@ -4,7 +4,12 @@ import {
 	type NumberSelector,
 } from "./number-select.ts";
 import type { Part } from "./pattern.ts";
-import { categoriesOf, categoryOf, type PluralType } from "./plurals.ts";
+import {
+	categoriesOf,
+	categoryOf,
+	categoryOfDigits,
+	type PluralType,
+} from "./plurals.ts";
 import { MessageProblem } from "./problem.ts";
 
 /** What a variant's key accepts for one selector: a literal value, or anything. */
@@ -116,7 +121,12 @@ function domainOf(
 			for (const key of keys) checkNumberKey(selector, key, locale);
 			const exact = keys.filter(isExactKey).map((key) => {
 				const count = Number(key);
-				return rules === undefined || !Number.isInteger(count)
+				if (rules === undefined) return named(key);
+				if (selector.digits !== undefined) {
+					const category = categoryOfDigits(locale, rules, key);
+					return { keys: new Set([key, category]), written: key };
+				}
+				return !Number.isInteger(count)
 					? named(key)
 					: {
 							keys: new Set([key, categoryOf(locale, rules, count)]),
