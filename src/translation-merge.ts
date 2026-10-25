@@ -5,8 +5,8 @@
  */
 
 import type { Catalog } from "./catalog.ts";
-import { isRecord } from "./config.ts";
 import type { GraiErrorCode } from "./error.ts";
+import { mergedMessage } from "./merged-message.ts";
 import { parseMessage } from "./message.ts";
 import { type Piece, piecesPattern } from "./pattern-pieces.ts";
 import { MessageProblem } from "./problem.ts";
@@ -100,7 +100,13 @@ export function mergeUnits(
 		);
 		// A message no unit changes is left as it is written.
 		if (given.length === 0) continue;
-		const value = messageOf(base.messages.get(key), keyUnits, accepted);
+		const value = mergedMessage(
+			base,
+			key,
+			{ locale, value: target?.messages.get(key) },
+			keyUnits,
+			accepted,
+		);
 		const problem =
 			value === undefined
 				? incomplete(keyUnits, accepted)
@@ -132,36 +138,6 @@ function byKey(units: readonly Unit[]): Map<string, Unit[]> {
 	for (const unit of units)
 		keys.set(unit.key, [...(keys.get(unit.key) ?? []), unit]);
 	return keys;
-}
-
-/**
- * The message the units give, in the base's shape: a pattern, or the base's declarations and
- * selectors with a variant per unit, which is one without a key when it has no selector.
- */
-function messageOf(
-	source: unknown,
-	units: readonly Unit[],
-	accepted: ReadonlyMap<string, Piece[]>,
-): unknown {
-	const match = new Map<string, string>();
-	for (const unit of units) {
-		const pieces = accepted.get(unit.id) ?? unit.target;
-		if (pieces === undefined) return undefined;
-		const key = unit.variant
-			.map(([selector, value]) => `${selector}=${value}`)
-			.join(",");
-		match.set(key, piecesPattern(pieces));
-	}
-	if (typeof source === "string") return match.get("");
-	const fields = Array.isArray(source) ? source[0] : undefined;
-	if (!isRecord(fields)) return undefined;
-	return [
-		{
-			declarations: fields.declarations,
-			selectors: fields.selectors,
-			match: Object.fromEntries(match),
-		},
-	];
 }
 
 function incomplete(

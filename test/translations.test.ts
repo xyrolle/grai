@@ -464,3 +464,84 @@ describe("a message with declarations and no selectors", () => {
 		expect(await units(config, true)).toEqual([]);
 	});
 });
+
+describe("a translation whose declarations differ from the base's", () => {
+	const items = (declaration: string, one: string, other: string) => [
+		{
+			declarations: [
+				"input count",
+				"input amount",
+				"local countPlural = count: plural",
+				declaration,
+			],
+			selectors: ["countPlural"],
+			match: { "countPlural=one": one, "countPlural=*": other },
+		},
+	];
+
+	it("keeps them through a merge of one of its forms", async () => {
+		const { dir, config, load } = project({
+			en: {
+				items: items(
+					"local price = amount: number",
+					"{count} item for {price}",
+					"{count} items for {price}",
+				),
+			},
+			de: {
+				items: items(
+					"local price = amount: currency currency=EUR",
+					"{count} Artikel für {price}",
+					"{count} Artikel für {price}",
+				),
+			},
+		});
+		const result = await exportLocale(config, "de", {
+			json: true,
+			untranslated: false,
+		});
+		const document = "document" in result ? JSON.parse(result.document) : {};
+		const [one] = document.units;
+		one.target = "{count} Stück für {price}";
+		const file = join(dir, "de.json");
+		writeFileSync(file, JSON.stringify({ ...document, units: [one] }));
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(m.items?.({ count: 1, amount: 5 }, { locale: "de" })).toBe(
+			`1 Stück für ${new Intl.NumberFormat("de", { style: "currency", currency: "EUR" }).format(5)}`,
+		);
+	});
+	it("takes the base's declaration of a local it lacks, which a code from the base reads", async () => {
+		const declared = (declarations: string[], pattern: string) => [
+			{ declarations, selectors: [], match: { "": pattern } },
+		];
+		const { dir, config, load } = project({
+			en: {
+				price: declared(
+					["input amount", "local price = amount: number"],
+					"Price {price}",
+				),
+			},
+			de: { price: declared(["input amount"], "Preis {amount}") },
+		});
+		const units = [
+			{ id: "price", source: "Price {price}", target: "Preis: {price}" },
+		];
+		const file = join(dir, "de.json");
+		writeFileSync(
+			file,
+			JSON.stringify({ srcLang: "en", trgLang: "de", units }),
+		);
+
+		const merged = await mergeDocument(config, file);
+		const { m } = await load();
+
+		expect(merged).toMatchObject({ messages: 1, refused: [] });
+		expect(m.price?.({ amount: 1234.5 }, { locale: "de" })).toBe(
+			"Preis: 1.234,5",
+		);
+	});
+});
