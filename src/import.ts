@@ -1,12 +1,17 @@
 import { join, relative } from "node:path";
 import { type Config, readConfig } from "./config.ts";
+import { descriptionsText } from "./descriptions.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { catalogsOf } from "./import/catalogs.ts";
 import { convertSources, type ImportFormat } from "./import/convert.ts";
 import { mappingFile, mappingText } from "./import/mapping.ts";
 import type { ImportReport } from "./import/report.ts";
 import { findSources } from "./import/sources.ts";
-import { existingCatalogs, writeCatalogs } from "./import/write.ts";
+import {
+	existingCatalogs,
+	unkeptDescriptions,
+	writeCatalogs,
+} from "./import/write.ts";
 
 export { type ImportFormat, importFormats } from "./import/convert.ts";
 export { mappingFile } from "./import/mapping.ts";
@@ -47,8 +52,12 @@ export function importCatalogs(
 	const errors: GraiError[] = [];
 	const sources = findSources(inputs, config, errors);
 	const messages = convertSources(sources, format, config.locales, errors);
-	const { files, keys, leftOut, changed } = catalogsOf(messages, config);
+	const { files, keys, descriptions, leftOut, changed } = catalogsOf(
+		messages,
+		config,
+	);
 	errors.push(...existingCatalogs(files, config.root));
+	errors.push(...unkeptDescriptions(descriptions, config, configFile));
 	if (keys.length === 0 && errors.length === 0) {
 		errors.push(
 			new GraiError(
@@ -62,9 +71,12 @@ export function importCatalogs(
 	if (errors.length > 0) {
 		return { ...report, written: [], errors: sortErrors(errors) };
 	}
-	const mapping = new Map([
+	const others = new Map([
 		[join(config.root, mappingFile), mappingText(format, keys)],
 	]);
-	const written = writeCatalogs(files, mapping, config.root);
+	if (config.descriptions !== undefined && descriptions.size > 0) {
+		others.set(config.descriptions, descriptionsText(descriptions));
+	}
+	const written = writeCatalogs(files, others, config.root);
 	return { ...report, written, errors: [] };
 }

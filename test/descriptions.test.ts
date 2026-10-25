@@ -1,15 +1,76 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { check } from "../src/check.ts";
 import { removeUnusedKeys } from "../src/fix.ts";
+import { importCatalogs } from "../src/import.ts";
 import { rename } from "../src/rename.ts";
 import { exportLocale } from "../src/translations.ts";
 import { project } from "./project.ts";
 
 const descriptions = "messages/descriptions.json";
 
+/** Imports FormatJS's extracted messages for en and ru into a new project with the config's extra fields. */
+function importedFormatjs(config: Record<string, unknown>) {
+	const dir = mkdtempSync(join(tmpdir(), "grai-descriptions-"));
+	onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+	const file = join(dir, "grai.config.json");
+	writeFileSync(
+		file,
+		JSON.stringify({
+			locales: ["en", "ru"],
+			baseLocale: "en",
+			catalogs: "messages/{locale}.json",
+			outdir: "out",
+			...config,
+		}),
+	);
+	mkdirSync(join(dir, "source"));
+	const describe = (defaultMessage: string, description?: string) => ({
+		defaultMessage,
+		...(description !== undefined && { description }),
+	});
+	writeFileSync(
+		join(dir, "source", "en.json"),
+		JSON.stringify({
+			open: describe("Open", "A button that opens the menu, not a state"),
+			close: describe("Close"),
+		}),
+	);
+	writeFileSync(
+		join(dir, "source", "ru.json"),
+		JSON.stringify({ open: "Открыть", close: "Закрыть" }),
+	);
+	return { dir, result: importCatalogs(file, "icu", [join(dir, "source")]) };
+}
+
 describe("translators' descriptions", () => {
+	it("are imported from FormatJS's descriptors into the file the config names", () => {
+		const { dir, result } = importedFormatjs({ descriptions });
+
+		expect(result.errors).toEqual([]);
+		expect(JSON.parse(readFileSync(join(dir, descriptions), "utf8"))).toEqual({
+			open: "A button that opens the menu, not a state",
+		});
+	});
+
+	it("stop an import whose config names no file for them, which then writes nothing", () => {
+		const { dir, result } = importedFormatjs({});
+
+		expect(result.errors.map((error) => error.message)).toEqual([
+			'grai.config.json: the sources describe 1 message for translators, which grai keeps in the file the config\'s "descriptions" names. Add "descriptions": "messages/descriptions.json" to the config, and import again.',
+		]);
+		expect(existsSync(join(dir, "messages"))).toBe(false);
+	});
+
 	it("are each a note of the key's units in an export", async () => {
 		const { dir, config } = project(
 			{
