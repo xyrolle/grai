@@ -6,6 +6,7 @@ import {
 	directions,
 	localePrefix,
 	locales,
+	prefixes,
 	strategy,
 	unlocalizedPaths,
 } from "./config.js";
@@ -17,6 +18,14 @@ const urlsNameLocales = strategy.includes("url");
 /** Whether a locale has a prefix: every one's with `localePrefix: "always"`, else all but the base's. */
 const prefixed = (/** @type {string} */ locale) =>
 	localePrefix === "always" || locale !== baseLocale;
+/**
+ * The locale a path segment is the prefix of, if it is one: a locale's tag, or the segment the
+ * config gives it, and never the base locale's unless every locale's paths are prefixed.
+ */
+const localeOfPrefix = (/** @type {string | undefined} */ segment) => {
+	const locale = locales[prefixes.indexOf(segment ?? "")];
+	return locale !== undefined && prefixed(locale) ? locale : undefined;
+};
 /** Whether a path is one the `url` strategy leaves alone, which never has a prefix. */
 const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
@@ -180,8 +189,8 @@ export function extractLocaleFromUrl(url) {
  */
 export function localeOfPath(pathname) {
 	if (!urlsNameLocales || leftAlone(pathname)) return undefined;
-	const first = pathname.split("/")[1];
-	if (isLocale(first) && prefixed(first)) return first;
+	const named = localeOfPrefix(pathname.split("/")[1]);
+	if (named !== undefined) return named;
 	return localePrefix === "always" ? undefined : baseLocale;
 }
 
@@ -194,7 +203,7 @@ export function localeOfPath(pathname) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (urlsNameLocales && isLocale(first) && prefixed(first)) {
+	if (urlsNameLocales && localeOfPrefix(first) !== undefined) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -215,7 +224,7 @@ export function localizeUrl(url, options) {
 		// The home page is /de, not /de/: SvelteKit and Next drop a trailing slash by default, and
 		// redirect to drop it.
 		const path = copy.pathname === "/" ? "" : copy.pathname;
-		copy.pathname = `/${locale}${path}`;
+		copy.pathname = `/${prefixes[locales.indexOf(locale)] ?? locale}${path}`;
 	}
 	return copy;
 }
