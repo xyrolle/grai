@@ -407,10 +407,14 @@ it("grai watch writes the output, then the shard a catalog's edit changes", asyn
 
 it("prints the usage and exits with 2 for a command it does not know", async () => {
 	const { dir } = project(catalogs);
-	const { code, stderr } = await grai(dir, "build");
+	for (const name of ["build", "constructor", "toString"]) {
+		const { code, stderr } = await grai(dir, name);
 
-	expect(code).toBe(2);
-	expect(stderr).toMatch(
-		/^grai: there is no command "build"\n\nUsage: grai <command>/,
-	);
+		expect(code).toBe(2);
+		expect(stderr).toMatch(
+			new RegExp(
+				`^grai: there is no command "${name}"\n\nUsage: grai <command>`,
+			),
+		);
+	}
 });

@@ -120,11 +120,13 @@ describe("grai import --from i18next", () => {
 				title: "Cart",
 				see: "See $t(title)",
 				loud: "{{value, uppercase}}",
+				inherited: "{{value, constructor}}",
 			},
 			"ru.json": {
 				title: "Корзина",
 				see: "См. $t(title)",
 				loud: "{{value, uppercase}}",
+				inherited: "{{value, constructor}}",
 			},
 		});
 		const m = await load();
@@ -138,6 +140,13 @@ describe("grai import --from i18next", () => {
 				locales: ["en", "ru"],
 				detail:
 					"{{value, uppercase}} formats the value as uppercase, which grai import does not convert. Write it with one of grai's formatting functions.",
+			},
+			{
+				file: "source/en.json",
+				key: "inherited",
+				locales: ["en", "ru"],
+				detail:
+					"{{value, constructor}} formats the value as constructor, which grai import does not convert. Write it with one of grai's formatting functions.",
 			},
 		]);
 	});
@@ -435,6 +444,7 @@ describe("grai import --from icu", () => {
 			{
 				"en.json": {
 					price: "{value, number, ::currency/EUR}",
+					inherited: "{value, number, constructor}",
 					others: "{n, plural, offset:1 other {# others}}",
 				},
 			},
@@ -445,6 +455,7 @@ describe("grai import --from icu", () => {
 			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
 		).toEqual([
 			"price: {value, number, ::currency/EUR} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
+			"inherited: {value, number, constructor} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
 			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
 		]);
 	});

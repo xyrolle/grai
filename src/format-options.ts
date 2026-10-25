@@ -19,6 +19,7 @@ import {
 	optionInput,
 } from "./format-inputs.ts";
 import { checkFormat } from "./intl-formatters.ts";
+import { ownEntry } from "./own-entry.ts";
 import { MessageProblem } from "./problem.ts";
 
 /**
@@ -71,7 +72,7 @@ export function parseCall(
 	optionsText: string,
 	source: string,
 ): Call {
-	const spec = functions[name];
+	const spec = ownEntry(functions, name);
 	if (spec === undefined) {
 		throw new MessageProblem(
 			"unsupported",
@@ -92,11 +93,11 @@ export function parseCall(
 			mode = selectModeOf(text, source, token);
 			continue;
 		}
-		const refused = spec.refused?.[key];
+		const refused = ownEntry(spec.refused ?? {}, key);
 		if (refused !== undefined) {
 			throw new MessageProblem("unsupported", `${source}: ${refused}`);
 		}
-		const kind = spec.options[key];
+		const kind = ownEntry(spec.options, key);
 		if (
 			kind === undefined ||
 			Object.hasOwn(given, key) ||
