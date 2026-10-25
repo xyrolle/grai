@@ -3,6 +3,7 @@ import {
 	readsNamespace,
 	statementAt,
 } from "./message-imports.ts";
+import { declaresAt } from "./redeclarations.ts";
 import { after, occurrencesOf } from "./sources.ts";
 
 /** A read of the namespace by a name the source computes: it may reach the keys that start with `prefix`, any key for "". */
@@ -77,7 +78,11 @@ function readAt(
 	const open = optional ? after(text, next + 2) : next;
 	const namesKey = text[next] === "." || (optional && text[open] !== "[");
 	if (namesKey) return undefined;
-	if (text[open] !== "[") return { at, written: name, prefix: "" };
+	if (text[open] !== "[") {
+		// A parameter or local of the same name declares another m, which reads nothing of these.
+		if (declaresAt(text, at, name)) return undefined;
+		return { at, written: name, prefix: "" };
+	}
 	const index = indexAt(text, open);
 	if (index !== undefined && writtenIndex.test(index)) return undefined;
 	const prefix =

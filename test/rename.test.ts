@@ -137,6 +137,21 @@ describe("grai rename", () => {
 		expect(result.changed).toEqual([]);
 	});
 
+	it("refuses in a file that declares the namespace's name again, which may be another m", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/render.js":
+				'import { m } from "$lib/i18n";\nexport function render(m) {\n\treturn m.cart_title();\n}\n',
+		});
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			"src/render.js:2:24: the file declares m again, so the rename cannot tell which of its m.cart_title read the key. Rename that m, or rename the key by hand.",
+		]);
+		expect(readText(dir, "src/render.js")).toContain("return m.cart_title();");
+	});
+
 	it("refuses a name another key has, in any case, and a name that is no key name", async () => {
 		const { config } = app();
 
