@@ -32,12 +32,6 @@ Done when: under `"live"`, a page re-renders in the locale it switches to, and a
 
 Done when: under `"live"`, it returns that promise (the entry above), with a browser test.
 
-## A dispatcher per key for a message with inputs
-
-Every message with inputs or markup dispatches through the runtime's one `message()` closure. V8 gives every closure of that literal one feedback vector, so its call of the locale's function sees every key's function and goes megamorphic. A call with inputs then costs 18–19 ns in a page against 11.7–12.3 ns for Paraglide's given `{ locale }` (`client`), and 110–130 ns against 67–122 ns on the server (`server`). An experiment outside `bench/`, which rewrote each such key's dispatch on the compiled output as a function of its own, took app A's call to 10.2 ns from 19.7 in Chromium, and to 43 ns from 53 in a request. A text message calls nothing through the dispatcher and keeps it.
-
-Done when: each message with inputs or markup has a dispatcher of its own, on the server inside the server build's shape, and the server's load, a page's bytes, hydration and the call are measured on both reference apps against the shared dispatcher, the calls winning without the load or the bytes losing more.
-
 ## Bound the formatters kept per value an input gives
 
 `formatterFor` keeps an Intl formatter for each value an input gives an option, in a map that nothing empties. Intl takes any well-formed three-letter currency code, and any offset time zone such as `+05:31`. So a server that formats a currency or a zone a request names can be made to keep up to 17,576 currency formatters, or 2,879 zone formatters, for each such formatter and locale. An app's own data names a few dozen values: Intl knows 162 currencies and 418 time zones by name. A formatter's memory sits mostly outside V8's heap, in ICU, so the heap does not show it.

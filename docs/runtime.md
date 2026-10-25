@@ -24,7 +24,7 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 Not adopted:
 - **Strings put in place of the calls after the framework compiled them.** Svelte has compiled each call as a dynamic expression, so the page hydrates as it does with the calls: 23.9–24.1 ms against 23.3–24.3 ms at a 4× slowdown, where `grai/svelte`'s strings take 15.9–16.2 ms (`svelte-texts`). It would also cost the build: SvelteKit has one client build, so a build per locale, 2 more client builds of 8.1 s on app A, cannot serve its pages, and copies per locale of the 326 of its 1,598 client chunks that call a message are 978 more files behind the import map (`inline-cost`).
 - **A strategy lookup per call.** The locale is resolved once per request on the server, and fixed by the bundle in the browser.
-- **A dispatcher generated per key for a text message.** Each copy reads the request's locale itself, and it is slower than one shared dispatcher: 49–103 ns against 19–25 ns a call (`server`). The engine keeps one hot function fast, and thousands of small copies slow. A message with inputs is another matter: through the shared dispatcher, its call of the locale's function goes megamorphic (`docs/followups.md`).
+- **A dispatcher generated per key for a text message.** Each copy reads the request's locale itself, and it is slower than one shared dispatcher: 49–103 ns against 19–25 ns a call (`server`). The engine keeps one hot function fast, and thousands of small copies slow. For a message with inputs, a dispatch of each key's own halves the call, and costs a page's load more than its calls save (`docs/design.md`).
 - **Anything more for "only the keys a page uses".** Per-key modules give each set of entries exactly its keys, and the build pools the small sets on purpose (`docs/design.md`): on app A a page loads 56% more keys than it uses, in 17 message chunks rather than 49 (median), and its JS is 1.5% smaller.
 
 ## Compared with other libraries
@@ -65,7 +65,7 @@ A message call inside a request, through 2,000 static call sites, 20 to a functi
 | grai, given `{ locale }` | 11–12 ns | 71–115 ns | 81–106 ns | 110–148 ns | 40–61 µs |
 | prototype, a dispatcher per key | 57–68 ns | 96–139 ns | 133–184 ns | | 131–138 µs |
 
-App B gives the same picture. A call with inputs costs more than Paraglide's, because the shared dispatcher's call of the locale's function goes megamorphic (`docs/followups.md`).
+App B gives the same picture. A call with inputs costs more than Paraglide's, because the shared dispatcher's call of the locale's function goes megamorphic; a dispatch per key would cost the server's load more (`docs/design.md`).
 
 - `AsyncLocalStorage` costs 21 ns a read in workerd, and a module variable 0.3 ns (`workerd`).
 - A module variable bound per request is not safe: of 200 renders that await between two messages, 50 render another request's locale, and none through `AsyncLocalStorage` (`interleave`).
