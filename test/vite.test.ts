@@ -234,6 +234,23 @@ describe("the Vite plugin's message chunks", () => {
 		expect(entries.dialog?.includes("Artikel")).toBe(false);
 	});
 
+	it("keeps the keys a first paint needs apart from the keys only a later import needs", async () => {
+		const { dir } = project({
+			en: { now: "Now", later: "Later" },
+			de: { now: "Jetzt", later: "Später" },
+		});
+		writeFileSync(
+			join(dir, "later.js"),
+			`import { m } from "./out/messages.js";\nexport const later = m.later();\n`,
+		);
+		const { chunks, entries } = await built(dir, {
+			page: `import { m } from "./out/messages.js";\nconsole.log(m.now());\nimport("./later.js");\n`,
+		});
+
+		expect([...keysOf(chunks).values()].sort()).toEqual([["later"], ["now"]]);
+		expect(entries.page?.includes("Später")).toBe(false);
+	});
+
 	it("pools sets of keys under ownChunkBytes, so a page of many of them makes few requests, each copy in its locale's words alone", async () => {
 		const pages = Array.from({ length: 12 }, (_, index) => `page${index}`);
 		const catalog = (locale: string) =>
