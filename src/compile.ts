@@ -250,18 +250,18 @@ function basePositionsMoved(
 	);
 }
 
-/** What decides the output: the compiler, the config and every catalog's bytes. */
+/**
+ * What decides the output: the compiler, the config and every catalog's bytes. The whole config,
+ * as no field is then left out by mistake: the catalogs' paths are in the declaration maps.
+ */
 function inputsOf(config: Config, hashes: readonly string[]): string {
 	return hash(
 		"sha1",
-		JSON.stringify([
-			hashOfCompiler(),
-			config.locales,
-			config.baseLocale,
-			config.strategy,
-			config.cookieName,
-			[...config.fallbacks],
-			hashes,
-		]),
+		JSON.stringify([hashOfCompiler(), config, hashes], collectionsAsLists),
 	);
+}
+
+/** JSON of a config's maps and sets, as lists of their entries. */
+function collectionsAsLists(_key: string, value: unknown): unknown {
+	return value instanceof Map || value instanceof Set ? [...value] : value;
 }
