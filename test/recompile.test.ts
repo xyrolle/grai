@@ -1,9 +1,11 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import type { Catalog } from "../src/catalog.ts";
 import { catalogKeys } from "../src/catalog-keys.ts";
-import { recompile } from "../src/compile.ts";
+import { type Build, recompile } from "../src/compile.ts";
 import { editedMessages } from "../src/edit.ts";
 import { project } from "./project.ts";
 
@@ -11,6 +13,10 @@ const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}", footer: "Footer" },
 	de: { title: "Titel", greeting: "Hallo {name}", footer: "Fußzeile" },
 };
+
+/** A full garbage collection, for a test that a value is no longer held. */
+setFlagsFromString("--expose-gc");
+const collect: () => void = runInNewContext("gc");
 
 /** A catalog as editors write it: one entry per line, indented by a tab. */
 const laidOut = (messages: Record<string, unknown>) =>
@@ -22,6 +28,7 @@ const where = { file: "messages/en.json", locale: "en" };
 const parsed = (messages: Record<string, unknown>): Catalog => ({
 	...where,
 	...catalogKeys(messages, where),
+	revision: Symbol(where.locale),
 });
 
 describe("a recompile after an edit", () => {
@@ -79,6 +86,29 @@ describe("a recompile after an edit", () => {
 		expect(formatted.result.written).toContain("formats.js");
 		expect(formats).toContain("export const number_de = ");
 		expect(existsSync(join(dir, "out", "formats.js"))).toBe(false);
+	});
+
+	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
+		const { dir, config } = project(catalogs);
+		const built = async (previous?: Build) => {
+			const { build, result } = await recompile(config, previous);
+			if (build === undefined) throw new Error(result.errors[0]?.message);
+			return build;
+		};
+		let build = await built();
+		const replaced = new WeakRef(build.catalogs[0] ?? {});
+		for (const title of ["Heading", "Header"]) {
+			writeFileSync(
+				join(dir, "messages", "en.json"),
+				laidOut({ ...catalogs.en, title }),
+			);
+			build = await built(build);
+		}
+		await new Promise((resolve) => setImmediate(resolve));
+		collect();
+
+		expect(build.catalogs[0]?.messages.get("title")).toBe("Header");
+		expect(replaced.deref()).toBeUndefined();
 	});
 
 	it("starts again from the last good build after a compile that failed", async () => {
