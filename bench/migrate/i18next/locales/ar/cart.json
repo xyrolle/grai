@@ -1,0 +1,13 @@
+{
+	"title": "سلتك",
+	"items_zero": "لا عناصر",
+	"items_one": "عنصر واحد",
+	"items_two": "عنصران",
+	"items_few": "{{count}} عناصر",
+	"items_many": "{{count}} عنصرًا",
+	"items_other": "{{count}} عنصر",
+	"summary": {
+		"total": "المجموع: {{sum}}",
+		"empty": "لا شيء آخر لإضافته"
+	}
+}

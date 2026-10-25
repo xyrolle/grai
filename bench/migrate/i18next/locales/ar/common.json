@@ -1,0 +1,7 @@
+{
+	"greeting": "مرحبا، {{name}}!",
+	"friend": "صديق",
+	"friend_male": "صديق",
+	"friend_female": "صديقة",
+	"place_ordinal_other": "المركز {{count}}"
+}
