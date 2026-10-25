@@ -125,6 +125,29 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 	);
 });
 
+it("writes the declaration maps again when the config moves the catalog they point to", async () => {
+	const { dir, config, compile } = project(catalogs);
+	await compile();
+	mkdirSync(join(dir, "moved"));
+	for (const locale of Object.keys(catalogs)) {
+		cpSync(
+			join(dir, "messages", `${locale}.json`),
+			join(dir, "moved", `${locale}.json`),
+		);
+	}
+	writeFileSync(
+		config,
+		JSON.stringify({
+			...JSON.parse(readFileSync(config, "utf8")),
+			catalogs: "moved/{locale}.json",
+		}),
+	);
+
+	expect((await compile()).written).toEqual(["keys/0.d.ts.map"]);
+	const map = readFileSync(join(dir, "out", "keys", "0.d.ts.map"), "utf8");
+	expect(JSON.parse(map).sources).toEqual(["../../moved/en.json"]);
+});
+
 it("writes a file of the output again when it is missing", async () => {
 	const { dir, compile } = project(catalogs);
 	await compile();
