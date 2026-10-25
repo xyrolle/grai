@@ -3,14 +3,20 @@ import type { Config } from "../config.ts";
 
 /** What of Astro's config grai's has to agree with. */
 export type AstroRouting = Pick<AstroConfig, "base" | "i18n">;
+type I18n = NonNullable<AstroRouting["i18n"]>;
+
+/** A locale Astro routes: as grai names it, which is `Astro.currentLocale`, and its URLs' prefix. */
+type RoutedLocale = { locale: string; prefix: string };
 
 /**
  * Each way Astro's config disagrees with grai's on where a page's locale comes from, as a
- * sentence; none when they agree.
+ * sentence that says what to set; none when they agree.
  * - With Astro's i18n routing, a page's locale is the one its URL names (`Astro.currentLocale`),
- *   so grai reads it from the URL alone, by the same locales, with the same default, which has
- *   no prefix in both.
- * - grai's `url` strategy finds the locale in the path's first segment, so the site has no base.
+ *   so grai reads the URL first, for the same locales under the same prefixes, with the same
+ *   default, prefixed in both or in neither. A path outside Astro's routing is one of grai's
+ *   `unlocalizedPaths`, whose locale the strategies after `url` find.
+ * - grai's `url` strategy finds the locale in the path's first segment, so the site has no base,
+ *   and no locale has a domain of its own.
  */
 export function disagreements(grai: Config, astro: AstroRouting): string[] {
 	return [
@@ -23,55 +29,104 @@ function baseDisagreements(base: string): string[] {
 	return base.replaceAll("/", "") === ""
 		? []
 		: [
-				`The "url" strategy reads the locale from the path's first segment, which Astro's base ${JSON.stringify(base)} takes. Serve the site from "/", or find the locale another way.`,
+				`The "url" strategy reads the locale from the path's first segment, which Astro's base ${JSON.stringify(base)} takes. Serve the site from Astro's base "/" ("The framework's base path" in grai's docs/followups.md).`,
 			];
 }
 
-function routingDisagreements(
+function routingDisagreements(grai: Config, i18n: I18n): string[] {
+	const routed = routedLocales(i18n);
+	return [
+		...strategyDisagreements(grai),
+		...localeDisagreements(grai, routed),
+		...defaultDisagreements(grai, i18n, routed),
+		...domainDisagreements(i18n),
+	];
+}
+
+/** Each locale Astro routes: a locale written as a tag is its own prefix, `{ path, codes }` is its first code's. */
+function routedLocales(i18n: I18n): RoutedLocale[] {
+	return i18n.locales.map((entry) =>
+		typeof entry === "string"
+			? { locale: entry, prefix: entry }
+			: { locale: entry.codes[0], prefix: entry.path },
+	);
+}
+
+function strategyDisagreements({ strategy }: Config): string[] {
+	if (strategy[0] === "url") return [];
+	const first = ["url", ...strategy.filter((source) => source !== "url")];
+	return [
+		`Astro's i18n routing renders each page in the locale its URL names, so "url" must come first in "strategy": ${JSON.stringify(first)}, not ${JSON.stringify(strategy)}.`,
+	];
+}
+
+/** grai's locales against Astro's, and each one's prefix: a tag, or the one `localePrefixes` gives. */
+function localeDisagreements(grai: Config, routed: RoutedLocale[]): string[] {
+	const astroLocales = routed.map(({ locale }) => locale);
+	const sameLocales =
+		astroLocales.length === grai.locales.length &&
+		grai.locales.every((locale) => astroLocales.includes(locale));
+	if (!sameLocales) {
+		return [
+			`Astro's i18n.locales must route grai's "locales", ${JSON.stringify(grai.locales)}, not ${JSON.stringify(astroLocales)}.`,
+		];
+	}
+	// The base locale's URLs have a prefix only with "localePrefix": "always".
+	const prefixed = routed.filter(
+		({ locale }) =>
+			locale !== grai.baseLocale || grai.urlRouting.localePrefix === "always",
+	);
+	return prefixed.flatMap(({ locale, prefix }) => {
+		const graiPrefix =
+			grai.urlRouting.prefixes[grai.locales.indexOf(locale)] ?? locale;
+		if (graiPrefix === prefix) return [];
+		return prefix === locale
+			? [
+					`grai serves ${locale} under /${graiPrefix}/ ("localePrefixes"), and Astro under /${locale}/. List it in Astro's i18n.locales as { path: ${JSON.stringify(graiPrefix)}, codes: [${JSON.stringify(locale)}] }.`,
+				]
+			: [
+					`Astro serves ${locale} under /${prefix}/, and grai under /${graiPrefix}/. Set "localePrefixes": { ${JSON.stringify(locale)}: ${JSON.stringify(prefix)} } in grai's config.`,
+				];
+	});
+}
+
+/** The default locale: grai's base locale, prefixed in both or in neither. */
+function defaultDisagreements(
 	grai: Config,
-	i18n: NonNullable<AstroRouting["i18n"]>,
+	i18n: I18n,
+	routed: RoutedLocale[],
 ): string[] {
 	const problems: string[] = [];
-	if (grai.strategy.length !== 1 || grai.strategy[0] !== "url") {
-		problems.push(
-			`Astro's i18n routing renders each page in the locale its URL names, so "strategy" must be ["url"], not ${JSON.stringify(grai.strategy)}.`,
-		);
-	}
-	const paths = i18n.locales.flatMap((locale) =>
-		typeof locale === "string" ? [] : [locale.path],
+	const astroDefault = routed.find(
+		({ prefix }) => prefix === i18n.defaultLocale,
 	);
-	if (paths.length > 0) {
+	if (astroDefault?.locale !== grai.baseLocale) {
+		const base = routed.find(({ locale }) => locale === grai.baseLocale);
 		problems.push(
-			`Astro's i18n.locales names ${paths.map((path) => JSON.stringify(path)).join(", ")} by a path; the "url" strategy names a locale by its tag, so list the locales as their tags.`,
+			`Astro's i18n.defaultLocale must be ${JSON.stringify(base?.prefix ?? grai.baseLocale)}, grai's "baseLocale", not ${JSON.stringify(i18n.defaultLocale)}.`,
 		);
 	}
-	const astroLocales = i18n.locales.flatMap((locale) =>
-		typeof locale === "string" ? [locale] : [],
-	);
-	const missing = grai.locales.filter(
-		(locale) => !astroLocales.includes(locale),
-	);
-	const extra = astroLocales.filter((locale) => !grai.locales.includes(locale));
-	if (paths.length === 0 && (missing.length > 0 || extra.length > 0)) {
+	if (i18n.routing === "manual") return problems;
+	const astroPrefixes = i18n.routing.prefixDefaultLocale;
+	const graiPrefixes = grai.urlRouting.localePrefix === "always";
+	if (astroPrefixes && !graiPrefixes) {
 		problems.push(
-			`Astro's i18n.locales must be grai's "locales": ${JSON.stringify(grai.locales)}, not ${JSON.stringify(astroLocales)}.`,
+			`Astro prefixes the default locale's URLs too (i18n.routing.prefixDefaultLocale). Set "localePrefix": "always" in grai's config.`,
 		);
 	}
-	if (i18n.defaultLocale !== grai.baseLocale) {
+	if (graiPrefixes && !astroPrefixes) {
 		problems.push(
-			`Astro's i18n.defaultLocale must be grai's "baseLocale", ${JSON.stringify(grai.baseLocale)}, not ${JSON.stringify(i18n.defaultLocale)}.`,
-		);
-	}
-	if (i18n.routing !== "manual" && i18n.routing.prefixDefaultLocale) {
-		problems.push(
-			`The base locale's URLs have no prefix in grai, so Astro's i18n.routing.prefixDefaultLocale must be false.`,
-		);
-	}
-	const domains = Object.keys(i18n.domains ?? {});
-	if (domains.length > 0) {
-		problems.push(
-			`Astro's i18n.domains serves ${domains.join(", ")} from domains of their own, where grai's "url" strategy finds the locale in the path. Serve every locale under its path prefix instead.`,
+			`grai prefixes every locale's URLs ("localePrefix": "always"). Set Astro's i18n.routing.prefixDefaultLocale to true.`,
 		);
 	}
 	return problems;
+}
+
+function domainDisagreements(i18n: I18n): string[] {
+	const domains = Object.keys(i18n.domains ?? {});
+	return domains.length === 0
+		? []
+		: [
+				`Astro's i18n.domains serves ${domains.join(", ")} from domains of their own, where grai's "url" strategy finds the locale in the path. Remove i18n.domains and serve each locale under its path prefix ("A domain per locale" in grai's docs/followups.md).`,
+			];
 }
