@@ -35,12 +35,14 @@ export type Build = {
 
 /** The runtime's modules, which every output carries as they are. */
 const runtime = {
-	runtime: readFileSync(
-		new URL("./runtime/runtime.js", import.meta.url),
-		"utf8",
-	),
-	server: readFileSync(new URL("./runtime/server.js", import.meta.url), "utf8"),
+	dispatch: runtimeModule("dispatch.js"),
+	runtime: runtimeModule("runtime.js"),
+	server: runtimeModule("server.js"),
 };
+
+function runtimeModule(file: string): string {
+	return readFileSync(new URL(`./runtime/${file}`, import.meta.url), "utf8");
+}
 
 /**
  * The compiler's own modules, the runtime's among them, hashed: what decides the output besides the

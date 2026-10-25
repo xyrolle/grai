@@ -62,7 +62,18 @@ export type MarkupMessage<
 > = Message<Inputs> & {
 	parts: Call<Inputs, MessagePart<Tag>[]>;
 };
-// What the rest of the output calls; not for apps.
+`;
+}
+
+/** dispatch.d.ts: the runtime's code, as the output's own modules import it. Apps import runtime.js. */
+export const dispatchDeclarations = `import type {
+	Locale,
+	MarkupMessage,
+	Message,
+	MessagePart,
+} from "./runtime.js";
+
+export * from "./runtime.js";
 /** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
 export declare function localeOfPath(pathname: string): Locale | undefined;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
@@ -105,7 +116,6 @@ export declare function formatterFor<Made extends Intl.NumberFormat | Intl.DateT
 	value: unknown,
 ): Made;
 `;
-}
 
 /** server.d.ts: the middleware, typed with the project's locales. */
 export const serverDeclarations = `import type { Locale } from "./runtime.js";

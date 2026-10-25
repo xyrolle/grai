@@ -64,7 +64,7 @@ export function formatModule(formatters: Iterable<Formatter>): string {
 	const imports =
 		imported.length === 0
 			? ""
-			: `import { ${imported.join(", ")} } from "./runtime.js";\n\n`;
+			: `import { ${imported.join(", ")} } from "./dispatch.js";\n\n`;
 	const definitions = sorted.map(({ name, locale, format }) =>
 		formatterCode(name, locale, format),
 	);
