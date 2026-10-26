@@ -61,6 +61,20 @@ describe("a reading of the files that may name a module outside the listed sourc
 		});
 	});
 
+	it("reads every file when a tsconfig's baseUrl is outside the roots, as any specifier may name a module through it", async () => {
+		const dir = projectWith({
+			"shared/i18n.ts": 'export { m } from "../out/messages.js";\n',
+			"tsconfig.json": JSON.stringify({ compilerOptions: { baseUrl: "." } }),
+			"src/a.ts": 'import { m } from "shared/i18n.ts";\nm.title();\n',
+			"src/d.ts": "export const d = 1;\n",
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: ["src/a.ts", "src/d.ts"],
+			reads: ["src/a.ts title"],
+		});
+	});
+
 	it("reads a file that imports an installed package that passes the output on, and none that imports one that does not", async () => {
 		const dir = projectWith({
 			"node_modules/passing/package.json": JSON.stringify({
