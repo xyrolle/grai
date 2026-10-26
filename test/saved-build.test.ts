@@ -278,6 +278,17 @@ it("removes a save a process left as it crashed, and none whose process still ru
 	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
 });
 
+it("takes up no saved build longer or shorter than it says, as a write over a longer file would leave", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	const bytes = readFileSync(savedFile(dir));
+	// A whole build with bytes after it, which V8 reads without a word.
+	writeFileSync(savedFile(dir), Buffer.concat([bytes, Buffer.from("more")]));
+
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeUndefined();
+	expect((await started(file)).build?.compilation.changed.size).toBe(2);
+});
+
 it("saves one whole build when two watchers of an outdir close at once, so no start takes up a mix of them", async () => {
 	// Long enough catalogs that a save takes several writes, which two saves at once would interleave.
 	const valued = (value: string) =>
