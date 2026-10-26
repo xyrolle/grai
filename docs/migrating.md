@@ -13,7 +13,7 @@ grai compile
 - **A call it cannot prove safe stays as it is**, with a note. That covers a locale or a default value that may read otherwise once the rewrite moves or drops it, an `m` that names another import, and a list a hook that is not React's takes.
 - **What is left** is the list it prints: the calls to migrate by hand, then the library's own API, such as its provider, its setup and its locale switch, which grai's runtime and middleware replace.
 
-`grai migrate` reads JavaScript and TypeScript modules, JSX included, with Vite's parser. A project without Vite adds `vite` as a dev dependency while it migrates. It lists each Svelte, Vue, Astro or MDX component that imports the library, for a person to migrate.
+`grai migrate` reads JavaScript and TypeScript modules, JSX included, with grai's parser, oxc's. It lists each Svelte, Vue, Astro or MDX component that imports the library, for a person to migrate.
 
 Each library has a small app in `bench/migrate/`. `node bench/migrate-equivalence.mjs` imports and migrates each one, then renders its pages before and after, for three locales and 30 sets of inputs, and fails on any difference.
 
