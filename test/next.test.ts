@@ -1,5 +1,11 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -151,6 +157,41 @@ await withGrai()(${JSON.stringify(PHASE_DEVELOPMENT_SERVER)});`,
 		await expect.poll(() => shards(dir)).toContain("Your basket");
 	});
 
+	it("refuses a Next basePath that is not grai's, under the url strategy, which reads the locale after it", async () => {
+		const { dir } = project(
+			{ en: { title: "Your cart" } },
+			{ strategy: ["url"], basePath: "/shop" },
+		);
+		inProject(dir);
+
+		await expect(
+			withGrai({ basePath: "/store" })(PHASE_PRODUCTION_BUILD),
+		).rejects.toThrow(
+			'grai.config.json: Next\'s basePath "/store" and grai\'s "basePath" "/shop" must name the same path: the "url" strategy reads the locale after it.',
+		);
+		await expect(withGrai()(PHASE_PRODUCTION_BUILD)).rejects.toThrow(
+			'grai.config.json: Next\'s basePath (none) and grai\'s "basePath" "/shop" must name the same path',
+		);
+		expect(
+			(await withGrai({ basePath: "/shop" })(PHASE_PRODUCTION_BUILD)).basePath,
+		).toBe("/shop");
+	});
+
+	it("reads the grai config its options name", async () => {
+		const { dir } = project({ en: { title: "Your cart" } }, { outdir: "out" });
+		inProject(dir);
+		renameSync(join(dir, "grai.config.json"), join(dir, "grai.base.json"));
+
+		const config = await withGrai(
+			{},
+			{ config: "grai.base.json" },
+		)(PHASE_PRODUCTION_BUILD);
+
+		expect(config.turbopack?.resolveAlias).toEqual({
+			"grai/next/output/*": "./out/*",
+		});
+	});
+
 	it("gives a command that bundles nothing, such as next start, the config as it is, without reading grai's", async () => {
 		const { dir } = project({ en: { title: "Your cart" } });
 		inProject(join(dir, "messages"));
@@ -193,8 +234,17 @@ async function proxyFor(dir: string) {
 	const proxy: (request: NextRequest) => Promise<Response> = (
 		await import(pathToFileURL(join(outDir, "proxy.js")).href)
 	).proxy;
-	return (path: string, headers: Record<string, string> = {}) =>
-		proxy(new NextRequest(`https://shop.test${path}`, { headers }));
+	return (
+		path: string,
+		headers: Record<string, string> = {},
+		basePath?: string,
+	) =>
+		proxy(
+			new NextRequest(`https://shop.test${path}`, {
+				headers,
+				...(basePath === undefined ? {} : { nextConfig: { basePath } }),
+			}),
+		);
 }
 
 /** The path a proxy's response rewrites the request to. */
@@ -221,6 +271,20 @@ describe("the proxy", () => {
 		expect(await rewritten("/cart?step=2")).toBe("/en/cart?step=2");
 		expect(await rewritten("/ro/cart")).toBe("/ro/cart");
 		expect(await rewritten("/en/cart")).toBe("/en/en/cart");
+	});
+
+	it("reads the locale after Next's basePath, and rewrites under it", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["url"],
+			basePath: "/shop",
+		});
+		await load();
+		const proxied = await proxyFor(dir);
+
+		expect([
+			rewrittenPath(await proxied("/shop/ro/cart", {}, "/shop")),
+			rewrittenPath(await proxied("/shop/cart", {}, "/shop")),
+		]).toEqual(["/shop/ro/cart", "/shop/en/cart"]);
 	});
 
 	it("rewrites a path in its locale's words to the app's route", async () => {

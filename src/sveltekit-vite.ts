@@ -1,5 +1,6 @@
-import type { Plugin } from "vite";
-import { grai as svelteGrai } from "./svelte.ts";
+import type { Plugin, ResolvedConfig } from "vite";
+import type { FrameworkBase } from "./base-agreement.ts";
+import { sveltePlugins } from "./svelte-plugins.ts";
 import type { GraiOptions } from "./vite-plugin.ts";
 
 /** The plugin's options: `config`, the path of the project's grai.config.json, from Vite's root. */
@@ -13,5 +14,23 @@ export type SvelteKitGraiOptions = Pick<GraiOptions, "config">;
  *     plugins: [grai(), sveltekit()]
  */
 export function grai(options: SvelteKitGraiOptions = {}): Plugin[] {
-	return svelteGrai({ ...options, localeChunks: true });
+	return sveltePlugins(
+		{ ...options, localeChunks: true },
+		{ frameworkBase: kitBase },
+	);
+}
+
+/**
+ * SvelteKit's `paths.base`, from the options its setup plugin keeps, where Kit itself reads its
+ * config from a resolved Vite config. Kit sets Vite's own base to its assets' path, which is
+ * not where its pages are.
+ */
+function kitBase(config: ResolvedConfig): FrameworkBase | undefined {
+	const setup = config.plugins.find(
+		(plugin) => plugin.name === "vite-plugin-sveltekit-setup",
+	);
+	const base: unknown = setup?.api?.options?.kit?.paths?.base;
+	return typeof base === "string"
+		? { option: "SvelteKit's paths.base", base }
+		: undefined;
 }
