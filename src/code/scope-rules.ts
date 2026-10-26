@@ -94,3 +94,32 @@ export function namesElement(node: Node, field: string): boolean {
 		node.type === "JSXOpeningElement" || node.type === "JSXClosingElement";
 	return element && field === "name";
 }
+
+/** The names an assignment's target writes. */
+export function writtenNames(target: Node): Node[] {
+	switch (target.type) {
+		case "Identifier":
+			return [target];
+		case "ObjectPattern":
+			return target.properties.flatMap((property) =>
+				writtenNames(
+					property.type === "RestElement" ? property.argument : property.value,
+				),
+			);
+		case "ArrayPattern":
+			return target.elements.flatMap((element) =>
+				element === null ? [] : writtenNames(element),
+			);
+		case "AssignmentPattern":
+			return writtenNames(target.left);
+		case "RestElement":
+			return writtenNames(target.argument);
+		case "TSAsExpression":
+		case "TSSatisfiesExpression":
+		case "TSNonNullExpression":
+		case "TSTypeAssertion":
+			return writtenNames(target.expression);
+		default:
+			return [];
+	}
+}
