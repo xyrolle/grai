@@ -40,6 +40,8 @@ export type Read = Place & {
 	via: "member" | "pattern" | "name" | "path" | "module";
 	edits: Edit[];
 	binding: Binding | undefined;
+	/** The read's call with no arguments, `m.title()`, which a text can replace. */
+	call: Span | undefined;
 };
 
 /**

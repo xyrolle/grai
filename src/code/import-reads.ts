@@ -144,9 +144,8 @@ function isOutputPath(specifier: string, graph: ModuleGraph): boolean {
 
 /** What an import binds, with every reference to it. */
 function bindingOf(module: ModuleFacts, local: string, at: Span): Binding {
-	const references = usesFrom(module.uses, local).map(({ at, shorthand }) => ({
-		at,
-		shorthand,
-	}));
+	const references = usesFrom(module.uses, local).map(
+		({ at, shorthand, call }) => ({ at, shorthand, call }),
+	);
 	return { name: local, at, references };
 }
