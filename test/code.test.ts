@@ -86,6 +86,21 @@ describe("reading a file's code", () => {
 		]);
 	});
 
+	it("reads a Svelte each block that names an index and no item, which binds the index alone", async () => {
+		const text = [
+			"<script>",
+			'\timport { m } from "$lib/i18n";',
+			"</script>",
+			"{#each { length: 3 }, i (i)}<p>{m.row()}</p>{/each}",
+			"{#each { length: 3 }, m}{m.toFixed}{/each}",
+		].join("\n");
+
+		expect(await readsOf("src/App.svelte", text)).toEqual([
+			"row 4:35 import",
+			"toFixed 5:28 local",
+		]);
+	});
+
 	it("reads a Vue component's scripts and template, with v-for's and v-slot's scopes", async () => {
 		const text = [
 			'<script setup lang="ts">',
