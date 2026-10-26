@@ -920,12 +920,49 @@ describe("the Vite plugin's dev server", devTest, () => {
 	}
 
 	/** A server render of the project's title. */
-	function serverRender(dir: string) {
+	function serverRender(dir: string, plugins: Plugin[] = []) {
 		writeFileSync(
 			join(dir, "render.js"),
 			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
 		);
-		return serverRenderOf(dir);
+		return serverRenderOf(dir, plugins);
+	}
+
+	/**
+	 * A plugin that holds the dev module an environment takes between the plugin's load and the
+	 * environment's evaluation, as a slow first request does: `loaded` once it holds the module, and
+	 * `sent` once the environment has been sent an edit's patch, which the module, not yet evaluated,
+	 * has no handler for. `release` lets the module go.
+	 */
+	function holding(environment: "client" | "ssr") {
+		const loaded = Promise.withResolvers<void>();
+		const sent = Promise.withResolvers<void>();
+		const released = Promise.withResolvers<void>();
+		const plugin: Plugin = {
+			name: "holding",
+			configureServer(server) {
+				const hot = server.environments[environment].hot;
+				const send = hot.send.bind(hot);
+				hot.send = (payload: HotPayload | string, data?: unknown) => {
+					if (typeof payload === "string") return send(payload, data);
+					if (payload.type === "custom" && payload.event === "grai:update")
+						sent.resolve();
+					send(payload);
+				};
+			},
+			async transform(_code, id) {
+				if (id !== "\0grai:keys" || this.environment.name !== environment)
+					return;
+				loaded.resolve();
+				await released.promise;
+			},
+		};
+		return {
+			plugin,
+			loaded: loaded.promise,
+			sent: sent.promise,
+			release: released.resolve,
+		};
 	}
 
 	it("has an import of the output wait for the first compile, rather than fail", async () => {
@@ -1247,6 +1284,25 @@ export const render = () => \`\${m.title()} \${globalThis.evaluated}\`;
 		await expect.poll(rendered, devWait).toBe("Heading 2");
 	});
 
+	it("writes the patch of an edit made while a server's runner takes the messages, once it has evaluated them", async () => {
+		const { dir } = project(catalogs);
+		const held = holding("ssr");
+		const rendered = await serverRender(dir, [held.plugin]);
+		const first = rendered();
+		await held.loaded;
+
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+		await held.sent;
+		held.release();
+		await first;
+
+		await expect.poll(rendered, devWait).toBe("Heading");
+	});
+
 	it("starts from the build the last server saved, with the edit made while none ran, and patches the next edit", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
@@ -1465,6 +1521,52 @@ window.loaded = performance.timeOrigin;
 		await title("Überschrift");
 
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+
+	it("shows an edit whose patch came while the page was taking the messages, before it could hear it", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><html lang="de"><p id="title"></p><script type="module" src="/main.js"></script>`,
+		);
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { m } from "./out/messages.js";
+const render = () => { document.getElementById("title").textContent = m.title(); };
+render();
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });
+`,
+		);
+		const held = holding("client");
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			// The page's own request takes the module: a request after the edit would drop Vite's
+			// pre-transform of main.js's imports, made before it, for a module with the edit.
+			server: { ...loopback, watch: fixtures, preTransformRequests: false },
+			plugins: [grai(), held.plugin],
+		});
+		await server.listen();
+		onTestFinished(() => server.close());
+		const browser = await chromium.launch();
+		onTestFinished(() => browser.close());
+		const page = await browser.newPage();
+		const loading = page.goto(server.resolvedUrls?.local[0] ?? "");
+		await held.loaded;
+
+		const catalog = join(dir, "messages", "de.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Titel"', '"Überschrift"'),
+		);
+		await held.sent;
+		held.release();
+		await loading;
+
+		await page.waitForFunction(
+			`document.getElementById("title").textContent === "Überschrift"`,
+		);
 	});
 
 	it("shows an edited message without reloading the page, for a project reached through a symlink", async () => {
