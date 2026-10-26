@@ -29,6 +29,7 @@
 		"hmr": "node hmr.mjs",
 		"call-sites": "node call-sites.mjs",
 		"startup": "node startup.mjs",
+		"server-shapes": "node server-shapes.mjs",
 		"library-bytes": "node library-bytes.mjs",
 		"compile-time": "node compile-time.mjs",
 		"types": "node types.mjs",
