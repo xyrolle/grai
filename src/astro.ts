@@ -90,16 +90,20 @@ function middlewareCode(
 	grai: Config,
 	project: Omit<
 		LocaleProject,
-		"middleware" | "getTextDirection" | "localeOfPath"
+		| "middleware"
+		| "getTextDirection"
+		| "localeOfPath"
+		| "routeOfPath"
+		| "pathOfRoute"
 	>,
 ): string {
 	const output = (file: string) => JSON.stringify(join(grai.outdir, file));
 	return `import { localeMiddleware } from "grai/astro/middleware";
 import { middleware } from ${output("server.js")};
 import { getTextDirection } from ${output("runtime.js")};
-import { localeOfPath } from ${output("internal.js")};
+import { localeOfPath, pathOfRoute, routeOfPath } from ${output("internal.js")};
 
-export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, ...${JSON.stringify(project)} });
+export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, routeOfPath, pathOfRoute, ...${JSON.stringify(project)} });
 `;
 }
 

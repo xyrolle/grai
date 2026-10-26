@@ -339,10 +339,9 @@ async function compiledProject(config: Record<string, unknown>) {
 		dir,
 		"server.js",
 	);
-	const internal = await outputModule<Pick<LocaleProject, "localeOfPath">>(
-		dir,
-		"internal.js",
-	);
+	const internal = await outputModule<
+		Pick<LocaleProject, "localeOfPath" | "routeOfPath" | "pathOfRoute">
+	>(dir, "internal.js");
 	return {
 		m,
 		middleware: (project: Partial<LocaleProject> = {}) =>
@@ -350,6 +349,8 @@ async function compiledProject(config: Record<string, unknown>) {
 				middleware: server.middleware,
 				getTextDirection: runtime.getTextDirection,
 				localeOfPath: internal.localeOfPath,
+				routeOfPath: internal.routeOfPath,
+				pathOfRoute: internal.pathOfRoute,
 				configName: "grai.config.json",
 				requestStrategies: { beforeUrl: [], afterUrl: [] },
 				...project,
@@ -467,6 +468,25 @@ describe("the middleware", () => {
 		expect(allowed).toEqual(["sha256-ro"]);
 	});
 
+	it("renders a path in its locale's words as the route Astro routes, its prefix kept", async () => {
+		const { m, middleware } = await compiledProject({
+			strategy: ["url"],
+			pathnames: { "/products/[id]": { ro: "/produse/[id]" } },
+		});
+		const routed: (string | undefined)[] = [];
+
+		const response = await middleware()(
+			context("/ro/produse/7?view=all"),
+			(rewrite?: string) => {
+				routed.push(rewrite);
+				return page(m)();
+			},
+		);
+
+		expect(routed).toEqual(["/ro/products/7?view=all"]);
+		expect(await response.text()).toContain('lang="ro"');
+	});
+
 	it("passes on anything but a page as it is", async () => {
 		const { middleware } = await compiledProject({ strategy: ["url"] });
 		const json = Response.json({ title: "Your cart" });
@@ -505,6 +525,22 @@ describe("the middleware", () => {
 				Response,
 			);
 		}
+	});
+
+	it("fails a prerendered page whose path its locale's words translate, which a static build has no page at", async () => {
+		const { m, middleware } = await compiledProject({
+			strategy: ["url"],
+			pathnames: { "/about": { ro: "/despre" } },
+		});
+		const onRequest = middleware();
+
+		expect(await prerendering(onRequest, m, "/ro/about")).toMatchObject({
+			name: "GraiError",
+			code: "config-invalid",
+			message: `grai.config.json: the page /ro/about is prerendered at /ro/about, but "pathnames" gives it /ro/despre in ro, where a static build has no page. Render the page on demand (export const prerender = false), or leave its path out of "pathnames".`,
+		});
+		expect(await prerendering(onRequest, m, "/about")).toBeInstanceOf(Response);
+		expect(await prerendering(onRequest, m, "/ro/")).toBeInstanceOf(Response);
 	});
 
 	it("fails a prerendered page whose locale a strategy ahead of the URL would find in the request", async () => {
