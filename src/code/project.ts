@@ -18,6 +18,7 @@ import { namesOf, textTest, written } from "./candidates.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
+import { Installed } from "./installed.ts";
 import { projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Outside, outsideNames } from "./outside.ts";
@@ -101,7 +102,8 @@ export async function readProjectCode(
 	const pool = new Pool();
 	try {
 		// The files whose text may name the output, a barrel or a module outside the listed sources,
-		// read and resolved, until the barrels they hold name no file more.
+		// read and resolved, until the barrels they hold and the packages the rest import name no file
+		// more.
 		const passers = new OutsidePackages(packages, config.root);
 		const listing = {
 			roots: listedRoots,
@@ -110,13 +112,20 @@ export async function readProjectCode(
 		};
 		const beyond = new Outside(listing, mappings ?? []);
 		const leaving = outsideNames(listing, mappings ?? [], links);
+		const installed = new Installed(
+			config.root,
+			seen.skipped,
+			mappings ?? [],
+			resolveFile,
+		);
 		let barrels = new Set<string>();
-		for (;;) {
+		let reached = new Set<string>();
+		for (let round = 0; ; round += 1) {
 			const names =
 				mappings &&
 				namesOf({ outdir: config.outdir, barrels }, mappings, links, packages);
 			if (names !== undefined) {
-				for (const name of leaving) names.add(name);
+				for (const name of [...leaving, ...reached]) names.add(name);
 				for (const name of passers.passing(names)) names.add(written(name));
 			}
 			const test = names && textTest(names);
@@ -125,7 +134,8 @@ export async function readProjectCode(
 					!sources.has(path) &&
 					(test === undefined || test.test(text) || beyond.test(path, text)),
 			);
-			if (taken.length === 0) break;
+			// The first round goes on with no file to read, to find the packages the files may import.
+			if (taken.length === 0 && round > 0) break;
 			const read = await factsOfSources(taken, cache, pool);
 			const added = new Map<string, SourceCode>();
 			taken.forEach(({ path, file, text }, index) => {
@@ -135,10 +145,13 @@ export async function readProjectCode(
 			for (const [path, source] of added) sources.set(path, source);
 			const paths = await resolvedImports(added, resolution, resolveFile, pool);
 			for (const [key, path] of paths) resolved.set(key, path);
-			barrels = await barrelsOf(
-				sources.keys(),
-				new ModuleGraph(output, resolve, factsOfPath),
-			);
+			const holds = holding(new ModuleGraph(output, resolve, factsOfPath));
+			barrels = await barrelsOf(sources.keys(), holds);
+			// The installed packages the sources left out may import, and that pass grai's on.
+			if (mappings !== undefined) {
+				const left = files.filter(({ path }) => !sources.has(path));
+				reached = await installed.passing(left, holds);
+			}
 		}
 		saveQuietly(cache);
 	} finally {
@@ -150,15 +163,22 @@ export async function readProjectCode(
 /** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */
 const holdsNothing: FileFacts = { modules: [] };
 
-/** The sources that pass grai's on: each whose module holds a key or more. */
+/** Whether a module passes grai's on: whether it holds a key or more. */
+function holding(graph: ModuleGraph): (path: string) => Promise<boolean> {
+	return async (path) => {
+		const held = await graph.keysHeld({ kind: "module", path });
+		return held === "every" || held.size > 0;
+	};
+}
+
+/** The sources that pass grai's on. */
 async function barrelsOf(
 	paths: Iterable<string>,
-	graph: ModuleGraph,
+	holds: (path: string) => Promise<boolean>,
 ): Promise<Set<string>> {
 	const barrels = new Set<string>();
 	for (const path of paths) {
-		const held = await graph.keysHeld({ kind: "module", path });
-		if (held === "every" || held.size > 0) barrels.add(path);
+		if (await holds(path)) barrels.add(path);
 	}
 	return barrels;
 }
