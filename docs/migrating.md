@@ -51,6 +51,7 @@ Each library has a small app in `bench/migrate/`. `node bench/migrate-equivalenc
 | `const t = await getTranslations("About")`, then `t("title")` | `m.About_title()` |
 | `const t = await getTranslations({ locale, namespace: "About" })`, then `t("visits", { count })` | `m.About_visits({ count }, { locale })` |
 
+- **The `await` goes with `getTranslations`.** Once every call of its `t` is rewritten, `const t = await getTranslations(…)` is removed, so the function no longer yields there, and the code after it runs in the same turn. That matters only to code that counts on the pause. For example, when several such functions run side by side, their work after that line interleaves in another order. It also matters when a call outside a request relied on `getTranslations` throwing there.
 - **Left for a person:**
   - `t.rich` and `t.markup`, whose markup renders through the message's `.parts()`;
   - `t.raw` and `t.has`: grai's messages are functions, and a missing key fails the build;
