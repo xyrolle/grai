@@ -135,7 +135,7 @@ The compiler writes these modules, with their declarations, into `outdir`.
 - `extractLocaleFromUrl(url: string | URL): Locale`: the locale a URL's first path segment names, else the base locale.
 - `deLocalizeUrl(url: string | URL): URL`: the URL without its locale prefix.
 - `localizeUrl(url: string | URL, options?: { locale?: Locale }): URL`: the URL with a locale's prefix, the current locale's by default.
-- `localizeHref(href: string, options?: { locale?: Locale }): string`: a path such as `/cart` with a locale's prefix; any other href as it is.
+- `localizeHref(href: string, options?: { locale?: Locale }): string`: a path such as `/cart` with a locale's prefix; a relative href, such as `./cart`, read from the page's URL, on the server the request's; a URL with a scheme or a host of its own as it is.
 
 The four URL helpers follow the `url` strategy. Without it no URL names a locale, so they leave every URL as it is, and `extractLocaleFromUrl` gives the base locale.
 - `type Message<Inputs>`: a message, `(inputs, options?: { locale?: Locale }) => string`. Without inputs, `inputs` is optional and takes none.

@@ -151,9 +151,10 @@ let current = locales.indexOf(
  * `setLocale` in the request changes it in place: Workers have no `enterWith` to bind another,
  * and Node marks it experimental.
  *
- * The request's origin goes with it, so a link to a locale on another host is a whole URL.
+ * The request's URL goes with it, which a relative link is read from, and from which a link to a
+ * locale on another host is a whole URL.
  *
- * @typedef {{ index: number, origin?: string }} RequestLocale
+ * @typedef {{ index: number, url?: string | URL }} RequestLocale
  */
 
 /**
@@ -172,9 +173,9 @@ export function bindRequests(storage) {
 	requests = storage;
 }
 
-/** The origin links are written from: the request's, else the page's, if either. */
-function currentOrigin() {
-	return requests?.getStore()?.origin ?? (page ? location.origin : undefined);
+/** The URL a link is read from: the request's, else the page's base URL, if either. */
+function currentUrl() {
+	return requests?.getStore()?.url ?? (page ? document.baseURI : undefined);
 }
 
 /**
@@ -463,20 +464,26 @@ export function localizeUrl(url, options) {
 
 /**
  * A path such as `/cart?step=2` with a locale's prefix, under the `url` strategy, or a whole URL
- * to a locale on a host of its own. Any other href, and every href without that strategy, is
- * given back as it is.
+ * to a locale on a host of its own. A relative href, such as `./cart` or `?step=2`, is read from
+ * the page's URL, on the server the request's, as a link is. A URL with a scheme or a host of its
+ * own, a relative href with neither page nor request to read it from, and every href without that
+ * strategy are given back as they are.
  *
  * @param {string} href
  * @param {{ locale?: string }} [options]
  * @returns {string}
  */
 export function localizeHref(href, options) {
-	if (!href.startsWith("/") || href.startsWith("//")) return href;
-	// A link leaves the current host only for a locale on a host of its own.
-	const origin = (hostsLocales && currentOrigin()) || "http://localhost";
-	const url = localizeUrl(new URL(href, origin), options);
-	if (hostsLocales && url.origin !== origin) return url.href;
-	return url.pathname + url.search + url.hash;
+	const rooted = href[0] === "/";
+	// A path from the root needs the page's URL only where a link may leave for another host.
+	const from = rooted && !hostsLocales ? undefined : currentUrl();
+	// Any other href that parses alone is a URL of its own, such as `https://…` or `mailto:`.
+	if (!readsUrl || (rooted ? href[1] === "/" : !from || URL.canParse(href)))
+		return href;
+	const url = new URL(href, from ?? "http://localhost");
+	const localized = localizeUrl(url, options);
+	if (hostsLocales && localized.host !== url.host) return localized.href;
+	return localized.pathname + localized.search + localized.hash;
 }
 
 /**

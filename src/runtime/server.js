@@ -5,7 +5,6 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import {
 	baseLocale,
 	cookieName,
-	hostsLocales,
 	locales,
 	prefixesEveryLocale,
 	queryParameter,
@@ -109,12 +108,8 @@ export async function middleware(request, handler) {
 	);
 	const response = unprefixedPage(request, url)
 		? Response.redirect(localizeUrl(url, { locale }), 307)
-		: await requests.run(
-				// The origin only where links may cross to another locale's host.
-				hostsLocales
-					? { index: locales.indexOf(locale), origin: url.origin }
-					: { index: locales.indexOf(locale) },
-				() => handler({ request, locale }),
+		: await requests.run({ index: locales.indexOf(locale), url }, () =>
+				handler({ request, locale }),
 			);
 	return vary === "" ? response : withVary(response);
 }
