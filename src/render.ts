@@ -6,7 +6,8 @@ import {
 	type DeclarationLine,
 	shardMap,
 } from "./declaration-maps.ts";
-import type { RuntimeFunction } from "./modules.ts";
+import { keyExports } from "./key-exports.ts";
+import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import {
 	type OutputModules,
 	type RenderedFormats,
@@ -242,31 +243,11 @@ function shardModule(
 	modules: OutputModules,
 	locales: readonly string[],
 ): string {
-	const uses = new Set<RuntimeFunction | "assertCompiledFor">([
-		"assertCompiledFor",
-	]);
-	const plurals = new Set<string>();
-	const formats = new Set<string>();
-	for (const key of keys) {
-		for (const name of key.uses) uses.add(name);
-		for (const name of key.plurals) plurals.add(name);
-		for (const name of key.formats.keys()) formats.add(name);
-	}
-	const imports = [
-		`import { ${[...uses].sort().join(", ")} } from "../${modules.runtime}";\n`,
-	];
-	if (plurals.size > 0) {
-		imports.push(
-			`import { ${[...plurals].sort().join(", ")} } from "../${modules.plurals}";\n`,
-		);
-	}
-	if (formats.size > 0 && modules.formats !== undefined) {
-		imports.push(
-			`import { ${[...formats].sort().join(", ")} } from "../${modules.formats}";\n`,
-		);
-	}
-	const code = keys.map((key) => key.code).join("");
-	return `${imports.join("")}\nassertCompiledFor(${JSON.stringify(locales)});\n${code}`;
+	// Each shard checks, as it is evaluated, that the runtime was compiled for its locales.
+	const uses = new Set<string>(["assertCompiledFor"]);
+	for (const key of keys) for (const name of key.uses) uses.add(name);
+	const names = calledNames(keys, uses);
+	return `${outputImports(names, (file) => `../${file}`, modules)}\n\nassertCompiledFor(${JSON.stringify(locales)});\n${keyExports(keys, everyName(names))}`;
 }
 
 /** A shard's declarations, but the line naming their map, and the line each key's is on. */

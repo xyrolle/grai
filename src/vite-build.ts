@@ -4,6 +4,7 @@ import type { Build } from "./compile.ts";
 import { withoutContentHash } from "./content-names.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
+import { keyExports } from "./key-exports.ts";
 import { keyReach, type ModuleGraph } from "./key-reach.ts";
 import { pageChunks } from "./key-sets.ts";
 import {
@@ -18,7 +19,7 @@ import {
 	textModulePrefix,
 } from "./locale-chunks.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
-import { outputImports } from "./output-imports.ts";
+import { calledNames, everyName, outputImports } from "./output-imports.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
 export function keysModule(build: Build): string {
@@ -32,17 +33,19 @@ const outputModule = (file: string) => `${outputPrefix}${file}`;
 
 /**
  * A key's module in a build, from the compiler's model, or nothing for an id that is no key's: the
- * key's code for the browser, or its code for a server.
+ * key's value for the browser, or for a server, exported under the key.
  */
 export function keyModule(
 	build: Build,
 	id: string,
 	consumer: "client" | "server",
 ): string | undefined {
-	const key = build.compilation.keys.get(id.slice(keyModulePrefix.length));
+	const name = id.slice(keyModulePrefix.length);
+	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
-	const code = consumer === "server" ? key.serverCode : key.code;
-	return `${outputImports(outputModule, build.rendered.modules, [key], key.uses)}\n${code}`;
+	const names = calledNames([key]);
+	const value = consumer === "server" ? key.serverValue : key.value;
+	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 
 /**
@@ -62,7 +65,9 @@ export function textModule(
 		const message = `grai_${name}`;
 		return `import { ${name} as ${message} } from "${keyPrefix}${name}";\nexport const ${name} = { get text() { return ${message}(); } };\n`;
 	}
-	return `${outputImports(outputModule, build.rendered.modules, [key], ["pageText"])}\nexport const ${name} = /*#__PURE__*/ pageText(${key.variants.join(", ")});\n`;
+	const names = calledNames([key], ["pageText"]);
+	const value = `/*#__PURE__*/ pageText(${key.variants.join(", ")})`;
+	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 
 /**

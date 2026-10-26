@@ -15,11 +15,12 @@ import { catchAll } from "./selection.ts";
 
 type Mode = "string" | "parts";
 
-/** What a key's code calls: runtime functions, plurals.js's functions and formatters, by name. */
+/** What a key's code calls: runtime functions, plurals.js's functions, formatters and globals, by name. */
 export type Used = {
 	uses: Set<RuntimeFunction>;
 	plurals: Set<string>;
 	formats: Map<string, Formatter>;
+	globals: Set<string>;
 };
 
 /** The code of an input, or of a local, by its name. */
