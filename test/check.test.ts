@@ -1,6 +1,13 @@
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import {
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { check } from "../src/check.ts";
 import { project } from "./project.ts";
 import { writeSources } from "./sources.ts";
@@ -104,6 +111,36 @@ describe("grai check's reads of components", () => {
 
 		expect(problems.map(({ message }) => message)).toEqual([
 			'app/pages/index.vue:7:52: "titel": m.titel names a key no catalog has. Add it with grai add titel --en "…" --de "…", or fix the name.',
+			'messages/en.json: "unused": no shipped code under . reads the key. Remove it from every catalog, or use it.',
+		]);
+	});
+});
+
+describe("grai check's modules, named as the bundler names them", () => {
+	it("reads a project reached through a symlink, its modules named by their real paths, so its imports of the output are reads", async () => {
+		const { dir } = project({ en: { title: "Title", unused: "Unused" } });
+		writeSources(dir, {
+			"src/lib/i18n.ts": 'export { m } from "../../out/messages.js";\n',
+			"src/app.ts": [
+				'import { title } from "#i18n/messages/title.js";',
+				'import { m } from "$lib/i18n";',
+				"title();",
+				"m.title();",
+				"",
+			].join("\n"),
+		});
+		const link = join(
+			realpathSync(mkdtempSync(join(tmpdir(), "grai-link-"))),
+			"app",
+		);
+		onTestFinished(() =>
+			rmSync(dirname(link), { recursive: true, force: true }),
+		);
+		symlinkSync(dir, link);
+
+		const { problems } = await check(join(link, "grai.config.json"));
+
+		expect(problems.map(({ message }) => message)).toEqual([
 			'messages/en.json: "unused": no shipped code under . reads the key. Remove it from every catalog, or use it.',
 		]);
 	});
