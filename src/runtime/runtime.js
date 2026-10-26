@@ -547,18 +547,20 @@ function translatedAfterPrefix(pathname, host, translate) {
 
 /**
  * A message's variant for the locale a call renders in: the one it names, else the bound one. On
- * a page, a call names no locale but the page's.
+ * a page, a call names no locale but the page's. A list too short for the locale's position holds
+ * the only variant there is: a locale's copy of a chunk, whose variant is the page's, or a project
+ * of one locale's.
  *
  * @template Variant
- * @param {readonly Variant[]} variants one per locale, in `locales` order; dev adds the key after
- * them, for the error to name
+ * @param {readonly Variant[]} variants one per locale, in `locales` order, or in a locale's copy
+ * the page's alone; dev adds the key after them, for the error to name
  * @param {{ locale?: string } | undefined} options
  * @returns {Variant}
  */
 function variantFor(variants, options) {
 	const locale = options?.locale;
 	const index = locale === undefined ? bound() : locales.indexOf(locale);
-	const variant = variants[index];
+	const variant = variants[index < variants.length ? index : 0];
 	if (variant === undefined || (page && index !== current))
 		throw noVariant(variants, locale, index);
 	return variant;
@@ -581,8 +583,7 @@ export function localeIndex(options) {
 
 /**
  * Why a call has no variant: it names a locale the project does not have, or one the page does
- * not render in. A production page holds one locale's variants: the page's, unless its import map
- * gave it another's.
+ * not render in. A production page holds its own locale's variants alone.
  *
  * @param {readonly unknown[]} variants
  * @param {unknown} locale
@@ -590,13 +591,9 @@ export function localeIndex(options) {
  */
 function noVariant(variants, locale, index) {
 	if (index < 0) return unknownLocale(locale);
-	const held =
-		variants[current] === undefined
-			? variants.findIndex((variant) => variant !== undefined)
-			: current;
 	return new GraiError(
 		"locale-not-loaded",
-		`${variants[locales.length] ?? "A message"} was called in "${locales[index]}", but this page renders in "${locales[held]}" alone.`,
+		`${variants[locales.length] ?? "A message"} was called in "${locales[index]}", but this page renders in "${locales[current]}" alone.`,
 	);
 }
 
