@@ -137,6 +137,33 @@ export async function seenThrough(
 		// A source the bundler resolves and this cannot: its importers link as the graph has them.
 		if (resolved.length === own.length) barrels.set(id, resolved);
 	}
+	/**
+	 * Whether a module exports `name`. The graph lists a star re-export's names as `*`, so a
+	 * re-export module's are followed through its own links: a name it re-exports by name first, as
+	 * the language resolves an export, then each `export *`, which never passes `default` on.
+	 */
+	const exportsName = (
+		id: string,
+		name: string,
+		seen: Set<string> = new Set(),
+	): boolean => {
+		const own = barrels.get(id);
+		if (own === undefined) {
+			const names = graph(id)?.exports ?? [];
+			return names.includes(name) || names.includes("*");
+		}
+		if (seen.has(id)) return false;
+		seen.add(id);
+		if (namedIn(own).has(name)) return true;
+		return (
+			name !== "default" &&
+			own.some(
+				({ link, id: target }) =>
+					link.exports === "*" && exportsName(target, name, seen),
+			)
+		);
+	};
+
 	/** Adds the modules that an importer taking `takes` from the re-export module `id` links to. */
 	const holding = (
 		id: string,
@@ -144,8 +171,15 @@ export async function seenThrough(
 		into: Set<string>,
 		seen: ReadonlySet<string>,
 	) => {
-		for (const { link, id: target, leftOut } of barrels.get(id) ?? []) {
-			const taken = takenThrough(link, takes, graph(target)?.exports ?? []);
+		const own = barrels.get(id) ?? [];
+		const named = namedIn(own);
+		for (const { link, id: target, leftOut } of own) {
+			const taken = takenThrough(
+				link,
+				takes,
+				(name) =>
+					name !== "default" && !named.has(name) && exportsName(target, name),
+			);
 			if (taken === undefined && leftOut) continue;
 			if (barrels.has(target) && !seen.has(target))
 				holding(target, taken ?? new Set(), into, new Set(seen).add(target));
@@ -158,14 +192,13 @@ export async function seenThrough(
 		// Seeing through one whose modules all keep their side effects would change nothing.
 		if (!resolved.some(({ id, leftOut }) => leftOut || barrels.has(id)))
 			continue;
-		const exported = new Set(graph(barrel)?.exports ?? []);
 		for (const importer of graph(barrel)?.importers ?? []) {
 			const own = links.get(importer)?.links;
 			// A re-export module's importers that only re-export too are seen through with it.
 			if (own === undefined || barrels.has(importer)) continue;
 			const candidates = own.filter(
 				({ takes }) =>
-					takes === "*" || [...takes].some((name) => exported.has(name)),
+					takes === "*" || [...takes].some((name) => exportsName(barrel, name)),
 			);
 			const targets = await Promise.all(
 				candidates.map(({ source }) => resolve(source, importer)),
@@ -186,20 +219,30 @@ export async function seenThrough(
 	return changed;
 }
 
+/** The names a re-export module's links re-export by name, which no `export *` beside them can. */
+function namedIn(own: readonly Resolved[]): ReadonlySet<string> {
+	return new Set(
+		own.flatMap(({ link }) =>
+			link.exports instanceof Map ? [...link.exports.keys()] : [],
+		),
+	);
+}
+
 /**
  * The names a link of a re-export module passes on to its source, for an importer that takes
- * `takes` from the re-export module: undefined when it passes none.
+ * `takes` from the re-export module: undefined when it passes none. An `export *` passes on those
+ * `passes` says its source holds for it.
  */
 function takenThrough(
 	link: ModuleLink,
 	takes: ReadonlySet<string> | "*",
-	sourceExports: readonly string[],
+	passes: (name: string) => boolean,
 ): ReadonlySet<string> | "*" | undefined {
 	const { exports } = link;
 	if (exports === undefined) return undefined;
 	if (exports === "*") {
 		if (takes === "*") return "*";
-		const taken = new Set(sourceExports.filter((name) => takes.has(name)));
+		const taken = new Set([...takes].filter(passes));
 		return taken.size === 0 ? undefined : taken;
 	}
 	const names = [...exports].flatMap(([exported, local]) =>
