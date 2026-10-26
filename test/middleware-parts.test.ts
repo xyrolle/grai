@@ -25,13 +25,13 @@ describe("the middleware's parts, for a framework that renders apart from it", (
 			strategy: ["cookie", "preferredLanguage"],
 			cookieName: "lang",
 		});
-		const lookup = (headers: Record<string, string>): unknown =>
+		const lookup = (headers: Record<string, string>): Promise<unknown> =>
 			localeOf(new Request("https://shop.test/", { headers }));
 
 		expect([
-			lookup({ cookie: "lang=ar", "accept-language": "de" }),
-			lookup({ "accept-language": "de-AT, en;q=0.5" }),
-			lookup({}),
+			await lookup({ cookie: "lang=ar", "accept-language": "de" }),
+			await lookup({ "accept-language": "de-AT, en;q=0.5" }),
+			await lookup({}),
 			vary,
 		]).toEqual(["ar", "de", "en", "Cookie, Accept-Language"]);
 	});
@@ -42,8 +42,8 @@ describe("the middleware's parts, for a framework that renders apart from it", (
 			cookieName: "lang",
 			localePrefix: "always",
 		});
-		const answer = (path: string, init: RequestInit = {}) => {
-			const response: Response | undefined = redirectOf(
+		const answer = async (path: string, init: RequestInit = {}) => {
+			const response: Response | undefined = await redirectOf(
 				new Request(`https://shop.test${path}`, init),
 			);
 			return (
@@ -56,9 +56,9 @@ describe("the middleware's parts, for a framework that renders apart from it", (
 		};
 
 		expect([
-			answer("/cart?step=2", { headers: { cookie: "lang=ar" } }),
-			answer("/de/cart"),
-			answer("/cart", { method: "POST" }),
+			await answer("/cart?step=2", { headers: { cookie: "lang=ar" } }),
+			await answer("/de/cart"),
+			await answer("/cart", { method: "POST" }),
 		]).toEqual([
 			[307, "https://shop.test/ar/cart?step=2", "Cookie"],
 			undefined,

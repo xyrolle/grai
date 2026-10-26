@@ -1,31 +1,39 @@
-import { relative, resolve } from "node:path";
+import { basename, relative, resolve } from "node:path";
 import type { NextConfig } from "next";
 import {
 	PHASE_DEVELOPMENT_SERVER,
 	PHASE_PRODUCTION_BUILD,
 } from "next/constants.js";
+import { baseDisagreement } from "../base-agreement.ts";
 import { type CompileResult, compile, isCompiled } from "../compile.ts";
-import { readConfig } from "../config.ts";
-import type { GraiError } from "../error.ts";
+import { type Config, readConfig } from "../config.ts";
+import { GraiError } from "../error.ts";
 import { watch } from "../watch.ts";
 
 /** The name grai/next imports the project's compiled output by, in every layer Next bundles. */
 const output = "grai/next/output";
 
+/** What withGrai takes besides Next's config: the grai config's file, grai.config.json by default. */
+export type WithGraiOptions = { config?: string };
+
 /**
- * Wraps a Next config for grai, with grai.config.json in the project's directory. `next dev`
- * compiles the catalogs and recompiles on each change; `next build` compiles them and fails on
- * any error. Both bundlers then resolve grai/next's imports of the output to the config's outdir.
- * Any other command bundles nothing, and gets the config as it is.
+ * Wraps a Next config for grai, with grai.config.json in the project's directory, or the file
+ * `options.config` names. `next dev` compiles the catalogs and recompiles on each change; `next
+ * build` compiles them and fails on any error. Both bundlers then resolve grai/next's imports of
+ * the output to the config's outdir. Any other command bundles nothing, and gets the config as it
+ * is. A Next `basePath` other than grai's is refused under the `url` strategy.
  */
 export function withGrai(
 	nextConfig: NextConfig = {},
+	options: WithGraiOptions = {},
 ): (phase: string) => Promise<NextConfig> {
 	return async (phase) => {
 		const dev = phase === PHASE_DEVELOPMENT_SERVER;
 		if (!dev && phase !== PHASE_PRODUCTION_BUILD) return nextConfig;
-		const configFile = resolve("grai.config.json");
-		const { outdir } = readConfig(configFile);
+		const configFile = resolve(options.config ?? "grai.config.json");
+		const config = readConfig(configFile);
+		checkBasePath(nextConfig, config, configFile);
+		const { outdir } = config;
 		if (dev) await watching(configFile);
 		else built(await compile(configFile));
 		return resolvingOutput(nextConfig, outdir);
@@ -66,6 +74,25 @@ async function startWatching(configFile: string): Promise<void> {
 		);
 	});
 	if (!compiled) await firstCompile;
+}
+
+/** Refuses a Next `basePath` other than grai's, under the `url` strategy (`base-agreement.ts`). */
+function checkBasePath(
+	nextConfig: NextConfig,
+	config: Config,
+	configFile: string,
+): void {
+	const problem = baseDisagreement(config, {
+		option: "Next's basePath",
+		base: nextConfig.basePath ?? "",
+	});
+	if (problem !== undefined) {
+		throw new GraiError(
+			"config-invalid",
+			{ file: basename(configFile) },
+			problem,
+		);
+	}
 }
 
 function built(result: CompileResult): void {
