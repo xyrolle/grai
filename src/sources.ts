@@ -7,7 +7,7 @@ import { globMatcher } from "./globs.ts";
  * Files that can name a message: JavaScript, TypeScript, the components of Svelte, Vue and Astro,
  * and MDX documents. A file of a kind left out here would name keys that check --fix then deletes.
  */
-const sourceExtensions = new Set([
+export const sourceExtensions: ReadonlySet<string> = new Set([
 	".js",
 	".mjs",
 	".cjs",
