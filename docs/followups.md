@@ -125,6 +125,12 @@ Turbopack builds the graph of code under `node_modules` more cheaply. In a secon
 
 Done when: a change brings the first compile level with next-intl's, or the design records why it stays.
 
+## `import { m }` in `next dev`
+
+`next dev` builds `m`, the namespace messages.js re-exports, whole in each layer that imports it, and again after each edit, so the README has Next's modules import the namespace of keys.js, which Turbopack reads member by member (`docs/design.md`). Turbopack tracks a member read through a re-exported namespace when it builds for production ([vercel/next.js#96396](https://github.com/vercel/next.js/pull/96396)), but `next dev` 16.4.3 and 16.5.0-canary.27 still compile the namespace's module whole: with four modules behind it and a page reading one, all four are compiled through `import { m }`, one through `import * as m`. An issue with that reproduction is drafted, and not yet posted. `grai migrate` writes `import { m }`, so a Next app it migrates gets the slower edits until then.
+
+Done when: `next dev` reads `m.key` through `export * as m` as it reads `import * as m`, with the bench's edits through `import { m }` as fast as through the namespace.
+
 ## Next on a loopback address
 
 Next 16.4 started on `127.0.0.1` or `[::1]` (`--hostname`, or `HOSTNAME` behind a reverse proxy) takes every proxy rewrite for an external one. Next's `NextURL` renames a loopback host `localhost`, so the rewrite the proxy returns names `localhost`, while Next's router knows itself by the address it was started on. It proxies the request to itself, where grai/next's proxy rewrites it again, under another `/<locale>`, and the page never answers. A Next app without grai, whose proxy only rewrites `/` to `/en`, answers, but runs its proxy twice for the page. Once its proxy rewrites every path, as an unprefixed base locale's does, it never answers either: 259 runs of the proxy in 10 s. On Next's default host, `0.0.0.0`, `localhost` and the machine's address, the rewrites stay internal. It is Next's bug, reported as [vercel/next.js#94745](https://github.com/vercel/next.js/issues/94745), with a fix in review, [vercel/next.js#95917](https://github.com/vercel/next.js/pull/95917): `NextURL` and the router name a loopback host differently. grai does not work around it.
