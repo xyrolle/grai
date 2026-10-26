@@ -16,6 +16,9 @@ export type Context = {
 	reading: Reading;
 };
 
+/** What a promise hands its value on by. */
+const promised: ReadonlySet<string> = new Set(["then", "catch", "finally"]);
+
 /** The reads one use makes, following its names from what it starts from. */
 export async function readUse(
 	{ path, source, graph, reading }: Context,
@@ -27,6 +30,17 @@ export async function readUse(
 	if (origin.kind === "key") return;
 	if (origin.kind === "module" && graph.output.keyOf(origin.path) !== undefined)
 		return;
+	// A load's promise hands its module to a callback, `import(path).then((module) => …)`, which
+	// is a use of the module whole.
+	const handed = use.chain[0];
+	if ("load" in use.from && handed !== undefined && promised.has(handed.name)) {
+		const reached = reachOf(await graph.keysHeld(origin));
+		if (reached !== undefined) {
+			const place = { path, source, at: handed.expression };
+			reading.reaches.push(reachAt(place, reached, use.type));
+		}
+		return;
+	}
 	let value: Value | undefined = origin;
 	let keyAt = use.at;
 	let readAt = use.at;
