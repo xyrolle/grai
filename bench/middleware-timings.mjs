@@ -1,6 +1,7 @@
 // What a request pays for its locale: the time grai's middleware and Paraglide's add to a handler
 // alone, each resolving the locale from the same request by the same strategy and binding it, and
-// grai's listing the headers it read in Vary; and a message call inside a request and outside any.
+// grai's listing the headers it read in Vary; and a message call inside a request, and outside one
+// naming its locale, as a server's calls must there.
 // middleware.mjs runs this in Node, and middleware-worker.js inside workerd, on the projects it
 // compiles from the Workers example's catalogs: one reading the cookie, then Accept-Language, and
 // one reading the URL.
@@ -117,8 +118,11 @@ async function timeRequests() {
 	return timings;
 }
 
-/** A text message's and a message with inputs' median time per call. */
-function timeCalls() {
+/**
+ * A text message's and a message with inputs' median time per call, each given `named`: no
+ * options, so it reads the bound locale, or `{ locale }`, which it renders in.
+ */
+function timeCalls(named) {
 	const inputs = { name: "Workers" };
 	const calls = (call) => () => {
 		let rendered = "";
@@ -128,27 +132,30 @@ function timeCalls() {
 	const options = { roundMs: ROUND_MS, rounds: ROUNDS };
 	return {
 		text: nanosecondsPer(
-			calls(() => m.title()),
+			calls(() => m.title({}, named)),
 			CALLS,
 			options,
 		),
 		inputs: nanosecondsPer(
-			calls(() => m.greeting(inputs)),
+			calls(() => m.greeting(inputs, named)),
 			CALLS,
 			options,
 		),
 	};
 }
 
-/** Both tables' timings: the calls inside a request in `ro`, and outside any in the base locale. */
+/**
+ * Both tables' timings: the calls inside a request in `ro`, and outside every request naming `ro`,
+ * as a server's calls must there.
+ */
 export async function timeServer() {
 	let inside;
 	await byHeaders(byCookie, () => {
-		inside = timeCalls();
+		inside = timeCalls(undefined);
 		return new Response("");
 	});
 	return {
 		requests: await timeRequests(),
-		calls: { inside, outside: timeCalls() },
+		calls: { inside, named: timeCalls({ locale: "ro" }) },
 	};
 }

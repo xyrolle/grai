@@ -1,8 +1,8 @@
 // What the server pays for the bound locale (middleware-timings.mjs): per request, what grai's
 // middleware and Paraglide's add to a handler alone; per message call, inside the middleware and
-// outside it. In Node, and inside a local workerd started by Wrangler's test harness, at Workers'
-// default Node.js compatibility: Paraglide's middleware imports `async_hooks` without the `node:`
-// prefix, which the `nodejs_als` flag alone does not resolve.
+// outside it naming its locale. In Node, and inside a local workerd started by Wrangler's test
+// harness, at Workers' default Node.js compatibility: Paraglide's middleware imports `async_hooks`
+// without the `node:` prefix, which the `nodejs_als` flag alone does not resolve.
 //   node middleware.mjs
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -106,12 +106,14 @@ for (const [runtime, { requests }] of runtimes)
 			`| ${name} | ${runtime} | ${formatNs(alone)} | ${formatNs(grai)} | ${formatNs(paraglide)} |`,
 		);
 
-console.log("\n### a message call, inside a request and outside any, ns\n");
 console.log(
-	"| runtime | text, inside | text, outside | with inputs, inside | with inputs, outside |",
+	"\n### a message call, inside a request and outside one naming its locale, ns\n",
+);
+console.log(
+	"| runtime | text, inside | text, naming its locale | with inputs, inside | with inputs, naming its locale |",
 );
 console.log("|---|---|---|---|---|");
 for (const [runtime, { calls }] of runtimes)
 	console.log(
-		`| ${runtime} | ${formatNs(calls.inside.text)} | ${formatNs(calls.outside.text)} | ${formatNs(calls.inside.inputs)} | ${formatNs(calls.outside.inputs)} |`,
+		`| ${runtime} | ${formatNs(calls.inside.text)} | ${formatNs(calls.named.text)} | ${formatNs(calls.inside.inputs)} | ${formatNs(calls.named.inputs)} |`,
 	);
