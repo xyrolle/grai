@@ -1,10 +1,12 @@
 import {
+	chmodSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -38,6 +40,7 @@ it("changes no file when one of them cannot be replaced, and leaves nothing behi
 	const added = join(dir, "fr.json");
 	const de = join(dir, "de.json");
 	writeFileSync(en, '{ "title": "Title" }');
+	chmodSync(en, 0o755);
 	mkdirSync(de);
 
 	expect(() =>
@@ -50,5 +53,19 @@ it("changes no file when one of them cannot be replaced, and leaves nothing behi
 		),
 	).toThrow(/EISDIR|EPERM/);
 	expect(readFileSync(en, "utf8")).toBe('{ "title": "Title" }');
+	expect(statSync(en).mode & 0o777).toBe(0o755);
 	expect(readdirSync(dir).sort()).toEqual(["de.json", "en.json"]);
+});
+
+it("keeps each file's permissions, an executable script's among them", () => {
+	const dir = directory();
+	const script = join(dir, "build.js");
+	writeFileSync(script, "#!/usr/bin/env node\nconsole.log(m.title());\n");
+	chmodSync(script, 0o755);
+
+	writeAll(
+		new Map([[script, "#!/usr/bin/env node\nconsole.log(m.heading());\n"]]),
+	);
+
+	expect(statSync(script).mode & 0o777).toBe(0o755);
 });

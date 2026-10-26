@@ -18,12 +18,22 @@ export type RuntimeSources = {
 	testing: string;
 };
 
-/** The files of the modules the keys import, in one output: the runtime, plurals and formats. */
+/**
+ * The files of the modules the keys import, in one output: the runtime through its anchor,
+ * `internal.js`, the plural rules and the formatters.
+ */
 export type OutputModules = {
 	runtime: string;
 	plurals: string;
 	formats: string | undefined;
 };
+
+/**
+ * The runtime's anchor: the one module of the output whose text changes with the runtime, which
+ * every entry and module of the output reaches the runtime and its config through. A process reads
+ * it once, so it holds one runtime, whichever compile's it read.
+ */
+const anchor = "internal.js";
 
 /** The runtime's API: what `runtime.js` gives apps, and all of it. */
 const runtimeApi = [
@@ -46,11 +56,11 @@ const runtimeApiTypes = ["Locale", "MarkupMessage", "Message", "MessagePart"];
 
 /**
  * The modules beside the keys, each named by its content: the config, the runtime that reads it,
- * the plural rules, and the formatters when a message calls one. With them come the entries apps
- * import instead: `runtime.js`, the runtime's API alone, and `config.js`, which re-export this
- * output's modules, and `server.js`, the middleware with its imports pinned to them. The output's
- * own modules import the runtime's module itself, and an adapter takes what it binds from
- * `internal.js`, which re-exports all of it.
+ * the plural rules, and the formatters when a message calls one. With them come the anchor,
+ * `internal.js`, which re-exports the runtime, and with it what the rest of the output reads of the
+ * config, and which an adapter takes what it binds from, and the entries apps import: `runtime.js`, the runtime's API alone, and `server.js`
+ * and `testing.js`, whose imports name the anchor. They change only with grai, never with the
+ * config.
  */
 export function renderModules(
 	config: Config,
@@ -76,22 +86,20 @@ export function renderModules(
 	});
 	const plurals = `${contentName("plurals", pluralsCode)}.js`;
 	const formatsCode =
-		formatters.length === 0
-			? undefined
-			: formatModule(formatters, `${runtime}.js`);
+		formatters.length === 0 ? undefined : formatModule(formatters, anchor);
 	const formats: OutputFile | undefined =
 		formatsCode === undefined
 			? undefined
 			: [`${contentName("formats", formatsCode)}.js`, formatsCode];
 	const reexport = (file: string) => `export * from "./${file}";\n`;
 	const api = (names: readonly string[]) =>
-		`export {\n${names.map((name) => `\t${name},\n`).join("")}} from "./${runtime}.js";\n`;
-	const pinned = new Map([
-		["./config.js", configFile],
-		["./runtime.js", `${runtime}.js`],
+		`export {\n${names.map((name) => `\t${name},\n`).join("")}} from "./${anchor}";\n`;
+	const anchored = new Map([
+		["./config.js", anchor],
+		["./runtime.js", anchor],
 	]);
 	return {
-		modules: { runtime: `${runtime}.js`, plurals, formats: formats?.[0] },
+		modules: { runtime: anchor, plurals, formats: formats?.[0] },
 		immutable: [
 			[configFile, configCode],
 			[`${runtime}.js`, runtimeCode],
@@ -100,17 +108,16 @@ export function renderModules(
 			...(formats === undefined ? [] : [formats]),
 		],
 		entries: [
-			["config.js", reexport(configFile)],
+			[anchor, reexport(`${runtime}.js`)],
+			["internal.d.ts", reexport(`${runtime}.js`)],
 			["runtime.js", api(runtimeApi)],
 			[
 				"runtime.d.ts",
 				api([...runtimeApi, ...runtimeApiTypes.map((name) => `type ${name}`)]),
 			],
-			["internal.js", reexport(`${runtime}.js`)],
-			["internal.d.ts", reexport(`${runtime}.js`)],
-			["server.js", pinImports(sources.server, pinned)],
+			["server.js", pinImports(sources.server, anchored)],
 			["server.d.ts", serverDeclarations],
-			["testing.js", pinImports(sources.testing, pinned)],
+			["testing.js", pinImports(sources.testing, anchored)],
 			["testing.d.ts", testingDeclarations],
 		],
 	};

@@ -280,6 +280,7 @@ describe("selecting on a :number local", () => {
 					still: onNumber("offset", { "n=*": "a" }),
 					both: onNumber("offset add=1 subtract=1", { "n=*": "a" }),
 					negative: onNumber("offset subtract=-1", { "n=*": "a" }),
+					huge: onNumber(`offset add=${"9".repeat(17)}`, { "n=*": "a" }),
 				},
 			}),
 		).toEqual([
@@ -287,6 +288,7 @@ describe("selecting on a :number local", () => {
 			'plural-category-unknown: messages/en.json: "category" (en): "few" is not a number or a plural category of en, so the variant n=few can never be chosen. Its categories are one, other.',
 			'message-invalid: messages/en.json: "exact" (en): the variant n=one can never be chosen: n selects by its exact value (select=exact), so a key is a number or *.',
 			'message-invalid: messages/en.json: "fraction" (en): the variant n=1.5 can never be chosen: n is a whole number. Remove it.',
+			`message-invalid: messages/en.json: "huge" (en): "local n = count: offset add=${"9".repeat(17)}": "add=${"9".repeat(17)}" needs a whole number up to 9007199254740991, which a number holds exactly.`,
 			'message-invalid: messages/en.json: "mode" (en): "local n = count: number select=cardinal": "select=cardinal" needs plural, ordinal or exact.',
 			'message-invalid: messages/en.json: "negative" (en): "local n = count: offset subtract=-1": "subtract=-1" needs a whole number.',
 			'selection-not-exhaustive: messages/en.json: "open" (en): no variant matches n=(any other value). Add one, or a variant with * for the selectors it does not care about.',

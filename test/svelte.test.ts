@@ -203,6 +203,7 @@ describe("grai/svelte's client build", () => {
 		);
 
 		expect(placed).toEqual({
+			"out/internal.js": ["runtime", "grai-runtime"],
 			"out/runtime.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"\0grai:text/title": ["text", "grai~client"],
@@ -227,6 +228,20 @@ describe("grai/svelte's client build", () => {
 			expect(code(files)).toContain(`pageText("${english}", "${german}")`);
 			expect(code(files)).not.toContain(`text("${english}", "${german}")`);
 		}
+	});
+
+	it("reads a text key's per-key import as its string, as it reads the namespace's", async () => {
+		const dir = svelteApp({
+			"package.json": JSON.stringify({
+				imports: { "#i18n/messages/*": "./out/keys.js" },
+			}),
+			"App.svelte": `<script>import { title } from "#i18n/messages/title.js";</script>
+<h1>{title()}</h1>`,
+		});
+		const { files } = await built(dir, withTexts(), "client");
+
+		expect(code(files)).toContain('pageText("Title", "Titel")');
+		expect(code(files)).not.toContain('text("Title", "Titel")');
 	});
 
 	it("hydrates the server's page in each locale, keeping its elements", async () => {
