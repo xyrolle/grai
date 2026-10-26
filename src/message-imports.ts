@@ -1,9 +1,5 @@
+import { type MessageModule, moduleOf } from "./output-paths.ts";
 import { before, nameEndingAt, type SourceFile } from "./sources.ts";
-
-/** A module of the output, by its import path: `messages.js` (`m`), `keys.js`, one key's path, or another. */
-type MessageModule =
-	| { type: "messages" | "keys" | "other" }
-	| { type: "key"; key: string };
 
 /** A name an import or re-export lists: the export it names, its local name, and where the export's name is. */
 type ListedName = { imported: string; local: string; at: number };
@@ -64,7 +60,6 @@ const exportedNamespace = new RegExp(
 	`\\bexport\\s*\\{[^}]*\\bm\\s+as\\s+(${name})`,
 	"g",
 );
-const keyName = new RegExp(`^${name}$`);
 const otherModule: MessageModule = { type: "other" };
 
 /** The names a namespace goes by in the files: `m`, and each name a file exports it as. */
@@ -197,19 +192,4 @@ function listedNames(list: string | undefined, listAt: number): ListedName[] {
 		const { type = "", imported = "", local = imported } = match.groups ?? {};
 		return { imported, local, at: listAt + match.index + type.length };
 	});
-}
-
-/** The module an import path names, by its last segment without the extension. */
-export function moduleOf(specifier: string): MessageModule {
-	// Each of the output's modules has "messages" or "keys" in its path, and most imports have
-	// neither: a dev server's import hook reads every import of the app, and spares splitting those.
-	if (!specifier.includes("messages") && !specifier.includes("keys"))
-		return otherModule;
-	const segments = specifier.split("/");
-	const last = (segments.at(-1) ?? "").replace(/\.[cm]?[jt]s$/, "");
-	if (segments.at(-2) === "messages" && keyName.test(last)) {
-		return { type: "key", key: last };
-	}
-	if (last === "messages" || last === "keys") return { type: last };
-	return otherModule;
 }
