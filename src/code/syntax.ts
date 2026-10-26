@@ -1,4 +1,4 @@
-import { type ESTree, parse } from "../code/parse.ts";
+import { type ESTree, parse } from "./parse.ts";
 
 /** Any node of a module's syntax tree. */
 export type Node = ESTree.Node;
