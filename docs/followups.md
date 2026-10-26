@@ -79,12 +79,6 @@ MessageFormat 2 lets a local be made from another, as in `local a = n: number` t
 
 Done when: a plural, formatted, `:offset` or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
 
-## Read every source by scope in `grai check` (the owner's decision)
-
-`grai check` reads sources as text, so where a file declares the namespace's name again, as `rows.map((m) => m.id)` does, it cannot tell which reads are grai's, and leaves that file's reads of the name out, saying so. A Vite build reads each module by scope through Vite's parser, but a project without Vite, such as a Next.js one, has only check. Depending on `oxc-parser`, the parser Vite 8 uses, would make check exact there too, for JavaScript, TypeScript and a component's scripts: its 0.155.0 is 2.9 MB unpacked, plus one native binding per platform (1.8 MB on macOS arm64, 2.1 MB on Linux x64, 1.6 MB on Windows x64, 1.7 MB as WebAssembly). It would be grai's first runtime dependency, which is the owner's to decide; templates would still be read as text. It would also make `rename` and check certain where the scan now refuses or leaves reads unchecked: JSX text, which the scan reads as JavaScript, and a `/` after `)` or `}`, which may start a regular expression or divide.
-
-Done when: the owner has decided, and, if yes, check reads JavaScript, TypeScript and component scripts with the same scope reading as the build, with no file left unchecked for a redeclared name, and `rename` refuses no place the scan cannot read.
-
 ## Bind the locale in Next's server actions and route handlers
 
 React keeps no `cache` in a server action or a route handler, so there a message names its locale (`docs/design.md`). A form's error messages are the common case.
@@ -172,12 +166,6 @@ Done when: the config maps hosts to locales, the middleware reads the request's 
 An app under a base path (SvelteKit's `paths.base`, Next's `basePath`, Astro's `base`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`, and the middleware reads `shop` as the path's locale. The framework owns the base path, so the config should not repeat it. `grai/astro` refuses a `base` with the `url` strategy until then.
 
 Done when: the Vite, Next and Astro adapters write the framework's base path into `config.js` at build, the URL helpers and the middleware put the locale after it, and a test in each example covers a localized link under a base path.
-
-## Rename what a module reads off a dynamic import
-
-`grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.
-
-Done when: a rename changes them, with a test of each.
 
 ## Descriptors `defineMessages` names, in `grai migrate`
 
