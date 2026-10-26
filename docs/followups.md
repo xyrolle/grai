@@ -163,12 +163,6 @@ Done when: the Vite, Next and Astro adapters write the framework's base path int
 
 Done when: a rename changes them, with a test of each.
 
-## Export and seed a locale that falls back
-
-`grai export en-GB --untranslated` lists every key en-GB takes from en as untranslated, so a translator is asked for all of en again; `grai seed en-GB` copies en's text into en-GB, which then no longer follows en. Both should treat a key a locale takes from its fallback as covered, and still let a translator give the locale its own text.
-
-Done when: `export --untranslated` leaves out a key the locale takes from its fallback, a full export offers it with the fallback's text as its source, `seed` refuses a locale that falls back or seeds nothing it takes from its fallback, and a test covers each.
-
 ## Descriptors `defineMessages` names, in `grai migrate`
 
 react-intl apps often write their descriptors once, `const messages = defineMessages({ title: { id: "shop.title", defaultMessage: "Shop" } })`, and call `intl.formatMessage(messages.title)` or `<FormattedMessage {...messages.title} />`. `grai migrate` lists those calls, although a `const` that `defineMessages` initializes with the ids written in it names each message as plainly as a descriptor written in the call.
