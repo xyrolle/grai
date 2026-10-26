@@ -32,6 +32,21 @@ const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
 /**
+ * Runs `code` in `locale` as the middleware runs a request's handler: each message it calls, and
+ * each task it starts, renders in that locale. A server renders nothing outside a request, so a
+ * job, such as a scheduled email, runs its code in this, and so does a test: under Vitest,
+ * `aroundEach((test) => withLocale("de", test))`.
+ *
+ * @template Result
+ * @param {string} locale
+ * @param {() => Result} code
+ * @returns {Result}
+ */
+export function withLocale(locale, code) {
+	return requests.run({ index: locales.indexOf(assertIsLocale(locale)) }, code);
+}
+
+/**
  * A strategy the server defines: how it finds a request's locale, if the request names one, and
  * the request headers it reads, for the `Vary` the middleware adds. Without them, any header may
  * change the locale, so the response varies by every one: `*`.

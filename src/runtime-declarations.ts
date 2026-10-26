@@ -182,6 +182,13 @@ export const serverDeclarations = `import type { Locale } from "./runtime.js";
 export declare const localeCopies: boolean;
 
 /**
+ * Runs \`code\` in \`locale\` as the middleware runs a request's handler: each message it calls,
+ * and each task it starts, renders in that locale. A job, such as a scheduled email, runs its code
+ * in this, and so does a test: under Vitest, \`aroundEach((test) => withLocale("de", test))\`.
+ */
+export declare function withLocale<Result>(locale: Locale, code: () => Result): Result;
+
+/**
  * Resolves a request's locale by the config's strategy and binds it for the handler and all it
  * calls. Returns the handler's response, its \`Vary\` listing the request headers the strategy
  * reads.
