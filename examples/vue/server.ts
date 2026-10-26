@@ -33,7 +33,13 @@ server.on("request", (incoming, outgoing) =>
 		});
 	}),
 );
-server.listen(port, () => console.log(`Listening on http://localhost:${port}`));
+// PORT=0 has the system pick a free port, which the server's address then gives.
+server.listen(port, () => {
+	const address = server.address();
+	const bound =
+		typeof address === "object" && address !== null ? address.port : port;
+	console.log(`Listening on http://localhost:${bound}`);
+});
 
 async function renderPage(
 	incoming: IncomingMessage,

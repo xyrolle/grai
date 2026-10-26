@@ -13,6 +13,7 @@ import {
 	onTestFinished,
 } from "vitest";
 import { outsideTests } from "./app-environment.ts";
+import { stopped } from "./stopped.ts";
 
 // The Nuxt example (examples/nuxt), built by `nuxt build`, checked by `nuxt typecheck` against the
 // package's built declarations and served by its Node server, by the URL prefix and then by the
@@ -22,47 +23,53 @@ const nuxt = join(example, "node_modules/.bin/nuxt");
 /** No telemetry, which would phone home and outlive the test in a process of its own. */
 const telemetry = { NUXT_TELEMETRY_DISABLED: "1" };
 
-/** Starts `command` in the example until the suite ends, once it prints `ready`. */
-function started(command: string, args: string[], ready: RegExp, extra = {}) {
-	let server: ChildProcess | undefined;
-	beforeAll(async () => {
-		const child = spawn(command, args, {
-			cwd: example,
-			env: outsideTests({ ...telemetry, ...extra }),
-		});
-		server = child;
-		let output = "";
-		await new Promise<void>((resolve, reject) => {
-			const read = (chunk: unknown) => {
-				output += String(chunk);
-				if (ready.test(output)) resolve();
-			};
-			child.stdout.on("data", read);
-			child.stderr.on("data", read);
-			child.on("exit", (code) =>
-				reject(new Error(`${command} exited: ${code}\n${output}`)),
-			);
-		});
-	}, 120_000);
-	afterAll(() => {
-		server?.kill();
+/** A server the suite started, and the origin it printed. */
+type Served = { server: ChildProcess; origin: string };
+
+/**
+ * Starts `command` in the example on 127.0.0.1 and a port the system picks, so that runs of this
+ * file side by side never meet, and resolves once it prints the address it listens on. It leads a
+ * process group of its own, so that stopping it stops what it forks, as `nuxt dev` forks its server.
+ */
+async function listening(
+	command: string,
+	args: string[],
+	env: Record<string, string> = {},
+): Promise<Served> {
+	const server = spawn(command, args, {
+		cwd: example,
+		env: outsideTests({ ...telemetry, NO_COLOR: "1", ...env }),
+		detached: true,
 	});
+	let printed = "";
+	const origin = await new Promise<string>((resolve, reject) => {
+		const read = (chunk: unknown) => {
+			printed += String(chunk);
+			const address = /http:\/\/127\.0\.0\.1:\d+/.exec(printed)?.[0];
+			if (address !== undefined) resolve(address);
+		};
+		server.stdout?.on("data", read);
+		server.stderr?.on("data", read);
+		server.on("exit", (code) =>
+			reject(new Error(`${command} exited: ${code}\n${printed}`)),
+		);
+	});
+	return { server, origin };
 }
 
-/** Builds the example with a grai config, and serves the build on `port` until the suite ends. */
-function built(port: number, config = "grai.config.json"): void {
-	beforeAll(() => {
-		const build = spawnSync(nuxt, ["build"], {
-			cwd: example,
-			env: outsideTests({ ...telemetry, GRAI_CONFIG: config }),
-			encoding: "utf8",
-		});
-		if (build.status !== 0) {
-			throw new Error(`nuxt build failed:\n${build.stdout}${build.stderr}`);
-		}
-	}, 180_000);
-	started("node", [".output/server/index.mjs"], /Listening on/, {
-		PORT: String(port),
+/** Builds the example with a grai config, and serves the build with its Node server. */
+function built(config = "grai.config.json"): Promise<Served> {
+	const build = spawnSync(nuxt, ["build"], {
+		cwd: example,
+		env: outsideTests({ ...telemetry, GRAI_CONFIG: config }),
+		encoding: "utf8",
+	});
+	if (build.status !== 0) {
+		throw new Error(`nuxt build failed:\n${build.stdout}${build.stderr}`);
+	}
+	return listening("node", [".output/server/index.mjs"], {
+		HOST: "127.0.0.1",
+		PORT: "0",
 	});
 }
 
@@ -102,8 +109,13 @@ const marked = () => page.evaluate(() => "marked" in globalThis);
 describe("the Nuxt example, built, by the URL prefix", {
 	timeout: 30_000,
 }, () => {
-	const origin = "http://localhost:4822";
-	built(4822);
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
+		app = await built();
+		origin = app.origin;
+	}, 300_000);
+	afterAll(() => app && stopped(app.server));
 
 	it("typechecks against the package's built declarations, as an app's nuxt typecheck sees them", () => {
 		const checked = spawnSync(nuxt, ["typecheck"], {
@@ -208,8 +220,13 @@ describe("the Nuxt example, built, by the URL prefix", {
 describe("the Nuxt example, built, by every locale's prefix, then the cookie and Accept-Language", {
 	timeout: 30_000,
 }, () => {
-	const origin = "http://localhost:4822";
-	built(4822, "grai.always.json");
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
+		app = await built("grai.always.json");
+		origin = app.origin;
+	}, 300_000);
+	afterAll(() => app && stopped(app.server));
 
 	it("sends a page asked for without a prefix to the cookie's locale's own prefix, and varies by the headers the strategy reads", async () => {
 		const sent = await fetch(`${origin}/about`, {
@@ -258,8 +275,13 @@ describe("the Nuxt example, built, by every locale's prefix, then the cookie and
 });
 
 describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
-	const origin = "http://localhost:4823";
-	started(nuxt, ["dev", "--port", "4823"], /Local:/);
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
+		app = await listening(nuxt, ["dev", "--port", "0", "--host", "127.0.0.1"]);
+		origin = app.origin;
+	}, 120_000);
+	afterAll(() => app && stopped(app.server));
 
 	/** Writes `text` as the Romanian title, and puts the catalog back after the test. */
 	function editTitle(title: string): void {
