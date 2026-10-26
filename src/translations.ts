@@ -29,13 +29,14 @@ export async function exportLocale(
 ): Promise<{ document: string; units: number } | { errors: GraiError[] }> {
 	const project = await readLocaleCatalogs(configFile, locale, "translate");
 	if ("errors" in project) return project;
-	const { config, base, target, identical } = project;
+	const { config, base, target, identical, inherited } = project;
 	try {
 		const units = exportUnits(
 			base,
 			target,
 			locale,
 			identical,
+			inherited,
 			options.untranslated,
 		);
 		const write = options.json ? writeUnitsJson : writeXliff;
@@ -97,7 +98,7 @@ export async function mergeDocument(
 		"translate",
 	);
 	if ("errors" in project) return project;
-	const { config, path, base, target, identical } = project;
+	const { config, path, base, target, identical, inherited } = project;
 	if (document.srcLang !== base.locale) {
 		const detail = `its source language is ${document.srcLang}, and the base locale is ${base.locale}.`;
 		return { errors: [new GraiError("translation-invalid", { file }, detail)] };
@@ -107,6 +108,7 @@ export async function mergeDocument(
 		target,
 		document.trgLang,
 		identical,
+		inherited,
 		document.units,
 	);
 	if (merged.messages.length > 0) {

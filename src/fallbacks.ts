@@ -1,5 +1,7 @@
-import type { Catalog } from "./catalog.ts";
 import type { GraiError } from "./error.ts";
+
+/** What a locale's messages are read from: its catalog, or the messages an import converted for it. */
+type LocaleMessages = { messages: ReadonlyMap<string, unknown> };
 
 /**
  * A config's `fallbacks`, checked: each locale that takes the messages it lacks from another locale
@@ -75,14 +77,15 @@ export function fallbackPositions(
 
 /**
  * The catalog a locale's message for a key comes from: its own when it has the key, else the first
- * along its chain of fallbacks that does. Undefined when none has it.
+ * along its chain of fallbacks that does. Undefined when none has it; a locale without a catalog has
+ * no key.
  */
-export function messageSource(
+export function messageSource<Source extends LocaleMessages>(
 	key: string,
 	index: number,
-	catalogs: readonly Catalog[],
+	catalogs: readonly (Source | undefined)[],
 	fallbackOf: readonly (number | undefined)[],
-): Catalog | undefined {
+): Source | undefined {
 	for (
 		let at: number | undefined = index;
 		at !== undefined;
