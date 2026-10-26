@@ -181,12 +181,6 @@ Done when: `grai migrate` rewrites a call whose tags each render one element of 
 
 Done when: `grai migrate` rewrites the calls in a component's script, and lists each one its markup makes.
 
-## Remove what a compile that stopped halfway left
-
-A compile that stops while it writes, killed or crashed, leaves the output's lock (`docs/design.md`), its temporary files in `.grai/`, and the files named by their content that it wrote before any entry named them. The lock is refused, so a person sees it; the rest stays, as no manifest records it.
-
-Done when: a writer under the lock removes the temporary files in `.grai/`, which only a writer under the lock makes, and retires the files named by their content that neither the manifest nor the output names, with a test that kills a compile between its writes.
-
 ## Keep the locale through Astro's client router
 
 Under Astro's `<ClientRouter />`, a link into another locale swaps the page in place. The runtime read `<html lang>` when the page first loaded, and the import map, once read, cannot change, so the new page's islands render in the first page's locale. Until this is done, a link into another locale needs `data-astro-reload`.
@@ -210,7 +204,6 @@ Done when: the map's hash joins the page's `script-src`, in the `Content-Securit
 `grai/sveltekit/client` runs a page's loads again with Kit's `refreshAll()` once the server has an edit (`grai:patched`). Kit drops a `refreshAll()` called before its client has started, as it reads the page's URL from state the start sets, so an edit that lands while the page is still starting shows only after the next edit, or a navigation. The server-rendered page is already on screen by then, so the window is the page's own start.
 
 Done when: `grai/sveltekit/client` defers that refresh until Kit has started, with a test of the example that edits a load's text as soon as the page's markup is on screen and sees the edit.
-
 
 ## The locale script outside Vite's pages
 
