@@ -12,8 +12,9 @@ import { deserialize, serialize } from "node:v8";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { factsOf } from "../src/code/facts.ts";
 import { factsOfFiles } from "../src/code/facts-pool.ts";
-import { readProjectCode } from "../src/code/project.ts";
-import { readConfig } from "../src/config.ts";
+import { type ProjectCode, readProjectCode } from "../src/code/project.ts";
+import { type Config, readConfig } from "../src/config.ts";
+import { GraiError } from "../src/error.ts";
 
 /** A project on disk with these files, and its config. */
 function projectWith(files: Record<string, string>) {
@@ -36,6 +37,13 @@ function projectWith(files: Record<string, string>) {
 		writeFileSync(join(dir, path), text);
 	}
 	return { dir, config: readConfig(join(dir, "grai.config.json")) };
+}
+
+/** A project's code, which the test expects to resolve. */
+async function codeOf(config: Config, dir: string): Promise<ProjectCode> {
+	const code = await readProjectCode(config, [join(dir, "src")]);
+	if (code instanceof GraiError) throw code;
+	return code;
 }
 
 describe("the module graph", () => {
@@ -67,7 +75,7 @@ describe("the module graph", () => {
 			join(dir, "vite.config.js"),
 			`export default { resolve: { alias: { "@i18n": ${JSON.stringify(join(dir, "src/lib/i18n.ts"))} } } };\n`,
 		);
-		const { graph } = await readProjectCode(config, [join(dir, "src")]);
+		const { graph } = await codeOf(config, dir);
 		const app = join(dir, "src/app.ts");
 		const of = (source: string, name: string) =>
 			graph.imported(app, source, name);
@@ -107,13 +115,36 @@ describe("resolving as the bundler resolves", () => {
 			"src/lib/i18n.ts": 'export { m } from "../../out/messages.js";\n',
 			"src/app.ts": "",
 		});
-		const { graph } = await readProjectCode(config, [join(dir, "src")]);
+		const { graph } = await codeOf(config, dir);
 
 		for (const importer of ["src/app.ts", "src/A.svelte", "src/a.astro"]) {
 			expect(
 				await graph.imported(join(dir, importer), "@/lib/i18n.ts", "m"),
 			).toEqual({ kind: "namespace" });
 		}
+	});
+
+	it("fails, naming the config, when the tsconfig extends a file not generated yet or the Vite config does not load", async () => {
+		const unsynced = projectWith({
+			"tsconfig.json": JSON.stringify({
+				extends: "./.svelte-kit/tsconfig.json",
+			}),
+			"src/app.ts": 'import { m } from "../out/messages.js";\n',
+		});
+		const broken = projectWith({
+			"vite.config.js":
+				'import plugin from "./missing-plugin.js";\nexport default { plugins: [plugin()] };\n',
+			"src/app.ts": "",
+		});
+
+		const failure = async ({ dir, config }: typeof unsynced) => {
+			const code = await readProjectCode(config, [join(dir, "src")]);
+			return code instanceof GraiError
+				? `${code.code}: ${code.file}`
+				: "resolved";
+		};
+		expect(await failure(unsynced)).toBe("resolution-invalid: tsconfig.json");
+		expect(await failure(broken)).toBe("resolution-invalid: vite.config.js");
 	});
 });
 
@@ -124,7 +155,7 @@ describe("reading a project's facts", () => {
 			"src/b.ts": "export const b = 1;\n",
 		});
 		const cache = join(dir, "out/.grai/facts");
-		await readProjectCode(config, [join(dir, "src")]);
+		await codeOf(config, dir);
 		const saved: {
 			version: string;
 			entries: [string, { hash: string; facts: unknown }][];
@@ -157,7 +188,7 @@ describe("reading a project's facts", () => {
 			}),
 		);
 		rmSync(join(dir, "src/a.ts"));
-		const { sources } = await readProjectCode(config, [join(dir, "src")]);
+		const { sources } = await codeOf(config, dir);
 
 		expect(sources.get(join(dir, "src/b.ts"))?.facts).toEqual(planted);
 		const kept: { entries: [string, unknown][] } = deserialize(
