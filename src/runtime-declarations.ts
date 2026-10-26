@@ -13,7 +13,10 @@ export declare const baseLocale: ${JSON.stringify(config.baseLocale)};
 export declare function isLocale(value: unknown): value is Locale;
 /** The value, if it is one of the project's locales; otherwise throws a GraiError. */
 export declare function assertIsLocale(value: unknown): Locale;
-/** The locale messages render in: the request's on the server, the page's in a browser. */
+/**
+ * The locale messages render in: the request's on the server, the page's in a browser. On a server
+ * outside every request the middleware binds, it throws a \`locale-unbound\` GraiError.
+ */
 export declare function getLocale(): Locale;
 ${setLocaleDeclaration(config.switch)}
 /** The direction a locale's script is written in, the bound locale's by default. */
@@ -35,7 +38,10 @@ type GraiErrorCode =
 	| "format-option-invalid"
 	| "locale-unbound"
 	| "output-changed";
-/** A message called in a locale it cannot render in, or with a value its variants do not take. */
+/**
+ * A message called in a locale it cannot render in, with a value its variants do not take, or on a
+ * server outside every request the middleware binds (\`locale-unbound\`).
+ */
 export declare class GraiError extends Error {
 	constructor(code: GraiErrorCode, message: string);
 	readonly code: GraiErrorCode;
