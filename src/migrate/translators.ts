@@ -1,9 +1,9 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Scopes } from "../code/scopes.ts";
+import type { Node, Span } from "../code/syntax.ts";
 import { arrayWithout, declarationWithout, type Edit } from "./edits.ts";
 import { valueImportOf } from "./imports.ts";
 import type { Outcome, Translator } from "./library.ts";
-import type { Scopes } from "./scopes.ts";
-import type { Node, Span } from "./syntax.ts";
 
 /** A use of a translator, and what it becomes. */
 export type TranslatorUse = { translator?: Translator; outcome: Outcome };

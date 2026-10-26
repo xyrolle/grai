@@ -1,4 +1,6 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Binding, Use } from "../code/scopes.ts";
+import { literalText } from "../code/syntax.ts";
 import {
 	expressionNamespace,
 	i18nextCall,
@@ -20,8 +22,6 @@ import {
 	type Translator,
 	writtenProperties,
 } from "./library.ts";
-import type { Binding, Use } from "./scopes.ts";
-import { literalText } from "./syntax.ts";
 
 /** i18next's own module and react-i18next's: the instance's `t` and the hook's, and `<Trans>`. */
 export const i18nextModules: Readonly<Record<string, LibraryModule>> = {
