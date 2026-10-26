@@ -141,7 +141,7 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 - `type Message<Inputs>`: a message, `(inputs, options?: { locale?: Locale }) => string`. Without inputs, `inputs` is optional and takes none.
 - `type MarkupMessage<Inputs, Tag>`: a message with markup; its `.parts()` takes the same arguments and returns `MessagePart<Tag>[]`, `Tag` being the tags its locales write.
 - `type MessagePart<Tag>`: `{ type: "text", value }`, or `{ type: "markup-start" | "markup-end" | "markup-standalone", name: Tag, options, attributes }`, an attribute without a value being `true`.
-- `class GraiError extends Error`: what a message or a locale function throws, with `code`:
+- `class GraiError extends Error`, made as `new GraiError(code, message)`: what a message or a locale function throws, with `code`:
   - `"locale-unknown"`: a value that is not one of the project's locales;
   - `"locale-not-loaded"`: a call, in a browser, in a locale other than the page's;
   - `"locale-unkept"`: `setLocale` in a page whose `strategy` keeps a choice nowhere;
