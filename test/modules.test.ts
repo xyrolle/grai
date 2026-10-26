@@ -241,7 +241,8 @@ describe("reading a project's facts", () => {
 	it("keeps each file's facts on disk, takes them while its text is the same, and drops a file gone", async () => {
 		const { dir, config } = projectWith({
 			"src/a.ts": 'import { m } from "../out/messages.js";\nm.title();\n',
-			"src/b.ts": "export const b = 1;\n",
+			"src/b.ts":
+				'import { m } from "../out/messages.js";\nexport const b = m;\n',
 		});
 		const cache = join(dir, "out/.grai/facts");
 		await codeOf(config, dir);
@@ -289,7 +290,8 @@ describe("reading a project's facts", () => {
 	it("takes every file's facts from the cache on a reading after one that changed nothing, and writes nothing", async () => {
 		const { dir, config } = projectWith({
 			"src/a.ts": 'import { m } from "../out/messages.js";\nm.title();\n',
-			"src/b.ts": "export const b = 1;\n",
+			"src/b.ts":
+				'import { m } from "../out/messages.js";\nexport const b = m;\n',
 		});
 		const cache = join(dir, "out/.grai/facts");
 		await codeOf(config, dir);
