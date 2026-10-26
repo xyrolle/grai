@@ -1,6 +1,7 @@
 // The package's build: the TypeScript sources compiled into dist with their declarations, and the
-// runtime's modules beside them as they are written. The compiler copies those into every
-// project's output, so tsc, which would print them anew, never sees them. dist starts empty, so a
+// runtime's modules beside them as they are written, with the templates of the output's
+// declarations. The compiler copies those into every project's output, so tsc, which would print
+// them anew, never sees them. dist starts empty, so a
 // module removed from src never ships.
 //
 // usage: node scripts/build.ts

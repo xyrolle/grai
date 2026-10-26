@@ -1,0 +1,54 @@
+import type { Locale } from "./runtime.js";
+
+/** Whether the build that compiled the output writes a copy of each message chunk per locale. */
+export declare const localeCopies: boolean;
+
+/**
+ * Runs `code` in `locale` as the middleware runs a request's handler: each message it calls,
+ * and each task it starts, renders in that locale. A job, such as a scheduled email, runs its code
+ * in this, and so does a test: under Vitest, `aroundEach((test) => withLocale("de", test))`.
+ */
+export declare function withLocale<Result>(locale: Locale, code: () => Result): Result;
+
+/**
+ * Resolves a request's locale by the config's strategy and binds it for the handler and all it
+ * calls. Returns the handler's response, its `Vary` listing the request headers the strategy
+ * reads.
+ */
+export declare function middleware(
+	request: Request,
+	handler: (resolved: {
+		request: Request;
+		locale: Locale;
+	}) => Response | Promise<Response>,
+): Promise<Response>;
+
+/**
+ * The locale the middleware binds for a request: the first the strategy finds in it, else the base
+ * locale. For a framework that renders apart from the middleware.
+ */
+export declare function localeOf(request: Request): Promise<Locale>;
+
+/**
+ * The redirect the middleware answers a request with, its `Vary` included, else undefined: with
+ * every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
+ */
+export declare function redirectOf(request: Request): Promise<Response | undefined>;
+
+/** The request headers the strategy reads, as the `Vary` the middleware adds: "" for none. */
+export declare let vary: string;
+
+/**
+ * Defines one of the server's own strategies, which the config's `strategy` lists by its name,
+ * such as `custom-session`: the middleware asks it for a request's locale in the strategy's
+ * order, and goes on to the next where it names none. `vary` names the request headers it reads,
+ * for the response's `Vary`; without it, the response varies by every header. Define each before
+ * the first request.
+ */
+export declare function defineServerStrategy(
+	name: `custom-${string}`,
+	strategy: {
+		getLocale(request: Request): Locale | undefined | Promise<Locale | undefined>;
+		vary?: readonly string[];
+	},
+): void;

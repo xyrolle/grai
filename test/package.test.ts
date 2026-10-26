@@ -95,10 +95,14 @@ function compiledModules(): string[] {
 		});
 }
 
-/** The runtime's modules, sorted: the compiler copies them into every output as they are written. */
-function runtimeModules(): string[] {
+/**
+ * The runtime's modules and the templates of the output's declarations, sorted: the compiler
+ * copies the modules into every output as they are written, and the declarations from the
+ * templates.
+ */
+function runtimeFiles(): string[] {
 	return readdirSync(join(root, "src", "runtime"))
-		.filter((file) => file.endsWith(".js"))
+		.filter((file) => file.endsWith(".js") || file.endsWith(".d.ts.template"))
 		.map((file) => `runtime/${file}`)
 		.sort();
 }
@@ -114,16 +118,16 @@ it("packs each module compiled with its declarations, and nothing else", () => {
 			"README.md",
 			"package.json",
 			...compiledModules(),
-			...runtimeModules().map((file) => `dist/${file}`),
+			...runtimeFiles().map((file) => `dist/${file}`),
 		].sort(),
 	);
 });
 
-it("packs the runtime's modules as they are written", () => {
+it("packs the runtime's modules and the declarations' templates as they are written", () => {
 	const shipped = packed.files
 		.filter((file) => file.startsWith("dist/runtime/"))
 		.map((file) => [file.slice("dist/".length), text(packed.dir, file)]);
-	const written = runtimeModules().map((file) => [
+	const written = runtimeFiles().map((file) => [
 		file,
 		text(root, `src/${file}`),
 	]);

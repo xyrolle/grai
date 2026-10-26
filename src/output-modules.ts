@@ -6,16 +6,19 @@ import { type Formatter, formatModule } from "./formatters.ts";
 import { pluralModule } from "./plurals.ts";
 import type { OutputFile } from "./render.ts";
 import {
+	type DeclarationTemplates,
 	runtimeDeclarations,
-	serverDeclarations,
-	testingDeclarations,
 } from "./runtime-declarations.ts";
 
-/** The runtime's modules as the package has them, which every output carries. */
+/**
+ * The runtime's modules as the package has them, which every output carries, and the templates of
+ * the output's declarations.
+ */
 export type RuntimeSources = {
 	runtime: string;
 	server: string;
 	testing: string;
+	declarations: DeclarationTemplates;
 };
 
 /** formats.js as a render made it, and whether one of its formatters shows digits. */
@@ -86,7 +89,7 @@ export function renderModules(
 		sources.runtime,
 		new Map([["./config.js", configFile]]),
 	);
-	const runtimeTypes = runtimeDeclarations(config);
+	const runtimeTypes = runtimeDeclarations(sources.declarations, config);
 	const runtime = contentName("runtime", runtimeCode, runtimeTypes);
 	const rendered =
 		previous !== undefined && !compilation.formatsChanged
@@ -123,9 +126,9 @@ export function renderModules(
 				api([...runtimeApi, ...runtimeApiTypes.map((name) => `type ${name}`)]),
 			],
 			["server.js", pinImports(sources.server, anchored)],
-			["server.d.ts", serverDeclarations],
+			["server.d.ts", sources.declarations.server],
 			["testing.js", pinImports(sources.testing, anchored)],
-			["testing.d.ts", testingDeclarations],
+			["testing.d.ts", sources.declarations.testing],
 		],
 	};
 }
