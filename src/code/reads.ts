@@ -7,7 +7,14 @@
 
 import { basename, dirname } from "node:path";
 import { moduleOf } from "../output-paths.ts";
-import type { Binding, ImportFact, ModuleFacts, Span } from "./facts.ts";
+import {
+	type Binding,
+	type ImportFact,
+	type ModuleFacts,
+	originOf,
+	type Span,
+	usesFrom,
+} from "./facts.ts";
 import type { ModuleGraph, Value } from "./modules.ts";
 import type { ProjectCode, SourceCode } from "./project.ts";
 import { reachOfPattern } from "./reach.ts";
@@ -134,10 +141,17 @@ async function readModule(
 		}
 		loads.push(undefined);
 	}
-	for (const use of module.uses) {
-		const origin =
-			"local" in use.from ? held.get(use.from.local) : loads[use.from.load];
-		if (origin !== undefined) await readUse(context, use, origin);
+	// Only the uses that start from what holds grai's are read, so only theirs are parsed.
+	for (const [local, origin] of held) {
+		for (const use of usesFrom(module.uses, local)) {
+			await readUse(context, use, origin);
+		}
+	}
+	for (const [load, origin] of loads.entries()) {
+		if (origin === undefined) continue;
+		for (const use of usesFrom(module.uses, originOf({ load }))) {
+			await readUse(context, use, origin);
+		}
 	}
 }
 
@@ -177,8 +191,6 @@ function isOutputPath(specifier: string, graph: ModuleGraph): boolean {
 
 /** What an import of a key binds, with every reference to it, for a rename of the key's name. */
 function bindingOf(module: ModuleFacts, local: string, at: Span): Binding {
-	const references = module.uses
-		.filter((use) => "local" in use.from && use.from.local === local)
-		.map((use) => use.at);
+	const references = usesFrom(module.uses, local).map((use) => use.at);
 	return { name: local, at, references };
 }

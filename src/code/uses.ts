@@ -4,7 +4,14 @@
  * own uses, as it is the same value; a copy into anything else is a use of it as a value.
  */
 
-import type { Binding, Span, UseEnd, UseFact } from "./facts.ts";
+import {
+	type Binding,
+	originOf,
+	type Span,
+	type UseEnd,
+	type UseFact,
+	type Uses,
+} from "./facts.ts";
 import type { ESTree } from "./parse.ts";
 import type { Scopes } from "./scopes.ts";
 import { literalText, type Node } from "./syntax.ts";
@@ -25,9 +32,15 @@ export function usesOf(
 	scopes: Scopes,
 	loads: readonly Node[],
 	span: (node: Span) => Span,
-): { uses: UseFact[]; aliases: Record<string, string> } {
-	const uses: UseFact[] = [];
+): { uses: Uses; aliases: Record<string, string> } {
+	const uses: Uses = {};
 	const aliases: Record<string, string> = {};
+	const add = (use: UseFact) => {
+		const origin = originOf(use.from);
+		const list = uses[origin];
+		if (Array.isArray(list)) list.push(use);
+		else uses[origin] = [use];
+	};
 	const follow = (
 		node: Node,
 		from: UseFact["from"],
@@ -36,7 +49,7 @@ export function usesOf(
 	) => {
 		const { end, alias, read } = endOf(node, chain, scopes, span);
 		if (alias === undefined) {
-			uses.push({ from, at: span(node), type, chain: read, end });
+			add({ from, at: span(node), type, chain: read, end });
 			return;
 		}
 		const binding = scopes.bindingOf(alias);

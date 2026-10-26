@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { factsOf, type ModuleFacts, type UseFact } from "../src/code/facts.ts";
+import {
+	factsOf,
+	type ModuleFacts,
+	type UseFact,
+	type Uses,
+	usesFrom,
+} from "../src/code/facts.ts";
 
 async function moduleOf(path: string, text: string): Promise<ModuleFacts> {
 	const facts = await factsOf(path, text);
@@ -7,6 +13,11 @@ async function moduleOf(path: string, text: string): Promise<ModuleFacts> {
 	const [module] = facts.modules;
 	if (module === undefined) throw new Error("no module");
 	return module;
+}
+
+/** Every use of a module, by origin, each origin's in the order the module makes them. */
+function allUses(uses: Uses): UseFact[] {
+	return Object.keys(uses).flatMap((origin) => usesFrom(uses, origin));
 }
 
 /**
@@ -46,7 +57,7 @@ describe("a file's facts", () => {
 		].join("\n");
 		const module = await moduleOf("src/a.ts", text);
 
-		expect(short(text, module.uses)).toEqual([
+		expect(short(text, allUses(module.uses))).toEqual([
 			"m title@title<m.title> value",
 			'm sub_title@sub_title<m["sub_title"]> value',
 			"m optional@optional<m?.optional> value",
@@ -129,7 +140,9 @@ describe("a file's facts", () => {
 		const text = `<script>\n\timport { m } from "$lib/i18n";\n</script>\n{#each rows as m}{m.cell}{/each}<p>{m.title()}</p>\n`;
 		const module = await moduleOf("src/App.svelte", text);
 
-		expect(short(text, module.uses)).toEqual(["m title@title<m.title> value"]);
+		expect(short(text, allUses(module.uses))).toEqual([
+			"m title@title<m.title> value",
+		]);
 	});
 
 	it("is a file's error where it does not parse", async () => {
