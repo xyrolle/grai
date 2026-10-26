@@ -70,7 +70,7 @@ describe("the names a specifier of grai's output must write", () => {
 		expect(names).toEqual(new Set(["grai", "i18n", "@app/web"]));
 	});
 
-	it("takes a text that writes a name, an escape in a string, or a load or a glob by a built path, and no load by a whole string", () => {
+	it("takes a text that writes a name, an escape in a specifier, a comment where one may be, or a load or a glob by a built path, and no load by a whole string", () => {
 		const test = textTest(new Set(["grai"]));
 		const taken = [
 			'import { m } from "./lib/grai/messages.js";',
@@ -80,6 +80,8 @@ describe("the names a specifier of grai's output must write", () => {
 			"const load = (name) => import /* split */ (name);",
 			'const lib = require ("./lib" + name);',
 			'const pages = import.meta.glob<Page>("./pages/*.ts");',
+			"import { format } from /* the lib */ './lib/format.js';",
+			'const lib = requir\\u0065("./lib/format.js");',
 		];
 		const left = [
 			'import { format } from "./lib/format.js";\nconst global = "glob";',
@@ -87,6 +89,7 @@ describe("the names a specifier of grai's output must write", () => {
 			"const text = 'a\\nb';",
 			'const quote = "a\\"b";',
 			"const digits = /\\d+/;",
+			'const label = "gr\\ai";',
 		];
 
 		expect(taken.map((text) => test.test(text))).toEqual(taken.map(() => true));
