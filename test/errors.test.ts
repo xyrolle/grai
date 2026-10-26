@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, pathnames, basePath, domains, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -123,9 +123,20 @@ describe("the config", () => {
 	it("names a strategy it does not know, and a strategy without the name of the place it reads", async () => {
 		const catalogs = { en: { title: "Title" } };
 
+		const unknown =
+			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query", "url", or a strategy the server defines, named "custom-" and a lowercase name, such as "custom-session".';
 		expect(await errorsOf(catalogs, { strategy: ["header"] })).toEqual([
-			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query" or "url".',
+			unknown,
 		]);
+		expect(await errorsOf(catalogs, { strategy: ["custom-"] })).toEqual([
+			unknown,
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["custom-Session"] })).toEqual([
+			unknown,
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["custom-session"] })).toEqual(
+			[],
+		);
 		expect(await errorsOf(catalogs, { strategy: ["localStorage"] })).toEqual([
 			'config-invalid: grai.config.json: "localStorageKey" must name the key the "localStorage" strategy reads.',
 		]);
@@ -174,6 +185,79 @@ describe("the config", () => {
 				localePrefix: "always",
 			}),
 		).toEqual([]);
+	});
+
+	it("takes pathnames only as paths of the url strategy's locales, each with its route's segments", async () => {
+		const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+		const errors = (pathnames: unknown) =>
+			errorsOf(catalogs, { strategy: ["url"], pathnames });
+
+		expect(await errors({ about: { de: "/ueber-uns" } })).toEqual([
+			'config-invalid: grai.config.json: "pathnames" maps "about", but a path starts with / and has no ?, # or empty segment, and a segment that is [name] is named by a JavaScript identifier.',
+		]);
+		expect(await errors({ "/about": { fr: "/a-propos" } })).toEqual([
+			'config-invalid: grai.config.json: "pathnames" gives "/about" a path in "fr", which is not one of "locales": en, de.',
+		]);
+		expect(
+			await errors({ "/products/[id]": { de: "/produkte/[sku]" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "pathnames" gives "/products/[id]" "/produkte/[sku]" in de, whose segments are [sku] where the route\'s are [id]. Name the same segments in each.',
+		]);
+		expect(
+			await errors({ "/about": { de: "/info" }, "/contact": { de: "/info" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "pathnames" gives de the path "/info" for "/about" and for "/contact". Give each route a path of its own.',
+		]);
+		expect(
+			await errorsOf(catalogs, {
+				pathnames: { "/about": { de: "/ueber-uns" } },
+			}),
+		).toEqual([
+			'config-invalid: grai.config.json: "pathnames" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+	});
+
+	it("takes basePath only as the url strategy's base, a path without a trailing slash", async () => {
+		const catalogs = { en: { title: "Title" } };
+		const message =
+			'config-invalid: grai.config.json: "basePath" must be the path the app is served under, as its framework has it, such as "/shop": it starts with / and does not end with one.';
+
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], basePath: "shop" }),
+		).toEqual([message]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], basePath: "/shop/" }),
+		).toEqual([message]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], basePath: "" }),
+		).toEqual([message]);
+		expect(await errorsOf(catalogs, { basePath: "/shop" })).toEqual([
+			'config-invalid: grai.config.json: "basePath" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+	});
+
+	it("takes domains only as a host of its own for every locale, with the url strategy", async () => {
+		const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+		const errors = (domains: unknown) =>
+			errorsOf(catalogs, { strategy: ["url"], domains });
+
+		expect(await errors({ en: "shop.test" })).toEqual([
+			'config-invalid: grai.config.json: "domains" must give every locale its host, and gives none to de.',
+		]);
+		expect(await errors({ en: "shop.test", de: "https://shop.de" })).toEqual([
+			'config-invalid: grai.config.json: "domains" gives de "https://shop.de", but a host is a lowercase name, such as "example.de", with a port if it has one.',
+		]);
+		expect(await errors({ en: "shop.test", de: "shop.test" })).toEqual([
+			'config-invalid: grai.config.json: "domains" gives de "shop.test", which is en\'s host too. Give each locale a host of its own.',
+		]);
+		expect(await errors({ en: "shop.test", fr: "shop.fr" })).toEqual([
+			'config-invalid: grai.config.json: "domains" names "fr", which is not one of "locales": en, de.',
+		]);
+		expect(
+			await errorsOf(catalogs, { domains: { en: "a.test", de: "b.test" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "domains" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
 	});
 
 	it("takes unlocalizedPaths only with the url strategy, as globs of paths", async () => {

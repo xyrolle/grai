@@ -65,14 +65,19 @@ export type LocaleSwitch = "reload" | "live";
 
 /**
  * A place a request or a page can name its locale in. `localStorage` is the page's alone, which a
- * request does not carry.
+ * request does not carry. A `custom-` one is the server's own, which it defines with
+ * `defineServerStrategy`, and which a page does not read.
  */
 export type Strategy =
 	| "cookie"
 	| "localStorage"
 	| "preferredLanguage"
 	| "query"
-	| "url";
+	| "url"
+	| `custom-${string}`;
+
+/** A strategy the server defines: `custom-` and a lowercase name, such as `custom-session`. */
+const customStrategy = /^custom-[a-z][a-z\d-]*$/;
 
 /** The strategies, in the order the docs and config.schema.json list them. */
 export const strategies: ReadonlySet<string> = new Set([
@@ -168,7 +173,7 @@ export function readConfig(file: string): Config {
 	}
 	if (!isStrategy(strategy)) {
 		throw invalid(
-			'"strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query" or "url"',
+			'"strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query", "url", or a strategy the server defines, named "custom-" and a lowercase name, such as "custom-session"',
 		);
 	}
 	const urlRouting = readUrlRouting(raw, strategy, locales, invalid);
@@ -301,7 +306,11 @@ function isWithin(path: string, directory: string): boolean {
 function isStrategy(value: unknown): value is Strategy[] {
 	return (
 		Array.isArray(value) &&
-		value.every((item) => typeof item === "string" && strategies.has(item)) &&
+		value.every(
+			(item) =>
+				typeof item === "string" &&
+				(strategies.has(item) || customStrategy.test(item)),
+		) &&
 		new Set(value).size === value.length
 	);
 }
