@@ -21,6 +21,9 @@ export async function bindingConflicts(
 	binding: Binding,
 	to: string,
 ): Promise<Conflict[]> {
+	// A file that never writes the new name, plainly or with an escape, declares and reads nothing by
+	// it, so its scopes need no reading.
+	if (!text.includes(to) && !text.includes("\\u")) return [];
 	const modules = await readCode(path, text);
 	if (!Array.isArray(modules)) return [];
 	for (const { program, source } of modules) {

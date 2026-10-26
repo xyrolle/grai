@@ -317,6 +317,25 @@ describe("grai rename", () => {
 		expect(result.changed).toEqual([]);
 	});
 
+	it("refuses where the new name is declared with an escape, as a name the file never writes plainly", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/total.ts": [
+				'import { cart_total } from "#i18n/messages/cart_total.js";',
+				"export const total = (count: number) => {",
+				"\tconst basket_\\u0074otal = cart_total({ count });",
+				"\treturn cart_total;",
+				"};",
+				"",
+			].join("\n"),
+		});
+
+		const result = await rename(config, "cart_total", "basket_total");
+
+		expect(result.errors.map(({ file }) => file)).toEqual(["src/total.ts:3:8"]);
+		expect(result.changed).toEqual([]);
+	});
+
 	it("refuses where the new name would read the key's binding, or a nearer one would take its reference", async () => {
 		const { dir, config } = app();
 		writeSources(dir, {
