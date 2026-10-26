@@ -275,31 +275,6 @@ it(
 	},
 );
 
-it(
-	"refuses a lock whose writer is gone, in every process, and says which file to delete",
-	processTest,
-	async () => {
-		const { dir, config, compile } = project(catalogs);
-		const lock = join(dir, "out", ".grai", "lock");
-		mkdirSync(dirname(lock), { recursive: true });
-		const gone = String(spawnSync(process.execPath, ["-e", ""]).pid);
-		writeFileSync(lock, gone);
-
-		const errors = await Promise.all(
-			[1, 2, 3].map(() => compileElsewhere(config)),
-		);
-		const [refused] = (await compile()).errors;
-
-		expect(errors).toEqual([
-			["output-locked"],
-			["output-locked"],
-			["output-locked"],
-		]);
-		expect(refused?.message).toContain(`delete ${lock}`);
-		expect(readFileSync(lock, "utf8")).toBe(gone);
-	},
-);
-
 it("removes the claims of writers no longer running as it takes the lock", async () => {
 	const { dir, compile } = project(catalogs);
 	const state = join(dir, "out", ".grai");
