@@ -3,6 +3,7 @@ import {
 	expressionNamespace,
 	i18nextCall,
 	type Lookup,
+	namespaceList,
 } from "./i18next-call.ts";
 import {
 	boundProperty,
@@ -18,7 +19,7 @@ import {
 	writtenProperties,
 } from "./library.ts";
 import type { Binding, Use } from "./scopes.ts";
-import { literalText, type Node } from "./syntax.ts";
+import { literalText } from "./syntax.ts";
 
 /** i18next's own module and react-i18next's: the instance's `t` and the hook's, and `<Trans>`. */
 export const i18nextModules: Readonly<Record<string, LibraryModule>> = {
@@ -100,20 +101,25 @@ function tOf(
 /** Where a call that names no namespace looks: i18next's default namespace. */
 function defaults(module: ModuleView): Lookup {
 	return {
+		loaded: undefined,
 		namespaces: [module.defaultNamespace],
 		keyPrefix: "",
 		locale: undefined,
 	};
 }
 
-/** The lookup `useTranslation(ns, { keyPrefix, lng })` gives its `t`, when the call writes it. */
+/**
+ * The lookup `useTranslation(ns, { keyPrefix, nsMode, lng })` gives its `t`, when the call writes
+ * it: it loads every namespace it names, and looks in the first unless its nsMode is fallback.
+ */
 function hookLookup(
 	call: ESTree.CallExpression,
 	module: ModuleView,
 ): Lookup | Left {
 	const [ns, options] = call.arguments;
-	const namespaces = namespacesOf(ns, module);
-	if (namespaces === undefined) return expressionNamespace;
+	const loaded =
+		ns === undefined ? [module.defaultNamespace] : namespaceList(ns);
+	if (loaded === undefined) return expressionNamespace;
 	const written = writtenProperties(options, "options");
 	if ("left" in written) return written;
 	const keyPrefix = written.properties.get("keyPrefix")?.value;
@@ -123,21 +129,15 @@ function hookLookup(
 			left: "its keyPrefix is an expression: call the message by name, as m.<key>().",
 		};
 	}
+	const nsMode = written.properties.get("nsMode")?.value;
+	const mode = nsMode === undefined ? "default" : literalText(nsMode);
+	if (mode !== "default" && mode !== "fallback") {
+		return {
+			left: "its nsMode is an expression: call the message by name, as m.<key>().",
+		};
+	}
+	const namespaces = mode === "fallback" ? loaded : loaded.slice(0, 1);
 	const lng = written.properties.get("lng")?.value;
 	const locale = lng && module.text.slice(lng.start, lng.end);
-	return { namespaces, keyPrefix: prefix, locale };
-}
-
-/** The namespaces a hook's first argument names: one, a list, or the default for none. */
-function namespacesOf(
-	node: Node | undefined,
-	module: ModuleView,
-): string[] | undefined {
-	if (node === undefined) return [module.defaultNamespace];
-	if (node.type !== "ArrayExpression") {
-		const namespace = literalText(node);
-		return namespace === undefined ? undefined : [namespace];
-	}
-	const names = node.elements.map((element) => literalText(element));
-	return names.every((name) => name !== undefined) ? names : undefined;
+	return { loaded, namespaces, keyPrefix: prefix, locale };
 }

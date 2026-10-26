@@ -30,6 +30,7 @@ Each library has a small app in `bench/migrate/`. `node bench/migrate-equivalenc
 | `t("greeting", { name, lng })` | `m.common_greeting({ name }, { locale: lng })` |
 
 - **A call that names no namespace** reads i18next's default one, `translation`. An app that sets `defaultNS` passes it: `grai migrate --default-namespace common`.
+- **A hook given several namespaces** loads them all but looks in the first, as react-i18next does, unless it passes `nsMode: "fallback"`. A key only another namespace has is listed with the call to write, should the app's `fallbackNS` reach it; so is a key that names a namespace the hook does not load.
 - **Left for a person:**
   - a key, namespace or context that is an expression;
   - options that are not an object written in the call;
