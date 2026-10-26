@@ -1,5 +1,13 @@
-import { writeFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import {
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { rename } from "../src/rename.ts";
 import { project } from "./project.ts";
 import {
@@ -85,6 +93,32 @@ describe("grai rename", () => {
 			"<h1 aria-label={m.basket_title()}>{m?.basket_title()}</h1>",
 		);
 		expect((await shop.load()).m.basket_title?.()).toBe("Your cart");
+	});
+
+	it("names each file it changed as the project does when the project is reached through a symlink", async () => {
+		const { dir } = app();
+		const link = join(
+			realpathSync(mkdtempSync(join(tmpdir(), "grai-link-"))),
+			"app",
+		);
+		onTestFinished(() =>
+			rmSync(dirname(link), { recursive: true, force: true }),
+		);
+		symlinkSync(dir, link);
+
+		const result = await rename(
+			join(link, "grai.config.json"),
+			"cart_title",
+			"basket_title",
+		);
+
+		expect(result.errors).toEqual([]);
+		expect(result.changed.toSorted()).toEqual([
+			"messages/de.json",
+			"messages/en.json",
+			"src/Cart.svelte",
+			"src/Header.tsx",
+		]);
 	});
 
 	it("changes only the key's string in a catalog, leaving every other byte as it is written", async () => {
