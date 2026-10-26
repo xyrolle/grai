@@ -229,6 +229,27 @@ describe("grai/svelte's client build", () => {
 		}
 	});
 
+	it("keeps an app's own exports beside its star re-export of the output, whichever comes first", async () => {
+		const dir = svelteApp({
+			"i18n.js": `export * from "./out/keys.js";
+export * from "./out/messages.js";
+export const title = () => "Own title";
+const own = () => "Own footer";
+export { own as footer };
+export const m = { custom: () => "Own custom" };
+`,
+			"App.svelte": `<script>import { footer, m, title } from "./i18n.js";</script>
+<h1>{title()}</h1><p>{footer()}</p><p>{m.custom()}</p>`,
+		});
+		const { files } = await built(dir, withTexts(), "client");
+
+		expect(code(files)).toContain('"Own title"');
+		expect(code(files)).toContain('"Own footer"');
+		expect(code(files)).toContain('"Own custom"');
+		expect(code(files)).not.toContain('pageText("Title", "Titel")');
+		expect(code(files)).not.toContain('pageText("Footer", "Fußzeile")');
+	});
+
 	it("hydrates the server's page in each locale, keeping its elements", async () => {
 		const dir = svelteApp({
 			"Label.svelte": `<script>let { text } = $props();</script><span>{text}</span>`,
