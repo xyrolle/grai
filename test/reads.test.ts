@@ -91,6 +91,21 @@ describe("the reads of a project's code", () => {
 		]);
 	});
 
+	it("reads what a dynamic import loads after one by a name, which loads nothing it can follow", async () => {
+		expect(
+			await readsOf({
+				"src/lib/i18n.ts": i18nTs,
+				"src/a.ts": [
+					'const path = "./b.ts";',
+					"const other = await import(path);",
+					'const i18n = await import("./lib/i18n.ts");',
+					"other.run(); i18n.m.title();",
+					"",
+				].join("\n"),
+			}),
+		).toEqual(["src/a.ts:4:21 member title"]);
+	});
+
 	it("takes a module a dynamic import hands to then as used whole, and a key's own module as its path", async () => {
 		expect(
 			await readsOf({
