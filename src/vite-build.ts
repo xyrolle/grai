@@ -43,8 +43,9 @@ export function keyModule(
 	const name = id.slice(keyModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
-	const names = calledNames([key]);
-	const value = consumer === "server" ? key.serverValue : key.value;
+	const server = consumer === "server";
+	const names = calledNames([key], server ? key.serverUses : key.uses);
+	const value = server ? key.serverValue : key.value;
 	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 

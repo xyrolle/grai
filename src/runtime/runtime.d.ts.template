@@ -109,6 +109,8 @@ export declare function pageText(...texts: string[]): string;
 export declare function message(
 	...variants: ((inputs: CompiledInputs) => string)[]
 ): Message<CompiledInputs>;
+/** The position in `locales` of the locale a call renders in: the one it names, else the bound one. */
+export declare function localeIndex(options?: { locale?: string }): number;
 /** A compiled message with markup: its text and its parts, a function per locale for each. */
 export declare function markup(
 	strings: ((inputs: CompiledInputs) => string)[],

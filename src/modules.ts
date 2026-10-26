@@ -2,14 +2,21 @@ import type { Formatter } from "./formatters.ts";
 import {
 	arrow,
 	functionExpression,
+	type LocaleFunction,
 	localeFunction,
 	type Used,
 } from "./locale-function.ts";
 import type { LocaleMessage } from "./message.ts";
 import { formatsLiteral, plainText } from "./pattern.ts";
+import { serverMessage } from "./server-message.ts";
 
 /** The runtime functions compiled messages call. */
-export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
+export type RuntimeFunction =
+	| "localeIndex"
+	| "markup"
+	| "message"
+	| "text"
+	| "unmatched";
 
 /**
  * A key compiled: the value its module exports, in keys.js and in a server build, the runtime
@@ -20,9 +27,15 @@ export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
 export type KeyModule = {
 	/** Its value in keys.js, each locale's function an arrow function. */
 	value: string;
-	/** Its value in a server build, each locale's function a function expression. */
+	/**
+	 * Its value in a server build: a message with inputs switches on the call's locale in its own
+	 * code (server-message.ts); any other key is its value in keys.js, each locale's function a
+	 * function expression.
+	 */
 	serverValue: string;
 	uses: ReadonlySet<RuntimeFunction>;
+	/** The runtime functions its value in a server build calls. */
+	serverUses: ReadonlySet<RuntimeFunction>;
 	/** The functions of plurals.js it calls, by name. */
 	plurals: ReadonlySet<string>;
 	/** The formatters it calls, by name. */
@@ -62,6 +75,7 @@ export function keyModule(
 			value,
 			serverValue: value,
 			uses: textUses,
+			serverUses: textUses,
 			plurals: noNames,
 			formats: noFormats,
 			globals: noNames,
@@ -88,16 +102,47 @@ export function keyModule(
 	const partArrows = parts.map(arrow);
 	return {
 		value: messageValue(kind, variants, partArrows),
-		serverValue: messageValue(
-			kind,
-			strings.map(functionExpression),
-			parts.map(functionExpression),
-		),
+		...serverModule(key, kind, strings, parts, used),
 		...used,
 		kind,
 		variants,
 		parts: partArrows,
 	};
+}
+
+/**
+ * A message's value in a server build, and the runtime functions it calls. One with inputs
+ * switches on the call's locale in its own code; one with markup is its value in keys.js, each
+ * locale's function a function expression.
+ */
+function serverModule(
+	key: string,
+	kind: "message" | "markup",
+	strings: readonly LocaleFunction[],
+	parts: readonly LocaleFunction[],
+	used: Used,
+): Pick<KeyModule, "serverValue" | "serverUses"> {
+	if (kind === "markup")
+		return {
+			serverValue: messageValue(
+				kind,
+				strings.map(functionExpression),
+				parts.map(functionExpression),
+			),
+			serverUses: used.uses,
+		};
+	const uses = new Set(used.uses);
+	uses.delete("message");
+	uses.add("localeIndex");
+	// Every name its code refers to, the key's own too: its options take none of them.
+	const bound = new Set<string>([
+		key,
+		...uses,
+		...used.plurals,
+		...used.formats.keys(),
+		...used.globals,
+	]);
+	return { serverValue: serverMessage(strings, bound), serverUses: uses };
 }
 
 /** A key's value: the runtime call that holds its variants, and for markup its parts. */

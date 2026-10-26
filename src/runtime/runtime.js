@@ -565,6 +565,21 @@ function variantFor(variants, options) {
 }
 
 /**
+ * The position in `locales` of the locale a call renders in: the one it names, else the bound one.
+ * A server build's message with inputs switches on it in its own code.
+ *
+ * @param {{ locale?: string } | undefined} options
+ * @returns {number}
+ */
+export function localeIndex(options) {
+	const locale = options?.locale;
+	if (locale === undefined) return bound();
+	const index = locales.indexOf(locale);
+	if (index < 0) throw unknownLocale(locale);
+	return index;
+}
+
+/**
  * Why a call has no variant: it names a locale the project does not have, or one the page does
  * not render in. A production page holds one locale's variants: the page's, unless its import map
  * gave it another's.
