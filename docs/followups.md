@@ -20,6 +20,12 @@ The merge rule may put a key a page needs only through a later import in a chunk
 
 Done when: a key reaches a page's first paint only if that page's first paint, not only a later import, needs it, with app B's chunks a page unchanged.
 
+## A page's locale copies against Paraglide's per-locale build
+
+On app A, a page's locale copies take 1,250 KB brotli summed over its 73 pages, 13% more than Paraglide's per-locale build of the same pages' keys bundled into one file per page, and 34.5 KB against 30.0 KB on its largest page (`bytes`). The chunks hold keys a page does not name, as sets of entries share them, each chunk compresses alone, and a copy keeps a `void 0` for each other locale's variant.
+
+Done when: a page's locale copies take no more than Paraglide's per-locale build in `bytes`, on both apps.
+
 ## Switch locale in place: `"switch": "live"`
 
 No page switches in place yet, so the config refuses `"live"`, for which `grai/svelte` keeps every message a call. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
