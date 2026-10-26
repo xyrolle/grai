@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { extname, join, relative, sep } from "node:path";
+import { extname, join, relative } from "node:path";
 import { type CodeText, codeText, type Uncertain } from "./code-text.ts";
-import { globMatcher } from "./globs.ts";
 
 /**
  * Files that can name a message: JavaScript, TypeScript, the components of Svelte, Vue and Astro,
@@ -29,8 +28,6 @@ const skippedDirectories = new Set(["node_modules", "dist", "build"]);
  */
 const identifier =
 	/(?<![\w$\\])(?:[A-Za-z_$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})(?:[\w$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})*/g;
-/** An identifier without escapes, as most files write every one: matched far faster. */
-const plainIdentifier = /(?<![\w$])[A-Za-z_$][\w$]*/g;
 const unicodeEscape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
 
 /**
@@ -110,25 +107,6 @@ export function occurrencesOf(text: string, name: string): number[] {
 	return [...text.matchAll(pattern)].map((match) => match.index);
 }
 
-/**
- * Every identifier the files write, in their strings and comments too, and an escaped one as the
- * name it spells: a key counts as named when it is one of them, so check --fix keeps it.
- */
-export function namesIn(files: readonly SourceFile[]): Set<string> {
-	const names = new Set<string>();
-	for (const { text } of files) {
-		if (!text.includes("\\u")) {
-			for (const written of text.match(plainIdentifier) ?? [])
-				names.add(written);
-			continue;
-		}
-		for (const written of text.match(identifier) ?? []) {
-			names.add(unescaped(written));
-		}
-	}
-	return names;
-}
-
 /** Each identifier code writes with an escape, as the name it spells, and where it is. */
 export function escapedNames(code: string): { name: string; at: number }[] {
 	return [...code.matchAll(identifier)]
@@ -143,31 +121,10 @@ export function unescaped(written: string): string {
 	);
 }
 
-/** A test file, by the path the project shows, and the identifiers it writes. */
+/** A test file, by the path the project shows, and the keys it reads. */
 export type TestNames = { file: string; names: ReadonlySet<string> };
 
-/**
- * The source files that ship, and the names each test writes. A file is a test when one of the
- * config's `tests` globs matches its path from the project's root.
- */
-export function splitTests(
-	files: readonly SourceFile[],
-	tests: readonly string[],
-): { shipped: SourceFile[]; tests: TestNames[] } {
-	const isTest = globMatcher(tests);
-	const shipped: SourceFile[] = [];
-	const testNames: TestNames[] = [];
-	for (const source of files) {
-		if (isTest(source.file.replaceAll(sep, "/"))) {
-			testNames.push({ file: source.file, names: namesIn([source]) });
-		} else {
-			shipped.push(source);
-		}
-	}
-	return { shipped, tests: testNames };
-}
-
-/** The tests that write a name, sorted by path, for a message: the first three, then how many more. */
+/** The tests that read a key, sorted by path, for a message: the first three, then how many more. */
 export function testsNaming(
 	tests: readonly TestNames[],
 	name: string,

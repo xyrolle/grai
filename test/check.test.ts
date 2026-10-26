@@ -9,7 +9,10 @@ async function problemsOf(
 	catalogs: Record<string, unknown>,
 ): Promise<string[]> {
 	const { dir, config } = project(catalogs);
-	writeFileSync(join(dir, "app.ts"), "m.invited(); m.files();");
+	writeFileSync(
+		join(dir, "app.ts"),
+		'import { m } from "./out/messages.js";\nm.invited(); m.files();\n',
+	);
 	const { problems } = await check(config);
 	return problems.map((error) => error.message);
 }
