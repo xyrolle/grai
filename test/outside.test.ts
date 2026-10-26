@@ -60,4 +60,50 @@ describe("a reading of the files that may name a module outside the listed sourc
 			],
 		});
 	});
+
+	it("reads a file that imports an installed package that passes the output on, and none that imports one that does not", async () => {
+		const dir = projectWith({
+			"node_modules/passing/package.json": JSON.stringify({
+				name: "passing",
+				type: "module",
+				exports: { "./i18n": "./i18n.js" },
+			}),
+			"node_modules/passing/i18n.js":
+				'export { m } from "../../out/messages.js";\n',
+			"node_modules/@scope/plain/package.json": JSON.stringify({
+				name: "@scope/plain",
+				type: "module",
+				main: "index.js",
+			}),
+			"node_modules/@scope/plain/index.js": "export const plain = 1;\n",
+			"src/a.ts": 'import { m } from "passing/i18n";\nm.title();\n',
+			"src/b.ts":
+				'import { plain } from "@scope/plain";\nexport const b = plain;\n',
+			"src/c.ts": 'export const c = "passing";\n',
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: ["src/a.ts"],
+			reads: ["src/a.ts title"],
+		});
+	});
+
+	it("reads a file that imports an installed package that passes on a barrel the reading finds", async () => {
+		const dir = projectWith({
+			"node_modules/bridge/package.json": JSON.stringify({
+				name: "bridge",
+				type: "module",
+				main: "index.js",
+			}),
+			"node_modules/bridge/index.js":
+				'export { m } from "../../src/lib/i18n.ts";\n',
+			"src/lib/i18n.ts": 'export { m } from "../../out/messages.js";\n',
+			"src/a.ts": 'import { m } from "bridge";\nm.title();\n',
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: ["src/a.ts", "src/lib/i18n.ts"],
+			reads: ["src/a.ts title"],
+		});
+	});
 });
