@@ -1,9 +1,12 @@
-import { usesIn } from "./call-sites.ts";
 import { messageEntries } from "./catalog-entries.ts";
 import { keyOf } from "./catalog-keys.ts";
+import { readProjectCode } from "./code/project.ts";
+import { readingOf } from "./code/reads.ts";
+import { codeProblems, mayReach, unknownReads } from "./code-problems.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { GraiError } from "./error.ts";
-import { lineAt, positionOf, sourceFiles } from "./sources.ts";
+import { compileOutputIfMissing } from "./output-present.ts";
+import { lineAt, positionOf } from "./sources.ts";
 
 /** A place a key is: the file, the line and column of the key there, and the line's text. */
 export type FoundLine = {
@@ -16,16 +19,18 @@ export type FoundLine = {
 export type FindResult = {
 	/** The key's entry in each catalog that has it. */
 	catalogs: FoundLine[];
-	/** Each call site: `m.key`, `m["key"]`, a per-key import, or a use of the name it binds. */
+	/** Each place code names the key in a read of it, and each use of a name such a read binds. */
 	callSites: FoundLine[];
-	/** Each other place a source writes the key's name, which may mean something else. */
-	mentions: FoundLine[];
+	/** Each read that may reach the key among others: by a computed name, whole, or by a pattern. */
+	reaches: FoundLine[];
 	errors: GraiError[];
 };
 
 /**
- * Every place a key is: its entry in each catalog, and each place the source files under the
- * roots (the project's root by default) write its name. A key no catalog has is an error.
+ * Every place a key is: its entry in each catalog, and each read of it in the code under the roots
+ * (the project's root by default), read as `check` reads it. A key no catalog has is an error, and
+ * so is a file whose reads cannot be known, as it does not parse or imports the output by a path
+ * nothing resolves.
  */
 export async function find(
 	configFile: string,
@@ -35,12 +40,12 @@ export async function find(
 	const found: FindResult = {
 		catalogs: [],
 		callSites: [],
-		mentions: [],
+		reaches: [],
 		errors: [],
 	};
 	const read = await readProject(configFile);
 	if ("errors" in read) return { ...found, errors: read.errors };
-	const { errors } = parseCatalogs(read.sources);
+	const { catalogs, errors } = parseCatalogs(read.sources);
 	if (errors.length > 0) return { ...found, errors };
 	for (const { file, bytes } of read.sources) {
 		const text = bytes.toString("utf8");
@@ -50,14 +55,35 @@ export async function find(
 		}
 	}
 	const { config } = read;
-	const files = sourceFiles(roots ?? [config.root], config.root, config.outdir);
-	for (const { source, uses } of usesIn(files, key)) {
-		for (const { at, kind } of uses) {
-			const place = foundLine(source.file, source.text, at);
-			if (kind === "mention") found.mentions.push(place);
-			else found.callSites.push(place);
+	const compiled = await compileOutputIfMissing(configFile, config);
+	if (compiled.length > 0) return { ...found, errors: [...compiled] };
+	const code = await readProjectCode(config, roots ?? [config.root]);
+	if (code instanceof GraiError) return { ...found, errors: [code] };
+	const reading = await readingOf(code);
+	const keys = new Set(
+		catalogs.flatMap(({ messages }) => [...messages.keys()]),
+	);
+	found.errors.push(...unknownReads(codeProblems(reading, keys, config)));
+	const sites = new Map<string, FoundLine & { at: number }>();
+	const site = ({ file, text }: { file: string; text: string }, at: number) =>
+		sites.set(`${file}\0${at}`, { ...foundLine(file, text, at), at });
+	for (const { key: each, source, at, edits, binding } of reading.reads) {
+		if (each !== key) continue;
+		for (const place of [at, ...edits.map((edit) => edit.at)]) {
+			site(source, place.start);
+		}
+		for (const reference of binding?.references ?? []) {
+			site(source, reference.at.start);
 		}
 	}
+	found.callSites = [...sites.values()]
+		.toSorted((a, b) =>
+			a.file === b.file ? a.at - b.at : a.file < b.file ? -1 : 1,
+		)
+		.map(({ at, ...line }) => line);
+	found.reaches = reading.reaches
+		.filter((reach) => mayReach(reach, key))
+		.map(({ source, at }) => foundLine(source.file, source.text, at.start));
 	if (found.catalogs.length === 0) {
 		const base = read.sources.find(
 			({ locale }) => locale === config.baseLocale,
@@ -73,16 +99,16 @@ export async function find(
 	return found;
 }
 
-/** What find prints: each place as `file:line:column: text`, a mention marked, then a count. */
+/** What find prints: each place as `file:line:column: text`, a reach marked, then a count. */
 export function foundLines(key: string, found: FindResult): string[] {
 	const place = ({ file, line, column, text }: FoundLine) =>
 		`${file}:${line}:${column}: ${text.trim()}`;
-	const mentions = found.mentions.length;
+	const reaches = found.reaches.length;
 	return [
 		...found.catalogs.map(place),
 		...found.callSites.map(place),
-		...found.mentions.map((mention) => `${place(mention)} (not a call site)`),
-		`grai: "${key}" is in ${count(found.catalogs.length, "catalog")} and ${count(found.callSites.length, "call site")}${mentions > 0 ? `, and named in ${count(mentions, "other place")}` : ""}`,
+		...found.reaches.map((reach) => `${place(reach)} (may read it)`),
+		`grai: "${key}" is in ${count(found.catalogs.length, "catalog")} and ${count(found.callSites.length, "call site")}${reaches > 0 ? `, and may be read at ${count(reaches, "other place")}` : ""}`,
 	];
 }
 
