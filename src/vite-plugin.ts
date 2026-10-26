@@ -16,6 +16,7 @@ import {
 import { moduleOf } from "./message-imports.ts";
 import { type ModuleLinks, moduleLinks, seenThrough } from "./module-links.ts";
 import { realPath } from "./real-path.ts";
+import { withSharedKeys } from "./server-chunks.ts";
 import {
 	type ChunkingGraph,
 	chunkFileName,
@@ -25,7 +26,6 @@ import {
 	messageChunkCopies,
 	messageChunking,
 	placeholderTexts,
-	serverMessageChunking,
 	textModule,
 } from "./vite-build.ts";
 import {
@@ -160,8 +160,7 @@ export function graiPlugin(
 			testing = environment.mode === "test";
 		},
 		configEnvironment(name, environment) {
-			if (serving) return undefined;
-			if (name !== "client") return serverMessageChunking();
+			if (serving || name !== "client") return undefined;
 			const chunking = messageChunking(files.outdir, pageChunkOf);
 			// With copies, a page's own preloads leave the shared message chunks out, for its locale
 			// script to preload the locale's copies.
@@ -198,6 +197,13 @@ export function graiPlugin(
 			},
 		},
 		outputOptions(output) {
+			if (serving) return null;
+			// Each output as Vite has resolved it: an app's or Vite's own choice not to split code
+			// stays, and an app's list of outputs gets no output of grai's.
+			if (this.environment.config.consumer === "server")
+				return output.codeSplitting === false
+					? null
+					: { ...output, codeSplitting: withSharedKeys(output.codeSplitting) };
 			if (!building(this.environment)) return null;
 			const named = output.chunkFileNames;
 			return {
