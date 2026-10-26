@@ -1,7 +1,7 @@
 import type { Format } from "./format-options.ts";
 import { type Formatter, formatterOf } from "./formatters.ts";
 import { literalKey } from "./literal-key.ts";
-import { localeReads, shiftedCode } from "./locale-reads.ts";
+import { globalCalled, localeReads, shiftedCode } from "./locale-reads.ts";
 import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
 import type { RuntimeFunction } from "./modules.ts";
@@ -80,7 +80,7 @@ export function localeFunction(
 		const moved =
 			format.shift === 0
 				? operand
-				: `(${shiftedCode(`Number(${operand})`, format.shift)})`;
+				: `(${shiftedCode(`${globalCalled("Number", used.globals)}(${operand})`, format.shift)})`;
 		return `${formatter.name}(${moved}${given})`;
 	};
 	/** A placeholder's or a literal's code: its value, through its formatter if it has one. */
