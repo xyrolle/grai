@@ -230,6 +230,20 @@ describe("grai/svelte's client build", () => {
 		}
 	});
 
+	it("reads a text key's per-key import as its string, as it reads the namespace's", async () => {
+		const dir = svelteApp({
+			"package.json": JSON.stringify({
+				imports: { "#i18n/messages/*": "./out/keys.js" },
+			}),
+			"App.svelte": `<script>import { title } from "#i18n/messages/title.js";</script>
+<h1>{title()}</h1>`,
+		});
+		const { files } = await built(dir, withTexts(), "client");
+
+		expect(code(files)).toContain('pageText("Title", "Titel")');
+		expect(code(files)).not.toContain('text("Title", "Titel")');
+	});
+
 	it("hydrates the server's page in each locale, keeping its elements", async () => {
 		const dir = svelteApp({
 			"Label.svelte": `<script>let { text } = $props();</script><span>{text}</span>`,
