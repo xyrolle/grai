@@ -81,6 +81,7 @@ export function project(
 	writeFileSync(
 		join(dir, "package.json"),
 		JSON.stringify({
+			type: "module",
 			imports: { "#i18n/messages/*": `./${outdir}/keys.js` },
 		}),
 	);

@@ -157,7 +157,7 @@ describe("a key named as something the output's code calls", () => {
 					},
 		});
 		await build(options(join(dir, "server"), true));
-		expect(said(join(dir, "server", "entry.mjs"))).toEqual(expected);
+		expect(said(join(dir, "server", "entry.js"))).toEqual(expected);
 		await build(options(join(dir, "client"), false));
 		const assets = join(dir, "client", "assets");
 		const client = readdirSync(assets).find((file) => file.startsWith("entry"));
