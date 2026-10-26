@@ -311,15 +311,15 @@ describe("reading a project's facts", () => {
 		expect(statSync(cache).ino).toBe(file);
 	});
 
-	it("sizes the pool by the work left: no worker for a little, one for each worker's start of it, at most the parallelism less one", () => {
+	it("sizes the pool by the work left: no worker for a little, one for each worker's cost of it, at most the parallelism less one", () => {
 		// The reading has taken a worker's start, a millisecond for each file read.
 		const after = workerStart + 1;
 		const workers = (left: number, parallelism = 8) =>
 			workersFor(workerStart, after, after, left, parallelism);
 
 		expect(
-			[400, 600, 1_000, 1_500, 100_000].map((left) => workers(left)),
-		).toEqual([0, 2, 4, 6, 7]);
+			[1_000, 1_999, 2_000, 4_000, 100_000].map((left) => workers(left)),
+		).toEqual([0, 0, 2, 4, 7]);
 		expect(workers(100_000, 2)).toBe(0);
 		// Before a worker's start has passed, the reading goes on here whatever is left.
 		expect(workersFor(workerStart, workerStart, workerStart, 100_000, 8)).toBe(

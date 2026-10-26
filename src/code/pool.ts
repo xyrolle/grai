@@ -61,16 +61,24 @@ export class Pool {
 			const task = tasks[at];
 			return task === undefined ? undefined : { at, task };
 		};
+		// Once a worker answers, this thread takes no more tasks: a worker waits for its next task
+		// while this thread is busy with one of its own.
+		let answered = false;
 		const serve = async (worker: Worker) => {
 			for (let taken = take(); taken !== undefined; taken = take()) {
 				answers[taken.at] = work.there(await answer(worker, taken.task));
+				answered = true;
 			}
 		};
 		const serving = this.workers.map(serve);
 		const total = tasks.reduce((sum, task) => sum + work.size(task), 0);
 		const begun = performance.now();
 		let done = 0;
-		for (let taken = here ? take() : undefined; taken; taken = take()) {
+		for (
+			let taken = here ? take() : undefined;
+			taken !== undefined;
+			taken = answered ? undefined : take()
+		) {
 			answers[taken.at] = await work.here(taken.task);
 			done += work.size(taken.task);
 			const wanted = workersFor(
@@ -106,10 +114,16 @@ export class Pool {
 }
 
 /**
- * How many workers the rest of a run takes, from how long the work done so far took: none while it
- * has taken less than a worker's start or the rest would take less than two, then one for each
- * worker's start the rest would take, at most the parallelism less one, and none rather than one,
- * which would only add its start.
+ * What a worker costs in all, in its starts: its start, then loading its code and warming it up,
+ * measured on app B as about a second of CPU for each worker against a start of 250 ms. More
+ * workers than the work pays for this make a run no faster and take the CPU from the machine.
+ */
+const workerCost = 4;
+
+/**
+ * How many workers the rest of a run takes, from how long the work done so far took: none until it
+ * has taken a worker's start, then one for each worker's cost the rest would take, at most the
+ * parallelism less one, and none rather than one, which would only add its start.
  */
 export function workersFor(
 	start: number,
@@ -118,9 +132,12 @@ export function workersFor(
 	left: number,
 	parallelism: number,
 ): number {
+	if (elapsed <= start) return 0;
 	const rest = (elapsed / done) * left;
-	if (elapsed <= start || rest <= 2 * start) return 0;
-	const workers = Math.min(parallelism - 1, Math.floor(rest / start));
+	const workers = Math.min(
+		parallelism - 1,
+		Math.floor(rest / (workerCost * start)),
+	);
 	return workers > 1 ? workers : 0;
 }
 
