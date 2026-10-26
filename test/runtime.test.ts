@@ -702,6 +702,47 @@ it("puts the locale after the app's base path, and reads it there", async () => 
 	]);
 });
 
+it("reads a relative href from the request's URL, as SvelteKit's resolve() writes a link under a relative base", async () => {
+	const { runtime, middleware } = await served({
+		strategy: ["url"],
+		basePath: "/shop",
+		pathnames: { "/about": { de: "/ueber-uns" } },
+	});
+	const links = async (path: string, ...hrefs: [string, string?][]) =>
+		(
+			await middleware(new Request(`https://example.test${path}`), () => {
+				const localized = hrefs.map(([href, locale]) =>
+					runtime.localizeHref(href, locale === undefined ? {} : { locale }),
+				);
+				return new Response(localized.join(" "));
+			})
+		).text();
+
+	expect(
+		await links("/shop/de", ["./about"], ["./about", "en"], ["./", "ar"]),
+	).toBe("/shop/de/ueber-uns /shop/about /shop/ar");
+	expect(
+		await links(
+			"/shop/de/products/7",
+			["../../about"],
+			["?view=all", "en"],
+			["#reviews"],
+		),
+	).toBe(
+		"/shop/de/ueber-uns /shop/products/7?view=all /shop/de/products/7#reviews",
+	);
+	// Outside a page and a request, the runtime knows nothing a relative href is relative to.
+	expect([
+		runtime.localizeHref("./about", { locale: "de" }),
+		runtime.localizeHref("mailto:shop@example.test"),
+		runtime.localizeHref("//cdn.example.test/logo.svg"),
+	]).toEqual([
+		"./about",
+		"mailto:shop@example.test",
+		"//cdn.example.test/logo.svg",
+	]);
+});
+
 it("takes a path without the base path as the app's own, as a framework that adds the base itself writes it", async () => {
 	const { runtime } = await output({ strategy: ["url"], basePath: "/shop" });
 
@@ -858,6 +899,9 @@ describe("in a browser", () => {
 			},
 			document: {
 				documentElement: { lang },
+				get baseURI() {
+					return visited.href;
+				},
 				set cookie(value: string) {
 					visited.cookie = value;
 				},
@@ -882,6 +926,20 @@ describe("in a browser", () => {
 		});
 		return visited;
 	}
+
+	it("reads a relative href from the page's URL", async () => {
+		page("de");
+		const { runtime } = await output({
+			strategy: ["url"],
+			pathnames: { "/about": { de: "/ueber-uns" } },
+		});
+
+		expect([
+			runtime.localizeHref("./about"),
+			runtime.localizeHref("?step=3", { locale: "ar" }),
+			runtime.localizeHref(""),
+		]).toEqual(["/de/ueber-uns", "/ar/cart?step=3", "/de/cart?step=2"]);
+	});
 
 	it("renders in the page's locale, and setLocale keeps a new one in its cookie, then reloads", async () => {
 		const visited = page("de");
