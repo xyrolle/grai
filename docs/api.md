@@ -34,6 +34,11 @@ The compiler, for a build script or a bundler grai has no adapter for.
 
 It exports nothing: an app imports it once, from `src/hooks.client.ts`, for what it does in dev. A catalog edit then draws the text it changed again in place: the renders that read an edited message run again, and once the server has the edit, so do the page's loads and remote functions. A build leaves it out.
 
+## `grai/sveltekit/navigation`
+
+- `reloadAcrossLocales({ localizeUrl }): void`: called once as the root layout initializes, it loads a page of another locale as a document, which the server draws in that locale, and leaves every navigation within the page's locale to Kit. It takes the output's `runtime.js` `localizeUrl`: a URL is another locale's when putting it in the page's locale changes its path.
+- `type PageUrls`: what it takes.
+
 ## `grai/next`
 
 - `bindLocale(locale: string): void`: binds the locale for the rest of the request's render. A page, a layout or `generateMetadata` calls it before any message, with the locale its params name.

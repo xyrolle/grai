@@ -102,6 +102,7 @@ async function askEditor(
 					"grai/svelte": [source("svelte.ts")],
 					"grai/sveltekit": [source("sveltekit.ts")],
 					"grai/sveltekit/vite": [source("sveltekit-vite.ts")],
+					"grai/sveltekit/navigation": [source("sveltekit-navigation.ts")],
 					"grai/next": [source("next/render.ts")],
 					"grai/next/config": [source("next/config.ts")],
 					"grai/next/proxy": [source("next/proxy.ts")],

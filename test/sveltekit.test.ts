@@ -156,7 +156,34 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		const page = await open(origin, "/ro/");
 		await page.getByText("Desenat în browser").waitFor();
 		expect(await page.locator("h1").textContent()).toBe("Bună ziua");
-		expect(await page.getByRole("link").getAttribute("href")).toBe("/ro/about");
+		expect(
+			await page.getByRole("link", { name: "Despre" }).getAttribute("href"),
+		).toBe("/ro/about");
+		await page.context().close();
+	});
+
+	it("loads a page of another locale as a document, in that locale", async () => {
+		const page = await open(origin, "/");
+		await page.getByText("Drawn in the browser").waitFor();
+		await page.evaluate("window.unreloaded = true");
+
+		await page.getByRole("link", { name: "ro", exact: true }).click();
+		await page.getByRole("heading", { name: "Bună ziua" }).waitFor();
+
+		expect(await html(page, "lang")).toBe("ro");
+		expect(await page.evaluate("window.unreloaded")).toBeUndefined();
+		await page.context().close();
+	});
+
+	it("keeps a link within the page's locale a client navigation", async () => {
+		const page = await open(origin, "/ro");
+		await page.getByText("Desenat în browser").waitFor();
+		await page.evaluate("window.unreloaded = true");
+
+		await page.getByRole("link", { name: "Despre" }).click();
+		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
+
+		expect(await page.evaluate("window.unreloaded")).toBe(true);
 		await page.context().close();
 	});
 

@@ -123,7 +123,20 @@ import { deLocalizeUrl } from "#lib/i18n/runtime.js";
 export const reroute: Reroute = ({ url }) => deLocalizeUrl(url).pathname;
 ```
 
-Links then name their locale with `localizeHref("/about")`.
+Links then name their locale with `localizeHref("/about")`. A page holds its own locale's words, so a link to another locale's page must load it as a document, as Kit would otherwise draw it in the client with the first page's locale. The root layout says so, once, and a navigation within one locale stays Kit's:
+
+```svelte
+<!-- src/routes/+layout.svelte -->
+<script lang="ts">
+	import { reloadAcrossLocales } from "grai/sveltekit/navigation";
+	import { localizeUrl } from "#lib/i18n/runtime.js";
+
+	let { children } = $props();
+	reloadAcrossLocales({ localizeUrl });
+</script>
+
+{@render children()}
+```
 
 A built page downloads only its own locale's words. The plugin is `grai/svelte`'s, and it also writes a copy of each message chunk per locale, which the output's `localeCopies` says; `handleLocale` then writes the page an import map from the shared chunks to its locale's copies, and points Kit's preloads at the copies. Built with any other plugin, `localeCopies` is false, and a page loads the shared chunks.
 
