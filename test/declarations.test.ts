@@ -331,6 +331,44 @@ console.log(thrown, messageOnly, unknownCode);
 	]).toEqual(["GraiError", "locale-unknown", "Bad locale", true]);
 });
 
+it("takes the keys a select matching exactly lists, when a :string select lists them too in NFC", async () => {
+	// "e" and a combining acute accent, which NFC writes as the one character é.
+	const decomposed = "cafe\u0301";
+	const { dir, compile } = project({
+		en: {
+			place: [
+				{
+					declarations: ["input place", "local s = place: string"],
+					selectors: ["s"],
+					match: { [`s=${decomposed}`]: "Café" },
+				},
+			],
+		},
+		de: {
+			place: [
+				{
+					declarations: ["input place"],
+					selectors: ["place"],
+					match: { [`place=${decomposed}`]: "Café" },
+				},
+			],
+		},
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+console.log(m.place({ place: "${decomposed}" }));
+m.place({ place: "tea" });
+`,
+	);
+
+	// Line 3: a key neither select lists.
+	expect(errors).toEqual(["3 TS2322"]);
+});
+
 it("types setLocale under reload as giving back nothing to await", async () => {
 	const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
 	const use = `import { setLocale } from "./out/runtime.js";

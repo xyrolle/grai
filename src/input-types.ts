@@ -54,10 +54,13 @@ const formatterUses: Readonly<Record<IntlFormatter, [Kind, string]>> = {
 	list: ["list", "is formatted as a list"],
 };
 
-/** A use of an input in a locale: a kind of value it takes, or the keys a select lists without `*`. */
+/**
+ * A use of an input in a locale: a kind of value it takes, or the keys a select lists without `*`,
+ * and whether it matches them in NFC, as a `:string` select does, or exactly.
+ */
 type Use = { locale: string } & (
 	| { kind: Kind; does: string }
-	| { keys: ReadonlySet<string> }
+	| { keys: ReadonlySet<string>; normalized: boolean }
 );
 type KindUse = Extract<Use, { kind: Kind }>;
 type KeysUse = Extract<Use, { keys: ReadonlySet<string> }>;
@@ -82,25 +85,30 @@ export function inputTypes(
 	);
 }
 
-/** The keys every select of an input lists, and the locales those selects are in. */
-type Listed = { keys: ReadonlySet<string>; locales: readonly string[] };
+/**
+ * The keys every select of an input lists: those every select that matches exactly lists, and
+ * those every `:string` select lists, in NFC; and the locales those selects are in.
+ */
+type Listed = {
+	exact: ReadonlySet<string> | undefined;
+	normalized: ReadonlySet<string> | undefined;
+	locales: readonly string[];
+};
 
 function inputType(name: string, messages: readonly LocaleMessage[]): string {
 	let kind: KindUse | undefined;
 	let listed: Listed | undefined;
 	for (const use of messages.flatMap((message) => usesOf(name, message))) {
 		if ("keys" in use) {
-			const keys =
-				listed === undefined ? use.keys : common(listed.keys, use.keys);
-			if (listed !== undefined && keys.size === 0) {
+			const next = withUse(listed, use);
+			if (listed !== undefined && keysOf(next).size === 0) {
 				throw conflict(name, together(listed), use);
 			}
-			const locales = new Set([...(listed?.locales ?? []), use.locale]);
-			listed = { keys, locales: [...locales] };
+			listed = next;
 		} else kind = narrowed(name, kind, use);
 		if (
 			listed !== undefined &&
-			literals(kind?.kind, listed.keys).length === 0
+			literals(kind?.kind, keysOf(listed)).length === 0
 		) {
 			const first = "keys" in use ? kind : together(listed);
 			if (first !== undefined) throw conflict(name, first, use);
@@ -108,12 +116,39 @@ function inputType(name: string, messages: readonly LocaleMessage[]): string {
 	}
 	return listed === undefined
 		? kindTypes[kind?.kind ?? "any"]
-		: literals(kind?.kind, listed.keys).join(" | ");
+		: literals(kind?.kind, keysOf(listed)).join(" | ");
+}
+
+/** The keys listed once a select lists its own too. */
+function withUse(listed: Listed | undefined, use: KeysUse): Listed {
+	const within = (keys: ReadonlySet<string> | undefined) =>
+		keys === undefined ? use.keys : common(keys, use.keys);
+	const locales = [...new Set([...(listed?.locales ?? []), use.locale])];
+	return use.normalized
+		? { exact: listed?.exact, normalized: within(listed?.normalized), locales }
+		: { exact: within(listed?.exact), normalized: listed?.normalized, locales };
+}
+
+/**
+ * The values every select matches a key of: the exact keys whose NFC form every `:string` select
+ * lists, or, with no select that matches exactly, the keys in NFC.
+ */
+function keysOf({ exact, normalized }: Listed): ReadonlySet<string> {
+	if (exact === undefined) return normalized ?? new Set();
+	if (normalized === undefined) return exact;
+	return new Set(
+		[...exact].filter((key) => normalized.has(key.normalize("NFC"))),
+	);
 }
 
 /** The keys every select lists so far, as one use in their locales, for an error to name. */
-function together({ keys, locales }: Listed): KeysUse {
-	return { locale: locales.join(", "), keys };
+function together(listed: Listed): KeysUse {
+	const locale = listed.locales.join(", ");
+	return {
+		locale,
+		keys: keysOf(listed),
+		normalized: listed.exact === undefined,
+	};
 }
 
 /** What an input takes once a use narrows it: the narrower of the two kinds. */
@@ -145,7 +180,9 @@ function usesOf(name: string, message: LocaleMessage): Use[] {
 				return selector.normalized ? key.normalize("NFC") : key;
 			}),
 		);
-		if (!keys.has(catchAll)) uses.push({ locale, keys });
+		if (!keys.has(catchAll)) {
+			uses.push({ locale, keys, normalized: selector.normalized });
+		}
 	}
 	for (const { input, format } of formatsOf(message)) {
 		if (input === name) take(...formatterUses[format.formatter]);
