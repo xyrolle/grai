@@ -11,6 +11,7 @@
 import type { AST } from "svelte/compiler";
 import { type ESTree, parse } from "./parse.ts";
 import { CodeWriter, type Lang, type SourceCode } from "./source.ts";
+import { spanOf, writeAttribute } from "./svelte-attributes.ts";
 
 /** A component's code, from Svelte's parse of it (`frameworks.ts`) and its text. */
 export function svelteCode(text: string, root: AST.Root): SourceCode {
@@ -193,7 +194,7 @@ class Template {
 		const lets: AST.LetDirective[] = [];
 		for (const attribute of node.attributes) {
 			if (attribute.type === "LetDirective") lets.push(attribute);
-			else this.attribute(attribute);
+			else writeAttribute(this.writer, attribute);
 		}
 		if (lets.length === 0) {
 			this.block(node.fragment);
@@ -208,20 +209,6 @@ class Template {
 		this.writer.write("\n) => {\n");
 		this.fragment(node.fragment);
 		this.writer.write("});\n");
-	}
-
-	private attribute(
-		attribute: Exclude<AST.ElementLike["attributes"][number], AST.LetDirective>,
-	): void {
-		if (attribute.type === "Attribute" || attribute.type === "StyleDirective") {
-			const { value } = attribute;
-			if (value === true) return;
-			for (const part of Array.isArray(value) ? value : [value]) {
-				if (part.type === "ExpressionTag") this.expression(part.expression);
-			}
-			return;
-		}
-		if (attribute.expression !== null) this.expression(attribute.expression);
 	}
 
 	/** A fragment in a block of its own, where its `{@const}`s stay. */
@@ -252,12 +239,4 @@ class Template {
 		const { start, end } = spanOf(node);
 		this.writer.piece(start, end);
 	}
-}
-
-/** Where a node of Svelte's tree is in the component, which every node it parses carries. */
-function spanOf(node: object): { start: number; end: number } {
-	const start =
-		"start" in node && typeof node.start === "number" ? node.start : 0;
-	const end = "end" in node && typeof node.end === "number" ? node.end : start;
-	return { start, end };
 }
