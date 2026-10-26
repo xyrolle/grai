@@ -8,6 +8,8 @@ import {
 	cookieSecure,
 	customPrefixes,
 	directions,
+	domains,
+	hostsLocales,
 	keepsChoice,
 	leavesPathsAlone,
 	locales,
@@ -28,6 +30,7 @@ import {
 // config.
 export {
 	cookieName,
+	hostsLocales,
 	leavesPathsAlone,
 	localeCopies,
 	prefixesEveryLocale,
@@ -148,7 +151,9 @@ let current = locales.indexOf(
  * `setLocale` in the request changes it in place: Workers have no `enterWith` to bind another,
  * and Node marks it experimental.
  *
- * @typedef {{ index: number }} RequestLocale
+ * The request's origin goes with it, so a link to a locale on another host is a whole URL.
+ *
+ * @typedef {{ index: number, origin?: string }} RequestLocale
  */
 
 /**
@@ -165,6 +170,22 @@ let requests;
  */
 export function bindRequests(storage) {
 	requests = storage;
+}
+
+/** The origin links are written from: the request's, else the page's, if either. */
+function currentOrigin() {
+	return requests?.getStore()?.origin ?? (page ? location.origin : undefined);
+}
+
+/**
+ * The locale whose host `domains` gives a host as, if it gives one. Not for apps: server.js and
+ * the adapters read a request's locale by it before its path.
+ *
+ * @param {string} host
+ * @returns {string | undefined}
+ */
+export function localeOfHost(host) {
+	return hostsLocales ? locales[domains.indexOf(host)] : undefined;
 }
 
 /** Whether a test bound the locale outside a request, which then holds on a server too. */
@@ -315,7 +336,11 @@ export function getTextDirection(locale) {
  * @returns {string}
  */
 export function extractLocaleFromUrl(url) {
-	return localeOfPath(new URL(url).pathname) ?? baseLocale;
+	const parsed = new URL(url);
+	return (
+		(hostsLocales && localeOfHost(parsed.host)) ||
+		(localeOfPath(parsed.pathname) ?? baseLocale)
+	);
 }
 
 /**
@@ -365,8 +390,10 @@ export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const within = servedUnderBase && withinBase(copy.pathname);
 	if (within) copy.pathname = within;
+	// On a locale's own host the host names the locale, and its paths have no prefix.
+	const hosted = hostsLocales && localeOfHost(copy.host);
 	const [, first, ...rest] = copy.pathname.split("/");
-	const prefixed = readsUrl ? localeOfPrefix(first) : undefined;
+	const prefixed = readsUrl && !hosted ? localeOfPrefix(first) : undefined;
 	if (
 		prefixed !== undefined &&
 		!(leavesPathsAlone && leftAlone(copy.pathname))
@@ -376,10 +403,10 @@ export function deLocalizeUrl(url) {
 	} else if (
 		translatesPaths &&
 		prefixed === undefined &&
-		!prefixesEveryLocale &&
+		(hosted || !prefixesEveryLocale) &&
 		!(leavesPathsAlone && leftAlone(copy.pathname))
 	) {
-		toRoute(copy, baseLocale);
+		toRoute(copy, hosted || baseLocale);
 	}
 	if (within) copy.pathname = underBase(copy.pathname);
 	return copy;
@@ -416,6 +443,13 @@ export function localizeUrl(url, options) {
 		if (words !== copy.pathname) copy.pathname = words;
 	}
 	if (
+		hostsLocales &&
+		localeOfHost(copy.host) !== undefined &&
+		!(leavesPathsAlone && leftAlone(copy.pathname))
+	) {
+		// On the locales' own hosts, a locale's paths are its host's, without a prefix.
+		copy.host = domains[locales.indexOf(locale)] ?? copy.host;
+	} else if (
 		readsUrl &&
 		(prefixesEveryLocale || locale !== baseLocale) &&
 		!(leavesPathsAlone && leftAlone(copy.pathname))
@@ -433,8 +467,9 @@ export function localizeUrl(url, options) {
 }
 
 /**
- * A path such as `/cart?step=2` with a locale's prefix, under the `url` strategy. Any other href,
- * and every href without that strategy, is given back as it is.
+ * A path such as `/cart?step=2` with a locale's prefix, under the `url` strategy, or a whole URL
+ * to a locale on a host of its own. Any other href, and every href without that strategy, is
+ * given back as it is.
  *
  * @param {string} href
  * @param {{ locale?: string }} [options]
@@ -442,52 +477,59 @@ export function localizeUrl(url, options) {
  */
 export function localizeHref(href, options) {
 	if (!href.startsWith("/") || href.startsWith("//")) return href;
-	const url = localizeUrl(new URL(href, "http://localhost"), options);
+	// A link leaves the current host only for a locale on a host of its own.
+	const origin = (hostsLocales && currentOrigin()) || "http://localhost";
+	const url = localizeUrl(new URL(href, origin), options);
+	if (hostsLocales && url.origin !== origin) return url.href;
 	return url.pathname + url.search + url.hash;
 }
 
 /**
- * A path in its locale's words as the route a framework routes by the prefix, such as Astro's
- * `[...locale]/about`: in the route's words, its prefix kept (`/de/ueber-uns` is `/de/about`).
+ * A URL's path in its locale's words as the route a framework routes by the prefix, such as
+ * Astro's `[...locale]/about`: in the route's words, its prefix kept (`/de/ueber-uns` is
+ * `/de/about`). On a locale's own host, the host names the locale.
  *
- * @param {string} pathname
+ * @param {URL} url
  * @returns {string}
  */
-export function routeOfPath(pathname) {
-	return translatedAfterPrefix(pathname, routePath);
+export function routeOfPath(url) {
+	return translatedAfterPrefix(url.pathname, url.host, routePath);
 }
 
 /**
- * A route's path, its prefix kept, in its locale's words: `/de/about` is `/de/ueber-uns`.
+ * A route's URL path, its prefix kept, in its locale's words: `/de/about` is `/de/ueber-uns`.
  *
- * @param {string} pathname
+ * @param {URL} url
  * @returns {string}
  */
-export function pathOfRoute(pathname) {
-	return translatedAfterPrefix(pathname, localePath);
+export function pathOfRoute(url) {
+	return translatedAfterPrefix(url.pathname, url.host, localePath);
 }
 
 /**
- * A path translated after its locale prefix, by the locale the prefix names, or the base locale's
- * where it has none. Without pathnames, for a path the `url` strategy leaves alone, and where the
- * translation changes nothing, it is the path as it is, its trailing slash too.
+ * A path translated after its locale prefix, by the locale its host or prefix names, or the base
+ * locale's where neither names one. Without pathnames, for a path the `url` strategy leaves alone,
+ * and where the translation changes nothing, it is the path as it is, its trailing slash too.
  *
  * @param {string} pathname
+ * @param {string} host
  * @param {(pathname: string, locale: number) => string} translate
  * @returns {string}
  */
-function translatedAfterPrefix(pathname, translate) {
+function translatedAfterPrefix(pathname, host, translate) {
 	const within = servedUnderBase && withinBase(pathname);
 	if (within) {
-		const translated = translatedAfterPrefix(within, translate);
+		const translated = translatedAfterPrefix(within, host, translate);
 		return translated === within ? pathname : underBase(translated);
 	}
 	if (!translatesPaths || (leavesPathsAlone && leftAlone(pathname))) {
 		return pathname;
 	}
+	const hosted = hostsLocales && localeOfHost(host);
 	const [, first, ...rest] = pathname.split("/");
-	const prefixed = localeOfPrefix(first);
-	const locale = prefixed ?? (prefixesEveryLocale ? undefined : baseLocale);
+	const prefixed = hosted ? undefined : localeOfPrefix(first);
+	const locale =
+		hosted || prefixed || (prefixesEveryLocale ? undefined : baseLocale);
 	if (locale === undefined) return pathname;
 	const path = prefixed === undefined ? pathname : `/${rest.join("/")}`;
 	const translated = translate(path, locales.indexOf(locale));
