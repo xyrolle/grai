@@ -47,7 +47,7 @@ describe("the reads of a project's code", () => {
 		).toEqual(["src/a.ts:4:3 member title", "src/a.ts:4:19 member subtitle"]);
 	});
 
-	it("reads a key's path once, however its module is then read", async () => {
+	it("reads a key's path once, and what code reads off its module as reads of that module", async () => {
 		expect(
 			await readsOf({
 				"src/a.ts": [
@@ -62,6 +62,8 @@ describe("the reads of a project's code", () => {
 			"src/a.ts:1:39 path title",
 			"src/a.ts:2:51 path subtitle",
 			"src/a.ts:3:44 path promo_a",
+			"src/a.ts:2:9 module subtitle",
+			"src/a.ts:4:28 module promo_a",
 		]);
 	});
 

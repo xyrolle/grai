@@ -6,7 +6,7 @@
 import type { Binding, Span, UseFact } from "./facts.ts";
 import type { KeysHeld, ModuleGraph, Value } from "./modules.ts";
 import type { SourceCode } from "./project.ts";
-import type { Place, Reach, Read, Reading } from "./reads.ts";
+import type { Edit, Place, Reach, Read, Reading } from "./reads.ts";
 
 /** The module being read, and where its reads go. */
 export type Context = {
@@ -25,17 +25,16 @@ export async function readUse(
 	use: UseFact,
 	origin: Value,
 ): Promise<void> {
-	// A key an import binds is read where it is imported, its uses that binding's references; a
-	// key's own module is read where its path is.
+	// A key an import binds is read where it is imported, its uses that binding's references.
 	if (origin.kind === "key") return;
-	if (origin.kind === "module" && graph.output.keyOf(origin.path) !== undefined)
-		return;
+	const ownKey =
+		origin.kind === "module" ? graph.output.keyOf(origin.path) : undefined;
 	// A load's promise hands its module to a callback, `import(path).then((module) => …)`, which
-	// is a use of the module whole.
+	// is a use of the module whole; a key's own module is read where its path is.
 	const handed = use.chain[0];
 	if ("load" in use.from && handed !== undefined && promised.has(handed.name)) {
 		const reached = reachOf(await graph.keysHeld(origin));
-		if (reached !== undefined) {
+		if (ownKey === undefined && reached !== undefined) {
 			const place = { path, source, at: handed.expression };
 			reading.reaches.push(reachAt(place, reached, use.type));
 		}
@@ -44,24 +43,36 @@ export async function readUse(
 	let value: Value | undefined = origin;
 	let keyAt = use.at;
 	let readAt = use.at;
-	let via: Read["via"] = "binding";
+	let name = "";
 	for (const link of use.chain) {
 		if (value.kind === "key") break;
 		value = await graph.member(value, link.name);
 		if (value === undefined) return;
 		keyAt = link.at;
 		readAt = link.expression;
-		via = "member";
+		name = link.name;
 	}
-	const written = text(source, readAt);
+	const via = ownKey === undefined ? "member" : "module";
 	if (value.kind === "key") {
-		const place = { path, source, at: keyAt };
 		reading.reads.push(
-			read(place, value.key, via, undefined, use.type, written),
+			read(
+				{ path, source, at: keyAt },
+				{
+					key: value.key,
+					via,
+					edits: named(name, value.key, keyAt),
+					binding: undefined,
+					type: use.type,
+					written: text(source, readAt),
+				},
+			),
 		);
 		return;
 	}
+	// The rest of a key's own module holds that key alone, which its path's read stands for.
+	if (ownKey !== undefined && use.end.kind !== "pattern") return;
 	const reach = async (at: Span, held: Value) => {
+		if (ownKey !== undefined) return;
 		const reached = reachOf(await graph.keysHeld(held));
 		if (reached === undefined) return;
 		reading.reaches.push(reachAt({ path, source, at }, reached, use.type));
@@ -80,20 +91,33 @@ export async function readUse(
 			await reach(at, value);
 		}
 	} else {
-		for (const name of end.names) {
-			const taken = await graph.member(value, name.name);
-			if (taken === undefined) continue;
-			if (taken.kind === "key") {
-				const place = { path, source, at: name.at };
-				reading.reads.push(
-					read(place, taken.key, "pattern", name.binds, use.type),
-				);
-			} else {
-				await reach(name.at, taken);
+		for (const taken of end.names) {
+			const held = await graph.member(value, taken.name);
+			if (held === undefined) continue;
+			if (held.kind !== "key") {
+				await reach(taken.at, held);
+				continue;
 			}
+			reading.reads.push(
+				read(
+					{ path, source, at: taken.at },
+					{
+						key: held.key,
+						via: ownKey === undefined ? "pattern" : "module",
+						edits: named(taken.name, held.key, taken.at),
+						binding: taken.binds,
+						type: use.type,
+					},
+				),
+			);
 		}
 		if (end.rest !== undefined) await reach(end.rest, value);
 	}
+}
+
+/** The edit of a name a read writes, when it is the key's own; another name is not the key's. */
+export function named(name: string, key: string, at: Span): Edit[] {
+	return name === key ? [{ at, before: "", after: "" }] : [];
 }
 
 /** The reach of the keys a value holds, or none when it holds none. */
@@ -104,15 +128,20 @@ function reachOf(
 	return held.size === 0 ? undefined : { prefix: "", choices: [...held] };
 }
 
+/** A read at a place, written as the place's text unless it says otherwise. */
 export function read(
 	place: Place,
-	key: string,
-	via: Read["via"],
-	binding: Binding | undefined,
-	type: boolean,
-	written: string = text(place.source, place.at),
+	fields: {
+		key: string;
+		via: Read["via"];
+		edits: Edit[];
+		binding: Binding | undefined;
+		type: boolean;
+		written?: string;
+	},
 ): Read {
-	return { ...place, key, written, type, via, binding };
+	const { written = text(place.source, place.at), ...rest } = fields;
+	return { ...place, ...rest, written };
 }
 
 export function reachAt(

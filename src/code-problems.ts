@@ -48,8 +48,9 @@ export function codeProblems(
 					`${message}, so grai cannot read its code. Fix it, as the bundler would fail it too.`,
 				),
 		),
+		// A read off a key's own module is reported where its path is.
 		...reading.reads
-			.filter(({ key }) => !keys.has(key))
+			.filter(({ key, via }) => !keys.has(key) && via !== "module")
 			.map(
 				({ source, at, key, written }) =>
 					new GraiError(
@@ -79,6 +80,16 @@ export function codeProblems(
 		reached,
 		tests: [...tests].map(([file, names]) => ({ file, names })),
 	};
+}
+
+/**
+ * The errors that leave reads unknown: a file that does not parse, and an import of the output
+ * that does not resolve. A command that changes the project acts on none while one stands.
+ */
+export function unknownReads({ errors }: CodeProblems): GraiError[] {
+	return errors.filter(
+		({ code }) => code === "source-invalid" || code === "import-unresolved",
+	);
 }
 
 /** Whether a read that may reach more keys than one reaches this one. */
