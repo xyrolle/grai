@@ -23,10 +23,11 @@ export type ImportedName = (
 /**
  * Follows an import to grai's keys.js the way the bundler binds it, through the modules that
  * re-export it: `export { m } from …`, an import exported again (`import { m } from …; export { m }`),
- * `export * from …` and `export * as m from …`. The output's messages.js is one of them: it is
- * `export * as m from "./keys.js"`. A key's path resolves, in a build, to the key's own module
- * (`\0grai:key/title`), which exports that key alone. Each module is parsed once, however many
- * imports reach it.
+ * `export * from …` and `export * as m from …`. A name a module exports itself, by a declaration
+ * or a specifier, is that export's, never a star export's. The output's messages.js is one of
+ * them: it is `export * as m from "./keys.js"`. A key's path resolves, in a build, to the key's
+ * own module (`\0grai:key/title`), which exports that key alone. Each module is parsed once,
+ * however many imports reach it.
  */
 export function importedName(
 	keysFile: string,
@@ -67,8 +68,15 @@ export function importedName(
 		const body = (await program(id, modules))?.body ?? [];
 		const next = (from: string, imported: string) =>
 			follow(from, id, imported, modules, new Set(seen).add(visit));
+		// A module's explicit exports, its declarations among them, come before its star exports,
+		// wherever each is written: a name exported both ways is the explicit export's.
 		for (const statement of body) {
 			if (statement.type === "ExportNamedDeclaration") {
+				if (
+					statement.declaration &&
+					declaredNames(statement.declaration).has(name)
+				)
+					return undefined;
 				const specifier = statement.specifiers.find(
 					(each) => exportName(each.exported) === name,
 				);
@@ -79,13 +87,20 @@ export function importedName(
 				const imported = importOf(body, local);
 				return imported && next(imported.source, imported.name);
 			}
-			if (statement.type === "ExportAllDeclaration") {
-				const exported = statement.exported && exportName(statement.exported);
-				if (exported === name) return next(statement.source.value, "*");
-				if (exported !== null) continue;
-				const found = await next(statement.source.value, name);
-				if (found !== undefined) return found;
-			}
+			if (statement.type === "ExportDefaultDeclaration" && name === "default")
+				return undefined;
+			if (
+				statement.type === "ExportAllDeclaration" &&
+				statement.exported &&
+				exportName(statement.exported) === name
+			)
+				return next(statement.source.value, "*");
+		}
+		for (const statement of body) {
+			if (statement.type !== "ExportAllDeclaration" || statement.exported)
+				continue;
+			const found = await next(statement.source.value, name);
+			if (found !== undefined) return found;
 		}
 		return undefined;
 	};
@@ -113,6 +128,32 @@ function importOf(
 		return { source: statement.source.value, name };
 	}
 	return undefined;
+}
+
+/** The names a declaration binds: a function's or class's, or each a variable's pattern takes. */
+function declaredNames(declaration: ESTree.Declaration): Set<string> {
+	if (declaration.type !== "VariableDeclaration")
+		return new Set(
+			"id" in declaration && declaration.id?.type === "Identifier"
+				? [declaration.id.name]
+				: [],
+		);
+	const names = new Set<string>();
+	const bind = (
+		pattern: ESTree.BindingPattern | ESTree.ParamPattern | null,
+	) => {
+		if (pattern === null) return;
+		if (pattern.type === "Identifier") names.add(pattern.name);
+		else if (pattern.type === "AssignmentPattern") bind(pattern.left);
+		else if (pattern.type === "RestElement") bind(pattern.argument);
+		else if (pattern.type === "ArrayPattern")
+			for (const element of pattern.elements) bind(element);
+		else if (pattern.type === "ObjectPattern")
+			for (const property of pattern.properties)
+				bind(property.type === "RestElement" ? property : property.value);
+	};
+	for (const declarator of declaration.declarations) bind(declarator.id);
+	return names;
 }
 
 function exportName(name: ESTree.ModuleExportName): string {
