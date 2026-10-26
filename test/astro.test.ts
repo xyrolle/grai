@@ -309,7 +309,16 @@ describe("grai's config beside Astro's", () => {
 		]);
 	});
 
-	it("refuses a base and domains, which the url strategy cannot read yet, saying what to set", () => {
+	it("agrees with a base that is grai's basePath, after which the url strategy reads the locale", () => {
+		expect(
+			disagreements(graiConfig({ strategy: ["url"], basePath: "/shop" }), {
+				...astroRouting(["en", "ro"]),
+				base: "/shop/",
+			}),
+		).toEqual([]);
+	});
+
+	it("refuses a base that is not grai's basePath, and domains, which the url strategy cannot read yet, saying what to set", () => {
 		expect(
 			disagreements(graiConfig({ strategy: ["url"] }), {
 				...astroRouting(["en", "ro"], {
@@ -318,7 +327,7 @@ describe("grai's config beside Astro's", () => {
 				base: "/shop/",
 			}),
 		).toEqual([
-			`The "url" strategy reads the locale from the path's first segment, which Astro's base "/shop/" takes. Serve the site from Astro's base "/" ("The framework's base path" in grai's docs/followups.md).`,
+			`Astro's base "/shop/" and grai's "basePath" (none) must name the same path: the "url" strategy reads the locale after it.`,
 			`Astro's i18n.domains serves ro from domains of their own, where grai's "url" strategy finds the locale in the path. Remove i18n.domains and serve each locale under its path prefix ("A domain per locale" in grai's docs/followups.md).`,
 		]);
 	});

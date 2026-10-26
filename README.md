@@ -179,6 +179,8 @@ import { withGrai } from "grai/next/config";
 export default withGrai({ /* the app's own config */ });
 ```
 
+`withGrai` reads `grai.config.json`, or the file its second argument names: `withGrai(nextConfig, { config: "grai.base.json" })`.
+
 ```ts
 // src/proxy.ts
 export { proxy } from "grai/next/proxy";
