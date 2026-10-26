@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 import type { Logger, Plugin } from "vite";
-import { type KeyReading, keyReading, keyReads } from "./build-key-reads.ts";
+import { BuildReading } from "./code/build-reading.ts";
 import { parse } from "./code/parse.ts";
 import { withGroups } from "./code-splitting.ts";
 import { type Build, recompile } from "./compile.ts";
@@ -40,6 +40,7 @@ import {
 	serveMessages,
 } from "./vite-dev.ts";
 import { pagePreloads, type Site, withPageLocale } from "./vite-html.ts";
+import { buildReads, chunkReads } from "./vite-reads.ts";
 
 /**
  * The plugin's options:
@@ -58,11 +59,19 @@ export type GraiOptions = {
 	localeChunks?: boolean;
 };
 
-/** grai's Vite plugin, and the build its last compile made, for the adapters built on it. */
-export type GraiPlugin = { plugin: Plugin; build: () => Build | undefined };
+/**
+ * grai's Vite plugins, the one that reads each module before any other and the one that does the
+ * rest, and the build its last compile made, for the adapters built on them.
+ */
+export type GraiPlugin = {
+	plugins: Plugin[];
+	build: () => Build | undefined;
+	/** A build environment's reading of its modules, which the adapters' transforms share. */
+	reading: (environment: string) => BuildReading | undefined;
+};
 
-/** The modules a build's check reads: scripts, and the components that compile to them. */
-const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro)$/;
+/** The modules whose shipped code links the client build's modules: scripts, and components. */
+const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro|mdx)$/;
 
 /**
  * What a framework's adapter tells the plugin. `pageEntries`: the entries each page's first paint
@@ -90,13 +99,14 @@ export function graiPlugin(
 		_key: string,
 		_importer: string,
 	): string | undefined => undefined;
-	/** How the build's modules are followed to keys.js, to check the keys they name. */
-	let reading: KeyReading | undefined;
+	/** Each build environment's reading of its modules, from its start. */
+	const readings = new Map<string, BuildReading>();
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	/**
-	 * What the client build's last transforms read of its modules, for the keys' reach: the keys each
-	 * reads through the namespace, those that read it by a computed name, and each one's links.
+	 * What the client build read of its modules, for the keys' reach: the keys each reads or may
+	 * reach, before any transform; those that may reach any key; and each one's links, from the
+	 * code it ships.
 	 */
 	const read = {
 		reads: new Map<string, ReadonlySet<string>>(),
@@ -263,36 +273,36 @@ export function graiPlugin(
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
 			const held = placeholderTexts(compiled);
 			if (held.length > 0) this.error(messagesOf(held));
+			readings.set(
+				this.environment.name,
+				new BuildReading(
+					compiled.config.root,
+					files.outdir,
+					// Through grai's own resolveId too, which gives a key's path its key's module.
+					(source, importer) =>
+						this.resolve(source, importer, { skipSelf: false }).then(
+							(resolved) => resolved?.id,
+							// A build that ends first drops its resolver: what it can no longer follow is
+							// none of grai's, as the bundler reports what it cannot resolve itself.
+							() => undefined,
+						),
+				),
+			);
 		},
-		// A module's code as the last plugins see it, a component's compiled, names the keys it ships, and
-		// tells the client build's chunking which keys it reads and what it links to.
+		// A module's code as the client build ships it, a component's compiled, tells its chunking what
+		// the module links to, globs expanded.
 		transform: {
 			order: "post",
 			filter: { id: { exclude: [/\/node_modules\//, /^\0/] } },
-			async handler(code, id) {
-				if (serving || build === undefined) return null;
+			handler(code, id) {
+				if (!building(this.environment) || build === undefined) return null;
 				if (
 					id.startsWith(files.outdir) ||
 					!scanned.test(id.split("?")[0] ?? id)
 				)
 					return null;
-				if (reading?.build !== build)
-					reading = keyReading(build, files.keysFile);
 				const { program } = parse(id, code, { lang: "js" });
-				const { keys, computed, missing } = await keyReads(
-					program,
-					code,
-					id,
-					reading,
-					async (source, importer) =>
-						(await this.resolve(source, importer))?.id,
-				);
-				if (missing.length > 0) this.error(messagesOf(missing));
-				if (building(this.environment)) {
-					if (keys.size > 0) read.reads.set(id, keys);
-					if (computed) read.computed.add(id);
-					read.modules.set(id, moduleLinks(program));
-				}
+				read.modules.set(id, moduleLinks(program));
 				return null;
 			},
 		},
@@ -407,5 +417,23 @@ export function graiPlugin(
 			return followedFile(files, build, file) ? [] : undefined;
 		},
 	};
-	return { plugin, build: () => build };
+	const reads = buildReads({
+		build: () => (serving ? undefined : build),
+		outdir: () => files.outdir,
+		reading: (environment) => readings.get(environment),
+		read: (environment, id, reading) => {
+			if (environment !== "client" || build === undefined) return;
+			const { keys, every } = chunkReads(
+				reading,
+				build.compilation.keys.keys(),
+			);
+			if (keys.size > 0) read.reads.set(id, keys);
+			if (every) read.computed.add(id);
+		},
+	});
+	return {
+		plugins: [reads, plugin],
+		build: () => build,
+		reading: (environment) => readings.get(environment),
+	};
 }

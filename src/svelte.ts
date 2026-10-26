@@ -15,5 +15,5 @@ import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
  */
 export function grai(options: GraiOptions = {}): Plugin[] {
 	const core = graiPlugin(options);
-	return [core.plugin, svelteTexts(core)];
+	return [...core.plugins, svelteTexts(core)];
 }
