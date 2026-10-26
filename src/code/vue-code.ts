@@ -110,12 +110,12 @@ class Template {
 	/** A function of the names the patterns bind, around what follows until it is closed. */
 	private open(patterns: readonly (Expression | undefined)[]): void {
 		this.writer.write("((");
+		// `v-for`'s key and index are optional: the parameters are those it writes.
 		patterns.forEach((pattern, index) => {
+			if (pattern === undefined) return;
 			if (index > 0) this.writer.write(",");
-			if (pattern !== undefined) {
-				const { start, end } = spanOf(pattern);
-				this.writer.piece(start, end);
-			}
+			const { start, end } = spanOf(pattern);
+			this.writer.piece(start, end);
 		});
 		this.writer.write("\n) => {\n");
 	}
