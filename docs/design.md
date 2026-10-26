@@ -480,15 +480,18 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
 - **Performance is measured against main in one window, and earned back without losing exactness:**
   - The commands measured are `check`, `check --fix`, `find` and `rename` on the synthetic project and app B (the refactor bench), together with the build's check and `test:performance`.
   - Every command now reads every source, because exactness needs the graph. Before, `find` and `rename` read only the files that wrote the key.
-  - Parsing is spread over a pool of worker threads, which return each file's facts.
-    - Single-threaded, Svelte's own parse takes 2.0 s for app B's 1,988 components (15 MB), and oxc 0.6 s for its scripts.
-    - With 8 workers, the whole of app B parses in 0.95 s, at a load of 74. That has to be measured again on a quiet machine.
-    - **The pool is sized by the work.** Reading starts on the main thread. Once it has taken as long as a worker takes to start, about 0.25 s, and the rest would take more than twice that, the rest goes to workers. Each worker gets at least that much, and there are never more than the machine's parallelism less one.
-      - Measured, the pool pays from about a thousand of app B's files and about four thousand of the synthetic project's, whose scripts are simpler, so a count of files would be wrong for one of them.
+  - **Svelte parses a component's template alone.** Its own preprocessor blanks each script's content, keeping every offset, and oxc parses the scripts. Svelte's parse otherwise runs each script through acorn too, which was most of its time: 2,000 of the synthetic project's components took 1.55 s, and now take 0.3 s.
+  - **One pool reads the files and then resolves the sources' imports, in tasks the first free thread takes, the main thread included.**
+    - The main thread takes tasks alone at first. It starts workers once it has taken a worker's start, about 0.25 s, and stops taking tasks once a worker answers, so that no worker waits on it.
+    - **The pool is sized by the work, at the main thread's fastest pace after its first task**, which loads the parsers, as a fresh process's first tasks run before its code warms up.
+      - A worker costs about four of its starts in all: its start, loading its code and warming up. That is about a second of CPU each on app B, so the pool takes one worker for each second of work left.
+      - More workers made no run faster on this machine: app B's reading took 1.5 s with four and 1.9 s with sixteen, and twice the CPU.
+    - On one thread, reading app B's 9,000 files takes 3.8 s and 5 s of CPU, and the synthetic project's 4.2 s. That is the floor of a cold run: main's whole check takes 2 s of CPU, as it reads no code but text.
   - **Each file's facts are kept on disk, in the outdir's `.grai/` state, which Git ignores already, so a one-shot command reads again only the files that changed.** The facts are cached, never an AST.
     - They are keyed by the content's hash, the hash of grai's reader code and the parsers' versions, so a change to any of them reads the file again. Hashing the reader's code, not grai's version, also covers an unreleased change to it.
     - They are written atomically, after a command that read a file again or found one gone, and an entry for such a file is dropped then. A warm run writes nothing: on app B, writing the cache took 0.6 s of a warm `check`.
-    - They are JSON, which V8 reads back in 0.35 s for app B's facts, against 0.63 s for its own serializer's 75 MB.
+    - They are a line per file, its facts as JSON, which V8 reads back in 0.35 s for app B's facts, against 0.63 s for its own serializer's 75 MB. A save writes each entry again as it was read.
+    - A module's uses are kept by what they start from, and a reading parses only those of what holds grai's. They are 70% of app B's facts, and about 6% of them start from grai's.
     - A warm run reads each file and hashes it, and parses nothing that is unchanged. The target is a warm `find` and `rename` at or under main's times. A cold run costs what reading every file exactly costs, and the pool keeps that as low as it can.
     - In memory, the facts are also kept across a watch, between `check --fix`'s fix and its check, and across a build's rebuilds.
   - The bench's projects have to resolve as real ones do. The synthetic project gets a package.json `imports` and an `i18n` module that re-exports `m`, and app B's copy keeps its package.json and tsconfig, since a guessed import is no longer read.
