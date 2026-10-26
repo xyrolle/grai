@@ -49,10 +49,16 @@ export function unrecordedCalls(
 ): string[] {
 	const calls: string[] = [];
 	for (const [key, compiled] of keys) {
-		const recorded = everyName(calledNames([compiled], compiled.uses));
-		for (const code of new Set([compiled.value, compiled.serverValue]))
+		// Each value, with the runtime functions it calls: keys.js's, and a server build's.
+		const values: [string, ReadonlySet<string>][] = [
+			[compiled.value, compiled.uses],
+			[compiled.serverValue, compiled.serverUses],
+		];
+		for (const [code, uses] of values) {
+			const recorded = everyName(calledNames([compiled], uses));
 			for (const name of freeNames(code))
 				if (!recorded.has(name)) calls.push(`${key}: ${name}`);
+		}
 	}
 	return calls;
 }

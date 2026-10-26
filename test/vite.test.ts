@@ -179,7 +179,7 @@ describe("the Vite plugin's build", () => {
 		]).toEqual([false, true, true]);
 	});
 
-	it("writes a message's functions as arrows for a browser, and as function expressions for a server", async () => {
+	it("writes a message's functions as arrows for a browser, and a server's in a function that switches on the locale", async () => {
 		const { dir } = project(catalogs);
 		const { entries: browser } = await built(dir, {
 			page: `import { m } from "./out/messages.js";\ndocument.body.textContent = m.greeting({ name: "Ana" });\n`,
@@ -195,7 +195,7 @@ describe("the Vite plugin's build", () => {
 
 		expect(browser.page).toMatch(/=>`Hallo \$\{/);
 		expect(server.server).toMatch(
-			/function ?\(i\) \{\s*return `Hallo \$\{i\["name"\]\}`/,
+			/switch \(localeIndex\(o\)\) \{\s*case 0: return `Hello \$\{i\["name"\]\}`;\s*default: return `Hallo \$\{i\["name"\]\}`;/,
 		);
 		expect([
 			m.greeting?.({ name: "Ana" }, { locale: "en" }),
