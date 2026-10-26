@@ -18,6 +18,9 @@ export function proxy(request: NextRequest): Promise<Response> {
 			? deLocalizeUrl(new URL(url.pathname, url.origin)).pathname
 			: url.pathname;
 		url.pathname = `/${locale}${path === "/" ? "" : path}`;
+		// Next started on a loopback address, `127.0.0.1` or `[::1]`, takes this rewrite for an external
+		// one and sends it back to itself, where this proxy rewrites it again: vercel/next.js#94745,
+		// with a fix in review, vercel/next.js#95917 (`docs/followups.md`).
 		return NextResponse.rewrite(url);
 	});
 }
