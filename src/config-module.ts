@@ -10,7 +10,7 @@ export function configModule(config: Config, localeCopies: boolean): string {
 		`export const baseLocale = ${JSON.stringify(config.baseLocale)};`,
 		`/** @type {readonly ("ltr" | "rtl")[]} */`,
 		`export const directions = ${JSON.stringify(config.locales.map(directionOf))};`,
-		`/** @type {readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[]} */`,
+		`/** @type {readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | \`custom-\${string}\`)[]} */`,
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		"/** @type {string | undefined} */",
 		`export const cookieName = ${config.cookie === undefined ? "undefined" : JSON.stringify(config.cookie.name)};`,
@@ -71,9 +71,11 @@ function strategyConstants(config: Config): string[] {
 	} = config.urlRouting;
 	const constants = {
 		readsUrl: config.strategy.includes("url"),
-		// Every place but the browser's languages keeps a visitor's choice.
+		// Every place but the browser's languages and the server's own keeps a visitor's choice: a
+		// page cannot write what the server's own strategy reads.
 		keepsChoice: config.strategy.some(
-			(source) => source !== "preferredLanguage",
+			(source) =>
+				source !== "preferredLanguage" && !source.startsWith("custom-"),
 		),
 		prefixesEveryLocale: localePrefix === "always",
 		customPrefixes: prefixes.some(

@@ -37,7 +37,8 @@ type GraiErrorCode =
 	| "value-unmatched"
 	| "format-option-invalid"
 	| "locale-unbound"
-	| "output-changed";
+	| "output-changed"
+	| "strategy-undefined";
 /**
  * A message called in a locale it cannot render in, with a value its variants do not take, or on a
  * server outside every request the middleware binds (\`locale-unbound\`).
@@ -75,7 +76,7 @@ export type MarkupMessage<
 /** Throws unless the keys of a module were compiled for the locales the runtime reads, in order. */
 export declare function assertCompiledFor(compiled: readonly string[]): void;
 /** The config, as the middleware and the adapters read it. */
-export declare const strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[];
+export declare const strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | \`custom-\${string}\`)[];
 export declare const cookieName: string | undefined;
 export declare const readsUrl: boolean;
 export declare const prefixesEveryLocale: boolean;
@@ -197,14 +198,29 @@ export declare function middleware(
  * The locale the middleware binds for a request: the first the strategy finds in it, else the base
  * locale. For a framework that renders apart from the middleware.
  */
-export declare function localeOf(request: Request): Locale;
+export declare function localeOf(request: Request): Promise<Locale>;
 
 /**
  * The redirect the middleware answers a request with, its \`Vary\` included, else undefined: with
  * every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
  */
-export declare function redirectOf(request: Request): Response | undefined;
+export declare function redirectOf(request: Request): Promise<Response | undefined>;
 
 /** The request headers the strategy reads, as the \`Vary\` the middleware adds: "" for none. */
-export declare const vary: string;
+export declare let vary: string;
+
+/**
+ * Defines one of the server's own strategies, which the config's \`strategy\` lists by its name,
+ * such as \`custom-session\`: the middleware asks it for a request's locale in the strategy's
+ * order, and goes on to the next where it names none. \`vary\` names the request headers it reads,
+ * for the response's \`Vary\`; without it, the response varies by every header. Define each before
+ * the first request.
+ */
+export declare function defineServerStrategy(
+	name: \`custom-\${string}\`,
+	strategy: {
+		getLocale(request: Request): Locale | undefined | Promise<Locale | undefined>;
+		vary?: readonly string[];
+	},
+): void;
 `;

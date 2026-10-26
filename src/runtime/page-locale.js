@@ -11,7 +11,7 @@
  *   locales: readonly string[],
  *   baseLocale: string,
  *   directions: readonly ("ltr" | "rtl")[],
- *   strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[],
+ *   strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | `custom-${string}`)[],
  *   cookieName: string | undefined,
  *   localStorageKey: string | undefined,
  *   queryParameter: string | undefined,

@@ -15,6 +15,7 @@ import {
 import {
 	assertIsLocale,
 	bindRequests,
+	GraiError,
 	isLocale,
 	lacksPrefix,
 	localeOfHost,
@@ -31,10 +32,48 @@ const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
 /**
+ * A strategy the server defines: how it finds a request's locale, if the request names one, and
+ * the request headers it reads, for the `Vary` the middleware adds. Without them, any header may
+ * change the locale, so the response varies by every one: `*`.
+ *
+ * @typedef {{
+ *   getLocale(request: Request): string | undefined | Promise<string | undefined>,
+ *   vary?: readonly string[],
+ * }} ServerStrategy
+ */
+
+/** @type {Map<string, ServerStrategy>} */
+const defined = new Map();
+
+/**
  * The request headers the strategy reads, which a shared cache must key each response by: the
  * `Vary` the middleware adds, for a framework that sends its response apart from the middleware.
+ * A definition of the server's own strategy names the ones it reads.
  */
-export const vary = headersRead().join(", ");
+export let vary = headersRead().join(", ");
+
+/**
+ * Defines one of the server's own strategies, which the config's `strategy` lists by its name, such
+ * as `custom-session`: the middleware asks it for a request's locale in the strategy's order, and
+ * goes on to the next where it names none. A page does not read it. Define each before the first
+ * request.
+ *
+ * @param {string} name
+ * @param {ServerStrategy} serverStrategy
+ */
+export function defineServerStrategy(name, serverStrategy) {
+	if (
+		!name.startsWith("custom-") ||
+		!strategy.some((source) => source === name)
+	) {
+		throw new GraiError(
+			"strategy-undefined",
+			`"${name}" is not in the config's "strategy": ${JSON.stringify(strategy)}. Name the strategy there, then define it.`,
+		);
+	}
+	defined.set(name, serverStrategy);
+	vary = headersRead().join(", ");
+}
 
 /**
  * Resolves the request's locale by the config's strategy and binds it for the handler and all it
@@ -48,7 +87,11 @@ export const vary = headersRead().join(", ");
  */
 export async function middleware(request, handler) {
 	const url = new URL(request.url);
-	const locale = assertIsLocale(findLocale(request, url));
+	const found = findLocale(request, url);
+	// Awaited only where the server's own strategy was asked, so no other request waits a turn.
+	const locale = assertIsLocale(
+		typeof found === "string" ? found : await found,
+	);
 	const response = unprefixedPage(request, url)
 		? Response.redirect(localizeUrl(url, { locale }), 307)
 		: await requests.run(
@@ -66,10 +109,10 @@ export async function middleware(request, handler) {
  * locale. For a framework that renders apart from the middleware.
  *
  * @param {Request} request
- * @returns {string}
+ * @returns {Promise<string>}
  */
-export function localeOf(request) {
-	return assertIsLocale(findLocale(request, new URL(request.url)));
+export async function localeOf(request) {
+	return assertIsLocale(await findLocale(request, new URL(request.url)));
 }
 
 /**
@@ -78,12 +121,12 @@ export function localeOf(request) {
  * For a framework that renders apart from the middleware.
  *
  * @param {Request} request
- * @returns {Response | undefined}
+ * @returns {Promise<Response | undefined>}
  */
-export function redirectOf(request) {
+export async function redirectOf(request) {
 	const url = new URL(request.url);
 	if (!unprefixedPage(request, url)) return undefined;
-	const locale = assertIsLocale(findLocale(request, url));
+	const locale = assertIsLocale(await findLocale(request, url));
 	const redirect = Response.redirect(localizeUrl(url, { locale }), 307);
 	return vary === "" ? redirect : withVary(redirect);
 }
@@ -111,13 +154,43 @@ function unprefixedPage(request, url) {
  *
  * @param {Request} request
  * @param {URL} url
+ * @param {number} [from] the place in the strategy to start at
+ * @returns {string | Promise<string>}
  */
-function findLocale(request, url) {
-	for (const source of strategy) {
+function findLocale(request, url, from = 0) {
+	for (let index = from; index < strategy.length; index++) {
+		const source = strategy[index];
+		if (source === undefined) break;
+		if (source.startsWith("custom-")) {
+			// The server's own strategy may wait on a session, and the places after it wait for it.
+			return fromServer(source, request).then(
+				(locale) => locale ?? findLocale(request, url, index + 1),
+			);
+		}
 		const locale = fromSource(source, request, url);
 		if (locale !== undefined) return locale;
 	}
 	return baseLocale;
+}
+
+/**
+ * The locale one of the server's own strategies finds in the request, if it finds one, which must
+ * be one of the project's.
+ *
+ * @param {string} name
+ * @param {Request} request
+ * @returns {Promise<string | undefined>}
+ */
+async function fromServer(name, request) {
+	const serverStrategy = defined.get(name);
+	if (serverStrategy === undefined) {
+		throw new GraiError(
+			"strategy-undefined",
+			`"strategy" lists "${name}", which no defineServerStrategy("${name}", { getLocale }) on this server defines. Define it before the first request.`,
+		);
+	}
+	const locale = await serverStrategy.getLocale(request);
+	return locale === undefined ? undefined : assertIsLocale(locale);
 }
 
 /**
@@ -139,7 +212,8 @@ function fromSource(source, request, url) {
 			return fromQuery(url);
 		case "url":
 			return localeOfHost(url.host) ?? localeOfPath(url.pathname);
-		case "localStorage":
+		// localStorage is the page's alone, and the server's own strategies are read by findLocale.
+		default:
 			return undefined;
 	}
 }
@@ -266,7 +340,7 @@ function covers(range, locale) {
  * cache keys on already, and a request does not carry `localStorage`.
  */
 function headersRead() {
-	/** @type {Record<(typeof strategy)[number], string[]>} */
+	/** @type {Record<string, readonly string[]>} */
 	const headersOf = {
 		cookie: ["Cookie"],
 		localStorage: [],
@@ -274,7 +348,9 @@ function headersRead() {
 		query: [],
 		url: [],
 	};
-	return strategy.flatMap((source) => headersOf[source]);
+	return strategy.flatMap(
+		(source) => headersOf[source] ?? defined.get(source)?.vary ?? ["*"],
+	);
 }
 
 /**
