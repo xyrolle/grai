@@ -178,11 +178,15 @@ function listedNames(list: string | undefined, listAt: number): ListedName[] {
 
 /** The module an import path names, by its last segment without the extension. */
 export function moduleOf(specifier: string): MessageModule {
+	// Each of the output's modules has "messages" or "keys" in its path, and most imports have
+	// neither: a dev server's import hook reads every import of the app, and spares splitting those.
+	if (!specifier.includes("messages") && !specifier.includes("keys"))
+		return otherModule;
 	const segments = specifier.split("/");
 	const last = (segments.at(-1) ?? "").replace(/\.[cm]?[jt]s$/, "");
 	if (segments.at(-2) === "messages" && keyName.test(last)) {
 		return { type: "key", key: last };
 	}
 	if (last === "messages" || last === "keys") return { type: last };
-	return { type: "other" };
+	return otherModule;
 }
