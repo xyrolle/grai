@@ -3,7 +3,7 @@ import { join, relative, resolve } from "node:path";
 import { withoutKeys } from "./catalog-text.ts";
 import { type ProjectCode, readProjectCode } from "./code/project.ts";
 import { type Reach, readingOf } from "./code/reads.ts";
-import { codeProblems, mayReach } from "./code-problems.ts";
+import { codeProblems, mayReach, unknownReads } from "./code-problems.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { withListedKeysChanged } from "./config-file.ts";
 import { descriptionsWithout } from "./descriptions.ts";
@@ -67,11 +67,7 @@ export async function removeUnusedKeys(
 		catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);
 	const problems = codeProblems(reading, keys, config);
-	// A file that does not parse, or an import of the output that does not resolve, reads what
-	// cannot be known, so nothing is removed.
-	const unknown = problems.errors.filter(
-		({ code }) => code === "source-invalid" || code === "import-unresolved",
-	);
+	const unknown = unknownReads(problems);
 	if (unknown.length > 0) return { ...result, errors: unknown };
 	result.code = code;
 	const { shipped, tests } = problems;
