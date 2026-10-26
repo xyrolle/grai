@@ -65,8 +65,11 @@ type Spanned = { start: number; end: number };
 /**
  * A message-only chunk's code, as rendered before minification, once per locale. Each key is a
  * call of the runtime with one variant per locale (`text(…)`, `message(…)`, or `markup([…], […])`);
- * each copy keeps only its locale's variant, at its locale's position, so the runtime picks it
- * for the page's locale. Imports, exports, every name, and any other code, such as a namespace
+ * each copy keeps only its locale's variant, alone, which the runtime takes as the page's locale's:
+ * an import map gives a page its own locale's copies. Holding the variant at its locale's position
+ * instead cost each call a `void 0` per locale before it: on app B (13,326 keys × 3), a page naming
+ * every key loaded 1.6% and 1.7% more brotli bytes in its second and third locales, 11% and 15%
+ * more raw. Imports, exports, every name, and any other code, such as a namespace
  * object the bundler makes, stay as rendered.
  */
 export function localeCopies(
@@ -91,11 +94,10 @@ export function localeCopies(
 			: [],
 	);
 	const source = (node: Spanned) => code.slice(node.start, node.end);
-	const only = (variants: readonly Spanned[], index: number) =>
-		[
-			...Array.from({ length: index }, () => "void 0"),
-			...variants.slice(index, index + 1).map(source),
-		].join(", ");
+	const only = (variants: readonly Spanned[], index: number) => {
+		const variant = variants[index];
+		return variant === undefined ? "" : source(variant);
+	};
 	// One pass over the calls in order, joined once. Rebuilding the code at each call took 8.4 s for a
 	// chunk of 13,000 keys, against 0.14 s.
 	const copyIn = (index: number) => {
