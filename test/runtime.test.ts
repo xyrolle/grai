@@ -504,6 +504,21 @@ describe("in a browser", () => {
 		});
 	});
 
+	it("keeps the page's own locale in its cookie without reloading the page", async () => {
+		const visited = page("de");
+		const { runtime } = await output({
+			strategy: ["cookie"],
+			cookieName: "lang",
+		});
+
+		runtime.setLocale("de");
+		expect(visited).toEqual({
+			cookie: "lang=de; path=/; max-age=34560000; samesite=lax; secure",
+			reloads: 0,
+			href: "https://shop.test/de/cart?step=2",
+		});
+	});
+
 	it("writes the cookie by the config's policy, Secure on https and wherever the policy needs it", async () => {
 		const cookieOf = async (href: string, config: Record<string, unknown>) => {
 			const visited = page("de");
