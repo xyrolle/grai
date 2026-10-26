@@ -70,6 +70,8 @@ type Visit = {
 	cookies?: Record<string, string>;
 	/** The path the site is served under, which every page of it shows: the build's `base`. */
 	base?: string;
+	/** The origin the site is served at. */
+	origin?: string;
 };
 
 /**
@@ -85,6 +87,7 @@ async function visit(
 		stored,
 		cookies = {},
 		base = "/",
+		origin = "http://grai.test",
 	}: Visit,
 ) {
 	const browser = await chromium.launch();
@@ -94,7 +97,7 @@ async function visit(
 		Object.entries(cookies).map(([name, value]) => ({
 			name,
 			value,
-			url: "http://grai.test",
+			url: origin,
 		})),
 	);
 	if (stored !== undefined) {
@@ -109,7 +112,7 @@ async function visit(
 			refused.push(message.text());
 	});
 	const requested: string[] = [];
-	await tab.route("http://grai.test/**", (route) => {
+	await tab.route(`${origin}/**`, (route) => {
 		const path = new URL(route.request().url()).pathname;
 		requested.push(path);
 		// A page of the site is its one document; any other file is at its path under the base.
@@ -123,7 +126,7 @@ async function visit(
 			headers,
 		});
 	});
-	await tab.goto(`http://grai.test${url}`);
+	await tab.goto(`${origin}${url}`);
 	await tab.waitForFunction(`document.body.textContent !== ""`);
 	// Strings, not functions: the test's TypeScript has no DOM types.
 	const seen = () =>
@@ -286,6 +289,18 @@ describe("a page's locale, when no server picks it", () => {
 			{ base: "/shop/" },
 		);
 		const { seen } = await visit(dist, "/shop/ar/", { base: "/shop/" });
+
+		expect(await seen()).toBe("ar rtl سلتك");
+	});
+
+	it("is the one whose host the site is served at, with a domain per locale", async () => {
+		const { dist } = await built(
+			site({
+				strategy: ["url"],
+				domains: { en: "grai.test", ro: "ro.grai.test", ar: "ar.grai.test" },
+			}),
+		);
+		const { seen } = await visit(dist, "/", { origin: "http://ar.grai.test" });
 
 		expect(await seen()).toBe("ar rtl سلتك");
 	});

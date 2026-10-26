@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, pathnames, basePath, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, pathnames, basePath, domains, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -222,6 +222,30 @@ describe("the config", () => {
 		).toEqual([message]);
 		expect(await errorsOf(catalogs, { basePath: "/shop" })).toEqual([
 			'config-invalid: grai.config.json: "basePath" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+	});
+
+	it("takes domains only as a host of its own for every locale, with the url strategy", async () => {
+		const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+		const errors = (domains: unknown) =>
+			errorsOf(catalogs, { strategy: ["url"], domains });
+
+		expect(await errors({ en: "shop.test" })).toEqual([
+			'config-invalid: grai.config.json: "domains" must give every locale its host, and gives none to de.',
+		]);
+		expect(await errors({ en: "shop.test", de: "https://shop.de" })).toEqual([
+			'config-invalid: grai.config.json: "domains" gives de "https://shop.de", but a host is a lowercase name, such as "example.de", with a port if it has one.',
+		]);
+		expect(await errors({ en: "shop.test", de: "shop.test" })).toEqual([
+			'config-invalid: grai.config.json: "domains" gives de "shop.test", which is en\'s host too. Give each locale a host of its own.',
+		]);
+		expect(await errors({ en: "shop.test", fr: "shop.fr" })).toEqual([
+			'config-invalid: grai.config.json: "domains" names "fr", which is not one of "locales": en, de.',
+		]);
+		expect(
+			await errorsOf(catalogs, { domains: { en: "a.test", de: "b.test" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "domains" is read only by the "url" strategy, which "strategy" does not list.',
 		]);
 	});
 

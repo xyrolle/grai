@@ -173,12 +173,6 @@ Done when: it converts, a test checks it against intl-messageformat, and the imp
 
 Done when: the import can map a project's format to a grai function, `$t()` with options nests the message with those inputs, and `bench/import-equivalence.mjs` covers both.
 
-## A domain per locale
-
-A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads. `grai/astro` refuses Astro's `i18n.domains` until then.
-
-Done when: the config maps hosts to locales, the middleware reads the request's host, `localizeHref` to a locale on another host gives an absolute URL, local development has a documented way in without the production hosts, and a test covers each.
-
 ## Rename what a module reads off a dynamic import
 
 `grai rename` refuses `(await import("…/messages/key.js")).key` and `module.key` after `const module = await import(…)`, since the scan does not follow a value. Both are rare outside tests.
