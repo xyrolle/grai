@@ -147,7 +147,7 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
   - `"locale-unkept"`: `setLocale` in a page whose `strategy` keeps a choice nowhere;
   - `"value-unmatched"`: a value a closed select does not list;
   - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency;
-  - `"locale-unbound"`: in Next.js, a server component that renders a message before its page or layout bound the locale.
+  - `"locale-unbound"`: on a server, a message rendered outside every request the middleware binds, such as in a stream's `pull()` once the middleware has returned; in Next.js, a server component that renders a message before its page or layout bound the locale.
 
 ### `testing.js`
 

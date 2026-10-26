@@ -83,8 +83,8 @@ export class GraiError extends Error {
 const page = typeof document !== "undefined";
 
 /**
- * The locale outside a request, by its position in `locales`: in a browser, the page's
- * `<html lang>`, the locale the server drew it in; in a script or a test, the base locale.
+ * The locale where no server binds requests, by its position in `locales`: in a browser, the
+ * page's `<html lang>`, the locale the server drew it in; in a script or a test, the base locale.
  */
 let current = locales.indexOf(
 	page && locales.includes(document.documentElement.lang)
@@ -116,9 +116,25 @@ export function bindRequests(storage) {
 	requests = storage;
 }
 
-/** The position in `locales` of the bound locale: the request's, else the one outside a request. */
+/** The position in `locales` of the bound locale: on a server, the request's; else the process's. */
 function bound() {
-	return requests?.getStore()?.index ?? current;
+	return requests === undefined ? current : serving().index;
+}
+
+/**
+ * The request a server is serving. Outside every request it binds there is none, and the
+ * process's locale would render some readers' pages in another language, so a call fails: a
+ * stream's pull runs there once the middleware has returned, as its reader starts it.
+ *
+ * @returns {RequestLocale}
+ */
+function serving() {
+	const request = requests?.getStore();
+	if (request !== undefined) return request;
+	throw new GraiError(
+		"locale-unbound",
+		"A message was rendered outside every request the middleware binds. Render it while the handler runs, or in a task the handler starts: a stream renders in its start() or in a task writing to it, not in its pull(), which runs once the middleware has returned. Outside a request, pass { locale } to the message.",
+	);
 }
 
 /**
@@ -137,8 +153,8 @@ export function getLocale() {
 }
 
 /**
- * Sets the locale. In a request, for the rest of the request; in a script or a test, for the
- * process. A page renders in its locale for as long as it lives, so in a page it keeps the choice
+ * Sets the locale. In a request, for the rest of the request; on a server outside every request,
+ * it throws `locale-unbound`; in a script or a test, for the process. A page renders in its locale for as long as it lives, so in a page it keeps the choice
  * where the strategy reads it: its cookie, its key in localStorage, its URL's prefix or query
  * parameter. Then it loads the page again in it, at the URL that names it, unless
  * `{ reload: false }`, which only keeps the choice, for the page's next load. A page whose
@@ -150,9 +166,8 @@ export function getLocale() {
  */
 export function setLocale(locale, options) {
 	const index = locales.indexOf(assertIsLocale(locale));
-	const request = requests?.getStore();
-	if (request !== undefined) {
-		request.index = index;
+	if (requests !== undefined) {
+		serving().index = index;
 		return;
 	}
 	if (!page) {
