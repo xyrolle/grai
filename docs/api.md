@@ -54,7 +54,7 @@ It exports nothing: an app imports it once, from `src/hooks.client.ts`, for what
 
 ## `grai/react`
 
-- `Markup<Tag>({ parts, markup }: { parts: readonly MessagePart<Tag>[]; markup: Record<Tag, (children?: ReactNode) => ReactNode> }): ReactNode`: draws a markup message's `.parts()` with the app's function for each of its tags, in server and client components alike. A tag the message writes and `markup` lacks is a type error, and throws, naming it.
+- `Markup<Tag>({ parts, markup }: { parts: readonly MessagePart<Tag>[]; markup: Record<Tag, (children: ReactNode | undefined, details: { options; attributes }) => ReactNode> }): ReactNode`: draws a markup message's `.parts()` with the app's function for each of its tags, in server and client components alike. Each function takes what its element encloses and the options and attributes the message writes on it, and decides what they do: none reaches the page on its own. A tag the message writes and `markup` lacks is a type error, and throws, naming it.
 
 ## `grai/astro`
 

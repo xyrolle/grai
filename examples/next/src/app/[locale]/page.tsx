@@ -16,7 +16,11 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 			<p id="terms">
 				<Markup
 					parts={m.terms.parts()}
-					markup={{ link: (children) => <a href="/terms">{children}</a> }}
+					markup={{
+						link: (children, { options }) => (
+							<a href={String(options.href)}>{children}</a>
+						),
+					}}
 				/>
 			</p>
 			<Link id="about" href={localizeHref("/about")}>
