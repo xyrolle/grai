@@ -33,17 +33,16 @@ const commands = {
 
 /**
  * Runs in the child: one command, timed after its module loads, printed as milliseconds on the
- * last line. `check --fix` is the command's own run, which prints what it removed and checked.
+ * last line. `check --fix` is the command's own run, which prints what it removed and checked, and
+ * its exit code, the check's verdict, is on that line too.
  */
 async function child(command, config, ...args) {
 	const [file, name] = commands[command];
 	const exported = (await import(join(graiSource, file)))[name];
 	const start = performance.now();
 	if (command === "fix") {
-		// Its exit code says whether the check found problems, which the parent does not judge: it
-		// checks that the unused keys are gone.
-		await exported.run(["--fix", "--config", config]);
-		console.log(JSON.stringify({ ms: performance.now() - start }));
+		const code = await exported.run(["--fix", "--config", config]);
+		console.log(JSON.stringify({ ms: performance.now() - start, code }));
 		return;
 	}
 	const result = await exported(config, ...args);
@@ -59,8 +58,8 @@ async function child(command, config, ...args) {
 }
 
 /**
- * The median of the runs, each after its own setup and then its check, in milliseconds, or
- * `refused` when the command refused a run.
+ * The median of the runs, each after its own setup and then its check of the run's result, in
+ * milliseconds, or `refused` when the command refused a run.
  */
 function median(setup, args, after = () => {}) {
 	const runs = Array.from({ length: RUNS }, (_, run) => {
@@ -72,8 +71,9 @@ function median(setup, args, after = () => {}) {
 				encoding: "utf8",
 			},
 		);
-		after();
-		return JSON.parse(output.trim().split("\n").at(-1) ?? "");
+		const result = JSON.parse(output.trim().split("\n").at(-1) ?? "");
+		after(result);
+		return result;
 	});
 	if (runs.some((run) => run.refused)) return "refused";
 	const ms = runs.map((run) => run.ms).toSorted((a, b) => a - b);
@@ -172,8 +172,15 @@ function addUnusedKeys(dir, catalogs, locales) {
 	}
 }
 
-/** Throws unless check --fix took the unused keys out of every catalog. */
-function removedUnusedKeys(dir, catalogs, locales) {
+/**
+ * Throws unless check --fix took the unused keys out of every catalog and then checked, which
+ * gives its verdict as the exit code. Whether the check found problems the bench does not judge.
+ */
+function fixedAndChecked(dir, catalogs, locales, { code }) {
+	if (code !== 0 && code !== 1)
+		throw new Error(
+			"check --fix timed the removal alone: no check followed it",
+		);
 	for (const locale of locales) {
 		const path = join(dir, catalogs.replace("{locale}", locale));
 		if (readFileSync(path, "utf8").includes('"zz_unused_'))
@@ -215,7 +222,7 @@ if (process.argv[2] === "--child") {
 				"check --fix": median(
 					() => addUnusedKeys(dir, catalogs, locales),
 					() => ["fix", config],
-					() => removedUnusedKeys(dir, catalogs, locales),
+					(result) => fixedAndChecked(dir, catalogs, locales, result),
 				),
 			};
 			const times = Object.entries(ms).map(
