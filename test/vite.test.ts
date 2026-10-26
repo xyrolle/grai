@@ -310,6 +310,31 @@ describe("the Vite plugin's build", () => {
 		);
 	});
 
+	it("takes a static block for a scope, and reads keys taken apart from the namespace", async () => {
+		const { dir } = project(catalogs);
+		const shadowed = [
+			`import { m } from "./out/messages.js";`,
+			"export class Box { static { const m = { id: 7 }; globalThis.box = m.id; } }",
+			"const { title } = m;",
+			"({ title: globalThis.heading } = m);",
+			"console.log(title());",
+		].join("\n");
+
+		await expect(built(dir, { a: `${shadowed}\n` })).resolves.toBeDefined();
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\nconst { absent } = m;\nconsole.log(absent());\n`,
+			}),
+		).rejects.toThrow('a.js:2:9: "absent": absent names a key no catalog has.');
+		await expect(
+			built(dir, {
+				a: `${shadowed}\nconst { absent } = m;\nconsole.log(absent());\n`,
+			}),
+		).rejects.toThrow(
+			'a.js:6:9: "absent": absent names a key no catalog has. Add it with grai add absent --en "…" --de "…", or fix the name.',
+		);
+	});
+
 	it("reads the namespace by scope, so a parameter or declaration of its name is not grai's", async () => {
 		const { dir } = project(catalogs);
 		const code = [

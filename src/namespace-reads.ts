@@ -1,7 +1,8 @@
 /**
- * The keys a module reads through a namespace it imports, by scope: `m.key`, `m?.key` and
- * `m["key"]` where `m` is the import, not a parameter, a variable, a function, a class or a caught
- * error that a nearer scope declares by the same name. Read from the module's ESTree program.
+ * The keys a module reads through a namespace it imports, by scope: `m.key`, `m?.key`, `m["key"]`
+ * and the keys a pattern takes apart, `const { key } = m`, where `m` is the import, not a parameter,
+ * a variable, a function, a class or a caught error that a nearer scope declares by the same name.
+ * Read from the module's ESTree program.
  */
 
 import {
@@ -48,6 +49,7 @@ export function namespaceReads(
 			const read = memberRead(node, inner, namespaces);
 			if (read !== undefined) reads.push(read);
 		}
+		reads.push(...patternReads(node, inner, namespaces));
 		for (const [field, value] of Object.entries(node)) {
 			if (typeFields.has(field)) continue;
 			for (const item of Array.isArray(value) ? value : [value]) {
@@ -59,15 +61,68 @@ export function namespaceReads(
 	return reads;
 }
 
-/** The names a program reads members of, `name.member` or `name[member]`, in any scope. */
+/**
+ * The names a program reads members of, `name.member`, `name[member]` or `const { member } =
+ * name`, in any scope.
+ */
 export function memberObjects(program: TreeNode): Set<string> {
 	const names = new Set<string>();
 	for (const { node } of walk([program])) {
-		if (node.type !== "MemberExpression") continue;
-		const name = identifierName(child(node, "object"));
+		const sides = Object.hasOwn(patternSides, node.type)
+			? patternSides[node.type]
+			: undefined;
+		const object =
+			node.type === "MemberExpression"
+				? child(node, "object")
+				: sides !== undefined && child(node, sides[0])?.type === "ObjectPattern"
+					? child(node, sides[1])
+					: undefined;
+		const name = identifierName(object);
 		if (name !== undefined) names.add(name);
 	}
 	return names;
+}
+
+/** The two sides of an assignment of a value to a pattern: a declaration's, an assignment's or a default's. */
+const patternSides: Readonly<Record<string, readonly [string, string]>> = {
+	VariableDeclarator: ["id", "init"],
+	AssignmentExpression: ["left", "right"],
+	AssignmentPattern: ["left", "right"],
+};
+
+/** The keys an object pattern takes apart from an unshadowed namespace: `const { key } = m`. */
+function patternReads(
+	node: TreeNode,
+	shadowed: ReadonlySet<string>,
+	namespaces: ReadonlySet<string>,
+): NamespaceRead[] {
+	const sides = Object.hasOwn(patternSides, node.type)
+		? patternSides[node.type]
+		: undefined;
+	if (sides === undefined) return [];
+	const pattern = child(node, sides[0]);
+	const name = identifierName(child(node, sides[1]));
+	if (pattern?.type !== "ObjectPattern" || name === undefined) return [];
+	if (!namespaces.has(name) || shadowed.has(name)) return [];
+	const properties = Array.isArray(pattern.properties)
+		? pattern.properties
+		: [];
+	return properties.flatMap((property): NamespaceRead[] => {
+		if (!isTreeNode(property) || property.type !== "Property") return [];
+		const key = child(property, "key");
+		const start = key === undefined ? undefined : numberOf(key, "start");
+		const end = key === undefined ? undefined : numberOf(key, "end");
+		if (start === undefined || end === undefined) return [];
+		const named =
+			property.computed === true
+				? key?.type === "Literal" && typeof key.value === "string"
+					? key.value
+					: undefined
+				: identifierName(key);
+		return named === undefined
+			? []
+			: [{ key: named, start, end, keyStart: start }];
+	});
 }
 
 /** The key a member names through an unshadowed namespace, if it is one. */
@@ -117,7 +172,11 @@ function declaredIn(node: TreeNode): string[] {
 	}
 	if (node.type === "ClassExpression") return boundNames(child(node, "id"));
 	if (node.type === "CatchClause") return boundNames(child(node, "param"));
-	if (node.type === "BlockStatement" || node.type === "Program") {
+	if (
+		node.type === "BlockStatement" ||
+		node.type === "StaticBlock" ||
+		node.type === "Program"
+	) {
 		return lexical(Array.isArray(node.body) ? node.body : []);
 	}
 	if (node.type === "SwitchStatement" && Array.isArray(node.cases)) {
