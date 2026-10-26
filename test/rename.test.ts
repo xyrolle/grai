@@ -30,17 +30,18 @@ function app() {
 }
 
 describe("grai rename", () => {
-	it("refuses a key a file writes with an escape, which it cannot find to change", async () => {
+	it("renames a key a file writes with an escape, writing it plainly", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
-			"src/app.js": `import { m } from "../out/messages.js";\nm.cart_t\\u0069tle();\n`,
+			"src/app.js": `import { m } from "../out/messages.js";\nm.cart_t\\u0069tle();\nm["cart_t\\x69tle"]();\n`,
 		});
 
-		const result = await rename(config, "cart_title", "basket_title");
-
-		expect(result.errors.map(({ message }) => message)).toEqual([
-			"src/app.js:2:3: it writes cart_title with an escape, which the rename cannot change safely. Write it plainly, or rename it by hand.",
-		]);
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/app.js")).toBe(
+			'import { m } from "../out/messages.js";\nm.basket_title();\nm["basket_title"]();\n',
+		);
 	});
 
 	it("renames reads of the key in code, never a string or a comment that mentions it", async () => {
@@ -146,20 +147,18 @@ describe("grai rename", () => {
 		);
 	});
 
-	it("changes nothing when a source names the key where it may mean something else", async () => {
+	it("leaves a name that reads no key alone, such as a property named like it", async () => {
 		const { dir, config } = app();
-		writeSources(dir, {
-			"src/labels.ts": 'export const labels = { cart_title: "Cart" };\n',
-		});
+		const labels = 'export const labels = { cart_title: "Cart" };\n';
+		writeSources(dir, { "src/labels.ts": labels });
 
-		const result = await rename(config, "cart_title", "basket_title");
-
-		expect(result.errors.map((error) => error.message)).toEqual([
-			'src/labels.ts:1:25: it names cart_title, but not as m.cart_title, m["cart_title"] or a per-key import, so the rename cannot tell that it means the key. Write it as one of those, or rename it by hand.',
-		]);
-		expect(result.changed).toEqual([]);
-		expect(readText(dir, "src/Header.tsx")).toBe(headerTsx);
-		expect(readText(dir, "messages/en.json")).toContain('"cart_title"');
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/labels.ts")).toBe(labels);
+		expect(readText(dir, "src/Header.tsx")).toBe(
+			headerTsx.replaceAll("cart_title", "basket_title"),
+		);
 	});
 
 	it("refuses while a read by a computed name may reach the key, and names the read", async () => {
@@ -172,7 +171,7 @@ describe("grai rename", () => {
 		const result = await rename(config, "cart_title", "basket_title");
 
 		expect(result.errors.map(({ message }) => message)).toEqual([
-			'src/render.ts:2:41: m[name] may read "cart_title", so the rename cannot change every read of it. Read it as m.cart_title, or rename it by hand.',
+			'src/render.ts:2:41: m[name] may read "cart_title", so the rename cannot tell whether to change it. Read the key by its name there, or rename it by hand.',
 		]);
 		expect(result.changed).toEqual([]);
 	});
@@ -186,24 +185,23 @@ describe("grai rename", () => {
 		const result = await rename(config, "cart_title", "basket_title");
 
 		expect(result.errors.map(({ message }) => message)).toEqual([
-			'src/load.ts:1:39: import(`#i18n/messages/${ may read "cart_title", so the rename cannot change every read of it. Read it as m.cart_title, or rename it by hand.',
+			`src/load.ts:1:39: import(\`#i18n/messages/\${name}.js\`) may read "cart_title", so the rename cannot tell whether to change it. Read the key by its name there, or rename it by hand.`,
 		]);
 		expect(result.changed).toEqual([]);
 	});
 
-	it("refuses in a file that declares the namespace's name again, which may be another m", async () => {
+	it("renames the namespace's reads by scope, and none of a parameter of the same name", async () => {
 		const { dir, config } = app();
-		writeSources(dir, {
-			"src/render.js":
-				'import { m } from "$lib/i18n";\nexport function render(m) {\n\treturn m.cart_title();\n}\n',
-		});
+		const render =
+			'import { m } from "$lib/i18n";\nexport function render(m) {\n\treturn m.cart_title();\n}\nexport const heading = m.cart_title();\n';
+		writeSources(dir, { "src/render.js": render });
 
-		const result = await rename(config, "cart_title", "basket_title");
-
-		expect(result.errors.map(({ message }) => message)).toEqual([
-			"src/render.js:2:24: the file declares m again, so the rename cannot tell which of its m.cart_title read the key. Rename that m, or rename the key by hand.",
-		]);
-		expect(readText(dir, "src/render.js")).toContain("return m.cart_title();");
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/render.js")).toBe(
+			render.replace("= m.cart_title()", "= m.basket_title()"),
+		);
 	});
 
 	it("leaves a string in an array alone, which reads no member", async () => {
@@ -219,31 +217,17 @@ describe("grai rename", () => {
 		);
 	});
 
-	it("refuses where the key may be in JSX text, which the scan reads as JavaScript, and names the place", async () => {
+	it("renames a read inside JSX text, and none in a regular expression after a /", async () => {
 		const { dir, config } = project(catalogs);
-		const view = `import { m } from "../out/messages.js";\nexport const View = () => <p>don't {m.cart_title()} don't</p>;\n`;
+		const view = `import { m } from "../out/messages.js";\nexport const View = () => <p>don't {m.cart_title()} don't</p>;\nif (true) /m.cart_title/.test("anything");\n`;
 		writeSources(dir, { "src/View.jsx": view });
 
-		const result = await rename(config, "cart_title", "basket_title");
-
-		expect(result.errors.map(({ message }) => message)).toEqual([
-			"src/View.jsx:2:39: the scan reads the file's JSX text as JavaScript, so it cannot tell whether this cart_title is code, text or a comment. Rename the key by hand.",
-		]);
-		expect(result.changed).toEqual([]);
-		expect(readText(dir, "src/View.jsx")).toBe(view);
-	});
-
-	it("refuses where a / before the key may start a regular expression or divide, and names the place", async () => {
-		const { dir, config } = project(catalogs);
-		const match = `import { m } from "../out/messages.js";\nif (true) /m.cart_title/.test("anything");\nexport const heading = m.cart_title();\n`;
-		writeSources(dir, { "src/match.js": match });
-
-		const result = await rename(config, "cart_title", "basket_title");
-
-		expect(result.errors.map(({ message }) => message)).toEqual([
-			"src/match.js:2:14: a / before it on the line may start a regular expression or divide, so the scan cannot tell whether this cart_title is code. Rename the key by hand.",
-		]);
-		expect(readText(dir, "src/match.js")).toBe(match);
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/View.jsx")).toBe(
+			view.replace("{m.cart_title()}", "{m.basket_title()}"),
+		);
 	});
 
 	it("refuses a name another key has, in any case, and a name that is no key name", async () => {
@@ -270,19 +254,103 @@ describe("grai rename", () => {
 		).toEqual(["key-invalid"]);
 	});
 
-	it("refuses to bind the new name in a file that already names it", async () => {
+	it("refuses to rename a binding named after the key where the new name is taken, and names the place", async () => {
 		const { dir, config } = app();
 		writeSources(dir, {
-			"src/Cart.svelte": `${cartSvelte}<script>const basket_total = 1;</script>\n`,
+			"src/Cart.svelte": cartSvelte.replace(
+				"let { count } = $props();",
+				"let { count } = $props();\n\tconst basket_total = 1;",
+			),
+			"src/total.ts": [
+				'import { cart_total } from "#i18n/messages/cart_total.js";',
+				"export const total = (count: number) => {",
+				"\tconst basket_total = cart_total({ count });",
+				"\treturn [basket_total, cart_total];",
+				"};",
+				"export const label = () => basket_label(cart_total);",
+				"",
+			].join("\n"),
 		});
 
-		expect(
-			(await rename(config, "cart_total", "basket_total")).errors.map(
-				(error) => error.message,
-			),
-		).toEqual([
-			'src/Cart.svelte: "cart_total": the file imports cart_total by its own name, and already names basket_total, which the renamed import would clash with. Rename that first.',
+		const result = await rename(config, "cart_total", "basket_total");
+
+		const taken =
+			"Rename this basket_total first, or import the key under another name.";
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			`src/Cart.svelte:5:8: basket_total is declared here, where cart_total, the key's binding, would take that name with the key. ${taken}`,
+			`src/total.ts:3:8: basket_total is declared here, where cart_total, the key's binding, would take that name with the key. ${taken}`,
 		]);
+		expect(result.changed).toEqual([]);
+	});
+
+	it("refuses where the new name would read the key's binding, or a nearer one would take its reference", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/total.ts": [
+				'import { cart_total } from "#i18n/messages/cart_total.js";',
+				"export const sum = () => basket_total + cart_total.length;",
+				"export function format(basket_total: number) {",
+				"\treturn cart_total({ count: basket_total });",
+				"}",
+				"",
+			].join("\n"),
+		});
+
+		const result = await rename(config, "cart_total", "basket_total");
+
+		expect(result.errors.map(({ file }) => file)).toEqual([
+			"src/total.ts:2:26",
+			"src/total.ts:3:24",
+		]);
+		expect(result.errors[0]?.message).toBe(
+			"src/total.ts:2:26: basket_total here would read the key's binding once it takes that name with the key. Rename this basket_total first, or import the key under another name.",
+		);
+	});
+
+	it("writes a shorthand out in full where the key's binding takes the new name", async () => {
+		const { dir, config } = app();
+		const imported =
+			'import { cart_total } from "#i18n/messages/cart_total.js";';
+		writeSources(dir, {
+			"src/Total.svelte": `<script>\n\t${imported}\n</script>\n<Price {cart_total} />\n`,
+			"src/Total.vue": `<script setup>\n${imported}\n</script>\n<template><Price :cart_total /></template>\n`,
+			"src/total.ts": `${imported}\nexport const labels = { cart_total };\n`,
+		});
+
+		expect((await rename(config, "cart_total", "basket_total")).errors).toEqual(
+			[],
+		);
+		const renamed = imported.replaceAll("cart_total", "basket_total");
+		expect(readText(dir, "src/Total.svelte")).toBe(
+			`<script>\n\t${renamed}\n</script>\n<Price cart_total={basket_total} />\n`,
+		);
+		expect(readText(dir, "src/Total.vue")).toBe(
+			`<script setup>\n${renamed}\n</script>\n<template><Price :cart_total="basket_total" /></template>\n`,
+		);
+		expect(readText(dir, "src/total.ts")).toBe(
+			`${renamed}\nexport const labels = { cart_total: basket_total };\n`,
+		);
+	});
+
+	it("renames a key through each module that passes it on by its own name, and no name a module gives it", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/lib/keys.ts":
+				'export { cart_title } from "../../out/keys.js";\nexport { cart_title as heading } from "../../out/keys.js";\n',
+			"src/lib/index.ts": 'export * from "./keys.ts";\n',
+			"src/page.ts":
+				'import { cart_title, heading } from "./lib/index.ts";\nimport * as lib from "./lib/keys.ts";\nexport const page = [cart_title(), heading(), lib.cart_title(), lib.heading()];\n',
+		});
+
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/lib/keys.ts")).toBe(
+			'export { basket_title } from "../../out/keys.js";\nexport { basket_title as heading } from "../../out/keys.js";\n',
+		);
+		expect(readText(dir, "src/page.ts")).toBe(
+			'import { basket_title, heading } from "./lib/index.ts";\nimport * as lib from "./lib/keys.ts";\nexport const page = [basket_title(), heading(), lib.basket_title(), lib.heading()];\n',
+		);
 	});
 
 	it("renames the key in the config's identicalToBase too, listing it once, and leaves the rest of the config as written", async () => {

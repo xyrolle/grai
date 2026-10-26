@@ -15,7 +15,7 @@ const catalogs = {
 };
 
 describe("grai find", () => {
-	it("prints a key's line in each catalog, each call site, and each other place that names it", async () => {
+	it("prints a key's line in each catalog and each call site, and no other text that spells it", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
 			"src/Cart.svelte": cartSvelte,
@@ -28,20 +28,20 @@ describe("grai find", () => {
 
 		expect(found.errors).toEqual([]);
 		expect(foundLines("cart_title", found).toSorted()).toEqual([
-			'grai: "cart_title" is in 2 catalogs and 4 call sites, and named in 1 other place',
+			'grai: "cart_title" is in 2 catalogs and 4 call sites',
 			'messages/de.json:2:2: "cart_title": "Ihr Warenkorb",',
 			'messages/en.json:2:2: "cart_title": "Your cart",',
 			"src/Cart.svelte:7:8: <h1>{m.cart_title()}</h1>",
 			'src/Cart.svelte:8:14: <p title={m["cart_title"]()}>{cart_total({ count })}</p>',
 			"src/Header.tsx:4:27: return <h1 aria-label={m.cart_title()}>{m?.cart_title()}</h1>;",
 			"src/Header.tsx:4:45: return <h1 aria-label={m.cart_title()}>{m?.cart_title()}</h1>;",
-			'src/labels.ts:1:25: export const labels = { cart_title: "Cart" }; (not a call site)',
 		]);
 	});
 
 	it("finds a key's call sites in tests too, which check does not count", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
+			"src/lib/i18n.ts": i18nTs,
 			"src/cart.test.ts": `import { m } from "$lib/i18n";\n${cartTest}`,
 		});
 
@@ -61,13 +61,13 @@ describe("grai find", () => {
 		expect(
 			found.callSites.map(({ line, column }) => `${line}:${column}`),
 		).toEqual(["3:11", "3:45", "8:31", "9:15"]);
-		expect(found.mentions).toEqual([]);
+		expect(found.reaches).toEqual([]);
 	});
 
 	it("reports a key no catalog has, with the places that name it", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
-			"src/a.ts": 'import { m } from "./m.js";\nm.cart_gone();\n',
+			"src/a.ts": 'import { m } from "../out/messages.js";\nm.cart_gone();\n',
 		});
 
 		const found = await find(config, "cart_gone");
@@ -75,6 +75,28 @@ describe("grai find", () => {
 		expect(found.callSites).toHaveLength(1);
 		expect(found.errors.map((error) => error.message)).toEqual([
 			'messages/en.json: "cart_gone": no catalog has the key.',
+		]);
+	});
+
+	it("lists the reads that may reach a key without naming it", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/lib/i18n.ts": i18nTs,
+			"src/pick.ts": [
+				'import { m } from "$lib/i18n";',
+				`export const pick = (name: string) => m[\`cart_\${name}\`]();`,
+				"export const all = () => Object.keys(m);",
+				`export const promo = (name: string) => m[\`promo_\${name}\`]();`,
+				"",
+			].join("\n"),
+		});
+
+		const found = await find(config, "cart_title");
+
+		expect(foundLines("cart_title", found).slice(2)).toEqual([
+			`src/pick.ts:2:39: export const pick = (name: string) => m[\`cart_\${name}\`](); (may read it)`,
+			"src/pick.ts:3:38: export const all = () => Object.keys(m); (may read it)",
+			'grai: "cart_title" is in 2 catalogs and 0 call sites, and may be read at 2 other places',
 		]);
 	});
 });
