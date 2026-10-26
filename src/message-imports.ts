@@ -103,10 +103,16 @@ export function messageBindings(
 	namespaceNames: ReadonlySet<string>,
 	isKeysFile: (specifier: string) => boolean = () => true,
 ): MessageBindings {
+	const destructured = statementsOf(text, destructuredImport);
+	// The dynamic import a destructuring holds is the same import, listed once.
+	const dynamic = statementsOf(text, dynamicImport).filter(
+		({ start }) =>
+			!destructured.some((outer) => outer.start <= start && start < outer.end),
+	);
 	const statements = [
 		...statementsOf(text, statement),
-		...statementsOf(text, destructuredImport),
-		...statementsOf(text, dynamicImport),
+		...destructured,
+		...dynamic,
 	].map((found) =>
 		found.module.type === "keys" && !isKeysFile(found.specifier.text)
 			? { ...found, module: otherModule }
