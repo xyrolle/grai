@@ -1,4 +1,11 @@
 import type { ESTree } from "./parse.ts";
+import {
+	assignedIn,
+	blocks,
+	isType,
+	namesElement,
+	writesName,
+} from "./scope-rules.ts";
 import { childrenOf, type Node, type Span } from "./syntax.ts";
 
 /** A name a module declares: the identifier that declares it, and the code it is visible in. */
@@ -7,26 +14,11 @@ export type Binding = { name: string; node: Node; scope: Span };
 /** A use of a name: an identifier that reads or writes it, or a JSX element's name. */
 export type Use = Extract<Node, { type: "Identifier" | "JSXIdentifier" }>;
 
-/** The scopes a walk is in: the function's, where `var` declares, and the block's, where the rest do. */
-type Enclosing = { fn: Span; block: Span };
-
-/** The fields that write a name rather than use one, unless the node computes them. */
-const nameFields: Readonly<Record<string, readonly string[]>> = {
-	MemberExpression: ["property"],
-	Property: ["key"],
-	MethodDefinition: ["key"],
-	PropertyDefinition: ["key"],
-	AccessorProperty: ["key"],
-	TSPropertySignature: ["key"],
-	TSMethodSignature: ["key"],
-	LabeledStatement: ["label"],
-	BreakStatement: ["label"],
-	ContinueStatement: ["label"],
-	ExportSpecifier: ["exported"],
-	ExportAllDeclaration: ["exported"],
-	MetaProperty: ["meta", "property"],
-	ImportAttribute: ["key"],
-};
+/**
+ * The scopes a walk is in: the function's, where `var` declares, and the block's, where the rest do;
+ * and whether it is in a type, where a name reads only a type of its declaration.
+ */
+type Enclosing = { fn: Span; block: Span; type: boolean };
 
 /**
  * The names a module declares and where each is used, scope by scope, as JavaScript resolves them:
@@ -39,10 +31,12 @@ export class Scopes {
 	private readonly uses = new Map<string, Use[]>();
 	/** The uses that assign their name a value: `x = …`, `x++`, `[x] = …`, `for (x of …)`. */
 	private readonly writes = new Set<Node>();
+	/** The uses in a type, `typeof x` or `x.Member` in an annotation, which read nothing at run time. */
+	private readonly typeUses = new Set<Node>();
 
 	constructor(program: ESTree.Program) {
 		const module = { start: program.start, end: program.end };
-		this.visitChildren(program, { fn: module, block: module });
+		this.visitChildren(program, { fn: module, block: module, type: false });
 	}
 
 	/** The node that holds a node. */
@@ -71,6 +65,11 @@ export class Scopes {
 		return innermost;
 	}
 
+	/** Whether a use is in a type, so that it reads nothing when the code runs. */
+	isTypeUse(use: Use): boolean {
+		return this.typeUses.has(use);
+	}
+
 	/** Whether anything assigns a binding again after it is declared. */
 	isAssignedAgain(binding: Binding): boolean {
 		return this.usesOf(binding).some((use) => this.writes.has(use));
@@ -87,7 +86,7 @@ export class Scopes {
 		const target = assignedIn(node);
 		if (target !== undefined) this.markWritten(target);
 		if (node.type === "Identifier") {
-			this.addUse(node);
+			this.addUse(node, at);
 		} else if (node.type === "ImportDeclaration") {
 			for (const specifier of node.specifiers) {
 				this.parents.set(specifier, node);
@@ -99,9 +98,21 @@ export class Scopes {
 		} else if (
 			node.type === "FunctionDeclaration" ||
 			node.type === "FunctionExpression" ||
-			node.type === "ArrowFunctionExpression"
+			node.type === "ArrowFunctionExpression" ||
+			node.type === "TSDeclareFunction" ||
+			node.type === "TSEmptyBodyFunctionExpression"
 		) {
 			this.visitFunction(node, at);
+		} else if (
+			node.type === "TSEnumDeclaration" ||
+			node.type === "TSImportEqualsDeclaration"
+		) {
+			this.addBinding(node.id, at.block);
+			this.visitChildren(node, at, "id");
+		} else if (node.type === "TSModuleDeclaration") {
+			// `namespace N {}` declares N, and what its body declares stays in it.
+			if (node.id.type === "Identifier") this.addBinding(node.id, at.block);
+			this.visitChildren(node, { ...at, block: node }, "id");
 		} else if (
 			node.type === "ClassDeclaration" ||
 			node.type === "ClassExpression"
@@ -111,12 +122,12 @@ export class Scopes {
 			this.visitChildren(node, at, "id");
 		} else if (node.type === "CatchClause") {
 			if (node.param !== null) this.declarePattern(node, node.param, node, at);
-			this.visitChildren(node, { fn: at.fn, block: node }, "param");
+			this.visitChildren(node, { ...at, block: node }, "param");
 		} else if (node.type === "StaticBlock") {
 			// A class's static block keeps its vars, as a function's body does.
-			this.visitChildren(node, { fn: node, block: node });
+			this.visitChildren(node, { ...at, fn: node, block: node });
 		} else if (blocks.has(node.type)) {
-			this.visitChildren(node, { fn: at.fn, block: node });
+			this.visitChildren(node, { ...at, block: node });
 		} else if (node.type !== "ExportNamedDeclaration" || node.source === null) {
 			// A re-export, `export { a } from "…"`, names another module's bindings.
 			this.visitChildren(node, at);
@@ -127,10 +138,11 @@ export class Scopes {
 		for (const [field, child] of childrenOf(node)) {
 			this.parents.set(child, node);
 			if (field === skipped || writesName(node, field)) continue;
+			const type = at.type || isType(child);
 			if (child.type === "JSXIdentifier") {
-				if (namesElement(node, field)) this.addUse(child);
+				if (namesElement(node, field)) this.addUse(child, at);
 			} else {
-				this.visit(child, at);
+				this.visit(child, type === at.type ? at : { ...at, type });
 			}
 		}
 	}
@@ -161,16 +173,23 @@ export class Scopes {
 		at: Enclosing,
 	): void {
 		if (node.id !== null) {
-			const declared = node.type === "FunctionDeclaration";
+			const declared =
+				node.type === "FunctionDeclaration" ||
+				node.type === "TSDeclareFunction";
 			this.addBinding(node.id, declared ? at.block : node);
 		}
-		const parameters = { fn: node, block: node };
+		const parameters = { fn: node, block: node, type: at.type };
 		for (const param of node.params) {
 			this.declarePattern(node, param, node, parameters);
 		}
+		for (const types of [node.typeParameters, node.returnType]) {
+			if (types === null || types === undefined) continue;
+			this.parents.set(types, node);
+			this.visit(types, { ...parameters, type: true });
+		}
 		if (node.body !== null) {
 			this.parents.set(node.body, node);
-			this.visit(node.body, { fn: node.body, block: node.body });
+			this.visit(node.body, { ...at, fn: node.body, block: node.body });
 		}
 	}
 
@@ -217,6 +236,17 @@ export class Scopes {
 			default:
 				this.visit(pattern, at);
 		}
+		const annotation =
+			pattern.type === "Identifier" ||
+			pattern.type === "ObjectPattern" ||
+			pattern.type === "ArrayPattern" ||
+			pattern.type === "RestElement"
+				? pattern.typeAnnotation
+				: null;
+		if (annotation !== null && annotation !== undefined) {
+			this.parents.set(annotation, pattern);
+			this.visit(annotation, { ...at, type: true });
+		}
 	}
 
 	/** Marks each name an assignment's target writes. */
@@ -253,19 +283,11 @@ export class Scopes {
 		appendTo(this.declared, node.name, binding);
 	}
 
-	private addUse(node: Use): void {
+	private addUse(node: Use, at: Enclosing): void {
 		appendTo(this.uses, node.name, node);
+		if (at.type) this.typeUses.add(node);
 	}
 }
-
-/** The nodes that open a block's scope: what `let`, `const` and `class` declare in them stays in them. */
-const blocks = new Set([
-	"BlockStatement",
-	"ForStatement",
-	"ForInStatement",
-	"ForOfStatement",
-	"SwitchStatement",
-]);
 
 function appendTo<T>(map: Map<string, T[]>, key: string, value: T): void {
 	const values = map.get(key);
@@ -273,30 +295,6 @@ function appendTo<T>(map: Map<string, T[]>, key: string, value: T): void {
 	else values.push(value);
 }
 
-/** What an assignment, an update or a `for … in`/`of` without a declaration writes to. */
-function assignedIn(node: Node): Node | undefined {
-	if (node.type === "AssignmentExpression") return node.left;
-	if (node.type === "UpdateExpression") return node.argument;
-	const loop = node.type === "ForInStatement" || node.type === "ForOfStatement";
-	return loop && node.left.type !== "VariableDeclaration"
-		? node.left
-		: undefined;
-}
-
 function size({ scope }: Binding): number {
 	return scope.end - scope.start;
-}
-
-/** Whether a node's field writes a name: a property's or a label's, not a use of a binding. */
-function writesName(node: Node, field: string): boolean {
-	const computed = "computed" in node && node.computed;
-	return !computed && (nameFields[node.type]?.includes(field) ?? false);
-}
-
-/** Whether a JSX name in this field names a component, which is a use of its binding. */
-function namesElement(node: Node, field: string): boolean {
-	if (node.type === "JSXMemberExpression") return field === "object";
-	const element =
-		node.type === "JSXOpeningElement" || node.type === "JSXClosingElement";
-	return element && field === "name";
 }
