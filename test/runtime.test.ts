@@ -13,6 +13,20 @@ const catalogs = {
 const output = (config: Record<string, unknown> = {}) =>
 	project(catalogs, config).load();
 
+/** What server.js gives a server to define its own strategies by, and the `Vary` they make. */
+type ServerStrategies = {
+	defineServerStrategy(
+		name: string,
+		strategy: {
+			getLocale(
+				request: Request,
+			): string | undefined | Promise<string | undefined>;
+			vary?: readonly string[];
+		},
+	): void;
+	vary: string;
+};
+
 /** A project's output as a server loads it: its messages, runtime and middleware. */
 async function served(config: Record<string, unknown> = {}) {
 	const { dir, load } = project(catalogs, config);
@@ -23,6 +37,7 @@ async function served(config: Record<string, unknown> = {}) {
 	return {
 		m,
 		runtime,
+		server: server as ServerStrategies,
 		middleware: server.middleware as (
 			request: Request,
 			handler: (resolved: {
@@ -721,6 +736,59 @@ it("sends an unprefixed page under the base path to its locale's path there", as
 	]).toEqual(["https://example.test/shop/de/cart", "de"]);
 });
 
+describe("with a strategy the server defines", () => {
+	const config = { strategy: ["custom-session", "cookie"], cookieName: "lang" };
+
+	it("asks the server's strategy for a request's locale in the strategy's order, and goes on when it names none", async () => {
+		const { middleware, server } = await served(config);
+		server.defineServerStrategy("custom-session", {
+			getLocale: async (request) =>
+				request.headers.get("x-user-locale") ?? undefined,
+			vary: ["X-User-Locale"],
+		});
+		const answer = (headers: Record<string, string>) =>
+			middleware(
+				new Request("https://shop.test/", { headers }),
+				({ locale }) => new Response(locale),
+			);
+		const byServer = await answer({ "x-user-locale": "de", cookie: "lang=ar" });
+		const byCookie = await answer({ cookie: "lang=ar" });
+
+		expect([
+			await byServer.text(),
+			await byCookie.text(),
+			byServer.headers.get("vary"),
+			server.vary,
+		]).toEqual(["de", "ar", "X-User-Locale, Cookie", "X-User-Locale, Cookie"]);
+	});
+
+	it("refuses a request no definition answers, a definition the strategy does not list, and a locale the project lacks", async () => {
+		const { middleware, server } = await served(config);
+		const request = () =>
+			middleware(
+				new Request("https://shop.test/"),
+				() => new Response(""),
+			).catch((error: unknown) => error);
+
+		expect(await request()).toMatchObject({
+			code: "strategy-undefined",
+			message:
+				'"strategy" lists "custom-session", which no defineServerStrategy("custom-session", { getLocale }) on this server defines. Define it before the first request.',
+		});
+		expect(
+			thrown(() =>
+				server.defineServerStrategy("custom-user", { getLocale: () => "de" }),
+			),
+		).toMatchObject({
+			code: "strategy-undefined",
+			message:
+				'"custom-user" is not in the config\'s "strategy": ["custom-session","cookie"]. Name the strategy there, then define it.',
+		});
+		server.defineServerStrategy("custom-session", { getLocale: () => "fr" });
+		expect(await request()).toMatchObject({ code: "locale-unknown" });
+	});
+});
+
 describe("with a domain per locale", () => {
 	const config = {
 		strategy: ["url"],
@@ -944,6 +1012,15 @@ describe("in a browser", () => {
 		});
 		runtime.setLocale("de");
 		expect([runtime.getLocale(), visited.reloads]).toEqual(["de", 0]);
+	});
+
+	it("refuses setLocale where only the server's own strategy keeps the choice, which a page cannot write", async () => {
+		page("de");
+		const { runtime } = await output({ strategy: ["custom-session"] });
+
+		expect(thrown(() => runtime.setLocale("ar"))).toMatchObject({
+			code: "locale-unkept",
+		});
 	});
 
 	it("names the new locale in the URL's query parameter with the query strategy", async () => {

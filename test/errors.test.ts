@@ -123,9 +123,20 @@ describe("the config", () => {
 	it("names a strategy it does not know, and a strategy without the name of the place it reads", async () => {
 		const catalogs = { en: { title: "Title" } };
 
+		const unknown =
+			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query", "url", or a strategy the server defines, named "custom-" and a lowercase name, such as "custom-session".';
 		expect(await errorsOf(catalogs, { strategy: ["header"] })).toEqual([
-			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query" or "url".',
+			unknown,
 		]);
+		expect(await errorsOf(catalogs, { strategy: ["custom-"] })).toEqual([
+			unknown,
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["custom-Session"] })).toEqual([
+			unknown,
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["custom-session"] })).toEqual(
+			[],
+		);
 		expect(await errorsOf(catalogs, { strategy: ["localStorage"] })).toEqual([
 			'config-invalid: grai.config.json: "localStorageKey" must name the key the "localStorage" strategy reads.',
 		]);
