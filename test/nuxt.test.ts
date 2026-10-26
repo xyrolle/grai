@@ -32,12 +32,18 @@ describe("the module", { timeout: 30_000 }, () => {
 		);
 	});
 
-	it("refuses the url strategy under a base URL, whose segment it would read as the locale", async () => {
+	it("refuses a base URL that is not grai's basePath, under the url strategy, which reads the locale after it", async () => {
 		await expect(
 			loaded({ strategy: ["url"] }, { app: { baseURL: "/shop/" } }),
 		).rejects.toThrow(
-			"grai: the url strategy reads a locale from a path's first segment, and Nuxt's app.baseURL is /shop/. Serve the app from /, or use another strategy.",
+			`grai.config.json: Nuxt's app.baseURL "/shop/" and grai's "basePath" (none) must name the same path: the "url" strategy reads the locale after it.`,
 		);
+		await expect(
+			loaded(
+				{ strategy: ["url"], basePath: "/shop" },
+				{ app: { baseURL: "/shop/" } },
+			),
+		).resolves.toBeUndefined();
 	});
 });
 
@@ -47,6 +53,7 @@ describe("the pages of the url strategy", () => {
 		prefixes: ["en", "ro"],
 		unlocalizedPaths: [],
 		pathnames: [],
+		basePath: "",
 	} as const;
 	const index: NuxtPage = { name: "index", path: "/", file: "index.vue" };
 	const docs: NuxtPage = {
