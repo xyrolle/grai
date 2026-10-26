@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { type ModuleCode, readCode } from "../src/code/read.ts";
 import { Scopes } from "../src/code/scopes.ts";
@@ -31,7 +32,8 @@ function readsIn(text: string) {
 				const kind =
 					binding === undefined
 						? "global"
-						: declaring?.type === "ImportSpecifier"
+						: declaring?.type === "ImportSpecifier" ||
+								declaring?.type === "ImportNamespaceSpecifier"
 							? "import"
 							: "local";
 				const at = fileOffset(source, node.property.start) ?? -1;
@@ -106,6 +108,47 @@ describe("reading a file's code", () => {
 			"label 7:47 local",
 			"slotted 8:29 local",
 			"after 9:8 import",
+		]);
+	});
+
+	it("reads the Vue example's component and the Nuxt example's pages, each key through the namespace it imports", async () => {
+		const keysOf = async (path: string) => {
+			const text = readFileSync(
+				new URL(`../examples/${path}`, import.meta.url),
+				"utf8",
+			);
+			const reads = await readsOf(path, text);
+			expect(reads.filter((read) => !read.endsWith(" import"))).toEqual([]);
+			return [...new Set(reads.map((read) => read.split(" ")[0]))].toSorted();
+		};
+
+		expect(await keysOf("vue/src/App.vue")).toEqual([
+			"cart_add",
+			"cart_items",
+			"drawn_in_browser",
+			"greeting",
+			"language_switch",
+			"terms",
+			"title",
+		]);
+		expect(await keysOf("nuxt/app/pages/index.vue")).toEqual([
+			"about_link",
+			"cart_add",
+			"cart_items",
+			"delivery_link",
+			"drawn_in_browser",
+			"greeting",
+			"terms",
+			"title",
+		]);
+		expect(await keysOf("nuxt/app/pages/about.vue")).toEqual([
+			"about_body",
+			"about_title",
+			"home_link",
+		]);
+		expect(await keysOf("nuxt/app/pages/delivery.vue")).toEqual([
+			"delivery_estimate",
+			"delivery_title",
 		]);
 	});
 
