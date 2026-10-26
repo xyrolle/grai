@@ -2,6 +2,8 @@ import { basename, dirname } from "node:path";
 import { type EnvironmentOptions, minifySync } from "vite";
 import type { Build } from "./compile.ts";
 import { withoutContentHash } from "./content-names.ts";
+import { GraiError, sortErrors } from "./error.ts";
+import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { keyReach, type ModuleGraph } from "./key-reach.ts";
 import { pageChunks } from "./key-sets.ts";
 import {
@@ -253,6 +255,43 @@ export function messageChunkCopies(): MessageChunkCopies {
  * letters, digits, `_` or `$` between `!~{` and `}~`, as `!~{00c}~` in a build of a dozen chunks.
  */
 const placeholder = /!~\{[\w$]+\}~/g;
+
+/**
+ * An error for each locale's text that holds a placeholder's shape, which a build refuses: the
+ * bundler writes each chunk's hash over its placeholder wherever it is in the code, and grai each
+ * copy's alike. No way of writing the text escapes that: the bundler prints a string by its value,
+ * and folds an escaped template, a concatenation or a join back into one string, before the hashes
+ * go in.
+ */
+export function placeholderTexts(build: Build): GraiError[] {
+	const { catalogs, keys } = build.compilation;
+	const fallbackOf = fallbackPositions(
+		build.config.locales,
+		build.config.fallbacks,
+	);
+	const errors: GraiError[] = [];
+	for (const [key, { variants, parts }] of keys) {
+		catalogs.forEach(({ file, locale }, index) => {
+			const held = `${variants[index]}${parts[index] ?? ""}`.match(
+				placeholder,
+			)?.[0];
+			if (held === undefined) return;
+			const where = {
+				file: messageSource(key, index, catalogs, fallbackOf)?.file ?? file,
+				key,
+				locale,
+			};
+			errors.push(
+				new GraiError(
+					"unsupported",
+					where,
+					`the text holds ${held}, the bundler's placeholder for a chunk's hash, which a build replaces with that hash. Write it without that shape, such as with a space after !~.`,
+				),
+			);
+		});
+	}
+	return sortErrors(errors);
+}
 
 /** Each chunk's hash by its placeholder, from its file name before and after hashing. */
 function hashesOf(chunks: readonly ChunkNames[]): Map<string, string> {

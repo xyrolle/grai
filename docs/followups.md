@@ -216,3 +216,9 @@ Done when: each adapter that can draw a page no server serves writes the script 
 The locale script writes the page's import map. A page that has one of its own then has two, which only browsers that merge import maps read both of; another takes the first and refuses the second.
 
 Done when: the plugin merges the page's own import map into the one the locale script writes, with a browser test of a page that has one.
+
+## A text that holds the bundler's placeholder for a hash
+
+A Vite build refuses a text with `!~{…}~` in it (`placeholderTexts` in `src/vite-build.ts`). Rolldown writes each chunk's hash over its placeholder wherever that is in a chunk's code, a string's value included, and grai does the same in each locale's copy. Every other way of writing the text, such as `\x7e` for the `~`, an escaped template, a concatenation or a join, comes out of Rolldown's printer and minifier as the one string again before the hashes go in.
+
+Done when: Rolldown leaves the placeholder's shape in a string's value alone, and the build takes the text as it is.
