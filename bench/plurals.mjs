@@ -1,13 +1,18 @@
 // Plural selection: Paraglide's registry, a new Intl.PluralRules per call, one cached per locale,
-// CLDR's rules compiled into a function (make-plural), and the same rules with an integer path
-// first, since a count is almost always an integer. Every variant is checked against Intl on
-// 0–10,000 and on fractions before it is timed; the bytes are each one's minified, gzipped code.
+// grai's rules as its compiler emits them in plurals.js, and two experiments: CLDR's rules
+// compiled into a function (make-plural), and the same rules with an integer path first, since a
+// count is almost always an integer. Every variant is checked against Intl on 0–10,000 and on
+// fractions before it is timed; the bytes are each one's minified, gzipped code, grai's bundled
+// from its output with what the rule calls.
 //   node plurals.mjs
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
+import { rolldown } from "rolldown";
 import { minifySync } from "rolldown/utils";
 import { cacheDir, selectedApps } from "./apps.mjs";
+import { graiOutput } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { pluralRuleOf } from "./prototype.mjs";
@@ -35,6 +40,34 @@ const gzipped = (code) =>
 
 const [app] = selectedApps(["synthetic"]);
 const registry = await import(`${await paraglideOutput(app)}/registry.js`);
+const { outdir } = await graiOutput(app);
+const pluralsFile = join(
+	outdir,
+	readdirSync(outdir).find((file) => /^plurals-\w+\.js$/.test(file)) ?? "",
+);
+const emitted = await import(pathToFileURL(pluralsFile).href);
+const emittedName = "grai's rules, as plurals.js has them";
+
+/** The minified, gzipped bytes of a locale's emitted rule, bundled with what it calls. */
+async function emittedBytes(locale) {
+	const build = await rolldown({
+		input: "entry",
+		plugins: [
+			{
+				name: "entry",
+				resolveId: (id) => (id === "entry" ? id : null),
+				load: (id) =>
+					id === "entry"
+						? `export { plural_${locale} } from ${JSON.stringify(pluralsFile)};`
+						: null,
+			},
+		],
+		logLevel: "silent",
+	});
+	const { output } = await build.generate({ format: "esm", minify: true });
+	await build.close();
+	return gzipSync(output[0].code).length;
+}
 const integers = Array.from({ length: 1000 }, (_, index) => index);
 const fractions = [0.5, 1.5, 2.25, 11.1, 21.5, 101.01];
 
@@ -57,6 +90,7 @@ for (const locale of ["ro", "ru", "en"]) {
 	);
 	const variants = {
 		"Paraglide registry.plural": (n) => registry.plural(locale, n, {}, true),
+		[emittedName]: emitted[`plural_${locale}`],
 		...(await import(module)).variants,
 	};
 	for (const [name, select] of Object.entries(variants)) {
@@ -79,7 +113,12 @@ for (const locale of ["ro", "ru", "en"]) {
 }
 for (const [name, ns] of rows) {
 	const source = variantSources("ru")[name];
-	const bytes = source ? gzipped(source) : "registry";
+	const bytes =
+		name === emittedName
+			? await emittedBytes("ru")
+			: source
+				? gzipped(source)
+				: "registry";
 	console.log(
 		`| ${name} | ${formatNs(ns.ro)} | ${formatNs(ns.ru)} | ${formatNs(ns.en)} | ${bytes} |`,
 	);
