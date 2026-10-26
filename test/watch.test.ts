@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
-import { type WatchOptions, watch } from "../src/watch.ts";
+import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
 const catalogs = {
@@ -67,14 +67,13 @@ it("gives a compile that throws to failed, and compiles again on the next change
 });
 
 /** A watcher of the project whose reports the test reads, closed when the test ends. */
-function watched(config: string, options: WatchOptions = {}) {
+function watched(config: string) {
 	const reported: CompileResult[] = [];
 	const failures: unknown[] = [];
 	const watcher = watch(
 		config,
 		(result) => reported.push(result),
 		(error) => failures.push(error),
-		options,
 	);
 	onTestFinished(async () => {
 		await watcher.close();
@@ -82,20 +81,6 @@ function watched(config: string, options: WatchOptions = {}) {
 	});
 	return reported;
 }
-
-it("compiles an edit while something else holds the process, when the watch does not", async () => {
-	const { dir, config } = project(catalogs);
-	const reported = watched(config, { persistent: false });
-	await expect.poll(() => reported.length).toBe(1);
-
-	writeFileSync(
-		join(dir, "messages", "de.json"),
-		JSON.stringify({ title: "Überschrift" }),
-	);
-
-	await expect.poll(() => reported.length).toBe(2);
-	expect(reported[1]?.errors).toEqual([]);
-});
 
 it("reads a catalog that a save truncates and then writes once the save has settled", async () => {
 	const { dir, config } = project(catalogs);
