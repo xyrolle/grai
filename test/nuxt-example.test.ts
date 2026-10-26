@@ -68,7 +68,7 @@ function built(port: number, config = "grai.config.json"): void {
 
 let browser: Browser;
 let page: Page;
-/** What the page logged as an error or a warning, and the scripts it fetched. */
+/** What the test's pages logged as an error or a warning, and the scripts they fetched. */
 let logged: string[];
 let scripts: string[];
 beforeAll(async () => {
@@ -76,19 +76,20 @@ beforeAll(async () => {
 });
 afterAll(() => browser?.close());
 beforeEach(async () => {
-	page = await browser.newPage();
+	const context = await browser.newContext();
+	page = await context.newPage();
 	logged = [];
 	scripts = [];
-	page.on("console", (message) => {
+	context.on("console", (message) => {
 		if (["error", "warning"].includes(message.type()))
 			logged.push(message.text());
 	});
-	page.on("pageerror", (error) => logged.push(error.message));
-	page.on("request", (request) => {
+	context.on("weberror", (error) => logged.push(error.error().message));
+	context.on("request", (request) => {
 		if (request.resourceType() === "script")
 			scripts.push(new URL(request.url()).pathname);
 	});
-	onTestFinished(() => page.context().close());
+	onTestFinished(() => context.close());
 });
 
 const text = (selector: string) => page.locator(selector).textContent();
@@ -127,6 +128,11 @@ describe("the Nuxt example, built, by the URL prefix", {
 			);
 			expect(served).toContain(`<h1>${title}</h1>`);
 
+			// Each locale in a page of its own: a page fetches the words of the pages it links to once
+			// it is idle, which can be after the next page is asked for, until it is closed.
+			const context = page.context();
+			await page.close();
+			page = await context.newPage();
 			scripts = [];
 			await page.goto(origin + path);
 			await page.locator("#hydrated").waitFor();
