@@ -14,7 +14,7 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
-	watch,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -163,19 +163,21 @@ function save(catalogFile, key, text) {
 	return now();
 }
 
-/** When grai next writes one of the outdir's shards, watching each as a file. */
-function shardWritten(outdir) {
-	const shards = readdirSync(join(outdir, "keys")).filter((name) =>
-		name.endsWith(".js"),
-	);
-	return new Promise((resolve) => {
-		const watchers = shards.map((name) =>
-			watch(join(outdir, "keys", name), () => {
-				for (const watcher of watchers) watcher.close();
-				resolve(now());
-			}),
-		);
-	});
+/**
+ * When grai wrote the shard that holds `text`: its file's modification time. A shard's name carries
+ * its content's hash, so an edit writes a new file rather than changing a watched one.
+ */
+function writtenAt(outdir, text) {
+	const keys = join(outdir, "keys");
+	for (const name of readdirSync(keys)) {
+		const file = join(keys, name);
+		if (
+			name.endsWith(".js") &&
+			readFileSync(file, "utf8").includes(JSON.stringify(text))
+		)
+			return statSync(file).mtimeMs;
+	}
+	throw new Error(`No shard of ${outdir} holds ${JSON.stringify(text)}.`);
 }
 
 /**
@@ -192,7 +194,6 @@ async function editToPage(browser, url, catalogFile, key, target, outdir) {
 	for (let edit = 0; edit < EDITS + 2; edit++) {
 		await new Promise((resolve) => setTimeout(resolve, SAVE_INTERVAL_MS));
 		const text = `Edit ${edit}: ${original}`;
-		const shard = outdir && shardWritten(outdir);
 		const written = save(catalogFile, key, text);
 		const shown = await page
 			.waitForFunction(
@@ -205,7 +206,7 @@ async function editToPage(browser, url, catalogFile, key, target, outdir) {
 		// The first two warm the dev server's compiles of the edited module.
 		if (edit >= 2) {
 			latencies.push(shown - written);
-			if (shard) writes.push((await shard) - written);
+			if (outdir) writes.push(writtenAt(outdir, text) - written);
 		}
 	}
 	save(catalogFile, key, original);
