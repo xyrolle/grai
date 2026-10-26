@@ -11,6 +11,7 @@ import {
 	it,
 	onTestFinished,
 } from "vitest";
+import { stopped } from "./stopped.ts";
 
 // The SvelteKit example (examples/sveltekit), built as an app builds it, with grai/sveltekit/vite's
 // plugin, served by adapter-node, and its pages in a real browser.
@@ -68,28 +69,6 @@ function served(mode = "production"): Promise<Served> {
 	return listening("node", ["build"], { HOST: "127.0.0.1", PORT: "0" });
 }
 
-/** Stops a server's whole process group, and resolves once the server has exited. */
-async function stopped(served: Served | undefined): Promise<void> {
-	if (served === undefined) return;
-	const { server } = served;
-	const exited =
-		server.exitCode === null && server.signalCode === null
-			? new Promise<void>((resolve) => server.once("exit", () => resolve()))
-			: undefined;
-	if (server.pid === undefined) return;
-	try {
-		process.kill(-server.pid, "SIGTERM");
-	} catch (error) {
-		// A group whose processes have all exited.
-		if (
-			!(error instanceof Error && "code" in error && error.code === "ESRCH")
-		) {
-			throw error;
-		}
-	}
-	await exited;
-}
-
 let browser: Browser;
 beforeAll(async () => {
 	browser = await chromium.launch();
@@ -113,12 +92,12 @@ const html = (page: Page, attribute: "lang" | "dir") =>
 // Building and serving an app takes seconds.
 describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 	let origin = "";
-	let server: Served | undefined;
+	let app: Served | undefined;
 	beforeAll(async () => {
-		server = await served();
-		origin = server.origin;
+		app = await served();
+		origin = app.origin;
 	}, 60_000);
-	afterAll(() => stopped(server));
+	afterAll(() => app && stopped(app.server));
 
 	// As an app's checker sees it: the example's code and output against grai's built declarations.
 	it("type-checks, under Kit's own checkJs", () => {
@@ -229,13 +208,13 @@ describe("handleLocale, in a build without the locale copies", {
 	timeout: 30_000,
 }, () => {
 	let origin = "";
-	let server: Served | undefined;
+	let app: Served | undefined;
 	beforeAll(async () => {
 		// The same app, built with grai/svelte's plugin, which writes no copies.
-		server = await served("svelte");
-		origin = server.origin;
+		app = await served("svelte");
+		origin = app.origin;
 	}, 60_000);
-	afterAll(() => stopped(server));
+	afterAll(() => app && stopped(app.server));
 
 	it("writes no import map, and the page loads the shared message chunks", async () => {
 		const html = await (await fetch(`${origin}/ro/`)).text();
@@ -265,14 +244,14 @@ describe("handleLocale, by the cookie and Accept-Language", {
 	timeout: 30_000,
 }, () => {
 	let origin = "";
-	let server: Served | undefined;
+	let app: Served | undefined;
 	beforeAll(async () => {
 		// The same app, with another strategy, the cookie, else the browser's languages, and a CSP
 		// whose scripts need Kit's nonce.
-		server = await served("cookie");
-		origin = server.origin;
+		app = await served("cookie");
+		origin = app.origin;
 	}, 60_000);
-	afterAll(() => stopped(server));
+	afterAll(() => app && stopped(app.server));
 
 	it("renders in the cookie's locale", async () => {
 		const page = await (await browser.newContext()).newPage();
@@ -309,18 +288,18 @@ describe("handleLocale, by the cookie and Accept-Language", {
 
 describe("grai/sveltekit/client under vite dev", { timeout: 30_000 }, () => {
 	let origin = "";
-	let server: Served | undefined;
+	let app: Served | undefined;
 	beforeAll(async () => {
-		server = await listening(bin("vite"), [
+		app = await listening(bin("vite"), [
 			"dev",
 			"--host",
 			"127.0.0.1",
 			"--port",
 			"0",
 		]);
-		origin = server.origin;
+		origin = app.origin;
 	}, 60_000);
-	afterAll(() => stopped(server));
+	afterAll(() => app && stopped(app.server));
 
 	/** Gives a Romanian message new text, as an editor saves it, and puts the catalog back after. */
 	function edit(key: string, text: string): void {
