@@ -7,8 +7,10 @@
 // naming a module of only the changed functions, which the page imports and writes into the
 // table; "patch, fs.watch" does the same from its own watcher on the catalogs instead of Vite's.
 // Beside them: Paraglide's own Vite plugin, which compiles again on an edit, and i18next and
-// use-intl, whose page imports the locale's JSON and accepts its update. The edits go to a copy of
-// the catalogs under .cache, never the app's.
+// use-intl, whose page imports the locale's JSON and accepts its update. Each page's heap, once
+// collected, is taken at load and after the edits, and against the same page with no messages
+// grai's plugin has a budget for it (HEAP_BUDGET). The edits go to a copy of the catalogs under
+// .cache, never the app's.
 //   node hmr.mjs [app...]
 import {
 	cpSync,
@@ -39,6 +41,13 @@ const { createServer } = await import(
 const EDITS = 20;
 const SHOWN = 500;
 const SAVE_INTERVAL_MS = 500;
+/**
+ * What grai's dev page may keep once collected, over the same page with no messages: bytes per
+ * message, a key in one locale, at load, and bytes per edit after the edits. Its table holds every
+ * locale of every key, and each call goes through a function a patch reaches: 351–361 B a message
+ * on catalogs of 6,366 to 13,326 keys in three locales, and 5.2–5.8 KB more an edit.
+ */
+const HEAP_BUDGET = { message: 400, edit: 8 * 1024 };
 
 /** The dev module: every key a row of per-locale functions, read through the current locale. */
 function devModule(locales, catalogs, patchable) {
@@ -208,6 +217,8 @@ render();`;
 	const accept = (specifier, update) =>
 		`if (import.meta.hot) import.meta.hot.accept(${JSON.stringify(specifier)}, (next) => { ${update}; render(); });`;
 	const pages = {
+		// Vite's client and the page alone, which draws the keys' names.
+		"no messages": render((key) => key),
 		// grai's plugin dispatches grai:change on window after an edit; the page draws again and
 		// cancels it, as a framework's adapter does, or the page would reload.
 		"grai's plugin": `import { m } from "./out/messages.js";
@@ -307,6 +318,7 @@ function pluginsFor(design, app, root, locale, timings) {
 			timingPlugin(catalogFile, timings),
 		];
 	}
+	if (design === "no messages") return [];
 	if (design === "i18next" || design === "use-intl")
 		return [timingPlugin(catalogFile, timings)];
 	if (design === "grai's plugin")
@@ -341,6 +353,13 @@ async function measure(browser, app, design) {
 	await page.goto(server.resolvedUrls.local[0]);
 	await page.waitForFunction(() => window.ready);
 	const load = performance.now() - loadStart;
+	// What the page keeps, its messages among it: V8's heap once a full collection has run.
+	const cdp = await page.context().newCDPSession(page);
+	const retained = async () => {
+		await cdp.send("HeapProfiler.collectGarbage");
+		return (await cdp.send("Runtime.getHeapUsage")).usedSize;
+	};
+	const heap = { load: await retained() };
 
 	const catalogFile = join(root, "messages", `${locale}.json`);
 	const catalogBytes = readFileSync(catalogFile).length;
@@ -366,7 +385,8 @@ async function measure(browser, app, design) {
 	// a patch came in, it could keep the words it was loaded with and miss the patch.
 	if (design === "grai's plugin") await rendered(original);
 	const latencies = [];
-	for (let edit = 0; edit < EDITS + 3; edit++) {
+	const edits = design === "no messages" ? 0 : EDITS + 3;
+	for (let edit = 0; edit < edits; edit++) {
 		// Saves come seconds apart; back-to-back writes would measure the file watcher's coalescing.
 		await new Promise((resolve) => setTimeout(resolve, SAVE_INTERVAL_MS));
 		catalog[key] = `Edit ${edit}: ${original}`;
@@ -392,18 +412,26 @@ async function measure(browser, app, design) {
 				browser: reached && changed.at - reached.answered,
 			});
 	}
+	heap.edits = await retained();
 	await page.close();
 	await server.close();
 	rmSync(root, { recursive: true, force: true });
 	const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-	const served = timings.generate
-		? `${megabytes(timings.generate.bytes)}, ${timings.generate.ms.toFixed(0)} ms`
-		: `${megabytes(catalogBytes)} catalog`;
+	const served =
+		design === "no messages"
+			? "—"
+			: timings.generate
+				? `${megabytes(timings.generate.bytes)}, ${timings.generate.ms.toFixed(0)} ms`
+				: `${megabytes(catalogBytes)} catalog`;
 	const cell = (field) =>
 		latencies[0]?.[field] === undefined
 			? "—"
 			: median(latencies.map((latency) => latency[field])).toFixed(1);
-	return `| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("server")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`;
+	return {
+		design,
+		heap,
+		row: `| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("server")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} | ${megabytes(heap.load)} | ${megabytes(heap.edits)} |`,
+	};
 }
 
 const browser = await chromium.launch();
@@ -416,17 +444,32 @@ for (const app of selectedApps()) {
 		"paraglide",
 		"i18next",
 		"use-intl",
+		"no messages",
 	];
 	// Paraglide's plugin logs each compile, so the table is printed once every design has run.
-	const rows = [];
-	for (const design of designs) rows.push(await measure(browser, app, design));
+	const results = [];
+	for (const design of designs)
+		results.push(await measure(browser, app, design));
 	console.log(
-		`\n### ${app.name}: one message edited until the page shows it, Vite dev, Chromium ${browser.version()}, median of ${EDITS} edits, ms\n`,
+		`\n### ${app.name}: one message edited until the page shows it, Vite dev, Chromium ${browser.version()}, median of ${EDITS} edits, ms; the page's heap once collected\n`,
 	);
 	console.log(
-		"| design | dev module, generated in | page load | edit to page | edit to server render | watcher | plugin | browser |",
+		"| design | dev module, generated in | page load | edit to page | edit to server render | watcher | plugin | browser | heap at load | heap after the edits |",
 	);
-	console.log("|---|---|---|---|---|---|---|---|");
-	for (const row of rows) console.log(row);
+	console.log("|---|---|---|---|---|---|---|---|---|---|");
+	for (const { row } of results) console.log(row);
+	const heapOf = (design) =>
+		results.find((result) => result.design === design).heap;
+	const grai = heapOf("grai's plugin");
+	const none = heapOf("no messages");
+	const messages =
+		app.locales.length * Object.keys(app.messages[app.baseLocale]).length;
+	const perMessage = (grai.load - none.load) / messages;
+	const perEdit = (grai.edits - grai.load) / (EDITS + 3);
+	const over = perMessage > HEAP_BUDGET.message || perEdit > HEAP_BUDGET.edit;
+	console.log(
+		`\ngrai's plugin keeps ${perMessage.toFixed(0)} B a message over the page with no messages (budget ${HEAP_BUDGET.message} B), and ${(perEdit / 1024).toFixed(1)} KB more an edit (budget ${HEAP_BUDGET.edit / 1024} KB)${over ? ": over budget" : ""}`,
+	);
+	if (over) process.exitCode = 1;
 }
 await browser.close();
