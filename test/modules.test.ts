@@ -312,19 +312,16 @@ describe("reading a project's facts", () => {
 	});
 
 	it("sizes the pool by the work left: no worker for a little, one for each worker's cost of it, at most the parallelism less one", () => {
-		// The reading has taken a worker's start, a millisecond for each file read.
-		const after = workerStart + 1;
-		const workers = (left: number, parallelism = 8) =>
-			workersFor(workerStart, after, after, left, parallelism);
+		// The reading has taken a worker's start; the rest would take this thread `rest` ms.
+		const workers = (rest: number, parallelism = 8) =>
+			workersFor(workerStart, workerStart + 1, rest, parallelism);
 
 		expect(
-			[1_000, 1_999, 2_000, 4_000, 100_000].map((left) => workers(left)),
+			[1_000, 1_999, 2_000, 4_000, 100_000].map((rest) => workers(rest)),
 		).toEqual([0, 0, 2, 4, 7]);
 		expect(workers(100_000, 2)).toBe(0);
 		// Before a worker's start has passed, the reading goes on here whatever is left.
-		expect(workersFor(workerStart, workerStart, workerStart, 100_000, 8)).toBe(
-			0,
-		);
+		expect(workersFor(workerStart, workerStart, 100_000, 8)).toBe(0);
 	});
 
 	it("reads files in workers into the same facts as on one thread, each in its place", async () => {

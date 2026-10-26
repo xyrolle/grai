@@ -73,21 +73,32 @@ export class Pool {
 		const serving = this.workers.map(serve);
 		const total = tasks.reduce((sum, task) => sum + work.size(task), 0);
 		const begun = performance.now();
-		let done = 0;
+		let left = total;
+		// This thread's pace, in ms a unit of work: its fastest task's, as its first ones load the code
+		// and warm it up, all but the first, which takes the loading alone.
+		let pace: number | undefined;
+		let first = true;
 		for (
 			let taken = here ? take() : undefined;
 			taken !== undefined;
 			taken = answered ? undefined : take()
 		) {
+			const started = performance.now();
 			answers[taken.at] = await work.here(taken.task);
-			done += work.size(taken.task);
-			const wanted = workersFor(
-				work.start,
-				performance.now() - begun,
-				done,
-				total - done,
-				availableParallelism(),
-			);
+			const size = work.size(taken.task);
+			left -= size;
+			const latest = (performance.now() - started) / size;
+			if (!first) pace = Math.min(pace ?? latest, latest);
+			first = false;
+			const wanted =
+				pace === undefined
+					? 0
+					: workersFor(
+							work.start,
+							performance.now() - begun,
+							pace * left,
+							availableParallelism(),
+						);
 			while (this.workers.length < wanted) serving.push(serve(this.started()));
 			// A worker's answer comes in as an event, which this thread takes only between its tasks.
 			await new Promise((resolve) => setImmediate(resolve));
@@ -121,19 +132,17 @@ export class Pool {
 const workerCost = 4;
 
 /**
- * How many workers the rest of a run takes, from how long the work done so far took: none until it
- * has taken a worker's start, then one for each worker's cost the rest would take, at most the
+ * How many workers the rest of a run takes, from how long it would take this thread: none until the
+ * run has taken a worker's start, then one for each worker's cost of the rest, at most the
  * parallelism less one, and none rather than one, which would only add its start.
  */
 export function workersFor(
 	start: number,
 	elapsed: number,
-	done: number,
-	left: number,
+	rest: number,
 	parallelism: number,
 ): number {
 	if (elapsed <= start) return 0;
-	const rest = (elapsed / done) * left;
 	const workers = Math.min(
 		parallelism - 1,
 		Math.floor(rest / (workerCost * start)),
