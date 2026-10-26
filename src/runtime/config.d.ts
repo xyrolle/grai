@@ -58,3 +58,7 @@ export declare const pathnames: readonly {
 export declare const servedUnderBase: boolean;
 /** The path the app is served under, such as `/shop`, or `""` for none. */
 export declare const basePath: string;
+/** Whether the config gives each locale a host of its own: `domains`. */
+export declare const hostsLocales: boolean;
+/** Each locale's host, in `locales` order, or none. */
+export declare const domains: readonly string[];

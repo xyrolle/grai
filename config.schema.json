@@ -138,6 +138,20 @@
 			"pattern": "^(?:/[^/?#\\s]+)+$",
 			"examples": ["/shop"]
 		},
+		"domains": {
+			"description": "With the \"url\" strategy: every locale's own host, each its own, such as { \"en\": \"example.com\", \"de\": \"example.de\" }. There a request's host names its locale, paths have no prefix, and a link to another locale is a whole URL. On any other host, such as localhost in development, the prefix names the locale.",
+			"type": "object",
+			"additionalProperties": {
+				"type": "string",
+				"pattern": "^[a-z\\d-]+(?:\\.[a-z\\d-]+)*(?::\\d{1,5})?$"
+			},
+			"examples": [
+				{
+					"en": "example.com",
+					"de": "example.de"
+				}
+			]
+		},
 		"tests": {
 			"description": "Globs, of *, **, ? and {a,b}, of the source files that are tests, by path from the root, which grai check does not count as using a key. [] makes no file a test.",
 			"type": "array",
