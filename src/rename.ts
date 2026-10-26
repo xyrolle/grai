@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import type { Catalog } from "./catalog.ts";
+import { type Catalog, fileOfKey, pathsInFile } from "./catalog.ts";
 import { type MessageEntry, messageEntries } from "./catalog-entries.ts";
-import { keyOf, placedPath } from "./catalog-keys.ts";
+import { type KeyPath, keyOf, placedPath } from "./catalog-keys.ts";
 import { layoutOf, tabbedLayout } from "./catalog-layout.ts";
 import { withKeyRenamed, withMessages, withoutKeys } from "./catalog-text.ts";
 import { readProjectCode } from "./code/project.ts";
@@ -42,11 +42,14 @@ export async function rename(
 ): Promise<RenameResult> {
 	const read = await readProject(configFile);
 	if ("errors" in read) return unchanged(read.errors);
-	const { catalogs, errors } = parseCatalogs(read.sources);
+	const { parts, catalogs, errors } = parseCatalogs(read.sources);
 	if (errors.length > 0) return unchanged(errors);
 	const { config } = read;
 	const base = catalogs.find(({ locale }) => locale === config.baseLocale);
-	const where = { file: base?.file ?? "", key: from };
+	const where = {
+		file: base === undefined ? "" : fileOfKey(base, from),
+		key: from,
+	};
 	const named = nameProblems(from, to, catalogs, where);
 	if (named.length > 0) return unchanged(named);
 	const compiled = await compileOutputIfMissing(configFile, config);
@@ -62,12 +65,18 @@ export async function rename(
 	const { files, problems } = await codeEdits(reading, from, to);
 	if (problems.length > 0) return unchanged(sortErrors(problems));
 	const texts = new Map<string, string>();
-	for (const [index, { file, bytes }] of read.sources.entries()) {
+	for (const [index, { file, files, bytes }] of read.sources.entries()) {
 		const text = bytes.toString("utf8");
 		const entry = messageEntries(text).find(({ path }) => keyOf(path) === from);
-		const value = catalogs[index]?.messages.get(from);
+		const value = parts[index]?.messages.get(from);
 		if (entry === undefined) continue;
-		texts.set(join(config.root, file), renamedIn(text, entry, value, to, base));
+		// A key that moves goes where `grai add` puts it in this file, among the base's keys in its file.
+		const siblings =
+			base === undefined ? [] : pathsInFile(base, files.indexOf(file));
+		texts.set(
+			join(config.root, file),
+			renamedIn(text, entry, value, to, siblings),
+		);
 	}
 	for (const [path, { text, edits }] of files) {
 		texts.set(path, edited(text, edits, to));
@@ -95,7 +104,7 @@ function renamedIn(
 	entry: MessageEntry,
 	value: unknown,
 	to: string,
-	base: Catalog | undefined,
+	siblings: Iterable<KeyPath>,
 ): string {
 	const object = entry.path.slice(0, -1);
 	const prefix = object.length === 0 ? "" : `${keyOf(object)}_`;
@@ -103,7 +112,7 @@ function renamedIn(
 		return withKeyRenamed(text, entry, to.slice(prefix.length));
 	}
 	const without = withoutKeys(text, new Set([keyOf(entry.path)]));
-	const placed = placedPath(to, base?.paths.values() ?? []);
+	const placed = placedPath(to, siblings);
 	return withMessages(
 		without,
 		[[placed, value]],

@@ -15,9 +15,11 @@ import { isAlive } from "./output-lock.ts";
  * A build as saved: every field of it but its key, which heads the file, and of each catalog every
  * field but its revision and edit. A revision is a symbol of the process that parsed the catalog,
  * so the build taken up gives each catalog a new one, and the edit it came from is the past's. No
- * field is listed, so one a build gains is saved with the rest.
+ * field is listed, so one a build gains is saved with the rest. A catalog is saved once however
+ * many lists hold it, a file's that is its locale's too, so it is one catalog again when taken up.
  */
-type Saved = Omit<Build, "key" | "catalogs" | "compilation"> & {
+type Saved = Omit<Build, "key" | "parts" | "catalogs" | "compilation"> & {
+	parts: readonly SavedCatalog[];
 	catalogs: readonly SavedCatalog[];
 	compilation: Omit<Compilation, "catalogs"> & {
 		catalogs: readonly SavedCatalog[];
@@ -105,12 +107,18 @@ function savedFile(build: Build): {
 	file: string;
 	bytes: Buffer;
 } {
-	const { key, catalogs: parsed, compilation, ...rest } = build;
-	const catalogs = parsed.map(withoutRevision);
+	const { key, parts, catalogs, compilation, ...rest } = build;
+	const savedOf = new Map<Catalog, SavedCatalog>();
+	const save = (catalog: Catalog) => {
+		const saved = savedOf.get(catalog) ?? withoutRevision(catalog);
+		savedOf.set(catalog, saved);
+		return saved;
+	};
 	const saved: Saved = {
 		...rest,
-		catalogs,
-		compilation: { ...compilation, catalogs },
+		parts: parts.map(save),
+		catalogs: catalogs.map(save),
+		compilation: { ...compilation, catalogs: compilation.catalogs.map(save) },
 	};
 	const state = join(build.config.outdir, stateDirectory);
 	const payload = serialize(saved);
@@ -144,13 +152,23 @@ export async function savedBuild(
 		key,
 	);
 	if (saved === undefined) return undefined;
-	const catalogs = saved.catalogs.map(
-		(catalog): Catalog => ({ ...catalog, revision: Symbol(catalog.locale) }),
-	);
+	const takenUp = new Map<SavedCatalog, Catalog>();
+	const takeUp = (catalog: SavedCatalog) => {
+		const parsed = takenUp.get(catalog) ?? {
+			...catalog,
+			revision: Symbol(catalog.locale),
+		};
+		takenUp.set(catalog, parsed);
+		return parsed;
+	};
 	return {
 		...saved,
-		catalogs,
-		compilation: { ...saved.compilation, catalogs },
+		parts: saved.parts.map(takeUp),
+		catalogs: saved.catalogs.map(takeUp),
+		compilation: {
+			...saved.compilation,
+			catalogs: saved.compilation.catalogs.map(takeUp),
+		},
 		key,
 	};
 }

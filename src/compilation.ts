@@ -1,4 +1,4 @@
-import type { Catalog } from "./catalog.ts";
+import { type Catalog, fileOfKey } from "./catalog.ts";
 import type { Config } from "./config.ts";
 import { lineCount } from "./declaration-maps.ts";
 import { keyDeclaration } from "./declarations.ts";
@@ -257,12 +257,14 @@ function parseMessages(
 	errors: GraiError[],
 ): LocaleMessage[] | undefined {
 	const messages: LocaleMessage[] = [];
-	catalogs.forEach(({ file, locale }, index) => {
+	catalogs.forEach((catalog, index) => {
+		const { locale } = catalog;
 		try {
 			messages.push(parseMessage(locale, values[index]));
 		} catch (error) {
 			if (!(error instanceof MessageProblem)) throw error;
-			const where = { file: sources[index]?.file ?? file, key, locale };
+			const file = fileOfKey(sources[index] ?? catalog, key);
+			const where = { file, key, locale };
 			errors.push(new GraiError(error.code, where, error.message));
 		}
 	});

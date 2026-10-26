@@ -234,7 +234,7 @@ export function followedFile(
 	build: Build | undefined,
 	file: string,
 ): boolean {
-	const catalogs = [...(build?.config.catalogs.values() ?? [])];
+	const catalogs = [...(build?.config.catalogs.values() ?? [])].flat();
 	return (
 		file === files.configFile ||
 		file.startsWith(`${files.outdir}/`) ||
