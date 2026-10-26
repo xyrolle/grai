@@ -9,7 +9,7 @@ import { compile } from "./compile.ts";
 import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
-import { grai as graiVite } from "./vite.ts";
+import { graiPlugin } from "./vite-plugin.ts";
 
 /** The integration's options. `config` is the path of the project's grai.config.json, from Astro's root. */
 export type GraiAstroOptions = { config?: string };
@@ -52,11 +52,12 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 				updateConfig({
 					vite: {
 						plugins: [
-							graiVite({
+							// Astro's own base is checked against grai's beside its i18n routing (`agreement.ts`).
+							...graiPlugin({
 								config: configFile,
 								reloadOnEdit: true,
 								localeChunks: true,
-							}),
+							}).plugins,
 							middlewareModule(() => middleware),
 						],
 					},
@@ -90,16 +91,20 @@ function middlewareCode(
 	grai: Config,
 	project: Omit<
 		LocaleProject,
-		"middleware" | "getTextDirection" | "localeOfPath"
+		| "middleware"
+		| "getTextDirection"
+		| "localeOfPath"
+		| "routeOfPath"
+		| "pathOfRoute"
 	>,
 ): string {
 	const output = (file: string) => JSON.stringify(join(grai.outdir, file));
 	return `import { localeMiddleware } from "grai/astro/middleware";
 import { middleware } from ${output("server.js")};
 import { getTextDirection } from ${output("runtime.js")};
-import { localeOfPath } from ${output("internal.js")};
+import { localeOfPath, pathOfRoute, routeOfPath } from ${output("internal.js")};
 
-export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, ...${JSON.stringify(project)} });
+export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, routeOfPath, pathOfRoute, ...${JSON.stringify(project)} });
 `;
 }
 

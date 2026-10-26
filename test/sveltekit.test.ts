@@ -117,6 +117,13 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		await page.context().close();
 	});
 
+	it("renders a page at its path in the locale's words, routed by reroute as the route", async () => {
+		const page = await open(origin, "/ro/despre");
+		expect(await html(page, "lang")).toBe("ro");
+		expect(await page.locator("h1").textContent()).toBe("Despre acest exemplu");
+		await page.context().close();
+	});
+
 	it("renders the base locale without a prefix", async () => {
 		const page = await open(origin, "/about");
 		expect(await html(page, "lang")).toBe("en");
@@ -137,7 +144,7 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		expect(await page.locator("h1").textContent()).toBe("Bună ziua");
 		expect(
 			await page.getByRole("link", { name: "Despre" }).getAttribute("href"),
-		).toBe("/ro/about");
+		).toBe("/ro/despre");
 		await page.context().close();
 	});
 
@@ -236,6 +243,29 @@ describe("handleLocale, in a build without the locale copies", {
 				(path) => !path.startsWith("/_app/immutable/chunks/grai/"),
 			),
 		).toEqual([]);
+		await page.context().close();
+	});
+});
+
+describe("handleLocale, under a base path", { timeout: 30_000 }, () => {
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
+		// The same app under /shop: Kit's paths.base, and grai.base.json's basePath.
+		app = await served("base");
+		origin = app.origin;
+	}, 60_000);
+	afterAll(() => app && stopped(app.server));
+
+	it("renders a page in the locale named after the base path, its links under the base path too", async () => {
+		const page = await open(origin, "/shop/ro");
+		expect(await html(page, "lang")).toBe("ro");
+		expect(
+			await page.getByRole("link", { name: "Despre" }).getAttribute("href"),
+		).toBe("/shop/ro/despre");
+
+		await page.getByRole("link", { name: "Despre" }).click();
+		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
 		await page.context().close();
 	});
 });
