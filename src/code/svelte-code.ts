@@ -97,10 +97,11 @@ class Template {
 	private each(node: AST.EachBlock): void {
 		this.expression(node.expression);
 		this.writer.write("((");
-		if (node.context !== null) this.pattern(node.context);
-		if (node.index !== undefined) {
-			this.writer.write(`${node.context === null ? "_" : ","} ${node.index}`);
-		}
+		// A block that names no item, `{#each list, index}`, binds its index alone: an empty pattern
+		// holds the item's place and declares nothing.
+		if (node.context === null) this.writer.write("[]");
+		else this.pattern(node.context);
+		if (node.index !== undefined) this.writer.write(`, ${node.index}`);
 		this.writer.write("\n) => {\n");
 		if (node.key !== undefined) this.expression(node.key);
 		this.fragment(node.body);
