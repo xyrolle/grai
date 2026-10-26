@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
@@ -11,8 +12,8 @@ import { stopped } from "./stopped.ts";
 const example = fileURLToPath(new URL("../examples/astro/", import.meta.url));
 const astro = join(example, "node_modules/.bin/astro");
 
-/** Runs `astro build`, failing with what it printed. */
-function built(args: string[]): void {
+/** Runs `astro build`, failing with what it printed, else giving it. */
+function built(args: string[]): string {
 	const { status, stdout, stderr } = spawnSync(astro, ["build", ...args], {
 		cwd: example,
 		encoding: "utf8",
@@ -22,20 +23,24 @@ function built(args: string[]): void {
 			`astro build ${args.join(" ")} failed:\n${stdout}${stderr}`,
 		);
 	}
+	return `${stdout}${stderr}`;
 }
 
 /**
  * Builds the example as `astro build` does, and gives the paths of the pages Astro tells its
- * integrations it built, as a sitemap reads them.
+ * integrations it built, as a sitemap reads them, and what the build printed.
  */
-function builtPages(): string[] {
+function builtPages(): { pages: string[]; printed: string } {
 	const { status, stdout, stderr } = spawnSync(
 		process.execPath,
 		[fileURLToPath(new URL("astro-build-pages.js", import.meta.url))],
 		{ cwd: example, encoding: "utf8" },
 	);
 	if (status !== 0) throw new Error(`the build failed:\n${stdout}${stderr}`);
-	return JSON.parse(stdout.trim().split("\n").at(-1) ?? "[]");
+	return {
+		pages: JSON.parse(stdout.trim().split("\n").at(-1) ?? "[]"),
+		printed: `${stdout}${stderr}`,
+	};
 }
 
 /**
@@ -182,8 +187,9 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 	const site = { origin: "" };
 	let served: Served | undefined;
 	let pages: string[] = [];
+	let printed = "";
 	beforeAll(async () => {
-		pages = builtPages();
+		({ pages, printed } = builtPages());
 		// --ignore-lock: a one-off server in the foreground, which the suite stops. Astro starts its
 		// preview server in the background, out of the suite's reach, when an agent runs the suite.
 		served = await listening(astro, [
@@ -246,6 +252,11 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 		);
 	});
 
+	it("reads no CSP in a site without one, which Astro would warn of on every page", () => {
+		expect(printed).toContain("page(s) built");
+		expect(printed).not.toContain("CSP was not configured");
+	});
+
 	it("type-checks with astro check, the types grai compiled for it included", () => {
 		const { status, stdout, stderr } = spawnSync(astro, ["check"], {
 			cwd: example,
@@ -254,6 +265,31 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 
 		expect(status, `${stdout}${stderr}`).toBe(0);
 	}, 60_000);
+});
+
+describe("the Astro example, prerendered under a CSP", {
+	timeout: 30_000,
+}, () => {
+	beforeAll(() => {
+		built(["--config", "astro.csp.config.ts"]);
+	}, 120_000);
+
+	it("lets each page's import map through its CSP by the map's hash", () => {
+		for (const page of ["index.html", "ro/index.html", "ar/about/index.html"]) {
+			const html = readFileSync(join(example, "dist-csp", page), "utf8");
+			const map = /<script type="importmap">(.*?)<\/script>/.exec(html)?.[1];
+			const policy =
+				/<meta http-equiv="content-security-policy" content="([^"]*)"/.exec(
+					html,
+				)?.[1];
+			const hash = createHash("sha256")
+				.update(map ?? "")
+				.digest("base64");
+
+			expect(map, page).toBeDefined();
+			expect(policy, page).toContain(`'sha256-${hash}'`);
+		}
+	});
 });
 
 describe("the Astro example, under a base path", { timeout: 30_000 }, () => {

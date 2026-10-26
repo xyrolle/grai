@@ -3,3 +3,4 @@ dist-server
 dist-base
 .astro
 src/lib/i18n
+dist-csp

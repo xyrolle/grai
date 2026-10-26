@@ -165,7 +165,6 @@ it("exports from grai/astro, grai/astro/middleware and grai/astro/translated-pat
 		"localeMiddleware",
 	]);
 	expect(await importableNames(dir, "grai/astro/middleware")).toEqual([
-		"ImportMap",
 		"LocaleContext",
 		"LocaleProject",
 		"localeMiddleware",
