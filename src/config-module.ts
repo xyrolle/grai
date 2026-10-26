@@ -1,6 +1,7 @@
 import type { Config } from "./config.ts";
 import { cookieAttributes } from "./cookie.ts";
 import { globPattern } from "./globs.ts";
+import { pathnamesTable } from "./pathnames.ts";
 
 /** config.js: the project's config, as the runtime reads it, and whether its build has copies. */
 export function configModule(config: Config, localeCopies: boolean): string {
@@ -9,7 +10,7 @@ export function configModule(config: Config, localeCopies: boolean): string {
 		`export const baseLocale = ${JSON.stringify(config.baseLocale)};`,
 		`/** @type {readonly ("ltr" | "rtl")[]} */`,
 		`export const directions = ${JSON.stringify(config.locales.map(directionOf))};`,
-		`/** @type {readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[]} */`,
+		`/** @type {readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | \`custom-\${string}\`)[]} */`,
 		`export const strategy = ${JSON.stringify(config.strategy)};`,
 		"/** @type {string | undefined} */",
 		`export const cookieName = ${config.cookie === undefined ? "undefined" : JSON.stringify(config.cookie.name)};`,
@@ -25,6 +26,10 @@ export function configModule(config: Config, localeCopies: boolean): string {
 		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,
 		"/** @type {readonly RegExp[]} */",
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
+		...pathnamesTable(config.urlRouting.pathnames),
+		`export const basePath = ${JSON.stringify(config.urlRouting.basePath)};`,
+		"/** @type {readonly string[]} */",
+		`export const domains = ${JSON.stringify(config.urlRouting.domains)};`,
 		"/** @type {boolean} */",
 		`export const localeCopies = ${localeCopies};`,
 		"",
@@ -56,18 +61,30 @@ export function directionOf(locale: string): "ltr" | "rtl" {
  * bundler folds, so a page carries the code of only what its config uses.
  */
 function strategyConstants(config: Config): string[] {
-	const { localePrefix, prefixes, unlocalizedPaths } = config.urlRouting;
+	const {
+		localePrefix,
+		prefixes,
+		unlocalizedPaths,
+		pathnames,
+		basePath,
+		domains,
+	} = config.urlRouting;
 	const constants = {
 		readsUrl: config.strategy.includes("url"),
-		// Every place but the browser's languages keeps a visitor's choice.
+		// Every place but the browser's languages and the server's own keeps a visitor's choice: a
+		// page cannot write what the server's own strategy reads.
 		keepsChoice: config.strategy.some(
-			(source) => source !== "preferredLanguage",
+			(source) =>
+				source !== "preferredLanguage" && !source.startsWith("custom-"),
 		),
 		prefixesEveryLocale: localePrefix === "always",
 		customPrefixes: prefixes.some(
 			(prefix, index) => prefix !== config.locales[index],
 		),
 		leavesPathsAlone: unlocalizedPaths.length > 0,
+		translatesPaths: pathnames.length > 0,
+		servedUnderBase: basePath !== "",
+		hostsLocales: domains.length > 0,
 	};
 	return Object.entries(constants).map(
 		([name, value]) => `export const ${name} = ${value};`,
