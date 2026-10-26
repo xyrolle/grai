@@ -13,13 +13,13 @@ import { requestLocaleKey } from "./request-locale.ts";
  * on the request's event for Nuxt's render, and adds the request headers the strategy read to the
  * response's `Vary`, so a shared cache keeps a page per locale.
  */
-const handler: EventHandler<Response | undefined> = defineEventHandler(
-	(event) => {
-		const redirect = redirectOf(event.req);
+const handler: EventHandler<Promise<Response | undefined>> = defineEventHandler(
+	async (event) => {
+		const redirect = await redirectOf(event.req);
 		if (redirect !== undefined) return redirect;
 		// Where a locale has a host of its own, the origin goes with the locale, so that a link to
 		// another locale's host is a whole URL.
-		const index = locales.indexOf(localeOf(event.req));
+		const index = locales.indexOf(await localeOf(event.req));
 		const kept: RequestLocale = hostsLocales
 			? { index, origin: new URL(event.req.url).origin }
 			: { index };
