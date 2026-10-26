@@ -1,11 +1,13 @@
 // The refactoring commands on a whole app: check, find, rename and check --fix, each in a new
 // Node process, timed once grai's modules have loaded. They run on a copy in the system's
-// temporary directory, removed after: app A's or B's src/ and catalogs, from the checkouts that
-// GRAI_BENCH_A and GRAI_BENCH_B name, or a synthetic project of app B's size (13,000 keys in three
-// locales, 9,000 source files, 68 MB) that anyone can run. find and rename take the key the most
-// files name; check --fix removes 50 unused keys added to each catalog, then checks, as the
-// command does: it runs the command itself, its output kept from the terminal. Medians of three
-// runs.
+// temporary directory, removed after: app A's or B's src/, catalogs and the files its imports
+// resolve by (package.json and tsconfig), from the checkouts that GRAI_BENCH_A and GRAI_BENCH_B
+// name, or a synthetic project of app B's size (13,000 keys in three locales, 9,000 source files,
+// 68 MB) that anyone can run. The output is compiled first, as a project's is, since the commands
+// follow imports to it. find and rename take the key the most files name; check --fix removes 50
+// unused keys added to each catalog, then checks, as the command does: it runs the command itself,
+// its output kept from the terminal. Each command is timed cold, without the facts kept on disk,
+// and warm, with them: medians of three runs.
 //   node refactor.mjs [app...]
 import { execFileSync } from "node:child_process";
 import {
@@ -25,6 +27,7 @@ const RUNS = 3;
 const UNUSED = 50;
 const self = new URL(import.meta.url).pathname;
 const commands = {
+	compile: ["compile.ts", "compile"],
 	check: ["check.ts", "check"],
 	find: ["find.ts", "find"],
 	rename: ["rename.ts", "rename"],
@@ -48,6 +51,10 @@ async function child(command, config, ...args) {
 	}
 	const result = await exported(config, ...args);
 	const ms = performance.now() - start;
+	if (command === "compile") {
+		if (result.errors.length > 0) throw result.errors[0];
+		return;
+	}
 	const errors = Array.isArray(result) ? result : result.errors;
 	// rename refuses a key a read by a computed name may reach, and that is its answer, not a failure.
 	if (command === "rename" && errors.length > 0) {
@@ -80,7 +87,11 @@ function median(setup, args, after = () => {}) {
 	return `${ms[Math.floor(RUNS / 2)]?.toFixed(0)} ms`;
 }
 
-/** A copy of an app's sources and catalogs, with a grai config, from its checkout or made up. */
+/**
+ * A copy of an app's sources and catalogs, and what its imports resolve by, from its checkout or
+ * made up. A Paraglide app imports its messages from its Paraglide output's path, so grai's output
+ * goes there, and a key's path maps to its keys.js.
+ */
 function copyOf(app, dir) {
 	if (app === "synthetic") return writeSynthetic(dir);
 	const root = process.env[`GRAI_BENCH_${app.toUpperCase()}`];
@@ -95,12 +106,32 @@ function copyOf(app, dir) {
 	);
 	const filter = (path) => !path.includes("/paraglide");
 	cpSync(join(root, "src"), join(dir, "src"), { recursive: true, filter });
+	for (const file of ["tsconfig.json", ".svelte-kit/tsconfig.json"]) {
+		try {
+			mkdirSync(dirname(join(dir, file)), { recursive: true });
+			cpSync(join(root, file), join(dir, file));
+		} catch {
+			// The app has no such file.
+		}
+	}
+	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+	writeFileSync(
+		join(dir, "package.json"),
+		JSON.stringify({
+			name: "bench",
+			type: "module",
+			imports: {
+				"#lib/paraglide/messages/*": "./src/lib/paraglide/keys.js",
+				...manifest.imports,
+			},
+		}),
+	);
 	for (const locale of settings.locales) {
 		const catalog = catalogs.replace("{locale}", locale);
 		mkdirSync(dirname(join(dir, catalog)), { recursive: true });
 		cpSync(join(root, catalog), join(dir, catalog));
 	}
-	return { locales: settings.locales, catalogs };
+	return { locales: settings.locales, catalogs, outdir: "src/lib/paraglide" };
 }
 
 /** App B's size: per-key imports and namespace reads of 13,000 keys in 9,000 files. */
@@ -111,6 +142,22 @@ function writeSynthetic(dir) {
 		(_, n) => `area${n % 97}_label_${n}`,
 	);
 	mkdirSync(join(dir, "messages"));
+	mkdirSync(join(dir, "src/lib"), { recursive: true });
+	writeFileSync(
+		join(dir, "package.json"),
+		JSON.stringify({
+			name: "bench",
+			type: "module",
+			imports: {
+				"#lib/*": "./src/lib/*.ts",
+				"#i18n/messages/*": "./src/lib/grai/keys.js",
+			},
+		}),
+	);
+	writeFileSync(
+		join(dir, "src/lib/i18n.ts"),
+		'export { m } from "./grai/messages.js";\n',
+	);
 	for (const locale of locales) {
 		const catalog = Object.fromEntries(
 			keys.map((key) => [key, `${locale} ${key}`]),
@@ -133,7 +180,11 @@ function writeSynthetic(dir) {
 			`<script lang="ts">\n\timport { m } from "#lib/i18n";\n\timport { ${a} } from "#i18n/messages/${a}.js";\n${code.repeat(110)}</script>\n\n<h1>{${a}()}</h1>\n<p>{m.${b}()} {m.${c}()} {m["${d}"]()}</p>\n`,
 		);
 	}
-	return { locales, catalogs: "messages/{locale}.json" };
+	return {
+		locales,
+		catalogs: "messages/{locale}.json",
+		outdir: "src/lib/grai",
+	};
 }
 
 /** The key the most source files name. */
@@ -189,17 +240,15 @@ if (process.argv[2] === "--child") {
 		: ["synthetic"]) {
 		const dir = mkdtempSync(join(tmpdir(), `grai-refactor-${app}-`));
 		try {
-			const { locales, catalogs } = copyOf(app, dir);
+			const { locales, catalogs, outdir } = copyOf(app, dir);
 			const config = join(dir, "grai.config.json");
 			writeFileSync(
 				config,
-				JSON.stringify({
-					locales,
-					baseLocale: locales[0],
-					catalogs,
-					outdir: "src/lib/grai",
-				}),
+				JSON.stringify({ locales, baseLocale: locales[0], catalogs, outdir }),
 			);
+			execFileSync(process.execPath, [self, "--child", "compile", config]);
+			const facts = join(dir, outdir, ".grai", "facts");
+			const cold = () => rmSync(facts, { force: true });
 			const key = busiestKey(
 				dir,
 				join(dir, catalogs.replace("{locale}", locales[0])),
@@ -208,11 +257,22 @@ if (process.argv[2] === "--child") {
 			// The runs rename the key and back, so each renames the same call sites.
 			const names = (run) =>
 				run % 2 === 0 ? [key, `${key}_x`] : [`${key}_x`, key];
+			const timed = (setup, args, after) => {
+				const coldly = median(
+					(run) => {
+						cold();
+						setup(run);
+					},
+					args,
+					after,
+				);
+				return `${coldly} (warm ${median(setup, args, after)})`;
+			};
 			const ms = {
-				check: median(none, () => ["check", config]),
-				find: median(none, () => ["find", config, key]),
-				rename: median(none, (run) => ["rename", config, ...names(run)]),
-				"check --fix": median(
+				check: timed(none, () => ["check", config]),
+				find: timed(none, () => ["find", config, key]),
+				rename: timed(none, (run) => ["rename", config, ...names(run)]),
+				"check --fix": timed(
 					() => addUnusedKeys(dir, catalogs, locales),
 					() => ["fix", config],
 					() => removedUnusedKeys(dir, catalogs, locales),
