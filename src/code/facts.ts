@@ -41,31 +41,38 @@ export type ExportFact =
 /**
  * A use of a value a module imports or loads: the import's local name, or the load's index; the
  * static names read from it in turn (`m.title` reads `title`, `i18n.m.title` reads `m` then
- * `title`); and what then happens to what they read.
+ * `title`), each where its name is and where the expression that reads it is; and what then
+ * happens to what they read.
  */
 export type UseFact = {
 	from: { local: string } | { load: number };
 	at: Span;
 	type: boolean;
-	chain: { name: string; at: Span }[];
+	chain: { name: string; at: Span; expression: Span }[];
 	end: UseEnd;
 };
 
 /**
  * What a use ends in:
  * - `value`, a use of what it read as a value: called, passed, returned or shown;
- * - `computed`, a read by a name the code computes, which may be any of the names that start with
- *   `prefix`, or one of `choices` when it is a choice between literals;
- * - `pattern`, names taken apart from it (`const { a, "b": c } = m`), each with what it binds;
+ * - `computed`, a read by a name the code computes (the expression at `at`), which may be any of
+ *   the names that start with `prefix`, or one of `choices` when it is a choice between literals;
+ * - `pattern`, names taken apart from it (`const { a, "b": c } = m`), each with what it binds, and
+ *   `rest`, where the pattern takes the rest or a name it computes, which may be any;
  * - `export`, an export of it, which `ExportFact` follows.
  */
 export type UseEnd =
 	| { kind: "value" }
-	| { kind: "computed"; prefix: string; choices: string[] | undefined }
+	| {
+			kind: "computed";
+			at: Span;
+			prefix: string;
+			choices: string[] | undefined;
+	  }
 	| {
 			kind: "pattern";
 			names: { name: string; at: Span; binds: Binding | undefined }[];
-			rest: boolean;
+			rest: Span | undefined;
 	  }
 	| { kind: "export" };
 
