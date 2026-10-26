@@ -1,8 +1,8 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Binding, Scopes, Use } from "../code/scopes.ts";
+import type { Node } from "../code/syntax.ts";
 import { covers, type Edit, importWithout } from "./edits.ts";
 import type { LibraryModule, Role } from "./library.ts";
-import type { Binding, Scopes, Use } from "./scopes.ts";
-import type { Node } from "./syntax.ts";
 
 /** An import of a library's name: the role the library gives it, or none for its own API. */
 export type LibraryImport = {

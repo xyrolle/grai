@@ -1,4 +1,6 @@
 import type { ESTree } from "../code/parse.ts";
+import { type Binding, Scopes } from "../code/scopes.ts";
+import { type Node, parseModule, type Span } from "../code/syntax.ts";
 import type { Mapping } from "../import/mapping.ts";
 import { applyEdits, covers } from "./edits.ts";
 import {
@@ -16,8 +18,6 @@ import {
 	ownApi,
 	type Translator,
 } from "./library.ts";
-import { type Binding, Scopes } from "./scopes.ts";
-import { type Node, parseModule, type Span } from "./syntax.ts";
 import {
 	type Dependency,
 	declarationEdits,

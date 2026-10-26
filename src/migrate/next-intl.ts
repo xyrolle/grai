@@ -1,4 +1,6 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Binding, Use } from "../code/scopes.ts";
+import { literalText, type Node, propertiesOf } from "../code/syntax.ts";
 import {
 	calledAt,
 	declaratorOf,
@@ -14,8 +16,6 @@ import {
 	writtenProperties,
 } from "./library.ts";
 import { messageCall } from "./message-call.ts";
-import type { Binding, Use } from "./scopes.ts";
-import { literalText, type Node, propertiesOf } from "./syntax.ts";
 
 /** Where a `t` looks a key up: under its namespace, if it has one, in its locale, if it names one. */
 type Scope = { namespace: string; locale: Node | undefined };

@@ -1,5 +1,5 @@
 import type { ESTree } from "../code/parse.ts";
-import type { Node, Span } from "./syntax.ts";
+import type { Node, Span } from "../code/syntax.ts";
 
 /** A change to a module's text: the span it replaces, and what it writes there. */
 export type Edit = Span & { text: string };

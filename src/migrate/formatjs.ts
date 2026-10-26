@@ -1,4 +1,11 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Binding, Use } from "../code/scopes.ts";
+import {
+	literalText,
+	type Node,
+	propertiesOf,
+	type Span,
+} from "../code/syntax.ts";
 import {
 	boundProperty,
 	calledAt,
@@ -17,8 +24,6 @@ import {
 	writtenProperties,
 } from "./library.ts";
 import { messageCall } from "./message-call.ts";
-import type { Binding, Use } from "./scopes.ts";
-import { literalText, type Node, propertiesOf, type Span } from "./syntax.ts";
 
 /** What a descriptor holds: the id names the message; the others are for translators and extraction. */
 const descriptorFields = new Set(["id", "defaultMessage", "description"]);
