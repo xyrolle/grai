@@ -127,7 +127,10 @@ describe("translators' descriptions", () => {
 			{ en: { open: "Open" }, de: { open: "Öffnen" } },
 			{ descriptions },
 		);
-		writeFileSync(join(dir, "app.ts"), "m.open();");
+		writeFileSync(
+			join(dir, "app.ts"),
+			'import { m } from "./out/messages.js";\nm.open();\n',
+		);
 		const problems = async (text: string) => {
 			writeFileSync(join(dir, descriptions), text);
 			return (await check(config)).problems.map((error) => error.message);

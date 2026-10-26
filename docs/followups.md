@@ -262,9 +262,3 @@ Done when: the plugin merges the page's own import map into the one the locale s
 A Vite build refuses a text with `!~{…}~` in it (`placeholderTexts` in `src/vite-build.ts`). Rolldown writes each chunk's hash over its placeholder wherever that is in a chunk's code, a string's value included, and grai does the same in each locale's copy. Every other way of writing the text, such as `\x7e` for the `~`, an escaped template, a concatenation or a join, comes out of Rolldown's printer and minifier as the one string again before the hashes go in.
 
 Done when: Rolldown leaves the placeholder's shape in a string's value alone, and the build takes the text as it is.
-
-## A load by a path the scan cannot read
-
-`check --fix` keeps the keys a dynamic import or a Vite glob may load when its path starts with literal text that names the messages directory, `` import(`#i18n/messages/${key}.js`) ``, and `rename` refuses such a load. A load whose path is a variable, `import(path)`, may load any module, a per-key one among them, but taking each for one would keep every unused key, and refuse every rename, in an app that loads any module by a variable: app B has 15 such loads, of its own modules. So such a load counts for none; one of a per-key module whose path the app builds elsewhere would lose its keys to `check --fix`.
-
-Done when: the owner has decided between reading such loads as reaching every key, with a way to say which do not, and following the path to where it is built.

@@ -1,59 +1,71 @@
 import { relative } from "node:path";
 import type { Catalog } from "./catalog.ts";
+import { type ProjectCode, readProjectCode } from "./code/project.ts";
+import { readingOf } from "./code/reads.ts";
+import { codeProblems } from "./code-problems.ts";
 import { compileCatalogs } from "./compilation.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import type { Config } from "./config.ts";
 import { descriptionProblems } from "./descriptions.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { parseMessage } from "./message.ts";
-import { missingKeyCalls, type Unchecked } from "./missing-key-calls.ts";
+import { compileOutputIfMissing } from "./output-present.ts";
 import { MessageProblem } from "./problem.ts";
 import { isSeed, untranslatedKeys } from "./seed.ts";
 import { shownInputs } from "./shown-inputs.ts";
-import { type ScannedSources, scanSources } from "./source-scan.ts";
 import { type TestNames, testsNaming } from "./sources.ts";
 
 /** What a check found: the problems, and each locale's keys that are still untranslated. */
 export type Checked = {
 	problems: GraiError[];
 	untranslated: Map<string, string[]>;
-	/** The files whose reads of a namespace the check left out, as they declare its name again. */
-	unchecked: Unchecked[];
 };
 
 /**
- * Every problem of a project, without writing anything: each error a compile would report, each
- * key no shipped source file names, each place a source names a key no catalog has, each input
- * one locale shows and another never does, each key `identicalToBase` lists that the catalogs no
- * longer bear out, and each description of a key no catalog has. Source files are those under the
- * project's root, or under `sources` when given, outside the outdir, dependencies, build output and
- * dot-directories; those the config's `tests` match ship nothing. Beside them, the keys each locale
- * has not translated yet, which are not problems: a message can rightly read as the base locale's.
- * The check after a fix takes the sources the fix read as `scanned`, which a fix hands on only
- * when it wrote none of them; the catalogs, the config and the descriptions it reads again.
+ * Every problem of a project: each error a compile would report, each key no shipped code reads or
+ * may reach, each place code names a key no catalog has, each file whose code does not parse, each
+ * input one locale shows and another never does, each key `identicalToBase` lists that the
+ * catalogs no longer bear out, and each description of a key no catalog has. The code is read as
+ * the bundler reads it (`code/`): the source files under the project's root, or under `sources`
+ * when given, outside the outdir, dependencies, build output and dot-directories, with their
+ * imports followed to the output, which is compiled first when it is missing, as its imports
+ * resolve only then. Those the config's `tests` match ship nothing. Beside them, the keys each
+ * locale has not translated yet, which are not problems: a message can rightly read as the base
+ * locale's. The check after a fix takes the code the fix read as `code`, as a fix writes none of it.
  */
 export async function check(
 	configFile: string,
 	sources?: readonly string[],
-	scanned?: ScannedSources,
+	code?: ProjectCode,
 ): Promise<Checked> {
 	const read = await readProject(configFile);
 	if ("errors" in read)
-		return { problems: read.errors, untranslated: new Map(), unchecked: [] };
+		return { problems: read.errors, untranslated: new Map() };
 	const { catalogs, errors } = parseCatalogs(read.sources);
-	if (errors.length > 0)
-		return { problems: errors, untranslated: new Map(), unchecked: [] };
+	if (errors.length > 0) return { problems: errors, untranslated: new Map() };
 	const { config } = read;
 	const compilation = compileCatalogs(config, catalogs);
 	const roots = sources ?? [config.root];
-	const { files, tests, names } = scanned ?? scanSources(roots, config);
 	const keys = new Set(
 		catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);
-	const missing = missingKeyCalls(files, keys, config);
-	const problems = [...compilation.errors, ...missing.errors];
+	const compiled = await compileOutputIfMissing(configFile, config);
+	if (compiled.length > 0) {
+		return { problems: sortErrors(compiled), untranslated: new Map() };
+	}
+	const project = code ?? (await readProjectCode(config, roots));
+	if (project instanceof GraiError) {
+		return { problems: [project], untranslated: new Map() };
+	}
+	const reading = await readingOf(project);
+	const {
+		errors: codeErrors,
+		reached,
+		tests,
+	} = codeProblems(reading, keys, config);
+	const problems = [...compilation.errors, ...codeErrors];
 	for (const key of compilation.keys.keys()) {
-		if (!names.has(key)) {
+		if (!reached(key)) {
 			problems.push(unused(key, config, catalogs, roots, tests));
 		}
 		problems.push(...differingInputs(key, catalogs));
@@ -69,7 +81,6 @@ export async function check(
 			config.baseLocale,
 			config.identicalToBase,
 		),
-		unchecked: missing.unchecked,
 	};
 }
 
@@ -85,8 +96,8 @@ function unused(
 	const testing = testsNaming(tests, key);
 	const detail =
 		testing === undefined
-			? `no source file under ${where} names the key. Remove it from every catalog, or use it.`
-			: `no source file under ${where} names the key but tests, which ship nothing: ${testing}. Remove it from every catalog and from those tests, or use it.`;
+			? `no shipped code under ${where} reads the key. Remove it from every catalog, or use it.`
+			: `no shipped code under ${where} reads the key, only tests, which ship nothing: ${testing}. Remove it from every catalog and from those tests, or use it.`;
 	return new GraiError("key-unused", { file: base?.file ?? "", key }, detail);
 }
 
