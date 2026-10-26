@@ -626,3 +626,46 @@ export const title = () => t("cart:title") + m;
 		);
 	});
 });
+
+describe("grai migrate leaves a call it cannot prove safe", () => {
+	it("calls grai's m only through its own import, and React's hooks only through React's", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/math.ts": `import { m } from "./numbers.js";
+import { t } from "i18next";
+
+export const title = () => t("cart:title") + m;
+`,
+			"src/typed.ts": `import type { m } from "../out/messages.js";
+import { t } from "i18next";
+
+export const title = (): string => t("cart:title");
+`,
+			"src/memo.ts": `import { t } from "i18next";
+
+function useMemo(read: () => string, values: unknown[]) {
+	return read() + values.length;
+}
+
+export const title = () => useMemo(() => t("cart:title"), [t]);
+`,
+		});
+
+		expect(project.left()).toEqual([
+			"src/math.ts:4:28: m names something else here: rename it, then run grai migrate again.",
+			"src/memo.ts:7:60: t is passed on, so where it is called cannot be followed: call the messages by name there.",
+			"src/typed.ts:4:36: m names something else here: rename it, then run grai migrate again.",
+		]);
+		expect(
+			project.text("src/memo.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+import { t } from "i18next";
+
+function useMemo(read: () => string, values: unknown[]) {
+	return read() + values.length;
+}
+
+export const title = () => useMemo(() => m.cart_title(), [t]);
+`);
+		expect(project.result.changed).toEqual(["src/memo.ts"]);
+	});
+});

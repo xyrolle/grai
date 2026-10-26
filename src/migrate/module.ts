@@ -73,7 +73,7 @@ export function migrateModule(
 	const module = { ...migration, text, scopes };
 	const imports = libraryImports(program, scopes, migration.libraries);
 	const { results, translators, dependencies } = resultsOf(imports, module);
-	const messagesBinding = messagesImport(program, scopes);
+	const messagesBinding = messagesImport(program, scopes, messages);
 	const settled = settle(results, scopes, messagesBinding);
 	const rewrites = settled.flatMap(({ outcome }) =>
 		"left" in outcome ? [] : [{ ...outcome.replace, text: outcome.text }],
