@@ -485,7 +485,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
       - the key of a mapping that may name one without that name: a Vite alias, a tsconfig `paths` key or a package.json `imports` key;
       - the name of a symlink or a package that holds one.
 
-      Or else it must hold what may spell any specifier: an escape in a string that may stand for a name's character (`\u`, `\x`, an octal one, a line continuation, or any character escaped that stands for itself, as `\s` does), a load by anything but one whole string, or a glob.
+      Or else it must hold what may spell a specifier otherwise. A specifier is a string right after `from`, `import`, `import(` or `require(`, so that is a comment there, an escape in one, `\u` anywhere (an identifier may spell `require` with one), a load by anything but one whole string, or a glob.
 
       Or it must hold what may lead outside the listed sources, where the reading follows a module as it follows any, and that module may pass the output on unseen (`code/outside.ts`):
       - an absolute path to an entry of the system's root, or a `file:` URL;
@@ -493,10 +493,10 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
       - the name of a directory the listing leaves out, a mapping key whose target is outside the listed sources, or a symlink to outside them.
 
       Counting the segments on a line, not in a string, keeps the test free of a lexer: a line holds every segment of each string on it, and maybe more.
-    - An installed package is no source, so the test never sees what it holds (`code/installed.ts`). A file imports one by a string that starts with its name, so the strings in a left-out file that start with an installed package's name are resolved from it and followed, as reading it would. A file that writes one whose module passes grai's on is read.
+    - An installed package is no source, so the test never sees what it holds (`code/installed.ts`). A file imports one by a specifier that starts with its name, so a left-out file's specifiers that start with an installed package's name are resolved from it and followed, as reading it would. A file that writes one whose module passes grai's on is read.
     - A tsconfig's `baseUrl` maps any specifier that is not a relative path to below it, so it is a mapping of `*`.
     - The test is necessary, not sufficient, so the reading it gives is the full reading's. On app B and the synthetic project, the reads, reaches and unresolved imports are identical with it and without it.
-    - Barrels are found as files are read, until they name no more files. A workspace package outside the project is a barrel when any of its files passes the test.
+    - Barrels are found as files are read, until they name no more files. A workspace package outside the project is a barrel when any of its files passes the test. The names only grow, round by round, so a round tests the files left out by the names found since alone (`code/text-test.ts`).
     - Some mappings may name the output or a module outside the listed sources from any specifier: a Vite alias that is a pattern, a `*` key that maps to one, such as a `baseUrl` outside the roots, or a tsconfig that does not read. Then every file is read.
     - App B's check reads 31% of its sources. The synthetic project's reads all of them, since every component imports the messages.
     - A source left out is not parsed, so its parse errors are not reported. It reads nothing of grai's, broken or not, and `check --fix` goes ahead without it.
