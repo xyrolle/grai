@@ -221,5 +221,9 @@ describe("reading a file's code", () => {
 		expect(
 			await readCode("src/App.svelte", "<p>{m.title(</p>\n"),
 		).toMatchObject({ at: 12 });
+		// A component's script is oxc's to parse, as Svelte parses its template alone.
+		expect(
+			await readCode("src/App.svelte", "<script>\n\tconst = 1;\n</script>\n"),
+		).toEqual({ at: 16, message: "Unexpected token" });
 	});
 });

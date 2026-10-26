@@ -6,6 +6,7 @@
  */
 
 import { createRequire } from "node:module";
+import type { AST } from "svelte/compiler";
 
 /** A framework whose components grai reads. */
 export type Framework = "svelte" | "vue" | "astro" | "mdx";
@@ -34,13 +35,26 @@ export function packageOf(framework: Framework): string {
 
 const require = createRequire(import.meta.url);
 
-/** Svelte's parser, or undefined when the project does not install Svelte. */
-export async function svelteParser(): Promise<
-	typeof import("svelte/compiler").parse | undefined
-> {
+/**
+ * Svelte's parse of a component's tree, or undefined when the project does not install Svelte.
+ * grai reads a component's scripts with oxc, so Svelte parses its template alone. Svelte's own
+ * preprocessor finds each script, and its content is blanked to spaces, keeping every offset.
+ * Svelte would otherwise parse each script with acorn too, which takes most of its time.
+ */
+export async function svelteParser(): Promise<SvelteParse | undefined> {
 	const compiler = await optional(() => import("svelte/compiler"));
-	return compiler?.parse;
+	if (compiler === undefined) return undefined;
+	const { parse, preprocess } = compiler;
+	return async (text) => {
+		const { code } = await preprocess(text, {
+			script: ({ content }) => ({ code: content.replace(/[^\n\r]/g, " ") }),
+		});
+		return parse(code, { modern: true });
+	};
 }
+
+/** Svelte's parse of a component, in its modern tree, its scripts' content left out. */
+export type SvelteParse = (text: string) => Promise<AST.Root>;
 
 /** Vue's parser of single-file components, or undefined when the project does not install Vue. */
 export async function vueParser(): Promise<

@@ -73,7 +73,9 @@ async function componentCode(
 		switch (framework) {
 			case "svelte": {
 				const parse = await svelteParser();
-				return parse === undefined ? missing : [svelteCode(text, parse)];
+				return parse === undefined
+					? missing
+					: [svelteCode(text, await parse(text))];
 			}
 			case "vue": {
 				const parse = await vueParser();
