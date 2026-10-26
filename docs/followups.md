@@ -93,9 +93,13 @@ Done when: a Next page's client chunks hold only its locale's variants, with a b
 
 ## Make Next's first compile of a page cheaper
 
-On the bench's page, `next dev`'s first response for the route takes longer with grai than with next-intl, from an empty `.next` and with it kept (`docs/runtime.md`): Turbopack compiles the whole output's 1.8 MB of message functions in each layer that imports them, server, server render and client, where next-intl's catalog is JSON.
+On the bench's page, `next dev`'s first response for the route takes longer with grai than with next-intl, from an empty `.next` and with it kept (`docs/runtime.md`).
 
-Done when: a profile of that compile names where the time goes, and either a change brings it level with next-intl's or the design records why it stays.
+A Turbopack trace (`next dev --internal-trace`, read with `next internal trace`) shows where the time goes. In one window, the page's endpoint takes 1,189 ms on grai against 694 ms on next-intl, and 766 ms on grai when the client component names no message. The gap is the client component's import of `m`: Turbopack builds the whole output into the module graphs of the server render and the browser, not only the server's. The module graphs take 640 ms against next-intl's 338 ms and 355 ms without client messages, and their `additional_entries` 205 ms against 9 ms. The server layer alone costs about 70 ms more than next-intl's.
+
+Turbopack builds the graph of code under `node_modules` more cheaply. In a second window, with the output under `node_modules`, the endpoint takes 763 ms against grai's 1,066 ms there, and the module graphs 340 ms against 484 ms. The first response, as the median of 7 rounds, is 1,827 ms against 2,039 ms, next-intl's being 1,610 ms. Where an app's output lives is a design decision, still open. Tried, and no better: one keys module, text messages as a JSON table, and 64 shards.
+
+Done when: a change brings the first compile level with next-intl's, or the design records why it stays.
 
 ## Next on a loopback address
 
