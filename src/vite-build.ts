@@ -47,7 +47,10 @@ export function keyModule(
 	const shape = process.env.GRAI_SERVER_SHAPE;
 	if (consumer === "server" && shape === "e")
 		return serverSwitch(build, name, key);
-	if (consumer === "server" && key.kind !== "text" && shape)
+	// Shape f: shape c for a message with inputs alone; markup keeps `markup`.
+	if (consumer === "server" && shape === "f" && key.kind === "message")
+		return serverDispatch(build, name, key, "c");
+	if (consumer === "server" && key.kind !== "text" && shape && shape !== "f")
 		return serverDispatch(build, name, key, shape);
 	const names = calledNames([key]);
 	const value = consumer === "server" ? key.serverValue : key.value;
