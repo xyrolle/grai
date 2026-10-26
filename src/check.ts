@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import type { Catalog } from "./catalog.ts";
+import { type Catalog, fileOfKey } from "./catalog.ts";
 import { compileCatalogs } from "./compilation.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import type { Config } from "./config.ts";
@@ -87,7 +87,8 @@ function unused(
 		testing === undefined
 			? `no source file under ${where} names the key. Remove it from every catalog, or use it.`
 			: `no source file under ${where} names the key but tests, which ship nothing: ${testing}. Remove it from every catalog and from those tests, or use it.`;
-	return new GraiError("key-unused", { file: base?.file ?? "", key }, detail);
+	const file = base === undefined ? "" : fileOfKey(base, key);
+	return new GraiError("key-unused", { file, key }, detail);
 }
 
 /** A directory as the project names it: relative to its root, or in full when outside it. */
@@ -172,7 +173,7 @@ function differingInputs(
 		return [
 			new GraiError(
 				"inputs-differ",
-				{ file: catalog.file, key, locale: catalog.locale },
+				{ file: fileOfKey(catalog, key), key, locale: catalog.locale },
 				`the message never shows ${missing.map((name) => `{${name}}`).join(", ")}, which ${readers.join(", ")} show${readers.length === 1 ? "s" : ""}. Show it here too, or drop it everywhere.`,
 			),
 		];

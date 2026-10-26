@@ -5,8 +5,8 @@
 
 import { mkdirSync } from "node:fs";
 import { dirname, relative } from "node:path";
-import type { Catalog } from "./catalog.ts";
-import { catalogWithMessages } from "./catalog-file.ts";
+import { type Catalog, fileIndexOf, fileOfKey } from "./catalog.ts";
+import { catalogsWithMessages } from "./catalog-file.ts";
 import type { KeyPath } from "./catalog-keys.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { sameJson } from "./edit.ts";
@@ -88,8 +88,11 @@ function seedProblem(
 	}
 }
 
-/** What seeding wrote: the catalog, and how many keys it gave the base text. */
-export type Seeded = { file: string; keys: number; result: CompileResult };
+/**
+ * What seeding wrote: the locale's catalog files it gave keys, or all of them when it gave none,
+ * and how many keys it gave the base text.
+ */
+export type Seeded = { files: string[]; keys: number; result: CompileResult };
 
 /**
  * Gives a locale's catalog the base text of every key it lacks, after the keys it has, creating
@@ -102,8 +105,8 @@ export async function seed(
 ): Promise<Seeded | { errors: GraiError[] }> {
 	const read = await readLocaleCatalogs(configFile, locale, "seed");
 	if ("errors" in read) return read;
-	const { config, path, base, target, inherited } = read;
-	const seeded: [KeyPath, unknown][] = [];
+	const { config, paths, base, target, inherited } = read;
+	const seeded: [KeyPath, unknown, number][] = [];
 	const problems: GraiError[] = [];
 	for (const [key, value] of base.messages) {
 		// A key the locale takes from its fallbacks stays theirs: seeding it would end that.
@@ -111,7 +114,7 @@ export async function seed(
 		const problem = seedProblem(
 			key,
 			value,
-			base.file,
+			fileOfKey(base, key),
 			config.baseLocale,
 			locale,
 		);
@@ -119,16 +122,19 @@ export async function seed(
 			problems.push(problem);
 			continue;
 		}
-		seeded.push([base.paths.get(key) ?? [key], seedValue(value, locale)]);
+		// A key goes in the locale's file at the place of the base's file that has it.
+		const path = base.paths.get(key) ?? [key];
+		seeded.push([path, seedValue(value, locale), fileIndexOf(base, key)]);
 	}
 	if (problems.length > 0) return { errors: problems };
-	if (seeded.length > 0) {
+	const [like] = config.catalogs.get(config.baseLocale) ?? paths;
+	const texts = catalogsWithMessages(paths, seeded, like);
+	for (const path of texts.keys())
 		mkdirSync(dirname(path), { recursive: true });
-		const like = config.catalogs.get(config.baseLocale) ?? path;
-		writeAll(new Map([[path, catalogWithMessages(path, seeded, like)]]));
-	}
+	writeAll(texts);
+	const written = texts.size > 0 ? [...texts.keys()] : paths;
 	return {
-		file: relative(config.root, path),
+		files: written.map((path) => relative(config.root, path)),
 		keys: seeded.length,
 		result: await compile(configFile),
 	};
