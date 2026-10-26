@@ -14,8 +14,8 @@
  */
 
 import {
-	isIndexAfter,
 	isPathAfter,
+	keepsString,
 	mayStartRegex,
 	passCode,
 	passedNothing,
@@ -133,7 +133,7 @@ function blankedCode(source: string, offset: number, jsx: boolean): CodeText {
 				keep(index + 1);
 				continue;
 			}
-			const kept = isPathAfter(passed) || isIndexAfter(passed);
+			const kept = keepsString(passed);
 			passLiteral(passed, index);
 			keep(index + 1);
 			if (kept) keep(end - 1);

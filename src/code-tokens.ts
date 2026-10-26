@@ -115,11 +115,26 @@ export function mayStartRegex(passed: Passed): boolean {
 }
 
 /**
+ * Whether a string after the code passed stays in the code: a module's path (`isPathAfter`), or
+ * a member's name as the index of `m["key"]` or `m?.["key"]`.
+ */
+export function keepsString(passed: Passed): boolean {
+	const [previous] = lastTokens(passed, 1);
+	if (previous?.text !== "[") return pathAfter(passed, previous);
+	const [, object, beforeObject] = lastTokens(passed, 3);
+	return object?.text === "." || endsOperand(object, beforeObject);
+}
+
+/**
  * Whether a literal after the code passed is a module's path: after `from` or `import`, or in the
  * call of a dynamic import or a Vite glob, `import(` or `import.meta.glob(`.
  */
 export function isPathAfter(passed: Passed): boolean {
-	const [previous] = lastTokens(passed, 1);
+	return pathAfter(passed, lastTokens(passed, 1)[0]);
+}
+
+/** Whether a literal after the code passed, whose last token is `previous`, is a module's path. */
+function pathAfter(passed: Passed, previous: Token | undefined): boolean {
 	if (previous?.text === "from" || previous?.text === "import") return true;
 	if (previous?.text !== "(") return false;
 	const [, callee, beforeCallee] = lastTokens(passed, 3);
@@ -129,14 +144,6 @@ export function isPathAfter(passed: Passed): boolean {
 	return (
 		texts.slice(1, 6).join(" ") === "glob . meta . import" && texts[6] !== "."
 	);
-}
-
-/** Whether a string after the code passed names a member, as the index of `m["key"]` or `m?.["key"]`. */
-export function isIndexAfter(passed: Passed): boolean {
-	const [previous] = lastTokens(passed, 1);
-	if (previous?.text !== "[") return false;
-	const [, object, beforeObject] = lastTokens(passed, 3);
-	return object?.text === "." || endsOperand(object, beforeObject);
 }
 
 /**
