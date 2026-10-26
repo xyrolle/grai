@@ -37,7 +37,9 @@ const missingKeyPrefix = "\0grai:missing-key/";
  * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
  * failed or threw, which the page shows in Vite's overlay until a build succeeds. After an edit,
  * the page gets a patch of the changed keys, or with `reloadOnEdit` reloads; a key added or
- * removed, or a new runtime (another config for it to read, or another grai), reloads it. A
+ * removed, one turned from text into markup or back, or a new runtime (another config for it to
+ * read, or another grai), reloads it. A patch imports the plural rules and formatters by their
+ * names in the edit's build, so it reaches them when an edit renames them. A
  * server environment that runs its modules in Vite's runner patches its table the same way, so
  * the next server render has the new words without the runner evaluating the program again; any
  * other environment takes the messages again. Once a server has the edit, the page is told
@@ -76,11 +78,19 @@ export function serveMessages(
 			before.rendered.files.get(anchor) === next.rendered.files.get(anchor);
 		if (changed.length === 0 && sameRuntime) return;
 		const environments = Object.values(server.environments);
-		const sameExports = changed.every(
-			(key) =>
-				before.compilation.keys.has(key) && next.compilation.keys.has(key),
-		);
-		if (!sameExports || !sameRuntime) {
+		// A patch writes a key's new variants into the table, under the export made when the module
+		// was evaluated: it reaches a key called the same way, and a key turned from text into markup,
+		// or back, needs an export with its parts, or without them.
+		const sameCalls = changed.every((key) => {
+			const was = before.compilation.keys.get(key);
+			const is = next.compilation.keys.get(key);
+			return (
+				was !== undefined &&
+				is !== undefined &&
+				(was.kind === "markup") === (is.kind === "markup")
+			);
+		});
+		if (!sameCalls || !sameRuntime) {
 			const reimporting = [...importers]
 				.filter(
 					([key]) =>
