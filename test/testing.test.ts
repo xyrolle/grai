@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { JSDOM } from "jsdom";
-import { expect, it, onTestFinished } from "vitest";
+import { aroundEach, describe, expect, it, onTestFinished } from "vitest";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -63,4 +63,36 @@ it("binds a test's locale in a process that serves requests too, outside every r
 	useLocale("de");
 
 	expect(m.title?.()).toBe("Ihr Warenkorb");
+});
+
+/** A project in English and German, loaded as a process whose middleware binds requests. */
+async function served() {
+	const { dir, load } = project({
+		en: { title: "Your cart" },
+		de: { title: "Ihr Warenkorb" },
+	});
+	const { m } = await load();
+	const output = (file: string) =>
+		import(pathToFileURL(join(dir, "out", file)).href);
+	return {
+		m,
+		server: await output("server.js"),
+		testing: await output("testing.js"),
+	};
+}
+
+describe("a test in a process that serves requests, bound with server.js's withLocale around it", () => {
+	let m: Messages = {};
+	aroundEach(async (test) => {
+		const loaded = await served();
+		m = loaded.m;
+		await loaded.server.withLocale("de", test);
+	});
+
+	it("renders in that locale, in its synchronous code and after an await", async () => {
+		const first = m.title?.();
+		await new Promise((resolve) => setTimeout(resolve));
+
+		expect([first, m.title?.()]).toEqual(["Ihr Warenkorb", "Ihr Warenkorb"]);
+	});
 });

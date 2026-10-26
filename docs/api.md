@@ -156,6 +156,7 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 ### `server.js`
 
 - `middleware(request: Request, handler: (resolved: { request: Request; locale: Locale }) => Response | Promise<Response>): Promise<Response>`: resolves the request's locale by the config's `strategy`, binds it for the handler and everything it calls, and gives back the handler's response, its `Vary` listing the request headers the strategy reads.
+- `withLocale<Result>(locale: Locale, code: () => Result): Result`: runs `code` in `locale` as the middleware runs a request's handler, so each message it calls and each task it starts renders in it: a scheduled job's code, or a test's, under Vitest `aroundEach((test) => withLocale("de", test))`.
 - `localeCopies: boolean`: whether the build that compiled the output wrote a copy of each message chunk per locale, which `grai/sveltekit`'s `handleLocale` reads.
 
 Everything else in `outdir` is internal: `internal.js`, the modules named by their content (`runtime-<hash>.js`, `config-<hash>.js`, `plurals-<hash>.js`, `formats-<hash>.js`), the shards under `keys/`, and `.grai/`.
