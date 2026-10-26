@@ -1,9 +1,8 @@
 /**
  * Files read into their facts in the pool (`pool.ts`), in tasks of about `taskSize` of text each.
- * A worker costs about `workerStart` to start and load the parsers, so this thread reads alone until
- * the reading has taken that long and the rest would take more than twice it. Measured on app B the
- * pool pays from about a thousand files, on the synthetic project from about four thousand, whose
- * scripts are simpler, so what decides is the work, not the count.
+ * A worker costs about `workerStart` to start and load the parsers, which the pool sizes its
+ * workers by (`workersFor`), from how fast this thread reads: what decides is the work, not the
+ * count of files, as app B's scripts take longer than the synthetic project's.
  */
 
 import { factsOf } from "./facts.ts";
