@@ -133,6 +133,44 @@ describe("resolving as the bundler resolves", () => {
 		}
 	});
 
+	it("resolves a Nuxt page by the tsconfig Nuxt generates, which the project's tsconfig references", async () => {
+		const nuxt = {
+			"tsconfig.json": JSON.stringify({
+				files: [],
+				references: [{ path: "./.nuxt/tsconfig.app.json" }],
+			}),
+			"app/pages/index.vue":
+				'<script setup lang="ts">\nimport * as m from "~/out/keys.js";\n</script>\n<template><h1>{{ m.title() }}</h1></template>\n',
+		};
+		const prepared = projectWith({
+			...nuxt,
+			".nuxt/tsconfig.app.json": JSON.stringify({
+				compilerOptions: { paths: { "~/*": ["../*"] } },
+				// As Nuxt writes it: a component is listed by its extension.
+				include: ["../app/**/*", "../app/**/*.vue"],
+			}),
+		});
+		const unprepared = projectWith(nuxt);
+		const code = await readProjectCode(prepared.config, [
+			join(prepared.dir, "app"),
+		]);
+		if (code instanceof GraiError) throw code;
+		const unresolved = await readProjectCode(unprepared.config, [
+			join(unprepared.dir, "app"),
+		]);
+
+		expect(
+			await code.graph.imported(
+				join(prepared.dir, "app/pages/index.vue"),
+				"~/out/keys.js",
+				"*",
+			),
+		).toEqual({ kind: "namespace" });
+		expect(unresolved instanceof GraiError ? unresolved.code : "resolved").toBe(
+			"resolution-invalid",
+		);
+	});
+
 	it("fails, naming the config, when the tsconfig extends a file not generated yet or the Vite config does not load", async () => {
 		const unsynced = projectWith({
 			"tsconfig.json": JSON.stringify({

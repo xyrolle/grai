@@ -57,8 +57,8 @@ export async function projectResolve(
 		},
 		builtinModules: true,
 	});
-	// A tsconfig the resolver cannot follow, such as one that extends a file a framework generates
-	// before it is generated, fails every import, and a command would then read none.
+	// A tsconfig the resolver cannot follow, such as one that extends or references what a framework
+	// generates before it is generated, fails every import, and a command would then read none.
 	const { error } = existsSync(tsconfig)
 		? resolver.resolveFileSync(tsconfig, "./tsconfig.json")
 		: {};
@@ -66,7 +66,7 @@ export async function projectResolve(
 		return new GraiError(
 			"resolution-invalid",
 			{ file: "tsconfig.json" },
-			`the project's tsconfig cannot be followed: ${error}. Generate what it extends, as SvelteKit's svelte-kit sync or Nuxt's nuxi prepare does, or fix it.`,
+			`the project's tsconfig cannot be followed: ${error}. Generate what it extends or references, as SvelteKit's svelte-kit sync or Nuxt's nuxi prepare does, or fix it.`,
 		);
 	}
 	return async (source, importer) => {
