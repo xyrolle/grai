@@ -205,7 +205,7 @@ Done when: `grai migrate` rewrites a call whose tags each render one element of 
 
 ## A component's script, in `grai migrate`
 
-`grai migrate` lists each Svelte, Vue, Astro or MDX component that imports the library, and rewrites none: its markup calls messages too, outside what an ES module parser reads.
+`grai migrate` lists each Svelte, Vue, Astro or MDX component that imports the library, read through its framework's parser, and rewrites none: the reader gives the component's script and markup as one program, but migrate's rewrites are written for a module's own text.
 
 Done when: `grai migrate` rewrites the calls in a component's script, and lists each one its markup makes.
 
