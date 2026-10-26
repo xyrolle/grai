@@ -16,8 +16,8 @@ import {
 	textModulePrefix,
 	textPrefix,
 } from "./locale-chunks.ts";
-import { moduleOf } from "./message-imports.ts";
 import { type ModuleLinks, moduleLinks, seenThrough } from "./module-links.ts";
+import { moduleOf } from "./output-paths.ts";
 import { realPath } from "./real-path.ts";
 import { sharedKeys } from "./server-chunks.ts";
 import {
