@@ -9,6 +9,7 @@ import { type CompileResult, compile, isCompiled } from "../compile.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { watch } from "../watch.ts";
+import { count, reportErrors } from "./errors.ts";
 
 /** The name grai/next imports the project's compiled output by, in every layer Next bundles. */
 const output = "grai/next/output";
@@ -101,16 +102,6 @@ function built(result: CompileResult): void {
 	throw new Error(
 		`grai: the catalogs did not compile, with ${count(result.errors)}.`,
 	);
-}
-
-function reportErrors(errors: readonly GraiError[]): void {
-	if (errors.length === 0) return;
-	for (const error of errors) console.error(error.message);
-	console.error(`grai: ${count(errors)}`);
-}
-
-function count(errors: readonly GraiError[]): string {
-	return `${errors.length} ${errors.length === 1 ? "error" : "errors"}`;
 }
 
 /** The config, with the output's name resolved to the outdir by Turbopack and by webpack. */
