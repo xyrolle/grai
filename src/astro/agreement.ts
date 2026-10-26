@@ -41,7 +41,9 @@ export function disagreements(grai: Config, astro: AstroRouting): string[] {
 	return [
 		...(base === undefined ? [] : [base]),
 		...ownRouteDisagreements(grai, astro),
-		...(astro.i18n === undefined ? [] : routingDisagreements(grai, astro.i18n)),
+		...(astro.i18n === undefined
+			? domainDisagreements(grai, undefined, [])
+			: routingDisagreements(grai, astro.i18n)),
 	];
 }
 
@@ -74,7 +76,7 @@ function routingDisagreements(grai: Config, i18n: I18n): string[] {
 		...strategyDisagreements(grai),
 		...localeDisagreements(grai, routed),
 		...defaultDisagreements(grai, i18n, routed),
-		...domainDisagreements(i18n),
+		...domainDisagreements(grai, i18n, routed),
 	];
 }
 
@@ -163,11 +165,44 @@ function defaultDisagreements(
 	return problems;
 }
 
-function domainDisagreements(i18n: I18n): string[] {
-	const domains = Object.keys(i18n.domains ?? {});
-	return domains.length === 0
-		? []
-		: [
-				`Astro's i18n.domains serves ${domains.join(", ")} from domains of their own, where grai's "url" strategy finds the locale in the path. Remove i18n.domains and serve each locale under its path prefix ("A domain per locale" in grai's docs/followups.md).`,
-			];
+/**
+ * grai's hosts beside Astro's i18n.domains: each locale Astro serves from a domain of its own has
+ * that host in grai's `domains`, and each locale but the default, which Astro serves at its site,
+ * has its grai host listed in i18n.domains.
+ */
+function domainDisagreements(
+	grai: Config,
+	i18n: I18n | undefined,
+	routed: RoutedLocale[],
+): string[] {
+	const astro = new Map(
+		Object.entries(i18n?.domains ?? {}).map(([key, url]) => [
+			routed.find(({ prefix }) => prefix === key)?.locale ?? key,
+			new URL(url).host,
+		]),
+	);
+	const hosts = grai.urlRouting.domains;
+	if (hosts.length === 0) {
+		return astro.size === 0
+			? []
+			: [
+					`Astro's i18n.domains serves ${[...astro.keys()].join(", ")} from domains of their own, which grai's "url" strategy reads only with "domains" in grai's config. Give each locale its host there, such as { ${[...astro].map(([locale, host]) => `"${locale}": "${host}"`).join(", ")} } beside the default locale's.`,
+				];
+	}
+	return grai.locales.flatMap((locale, index) => {
+		const host = hosts[index] ?? "";
+		const served = astro.get(locale);
+		if (served === undefined) {
+			return locale === grai.baseLocale
+				? []
+				: [
+						`grai's "domains" gives ${locale} the host "${host}", which Astro's i18n.domains does not list. Add "${locale}": "https://${host}" there.`,
+					];
+		}
+		return served === host
+			? []
+			: [
+					`Astro's i18n.domains serves ${locale} from "${served}", and grai's "domains" gives it "${host}". Give each locale the same host in both.`,
+				];
+	});
 }
