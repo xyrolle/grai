@@ -5,8 +5,8 @@
 
 import { readFileSync } from "node:fs";
 import { dirname, extname, relative } from "node:path";
-import { catalogWithMessages } from "./catalog-file.ts";
-import type { KeyPath } from "./catalog-keys.ts";
+import { fileIndexOf } from "./catalog.ts";
+import { catalogsWithMessages } from "./catalog-file.ts";
 import { type CompileResult, compile } from "./compile.ts";
 import { readDescriptions } from "./descriptions.ts";
 import { GraiError } from "./error.ts";
@@ -60,9 +60,12 @@ export async function exportLocale(
 	}
 }
 
-/** What a merge wrote into the locale's catalog, and what it refused. */
+/**
+ * What a merge wrote into the locale's catalog: the files it changed messages of, or all of them
+ * when it changed none, and the units it took. And what it refused.
+ */
 export type MergeResult = {
-	file: string;
+	files: string[];
 	messages: number;
 	units: number;
 	refused: GraiError[];
@@ -98,7 +101,7 @@ export async function mergeDocument(
 		"translate",
 	);
 	if ("errors" in project) return project;
-	const { config, path, base, target, identical, inherited } = project;
+	const { config, paths, base, target, identical, inherited } = project;
 	if (document.srcLang !== base.locale) {
 		const detail = `its source language is ${document.srcLang}, and the base locale is ${base.locale}.`;
 		return { errors: [new GraiError("translation-invalid", { file }, detail)] };
@@ -111,26 +114,20 @@ export async function mergeDocument(
 		inherited,
 		document.units,
 	);
-	if (merged.messages.length > 0) {
-		const like = config.catalogs.get(base.locale) ?? path;
-		writeAll(
-			new Map([
-				[
-					path,
-					catalogWithMessages(
-						path,
-						merged.messages.map(([key, value]): [KeyPath, unknown] => [
-							target?.paths.get(key) ?? base.paths.get(key) ?? [key],
-							value,
-						]),
-						like,
-					),
-				],
-			]),
-		);
-	}
+	// A message goes back to the file the locale has its key in, or else the base's place for it.
+	const texts = catalogsWithMessages(
+		paths,
+		merged.messages.map(([key, value]) =>
+			target?.messages.has(key)
+				? [target.paths.get(key) ?? [key], value, fileIndexOf(target, key)]
+				: [base.paths.get(key) ?? [key], value, fileIndexOf(base, key)],
+		),
+		(config.catalogs.get(base.locale) ?? paths)[0],
+	);
+	writeAll(texts);
+	const written = texts.size > 0 ? [...texts.keys()] : paths;
 	return {
-		file: relative(config.root, path),
+		files: written.map((path) => relative(config.root, path)),
 		messages: merged.messages.length,
 		units: merged.units,
 		refused: merged.refused.map(

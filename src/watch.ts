@@ -206,7 +206,7 @@ function watchedFile(
 /** The catalog files the config names, or none while the config cannot be read: the compile says why. */
 function catalogsOf(configFile: string): string[] {
 	try {
-		return [...readConfig(configFile).catalogs.values()];
+		return [...readConfig(configFile).catalogs.values()].flat();
 	} catch (error) {
 		if (error instanceof GraiError) return [];
 		throw error;
