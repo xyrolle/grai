@@ -360,13 +360,13 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 | Hydrating that page | 5.4–6.9 ms | 7.9–10.4 ms | 12.2–15.6 ms | 16.7–21.6 ms | `hydrate` |
 | That page's JS, brotli | 22.9–24.9 KB | 38.0–40.5 KB | 125–133 KB | 125–133 KB | `hydrate` |
 | The runtime in the browser, its whole API, brotli | 1.0 KB | 3.6 KB | 12.1 KB | 10.2 KB | `library-bytes` |
-| A new server process: load, then first render | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms | `startup` |
+| A new server process: load, then first render | 16.6 + 3.1 ms | 46.6 + 2.3 ms | 14.5 + 11.2 ms | 13.0 + 21.9 ms | `startup` |
 | Type checking 500 calls with `tsc` 7 | 82 ms | 278 ms | 609 ms | 521 ms | `types` |
 | The editor's first completion of a key | 0.2 s | 1.0 s | 49 s | 21 s | `types` |
 
 ## Limitations
 
-- **A new server process loads grai's messages more slowly than i18next or use-intl:** 25 ms, against 16 ms on app A (`startup`). V8 reads functions more slowly than strings, even the function expressions of grai's server build, which it only pre-parses. grai's faster first render makes up most of it, but the gap is still open. With Node's compile cache (`module.enableCompileCache()`), grai's load takes 11–14 ms.
+- **A new server process loads grai's messages more slowly than i18next or use-intl:** 16.6 ms against 14.5 and 13.0 ms on app A, and 32.8 against 28.9 and 24.6 ms on app B (`startup`). V8 parses grai's binding for each key and its text keys' strings as code. One object of every key would load faster, but each call would then cost about a third more (`docs/runtime.md`), so the server build keeps a binding per key. Through the first render grai is ahead, and with Node's compile cache (`module.enableCompileCache()`) it loads first: 8.0 ms against 11.5 and 10.5 ms on app A.
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatch per key halves the call in a page, 9.8–11.7 ns, but costs each page load 0.2–0.4 ms of evaluation or about 10% more message bytes, more than a page's calls save, so it is not adopted (`docs/design.md`).
 - **A Next app started on a loopback address, `127.0.0.1` or `[::1]`, never answers a page:** there Next 16.4 sends each of the proxy's rewrites back to itself, and grai/next's proxy rewrites each one again. Start Next on its default host, `0.0.0.0` or the machine's address, as behind a reverse proxy (`docs/followups.md`).
 - **Under a CSP of hashes, a built SvelteKit page downloads its locale's message chunks and the shared ones.** The browser refuses the import map, which carries Kit's nonce but no hash yet. A CSP of nonces works, as Kit's `auto` mode gives a page it renders on request.
