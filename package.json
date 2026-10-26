@@ -102,7 +102,9 @@
 		"next": ">=16.3",
 		"react": ">=19",
 		"svelte": ">=5",
-		"vite": ">=8"
+		"vite": ">=8",
+		"vue": ">=3.5",
+		"@mdx-js/mdx": ">=3"
 	},
 	"peerDependenciesMeta": {
 		"@sveltejs/kit": {
@@ -125,11 +127,18 @@
 		},
 		"vite": {
 			"optional": true
+		},
+		"vue": {
+			"optional": true
+		},
+		"@mdx-js/mdx": {
+			"optional": true
 		}
 	},
 	"devDependencies": {
 		"@arethetypeswrong/cli": "0.18.5",
 		"@biomejs/biome": "2.6.2",
+		"@mdx-js/mdx": "3.1.1",
 		"@sveltejs/kit": "3.1.0",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
 		"@types/jsdom": "30.0.0",
@@ -153,6 +162,7 @@
 		"typescript": "7.0.2",
 		"vite": "8.3.5",
 		"vitest": "5.0.5",
+		"vue": "3.5.44",
 		"wrangler": "4.152.0"
 	},
 	"dependencies": {
