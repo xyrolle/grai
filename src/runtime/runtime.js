@@ -78,22 +78,26 @@ const leftAlone = (/** @type {string} */ pathname) =>
 /**
  * A path filled into another form of the first pathname whose form it matches: a locale's words
  * into the route's, or the route's into a locale's, as `forms` picks them. A named segment is
- * carried across. A path no pathname matches is given back as it is.
+ * carried across, and so is a trailing slash, as a framework that writes each page into a folder
+ * links it. A path no pathname matches is given back as it is.
  *
  * @param {string} pathname
  * @param {(entry: (typeof pathnames)[number]) => readonly [PathForm | undefined, PathForm | undefined]} forms
  */
 function translatedPath(pathname, forms) {
+	const slash = pathname.length > 1 && pathname.endsWith("/");
+	const path = slash ? pathname.slice(0, -1) : pathname;
 	for (const entry of pathnames) {
 		const [from, to] = forms(entry);
 		if (from === undefined || to === undefined) continue;
-		const match = from.pattern.exec(pathname);
+		const match = from.pattern.exec(path);
 		if (match === null) continue;
-		return to.path.replace(
+		const filled = to.path.replace(
 			/\[([^\]]+)\]/g,
 			(/** @type {string} */ _, /** @type {string} */ name) =>
 				match[from.names.indexOf(name) + 1] ?? "",
 		);
+		return slash && filled !== "/" ? `${filled}/` : filled;
 	}
 	return pathname;
 }

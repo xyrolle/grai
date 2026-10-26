@@ -646,6 +646,30 @@ it("links to a page in its locale's words, and reads them back as the app's rout
 	]);
 });
 
+it("keeps a path's trailing slash through its words, as a framework that writes pages into folders links them", async () => {
+	const { runtime } = await output({
+		strategy: ["url"],
+		pathnames: {
+			"/about": { de: "/ueber-uns" },
+			"/products/[id]": { de: "/produkte/[id]" },
+		},
+	});
+
+	expect([
+		runtime.localizeHref("/about/", { locale: "de" }),
+		runtime.localizeHref("/products/7/?view=all", { locale: "de" }),
+		runtime.localizeHref("/de/ueber-uns/", { locale: "en" }),
+		runtime.deLocalizeUrl("https://shop.test/de/produkte/7/").pathname,
+		runtime.localizeHref("/", { locale: "de" }),
+	]).toEqual([
+		"/de/ueber-uns/",
+		"/de/produkte/7/?view=all",
+		"/about/",
+		"/products/7/",
+		"/de",
+	]);
+});
+
 it("translates the base locale's paths too, and sends an unprefixed page to its locale's words", async () => {
 	const config = {
 		strategy: ["url", "cookie"],
