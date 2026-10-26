@@ -1,5 +1,6 @@
 import type { ESTree } from "vite";
 import { arrayWithout, declarationWithout, type Edit } from "./edits.ts";
+import { valueImportOf } from "./imports.ts";
 import type { Outcome, Translator } from "./library.ts";
 import type { Scopes } from "./scopes.ts";
 import type { Node, Span } from "./syntax.ts";
@@ -34,13 +35,28 @@ export function dependencyList(
 	if (list?.type !== "ArrayExpression" || call?.type !== "CallExpression") {
 		return undefined;
 	}
-	const { callee } = call;
-	const hook =
-		callee.type === "MemberExpression" && !callee.computed
-			? callee.property
-			: callee;
-	const named = hook.type === "Identifier" && dependencyHooks.has(hook.name);
-	return named && call.arguments.at(-1) === list ? list : undefined;
+	const hook = reactExport(call.callee, scopes);
+	const lists = hook !== undefined && dependencyHooks.has(hook);
+	return lists && call.arguments.at(-1) === list ? list : undefined;
+}
+
+/** The name of React's export a callee is: `useMemo` imported from react, or `React.useMemo`. */
+function reactExport(callee: Node, scopes: Scopes): string | undefined {
+	const named = callee.type === "Identifier" ? callee : undefined;
+	const member =
+		callee.type === "MemberExpression" &&
+		!callee.computed &&
+		callee.object.type === "Identifier" &&
+		callee.property.type === "Identifier"
+			? { object: callee.object, name: callee.property.name }
+			: undefined;
+	const local = named ?? member?.object;
+	const binding = local && scopes.resolve(local.name, local.start);
+	const imported = binding && valueImportOf(binding, scopes);
+	if (imported?.module !== "react") return undefined;
+	if (named !== undefined) return imported.name;
+	const whole = imported.name === "default" || imported.name === "*";
+	return whole ? member?.name : undefined;
 }
 
 /** The translators each use of which, but their hook dependencies, is rewritten. */

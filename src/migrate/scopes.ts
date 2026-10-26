@@ -82,6 +82,7 @@ export class Scopes {
 		} else if (node.type === "ImportDeclaration") {
 			for (const specifier of node.specifiers) {
 				this.parents.set(specifier, node);
+				this.parents.set(specifier.local, specifier);
 				this.addBinding(specifier.local, at.block);
 			}
 		} else if (node.type === "VariableDeclaration") {

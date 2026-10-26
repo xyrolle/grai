@@ -71,22 +71,44 @@ export function unusedImports(
 	return { edits: dropped, staying };
 }
 
-/** The module's own `import { m } from …`, which its rewrites call. */
+/** The module's own `import { m } from "<messages>"`, a value from grai's messages, which its rewrites call. */
 export function messagesImport(
 	program: ESTree.Program,
 	scopes: Scopes,
+	messages: string,
 ): Binding | undefined {
 	for (const statement of program.body) {
 		if (statement.type !== "ImportDeclaration") continue;
 		for (const specifier of statement.specifiers) {
-			const named =
-				specifier.type === "ImportSpecifier" &&
-				importedName(specifier) === "m" &&
+			const binding = scopes.bindingOf(specifier.local);
+			const imported = binding && valueImportOf(binding, scopes);
+			const own =
+				imported?.module === messages &&
+				imported.name === "m" &&
 				specifier.local.name === "m";
-			if (named) return scopes.bindingOf(specifier.local);
+			if (own) return binding;
 		}
 	}
 	return undefined;
+}
+
+/** The module a binding is imported from as a value, and the name it takes there. */
+export function valueImportOf(
+	binding: Binding,
+	scopes: Scopes,
+): { module: string; name: string } | undefined {
+	const specifier = scopes.parent(binding.node);
+	const declaration = specifier && scopes.parent(specifier);
+	if (declaration?.type !== "ImportDeclaration") return undefined;
+	const isSpecifier =
+		specifier?.type === "ImportSpecifier" ||
+		specifier?.type === "ImportDefaultSpecifier" ||
+		specifier?.type === "ImportNamespaceSpecifier";
+	if (!isSpecifier || declaration.importKind === "type") return undefined;
+	if (specifier.type === "ImportSpecifier" && specifier.importKind === "type") {
+		return undefined;
+	}
+	return { module: declaration.source.value, name: importedName(specifier) };
 }
 
 /** `import { m } from "<messages>"`, before the module's first import or its first statement. */
