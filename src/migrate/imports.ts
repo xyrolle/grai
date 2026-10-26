@@ -71,20 +71,27 @@ export function unusedImports(
 	return { edits: dropped, staying };
 }
 
-/** The module's own `import { m } from "<messages>"`, a value from grai's messages, which its rewrites call. */
+/**
+ * How a migrated module imports grai's messages as `m`: `import { m } from "<path>"`, the namespace
+ * messages.js exports, or with `namespace`, `import * as m from "<path>"`, keys.js's own.
+ */
+export type MessagesImport = { path: string; namespace: boolean };
+
+/** The module's own import of `m` from grai's messages, a value its rewrites call. */
 export function messagesImport(
 	program: ESTree.Program,
 	scopes: Scopes,
-	messages: string,
+	messages: MessagesImport,
 ): Binding | undefined {
+	const name = messages.namespace ? "*" : "m";
 	for (const statement of program.body) {
 		if (statement.type !== "ImportDeclaration") continue;
 		for (const specifier of statement.specifiers) {
 			const binding = scopes.bindingOf(specifier.local);
 			const imported = binding && valueImportOf(binding, scopes);
 			const own =
-				imported?.module === messages &&
-				imported.name === "m" &&
+				imported?.module === messages.path &&
+				imported.name === name &&
 				specifier.local.name === "m";
 			if (own) return binding;
 		}
@@ -111,10 +118,10 @@ export function valueImportOf(
 	return { module: declaration.source.value, name: importedName(specifier) };
 }
 
-/** `import { m } from "<messages>"`, before the module's first import or its first statement. */
+/** The import of `m` from grai's messages, before the module's first import or its first statement. */
 export function messagesInsertion(
 	program: ESTree.Program,
-	messages: string,
+	{ path, namespace }: MessagesImport,
 ): Edit {
 	const first =
 		program.body.find((statement) => statement.type === "ImportDeclaration") ??
@@ -123,7 +130,8 @@ export function messagesInsertion(
 				!(statement.type === "ExpressionStatement" && "directive" in statement),
 		);
 	const at = first?.start ?? program.end;
-	return { start: at, end: at, text: `import { m } from "${messages}";\n` };
+	const imported = namespace ? "* as m" : "{ m }";
+	return { start: at, end: at, text: `import ${imported} from "${path}";\n` };
 }
 
 /** The name an import takes from its module: `default` for a default import, `*` for a namespace. */

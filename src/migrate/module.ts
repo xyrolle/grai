@@ -6,6 +6,7 @@ import { applyEdits, covers } from "./edits.ts";
 import {
 	type LibraryImport,
 	libraryImports,
+	type MessagesImport,
 	messagesImport,
 	messagesInsertion,
 	type StayingUse,
@@ -52,14 +53,14 @@ type Result = {
 };
 
 /**
- * Rewrites each call of a library's messages as a call of grai's, imports `m` from `messages`,
+ * Rewrites each call of a library's messages as a call of grai's, imports `m` as `messages` says,
  * and removes the declarations and imports that leave unused. Every use it cannot rewrite stays,
  * with the declarations and imports it needs, and is reported.
  */
 export function migrateModule(
 	file: string,
 	text: string,
-	messages: string,
+	messages: MessagesImport,
 	migration: Migration,
 ): MigratedModule {
 	const program = parseModule(file, text);
