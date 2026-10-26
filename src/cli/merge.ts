@@ -22,8 +22,8 @@ export const mergeCommand: Command = {
 		if ("errors" in merged) return failed(merged.errors);
 		console.log(
 			merged.messages === 0
-				? `grai: the file changes no message of ${merged.file}`
-				: `grai: merged ${merged.units} ${merged.units === 1 ? "unit" : "units"} into ${merged.messages} ${merged.messages === 1 ? "message" : "messages"} of ${merged.file}`,
+				? `grai: the file changes no message of ${merged.files.join(", ")}`
+				: `grai: merged ${merged.units} ${merged.units === 1 ? "unit" : "units"} into ${merged.messages} ${merged.messages === 1 ? "message" : "messages"} of ${merged.files.join(", ")}`,
 		);
 		const code = reported(config, merged.result, performance.now() - started);
 		return merged.refused.length > 0 ? failed(merged.refused) : code;

@@ -27,7 +27,7 @@ describe("grai seed", () => {
 		const seeded = await seed(config, "de");
 
 		expect(seeded).toMatchObject({
-			file: "messages/de.json",
+			files: ["messages/de.json"],
 			keys: 2,
 			result: { errors: [] },
 		});

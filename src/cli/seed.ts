@@ -21,10 +21,11 @@ export const seedCommand: Command = {
 		const seeded = await seed(config, locale);
 		if ("errors" in seeded) return failed(seeded.errors);
 		const base = readConfig(config).baseLocale;
+		const files = seeded.files.join(", ");
 		console.log(
 			seeded.keys === 0
-				? `grai: ${seeded.file} has every key of ${base}`
-				: `grai: seeded ${seeded.keys} ${seeded.keys === 1 ? "key" : "keys"} into ${seeded.file} with the text of ${base}`,
+				? `grai: ${files} ${seeded.files.length === 1 ? "has" : "have"} every key of ${base}`
+				: `grai: seeded ${seeded.keys} ${seeded.keys === 1 ? "key" : "keys"} into ${files} with the text of ${base}`,
 		);
 		return reported(config, seeded.result, performance.now() - started);
 	},

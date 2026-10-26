@@ -25,10 +25,26 @@
 			"type": "string"
 		},
 		"catalogs": {
-			"description": "Each locale's catalog, a path with {locale} in it.",
-			"type": "string",
-			"pattern": "\\{locale\\}",
-			"examples": ["messages/{locale}.json"]
+			"description": "Each locale's catalog, a path with {locale} in it, or a list of distinct such paths, where a locale's messages are split across files: a key is in one of them, and a new key goes in the first.",
+			"oneOf": [
+				{
+					"type": "string",
+					"pattern": "\\{locale\\}"
+				},
+				{
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"type": "string",
+						"pattern": "\\{locale\\}"
+					}
+				}
+			],
+			"examples": [
+				"messages/{locale}.json",
+				["messages/{locale}.json", "messages/admin/{locale}.json"]
+			]
 		},
 		"outdir": {
 			"description": "Where the compiled output goes: a directory of grai's own.",
