@@ -9,18 +9,23 @@ async function moduleOf(path: string, text: string): Promise<ModuleFacts> {
 	return module;
 }
 
-/** Each use, written short: where it comes from, the names it reads, and how it ends. */
+/**
+ * Each use, written short: where it comes from, the names it reads (each where its name is, then
+ * the expression that reads it), and how it ends, with the text of a computed read or a rest.
+ */
 function short(text: string, uses: readonly UseFact[]): string[] {
+	const of = ({ start, end }: { start: number; end: number }) =>
+		text.slice(start, end);
 	return uses.map(({ from, chain, end, type }) => {
 		const source = "local" in from ? from.local : `load ${from.load}`;
 		const names = chain.map(
-			({ name, at }) => `${name}@${text.slice(at.start, at.end)}`,
+			({ name, at, expression }) => `${name}@${of(at)}<${of(expression)}>`,
 		);
 		const ending =
 			end.kind === "computed"
-				? `computed ${JSON.stringify(end.prefix)}${end.choices === undefined ? "" : ` ${end.choices.join("|")}`}`
+				? `computed ${JSON.stringify(end.prefix)}${end.choices === undefined ? "" : ` ${end.choices.join("|")}`} <${of(end.at)}>`
 				: end.kind === "pattern"
-					? `pattern ${end.names.map(({ name, binds }) => `${name}${binds === undefined ? "" : `>${binds.name}x${binds.references.length}`}`).join(",")}${end.rest ? ",..." : ""}`
+					? `pattern ${end.names.map(({ name, binds }) => `${name}${binds === undefined ? "" : `>${binds.name}x${binds.references.length}`}`).join(",")}${end.rest === undefined ? "" : ` <${of(end.rest)}>`}`
 					: end.kind;
 		return [source, ...names, ending, ...(type ? ["type"] : [])].join(" ");
 	});
@@ -42,21 +47,21 @@ describe("a file's facts", () => {
 		const module = await moduleOf("src/a.ts", text);
 
 		expect(short(text, module.uses)).toEqual([
-			"m title@title value",
-			"m sub_title@sub_title value",
-			"m optional@optional value",
-			"m cast@cast value",
+			"m title@title<m.title> value",
+			'm sub_title@sub_title<m["sub_title"]> value',
+			"m optional@optional<m?.optional> value",
+			"m cast@cast<(m as typeof m).cast> value",
 			"m value type",
-			'm computed "promo_"',
-			'm computed "a_"',
-			'm computed "" yes|no',
-			'm computed ""',
-			"m pattern heading>headingx2,key_two>twox0,x>threex0,...",
-			"m aliased@aliased value",
+			`m computed "promo_" <m[\`promo_\${season}\`]>`,
+			'm computed "a_" <m["a_" + b]>',
+			'm computed "" yes|no <m[flag ? "yes" : "no"]>',
+			'm computed "" <m[name]>',
+			"m pattern heading>headingx2,key_two>twox0,x>threex0 <...rest>",
+			"m aliased@aliased<t.aliased> value",
 			"m export",
 			"m value",
 			"m export",
-			"m typed@typed value type",
+			"m typed@typed<m.typed> value type",
 		]);
 		expect(module.aliases).toEqual({ t: "m" });
 	});
@@ -124,7 +129,7 @@ describe("a file's facts", () => {
 		const text = `<script>\n\timport { m } from "$lib/i18n";\n</script>\n{#each rows as m}{m.cell}{/each}<p>{m.title()}</p>\n`;
 		const module = await moduleOf("src/App.svelte", text);
 
-		expect(short(text, module.uses)).toEqual(["m title@title value"]);
+		expect(short(text, module.uses)).toEqual(["m title@title<m.title> value"]);
 	});
 
 	it("is a file's error where it does not parse", async () => {
