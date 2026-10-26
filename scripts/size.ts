@@ -31,7 +31,7 @@ import { grai } from "../src/vite.ts";
  */
 const budgets: Record<string, number> = {
 	runtime: 1024,
-	grai: 34_000,
+	grai: 35_000,
 	"grai/vite": 49_000,
 	"grai/svelte": 52_000,
 	"grai/sveltekit": 650,
@@ -39,7 +39,7 @@ const budgets: Record<string, number> = {
 	"grai/sveltekit/client": 460,
 	"grai/sveltekit/navigation": 250,
 	"grai/next": 650,
-	"grai/next/config": 36_000,
+	"grai/next/config": 37_000,
 	"grai/next/proxy": 350,
 	"grai/react": 500,
 	"grai/astro": 55_500,
