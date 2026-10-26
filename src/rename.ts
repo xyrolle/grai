@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { type Use, usesIn } from "./call-sites.ts";
 import { type Catalog, fileOfKey, pathsInFile } from "./catalog.ts";
 import { type MessageEntry, messageEntries } from "./catalog-entries.ts";
 import { type KeyPath, keyOf, placedPath } from "./catalog-keys.ts";
 import { layoutOf, tabbedLayout } from "./catalog-layout.ts";
 import { withKeyRenamed, withMessages, withoutKeys } from "./catalog-text.ts";
+import { readProjectCode } from "./code/project.ts";
+import { readingOf } from "./code/reads.ts";
+import { codeProblems, unknownReads } from "./code-problems.ts";
 import {
 	type CompileResult,
 	compile,
@@ -16,26 +18,21 @@ import { withListedKeysChanged } from "./config-file.ts";
 import { descriptionsRenamed } from "./descriptions.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
-import {
-	escapeProblems,
-	ownershipProblems,
-	reachProblems,
-	siteProblems,
-	uncertainProblems,
-} from "./rename-checks.ts";
-import { sourceFiles } from "./sources.ts";
+import { compileOutputIfMissing } from "./output-present.ts";
+import { codeEdits, edited } from "./rename-edits.ts";
 import { writeAll } from "./write-all.ts";
 
 /** What a rename changed, relative to the project's root, and what the compile after it wrote. */
 export type RenameResult = CompileResult & { changed: string[] };
 
 /**
- * Renames a key in every catalog, at every call site under the roots (the project's root by
- * default), in the config's lists and in the descriptions file, all of them or none, then
- * compiles. In an object of messages, the key keeps its place while its new name still starts with
- * the object's key. It changes nothing when no catalog has the key, when the new name is no key
- * name or is taken, or when a source writes the key's name where it cannot tell that it means the
- * key; each is an error that names the place.
+ * Renames a key in every catalog, at every read of it in the code under the roots (the project's
+ * root by default), read as `check` reads it, in the config's lists and in the descriptions file,
+ * all of them or none, then compiles. A binding named after the key is renamed with it, with every
+ * reference to it. In an object of messages, the key keeps its place while its new name still
+ * starts with the object's key. It changes nothing when no catalog has the key, when the new name
+ * is no key name or another key's, when a read may reach the key without naming it, when a binding
+ * cannot take the new name, or when a file's reads cannot be known; each is an error at its place.
  */
 export async function rename(
 	configFile: string,
@@ -55,15 +52,17 @@ export async function rename(
 	};
 	const named = nameProblems(from, to, catalogs, where);
 	if (named.length > 0) return unchanged(named);
-	const files = sourceFiles(roots ?? [config.root], config.root, config.outdir);
-	const sites = usesIn(files, from);
-	const problems = [
-		...sites.flatMap((site) => siteProblems(site, from, to)),
-		...reachProblems(files, from),
-		...escapeProblems(files, from),
-		...uncertainProblems(files, from),
-		...ownershipProblems(sites, from),
-	];
+	const compiled = await compileOutputIfMissing(configFile, config);
+	if (compiled.length > 0) return unchanged([...compiled]);
+	const code = await readProjectCode(config, roots ?? [config.root]);
+	if (code instanceof GraiError) return unchanged([code]);
+	const reading = await readingOf(code);
+	const keys = new Set(
+		catalogs.flatMap(({ messages }) => [...messages.keys()]),
+	);
+	const unknown = unknownReads(codeProblems(reading, keys, config));
+	if (unknown.length > 0) return unchanged(unknown);
+	const { files, problems } = await codeEdits(reading, from, to);
 	if (problems.length > 0) return unchanged(sortErrors(problems));
 	const texts = new Map<string, string>();
 	for (const [index, { file, files, bytes }] of read.sources.entries()) {
@@ -79,8 +78,8 @@ export async function rename(
 			renamedIn(text, entry, value, to, siblings),
 		);
 	}
-	for (const { source, uses } of sites) {
-		texts.set(source.path, renamed(source.text, uses, from, to));
+	for (const [path, { text, edits }] of files) {
+		texts.set(path, edited(text, edits, to));
 	}
 	const configText = withListedKeysChanged(
 		readFileSync(configFile, "utf8"),
@@ -160,20 +159,4 @@ function nameProblems(
 			`the catalogs have "${taken}" already${collision}. Choose another name.`,
 		),
 	];
-}
-
-/** The text with the key's name replaced by the new one at each use. */
-function renamed(
-	text: string,
-	uses: readonly Use[],
-	from: string,
-	to: string,
-): string {
-	let result = "";
-	let last = 0;
-	for (const { at } of uses.toSorted((a, b) => a.at - b.at)) {
-		result += text.slice(last, at) + to;
-		last = at + from.length;
-	}
-	return result + text.slice(last);
 }

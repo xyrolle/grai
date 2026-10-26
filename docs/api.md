@@ -76,8 +76,8 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `grai check [--source <dir>]... [--json]`: reports every problem, reading the code as the bundler does. It writes nothing but the output, which it compiles first when it is missing. `--json` prints `{ problems: [{ code, file, key, locale, message }], untranslated: { [locale]: string[] } }`.
 - `grai check --fix [--source <dir>]...`: removes from every catalog the keys no shipped code reads or may reach, lists each one, then checks. It removes nothing while a source does not parse.
 - `grai add <key> --<locale> <text>...`: adds the key to every catalog, with a text for each locale, then compiles.
-- `grai find <key> [--source <dir>]...`: prints the key's line in each catalog, and each call site.
-- `grai rename <key> <new> [--source <dir>]...`: renames the key in every catalog and at every call site, then compiles.
+- `grai find <key> [--source <dir>]...`: prints the key's line in each catalog, each call site, and each read that may reach the key without naming it, reading the code as `check` does.
+- `grai rename <key> <new> [--source <dir>]...`: renames the key in every catalog and at every call site, a binding named after it with every reference to it, then compiles. It changes nothing while a read may reach the key without naming it, or where a binding's new name is taken, and names the place.
 - `grai seed <locale>`: gives the locale's catalog the base text of each key it lacks, then compiles.
 - `grai export <locale> [--untranslated] [--json]`: prints the locale's messages as XLIFF 2.0. `--json` prints `{ srcLang, trgLang, units: [{ id, key, variant?, note?, source, target? }] }`.
 - `grai merge <file>`: writes an exported file's translations into its locale's catalog, then compiles.

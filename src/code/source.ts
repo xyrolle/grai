@@ -117,6 +117,15 @@ export function fileOffset(code: SourceCode, at: number): number | undefined {
 	return undefined;
 }
 
+/** Where an offset of the file is in a module's text, or undefined when no piece holds it. */
+export function textOffset(code: SourceCode, at: number): number | undefined {
+	for (const piece of code.pieces) {
+		if (piece.from <= at && at <= piece.from + piece.length)
+			return piece.at + at - piece.from;
+	}
+	return undefined;
+}
+
 /** The file offset of the piece nearest before an offset of the text, for a place in grai's code. */
 export function nearestFileOffset(code: SourceCode, at: number): number {
 	let nearest = 0;
