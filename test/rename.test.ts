@@ -206,6 +206,19 @@ describe("grai rename", () => {
 		expect(readText(dir, "src/render.js")).toContain("return m.cart_title();");
 	});
 
+	it("leaves a string in an array alone, which reads no member", async () => {
+		const { dir, config } = project(catalogs);
+		const data = `import { m } from "../out/messages.js";\nexport const data = ["m.cart_title"];\nexport const heading = m.cart_title();\n`;
+		writeSources(dir, { "src/data.js": data });
+
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/data.js")).toBe(
+			data.replace("m.cart_title()", "m.basket_title()"),
+		);
+	});
+
 	it("refuses a name another key has, in any case, and a name that is no key name", async () => {
 		const { config } = app();
 
