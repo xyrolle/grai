@@ -1,7 +1,7 @@
 import { bindLocale } from "grai/next";
 import { Markup } from "grai/react";
 import Link from "next/link";
-import { m } from "@/i18n/messages.js";
+import * as m from "@/i18n/keys.js";
 import { localizeHref } from "@/i18n/runtime.js";
 import { Cart } from "./cart.tsx";
 import { LanguageSwitch } from "./language-switch.tsx";

@@ -1,6 +1,6 @@
 import { bindLocale } from "grai/next";
 import { connection } from "next/server";
-import { m } from "@/i18n/messages.js";
+import * as m from "@/i18n/keys.js";
 import { Cart } from "../cart.tsx";
 
 /** Reads the estimate, as from a carrier's API: the render awaits it, and other requests run meanwhile. */

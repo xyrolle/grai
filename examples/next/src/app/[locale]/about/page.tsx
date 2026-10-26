@@ -3,7 +3,7 @@ import Link from "next/link";
 // Per-key paths, which package.json maps to keys.js, work beside the m namespace.
 import { about_body } from "#i18n/messages/about_body.js";
 import { about_title } from "#i18n/messages/about_title.js";
-import { m } from "@/i18n/messages.js";
+import * as m from "@/i18n/keys.js";
 import { getLocale, locales, localizeHref } from "@/i18n/runtime.js";
 
 export async function generateMetadata({
