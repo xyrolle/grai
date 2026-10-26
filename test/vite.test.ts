@@ -550,7 +550,7 @@ describe("grai/vite's module kinds", () => {
 describe("the Vite plugin's locale copies", () => {
 	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
 
-	it("copies a chunk byte for byte, each call keeping only its locale's variants, at their position", () => {
+	it("copies a chunk byte for byte, each call keeping only its locale's variants, alone", () => {
 		const chunk = (calls: string) =>
 			`import { markup, message, text } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
 		const copies = localeCopies(
@@ -565,9 +565,9 @@ var terms = /*#__PURE__*/ markup([(i) => "Terms", (i) => "AGB"], [(i) => [], (i)
 			en: chunk(`var title = /*#__PURE__*/ text("Title");
 var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`);
 var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
-			de: chunk(`var title = /*#__PURE__*/ text(void 0, "Titel");
-var greeting = /*#__PURE__*/ message(void 0, (i) => \`Hallo \${i.name}\`);
-var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type: "text", value: "AGB" }]]);`),
+			de: chunk(`var title = /*#__PURE__*/ text("Titel");
+var greeting = /*#__PURE__*/ message((i) => \`Hallo \${i.name}\`);
+var terms = /*#__PURE__*/ markup([(i) => "AGB"], [(i) => [{ type: "text", value: "AGB" }]]);`),
 		});
 	});
 
@@ -579,7 +579,7 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 			localeCopies("chunk.js", chunk(`"Title", "Titel"`), ["en", "de"]).get(
 				"de",
 			),
-		).toBe(chunk(`void 0, "Titel"`));
+		).toBe(chunk(`"Titel"`));
 	});
 
 	it("says in config.js whether the build wrote them, for the server", async () => {

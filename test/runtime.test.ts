@@ -644,6 +644,46 @@ describe("in a browser", () => {
 		});
 	});
 
+	it("takes a key's one variant, as a locale's copy of a message chunk gives it, as the page's locale's", async () => {
+		page("de");
+		const { dir, load } = project(catalogs);
+		await load();
+		// The runtime's functions as a copy's calls reach them.
+		const { markup, message, pageText, text } = await import(
+			pathToFileURL(join(dir, "out", "internal.js")).href
+		);
+		const title = text("Ihr Warenkorb");
+		const greeting = message(
+			(inputs: { name: string }) => `Hallo ${inputs.name}`,
+		);
+		const terms = markup(
+			[() => "AGB"],
+			[() => [{ type: "text", value: "AGB" }]],
+		);
+
+		expect([
+			title(),
+			title({}, { locale: "de" }),
+			greeting({ name: "Ada" }),
+			terms(),
+			terms.parts(),
+			pageText("Ihr Warenkorb"),
+		]).toEqual([
+			"Ihr Warenkorb",
+			"Ihr Warenkorb",
+			"Hallo Ada",
+			"AGB",
+			[{ type: "text", value: "AGB" }],
+			"Ihr Warenkorb",
+		]);
+		// A call naming another locale is refused, naming the page's.
+		expect(thrown(() => title({}, { locale: "en" }))).toMatchObject({
+			code: "locale-not-loaded",
+			message:
+				'A message was called in "en", but this page renders in "de" alone.',
+		});
+	});
+
 	it("keeps the choice with setLocale and { reload: false }, and leaves the page in its locale", async () => {
 		const visited = page("de");
 		const { m, runtime } = await output({

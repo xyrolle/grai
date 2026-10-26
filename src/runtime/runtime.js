@@ -327,8 +327,8 @@ export function localizeHref(href, options) {
  * a page, a call names no locale but the page's.
  *
  * @template Variant
- * @param {readonly Variant[]} variants one per locale, in `locales` order; dev adds the key after
- * them, for the error to name
+ * @param {readonly (Variant | undefined)[]} variants one per locale, in `locales` order, none for a
+ * locale the page does not render in; dev adds the key after them, for the error to name
  * @param {{ locale?: string } | undefined} options
  * @returns {Variant}
  */
@@ -363,6 +363,27 @@ function noVariant(variants, locale, index) {
 }
 
 /**
+ * A key's variants at their locales' positions. A page's copy of a message chunk gives each key its
+ * locale's variant alone (`localeCopies`), and the page renders in that locale, which its import map
+ * chose with its `<html lang>`: the variant goes to the page's position, after an undefined for
+ * each locale before it, as a call that held them all would have it. Placed once, as the module is
+ * evaluated, so a call reads its variant as for any key; at the first locale's position it already
+ * is.
+ *
+ * @template Variant
+ * @param {Variant[]} variants
+ * @returns {readonly (Variant | undefined)[]}
+ */
+function positional(variants) {
+	if (!page || current === 0 || variants.length !== 1) return variants;
+	// Made at its length, as a call's own list of variants is: one grown by pushes cost each call
+	// about 1 ns more in a measure of 11,673 calls.
+	return Array.from({ length: current + 1 }, (_, at) =>
+		at === current ? variants[0] : undefined,
+	);
+}
+
+/**
  * A message with inputs: one function per locale, in `locales` order.
  *
  * @template Inputs, Result
@@ -370,7 +391,8 @@ function noVariant(variants, locale, index) {
  * @returns {(inputs: Inputs, options?: { locale?: string }) => Result}
  */
 export function message(...variants) {
-	return (inputs, options) => variantFor(variants, options)(inputs);
+	const placed = positional(variants);
+	return (inputs, options) => variantFor(placed, options)(inputs);
 }
 
 /**
@@ -380,7 +402,8 @@ export function message(...variants) {
  * @returns {(inputs?: unknown, options?: { locale?: string }) => string}
  */
 export function text(...texts) {
-	return (_inputs, options) => variantFor(texts, options);
+	const placed = positional(texts);
+	return (_inputs, options) => variantFor(placed, options);
 }
 
 /**
@@ -392,7 +415,7 @@ export function text(...texts) {
  * @returns {string}
  */
 export function pageText(...texts) {
-	return variantFor(texts, undefined);
+	return variantFor(positional(texts), undefined);
 }
 
 /**
