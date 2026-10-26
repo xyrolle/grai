@@ -354,7 +354,7 @@ export function localizeHref(href, options) {
  * @param {{ locale?: string } | undefined} options
  * @returns {Variant}
  */
-function variantFor(variants, options) {
+export function variantFor(variants, options) {
 	const locale = options?.locale;
 	const index = locale === undefined ? bound() : locales.indexOf(locale);
 	const variant = variants[index];
@@ -393,6 +393,46 @@ function noVariant(variants, locale, index) {
  */
 export function message(...variants) {
 	return (inputs, options) => variantFor(variants, options)(inputs);
+}
+
+/**
+ * The position in `locales` of the locale a call renders in: the one it names, else the bound one.
+ * A server build's message dispatches on it in its own code.
+ *
+ * @param {{ locale?: string } | undefined} options
+ * @returns {number}
+ */
+export function localeIndex(options) {
+	const locale = options?.locale;
+	if (locale === undefined) return bound();
+	const index = locales.indexOf(locale);
+	if (index < 0) throw unknownLocale(locale);
+	return index;
+}
+
+/**
+ * A message in a server build whose own code makes its dispatch: `make` of its variants.
+ *
+ * @template Variant, Dispatch
+ * @param {(variants: readonly Variant[]) => Dispatch} make
+ * @param {readonly Variant[]} variants
+ * @returns {Dispatch}
+ */
+export function dispatcher(make, variants) {
+	return make(variants);
+}
+
+/**
+ * A message with markup whose own code makes its dispatches: of its text, with that of its parts
+ * as `.parts`.
+ *
+ * @template {object} Dispatch
+ * @template Parts
+ * @param {Dispatch} dispatch
+ * @param {Parts} parts
+ */
+export function withParts(dispatch, parts) {
+	return Object.assign(dispatch, { parts });
 }
 
 /**

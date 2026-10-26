@@ -1,10 +1,11 @@
 import { basename, dirname } from "node:path";
 import { minifySync, type Rolldown } from "vite";
+import type { CompiledKey } from "./compilation.ts";
 import type { Build } from "./compile.ts";
 import { withoutContentHash } from "./content-names.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
-import { keyExports } from "./key-exports.ts";
+import { freshName, keyExports } from "./key-exports.ts";
 import { type KeyLinks, keyReach, type ModuleGraph } from "./key-reach.ts";
 import { pageChunks } from "./key-sets.ts";
 import {
@@ -43,9 +44,99 @@ export function keyModule(
 	const name = id.slice(keyModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
+	const shape = process.env.GRAI_SERVER_SHAPE;
+	if (consumer === "server" && key.kind !== "text" && shape)
+		return serverDispatch(build, name, key, shape);
 	const names = calledNames([key]);
 	const value = consumer === "server" ? key.serverValue : key.value;
 	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
+}
+
+/** The runtime functions each prototype shape of a server build's dispatch calls. */
+const shapeFunctions: Record<string, readonly string[]> = {
+	a: ["dispatcher", "variantFor"],
+	b: ["variantFor"],
+	c: ["localeIndex"],
+	d: ["localeIndex"],
+};
+
+/**
+ * PROTOTYPE. A message with inputs or markup in a server build, dispatched by code of its own, so
+ * that its call of a locale's function stays monomorphic:
+ *   a  the runtime makes it from the key's own function, `dispatcher(function (v) {…}, […])`
+ *   b  an array of the key's functions, and a function of its own that calls `variantFor`
+ *   c  a switch on the locale's index, each locale's code inlined in the key's own function
+ *   d  a function per locale, and a switch on the locale's index that calls it
+ */
+function serverDispatch(
+	build: Build,
+	name: string,
+	key: CompiledKey,
+	shape: string,
+): string {
+	const markup = key.kind === "markup";
+	const functions = [
+		...(shapeFunctions[shape] ?? []),
+		...(markup ? ["withParts"] : []),
+	];
+	const names = calledNames([key], functions);
+	const bound = new Set([...everyName(names), name]);
+	const fresh = (wanted: string) => {
+		const own = freshName(wanted, bound);
+		bound.add(own);
+		return own;
+	};
+	const o = fresh("o");
+	const statements: string[] = [];
+	const own = (
+		locales: readonly {
+			parameter: string;
+			declarations: string;
+			body: string;
+		}[],
+	) => {
+		const written = locales.map(
+			({ parameter, declarations, body }) =>
+				`function (${parameter}) { ${declarations}return ${body}; }`,
+		);
+		switch (shape) {
+			case "a":
+				return `/*#__PURE__*/ dispatcher(function (v) { return function (i, ${o}) { return variantFor(v, ${o})(i); }; }, [${written.join(", ")}])`;
+			case "b": {
+				const v = fresh("v");
+				statements.push(`const ${v} = [${written.join(", ")}];\n`);
+				return `function (i, ${o}) { return variantFor(${v}, ${o})(i); }`;
+			}
+			case "c": {
+				const cases = locales.map(
+					({ declarations, body }, index) =>
+						`${index === locales.length - 1 ? "default" : `case ${index}`}: { ${declarations}return ${body}; }`,
+				);
+				return `function (i, ${o}) { switch (localeIndex(${o})) { ${cases.join(" ")} } }`;
+			}
+			default: {
+				const called = written.map((code) => {
+					const local = fresh("$");
+					statements.push(
+						`function ${local}${code.slice("function ".length)}\n`,
+					);
+					return local;
+				});
+				const cases = called.map(
+					(local, index) =>
+						`${index === called.length - 1 ? "default" : `case ${index}`}: return ${local}(i);`,
+				);
+				return `function (i, ${o}) { switch (localeIndex(${o})) { ${cases.join(" ")} } }`;
+			}
+		}
+	};
+	const strings = own(key.functions.strings);
+	const value = markup
+		? `/*#__PURE__*/ withParts(${strings}, ${own(key.functions.parts)})`
+		: strings;
+	const taken = new Set(bound);
+	taken.delete(name);
+	return `${outputImports(names, outputModule, build.rendered.modules)}\n${statements.join("")}${keyExports([{ name, value }], taken)}`;
 }
 
 /**

@@ -17,7 +17,7 @@ import { MessageProblem } from "./problem.ts";
  */
 export type CompiledKey = Pick<
 	KeyModule,
-	"value" | "serverValue" | "kind" | "variants" | "parts"
+	"value" | "serverValue" | "kind" | "variants" | "parts" | "functions"
 > & {
 	/** The key's name, which its module exports it under. */
 	name: string;
@@ -182,6 +182,7 @@ function compileKey(
 		kind: module.kind,
 		variants: module.variants,
 		parts: module.parts,
+		functions: module.functions,
 		markup: messages.some((message) => message.markup),
 	};
 }

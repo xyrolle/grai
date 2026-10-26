@@ -2,6 +2,7 @@ import type { Formatter } from "./formatters.ts";
 import {
 	arrow,
 	functionExpression,
+	type LocaleFunction,
 	localeFunction,
 	type Used,
 } from "./locale-function.ts";
@@ -35,7 +36,14 @@ export type KeyModule = {
 	variants: readonly string[];
 	/** Per locale, for markup: a function of the inputs giving the parts. */
 	parts: readonly string[];
+	/** Per locale, a message's or markup's functions as written, for a server build's own dispatch. */
+	functions: {
+		strings: readonly LocaleFunction[];
+		parts: readonly LocaleFunction[];
+	};
 };
+
+const noFunctions: KeyModule["functions"] = { strings: [], parts: [] };
 
 /** What every text key calls: the runtime's `text`, and nothing else, shared by them all. */
 const textUses: ReadonlySet<RuntimeFunction> = new Set(["text"]);
@@ -68,6 +76,7 @@ export function keyModule(
 			kind: "text",
 			variants: texts,
 			parts: [],
+			functions: noFunctions,
 		};
 	}
 	const used: Used = {
@@ -97,6 +106,7 @@ export function keyModule(
 		kind,
 		variants,
 		parts: partArrows,
+		functions: { strings, parts },
 	};
 }
 
