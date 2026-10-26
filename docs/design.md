@@ -384,6 +384,97 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 - **grai/vite runs in the browser's build only.** Nuxt runs its server's dev modules in vite-node, outside Vite's module runner, so grai/vite's patch of a runner would not reach them. Nuxt invalidates those modules when grai writes the output's files, so the next server render has the edit, and the open page renders it again in place through `grai/vue/client`, which the plugin imports.
 - **`ssr: false` is refused,** since the server picks each page's locale.
 
+## Reading code
+
+grai reads an app's code to know which keys it reads: to report a key no catalog has, to remove a key nothing reads, to find and rename a key's reads, to migrate another library's calls, and to chunk a build's messages by the pages that read them. It reads code as the bundler does, everywhere, with one mechanism.
+
+- **One reader, in `src/code/`, and nothing else reads code.** `check`, `check --fix`, `find`, `rename`, `migrate`, `grai/svelte`'s text calls and the Vite plugin's key reads all take what it gives, so no two of them can read a file differently.
+  - `parse.ts` is the only module that imports the parser. It gives a file's, or a piece of a file's, ESTree and module record, with offsets in the file's UTF-16, and its errors.
+  - `components.ts` reads a Svelte, Vue, Astro or MDX file as its scripts and its template's expressions, each parsed by `parse.ts` at its place in the file. It also gives the scopes the template opens: `{#each … as item}`, `{#snippet row(item)}`, `{@const}`, `{:then value}`, `let:`, `v-for` and `v-slot`.
+  - `scopes.ts` gives the declaration each name refers to, by ECMAScript's rules and TypeScript's (a type binds no value), with a component's template scopes inside its scripts'. It is the one scope reader, which `migrate` uses too.
+  - `facts.ts` gives what a file imports and exports, and each use of each name it imports: a member read, an index, a destructuring, a call, a use whole, and each dynamic import. Its result is plain data about one file, which knows nothing of the others. That makes it a pure function of the file's text, so workers compute it and it is cached by content.
+  - `modules.ts` resolves imports and follows a name through re-exports to grai's output. It takes the resolver as an argument: `oxc-resolver` for the CLI, the bundler's own resolution in a build.
+  - `reads.ts` turns facts and module reach into the reads of the messages, with their places. These are what the commands and the build consume.
+
+  ```ts
+  // The CLI: every source under the roots, read and resolved.
+  readSources(config, roots): Promise<Reading | ParseErrors>
+  // A build: one module, by the bundler's resolution.
+  readModule(path, text, resolve): Promise<ModuleReading | ParseErrors>
+  type Reading = {
+    reads: Read[];        // a key read, with its place and its file
+    reaches: Reach[];     // computed reads, whole uses and loads by pattern: the keys each may reach, with its place
+    tests: Read[];        // the reads of test files, which ship nothing
+  };
+  ```
+- **The parser is `oxc-parser` (0.155 today), grai's first runtime dependency, with `oxc-resolver`.**
+  - Install size: 4.7 MB for the parser on macOS arm64 (the package, 2.9 MB of it a WebAssembly build for platforms without a native one, and a 1.7 MB native binding). The resolver adds 1.6 MB.
+  - It is the parser Vite 8's Rolldown is built on. It parses TypeScript and JSX, and gives ESTree with UTF-16 offsets, names with their escapes read (`title` is `title`), and errors with their places.
+  - Parsing app B's 6,980 scripts (53 MB) to full ESTree takes 0.6 s through its raw transfer. The same parse returned as JSON takes 2.8 s.
+  - The build uses grai's copy too, not Vite's re-export. With one version, the build and the CLI read every file into the same tree. A Next project, which has no Vite, reads code with the same parser. Loading a second copy of the parser in a Vite build costs one native binding.
+  - The resolver is the one Rolldown resolves with, published for Node. It reads tsconfig `paths` (with `extends`, so SvelteKit's generated `.svelte-kit/tsconfig.json` brings `$lib`) and package.json `imports` and `exports` under the bundler's conditions. It caches by directory: app B's 24,573 distinct imports resolve in 0.6 s cold.
+  - Node's own resolution knows neither tsconfig paths nor TypeScript's extensions. TypeScript's module resolution needs `typescript` and is slower. Running Vite's resolver needs the app's Vite config loaded, which a Next project does not have.
+- **A component is read through its framework's own parser, and its expressions through oxc.**
+  - Svelte: `svelte/compiler`'s `parse` (the modern AST) gives the scripts and every expression's place.
+  - Vue: `vue/compiler-sfc`'s `parse` gives the blocks and the template's expressions as text with their places, `v-for`'s parts among them.
+  - Astro: `@astrojs/compiler-rs`, the parser Astro 7 itself depends on, loaded through the project's `astro`.
+  - MDX: `@mdx-js/mdx`'s parser.
+
+  Each expression's text is then parsed by `parse.ts` at its offset. Script and template therefore come out as one kind of tree: in TypeScript where the component's script is, and with JSX where the template allows it. Each framework is an optional peer, loaded only when the project has such a file. A component whose framework is not installed is an error that names the package. No markup is read as text.
+- **A file that does not parse fails the command,** with the parser's message at its place, as the bundler fails it (`source-invalid`). It is never read another way. `check` reports it, and `check --fix`, `find`, `rename` and `migrate` refuse to act, since the reads of a file they cannot parse are unknown.
+- **Scopes are ECMAScript's, exactly.**
+  - These declare names: `var`, which reaches the nearest function body or static block, `let`, `const`, `class` and `function` (hoisted). So do parameters, a caught error, imports, TypeScript's `enum`, `namespace` and `import x = require()`, and a template's blocks.
+  - A type, an interface and `declare` bind no value.
+  - A name reads the nearest declaration of it. A `const` set to the namespace (`const t = m`) is the namespace too, since it cannot change. Any other copy is a use of the namespace whole.
+  - The "not checked: declares m again" path goes. Every read is placed exactly.
+- **Module reach comes from the module graph, never from a name or a path.**
+  - An import is grai's if it resolves to the output's `messages.js`, `keys.js` or a key's path, or to a module whose export of that name does, followed through re-exports:
+    - `export { m } from`, and an import exported again;
+    - `export * as`;
+    - `export *`, where a name a module exports itself wins over a star export of the same name, as the bundler binds it;
+    - a default export.
+  - An import that does not resolve names no file, so it names none of grai's. The one exception is a path that ends in the output's directory and one of its modules, which only an alias the CLI cannot see resolves: that is an error naming the import and saying where to declare the alias (tsconfig `paths` or package.json `imports`). It is never taken for grai's or for not grai's.
+  - `require()` of a literal path is an import, as the bundler converts it.
+  - In a build, the bundler's resolution gives every import, and per-key paths resolve to its key modules (`\0grai:key/title`).
+- **What a read reaches:**
+  - **A key, read by name:** `m.key`, `m?.key`, `m["key"]` and a template without substitutions; `{ key }`, `{ "key": name }` or `{ ["key"]: name }` taken apart from `m`; a key's path imported statically or dynamically, destructured or not; a named import of keys.js; and each use of the name such an import binds.
+  - **A computed read, `m[expr]`, reaches every key the index can be.**
+    - A literal is the one key.
+    - A template that starts with text, or text joined to something, reaches every key that starts with that text.
+    - A choice between literals (`a ? "x" : "y"`) reaches those keys.
+    - Anything else reaches every key.
+  - **A use of `m` whole** reaches every key: passed on, spread, `Object.keys(m)`, `for…in`, a rest taken apart, or a copy that is not a `const`. So does a namespace import of keys.js used whole.
+  - **A dynamic import with a literal path** is the import it names: a key's path reads that key, and messages.js or keys.js is the namespace, read through what the code does with it.
+  - **A dynamic import with a template path** reaches the keys whose path the template matches, `${…}` standing for any text without `/`. This is how Vite's dynamic-import variables expand one into a glob. **`import.meta.glob`** reaches the keys its pattern matches.
+  - **A dynamic import of anything else (`import(path)`) reaches nothing,** as the bundler treats it: it bundles no module for it, and the import is left to the runtime.
+    - In a Vite build, a key's path resolves to a module that exists only in the build, so no runtime import can reach it.
+    - In an app that imports the output unbundled, a path built at run time can reach a key's module. That load is outside what any build tool sees, and the docs say so.
+    - So for `check` it is no read, and for `check --fix` a key only such an import loads is unused. For `rename` it is nothing to refuse.
+  - **A type that names a key** (`typeof m.key`, an import type of a key's path) is a read for `check`, `check --fix`, `find` and `rename`, since removing or renaming the key would break the type. It is not a read for chunking: no runtime code reads it.
+  - **JSX text, regular expressions against division, comments, strings and escapes are the parser's,** and stop being questions.
+- **What the commands do with the reads:**
+  - `check` reports each key read that no catalog has, at its place. A key is unused when no read of shipped code reaches it.
+  - A computed read or a whole use that keeps keys no read names is listed with its place, as `check --fix` lists it. A key only tests read is unused, and the report names those tests.
+  - `check --fix` removes the unused keys, and the check after it takes the reading the fix made.
+  - `find` lists every read of the key: by name, and the computed reads, whole uses and loads that may reach it.
+  - `rename` edits exactly the spans of the key's reads by name. That covers a member, a string or template, a path's last segment, an import's name, and the name a per-key import or a shorthand pattern binds, with every reference to it. An escaped name is written plainly.
+  - `rename` refuses only for these reasons, each named with its place:
+    - a computed read, whole use or pattern load that may reach the key;
+    - a binding it would rename that would collide with, or capture, another name in its scope;
+    - a new name another key has.
+
+    It no longer refuses for mentions, escapes, JSX text, `/` or a namespace declared again.
+  - A build reads each module's source with the same reader, the bundler resolving, so a build and `check` find the same reads at the same places. Vue's compiled template reads a script's import through `unref()`, which would read as a use whole, so reading the source is also what keeps its reads exact. Chunking links modules by what the bundler ships, the module's transformed code read by the same parser, since only that shows Vite's expanded globs.
+  - `migrate` parses and scopes through the reader. It finds a component's imports of the library from the component's parse, not from its text.
+- **Performance is measured against main in one window, and earned back without losing exactness:**
+  - The commands measured are `check`, `check --fix`, `find` and `rename` on the synthetic project and app B (the refactor bench), together with the build's check and `test:performance`.
+  - Every command now reads every source, because exactness needs the graph. Before, `find` and `rename` read only the files that wrote the key.
+  - Parsing is spread over a pool of worker threads, sized to the machine's parallelism, which return each file's facts.
+    - Single-threaded, Svelte's own parse takes 2.0 s for app B's 1,988 components (15 MB), and oxc 0.6 s for its scripts.
+    - With 8 workers, the whole of app B parses in 0.95 s, at a load of 74. That has to be measured again on a quiet machine.
+  - Facts are cached by content: across a watch, between `check --fix`'s fix and its check, and across a build's rebuilds.
+  - The bench's projects have to resolve as real ones do. The synthetic project gets a package.json `imports` and an `i18n` module that re-exports `m`, and app B's copy keeps its package.json and tsconfig, since a guessed import is no longer read.
+
 ## CLI
 
 - `grai compile` writes the output once; `grai watch` keeps it current, incrementally.
