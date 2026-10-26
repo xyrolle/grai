@@ -24,9 +24,9 @@ import { grai } from "../src/vite.ts";
  * Each one's budget, in bytes. The runtime's is the design's 1 KB, and the 37 B that read a
  * relative href from the page's URL. An entry's is about a fifth over its
  * size when it was set. The entries that carry the compiler, set with the templates of the output's
- * declarations beside it as files: grai 32,551 B, grai/next/config 34,496 B, grai/vite 45,300 B
- * with its locale script, and with grai/vite's plugin grai/svelte 46,515 B, grai/sveltekit/vite
- * 46,570 B, grai/astro 47,043 B and grai/nuxt 45,981 B. The others: grai/sveltekit 541 B
+ * declarations beside it as files: grai 32,551 B, grai/next/config 34,496 B, grai/vite 55,846 B
+ * with its locale script and the build's reader of code, and with grai/vite's plugins grai/svelte
+ * 56,167 B, grai/sveltekit/vite 56,221 B, grai/astro 58,675 B and grai/nuxt 56,820 B. The others: grai/sveltekit 541 B
  * with its import map, grai/sveltekit/client 382 B, grai/sveltekit/navigation 210 B, grai/next
  * 516 B, grai/next/proxy 265 B, grai/react 413 B, grai/astro/middleware 1,838 B, grai/vue 426 B,
  * grai/vue/client 292 B, grai/astro/translated-paths 1,621 B, which a static Astro build loads
@@ -35,23 +35,23 @@ import { grai } from "../src/vite.ts";
 const budgets: Record<string, number> = {
 	runtime: 1061,
 	grai: 39_100,
-	"grai/vite": 54_400,
+	"grai/vite": 67_000,
 	"grai/register": 900,
-	"grai/svelte": 55_900,
+	"grai/svelte": 67_400,
 	"grai/sveltekit": 650,
-	"grai/sveltekit/vite": 55_900,
+	"grai/sveltekit/vite": 67_500,
 	"grai/sveltekit/client": 460,
 	"grai/sveltekit/navigation": 250,
 	"grai/next": 650,
 	"grai/next/config": 41_400,
 	"grai/next/proxy": 350,
 	"grai/react": 500,
-	"grai/astro": 56_500,
+	"grai/astro": 70_400,
 	"grai/astro/middleware": 2_200,
 	"grai/astro/translated-paths": 1_950,
 	"grai/vue": 520,
 	"grai/vue/client": 350,
-	"grai/nuxt": 55_200,
+	"grai/nuxt": 68_200,
 };
 
 const root = new URL("../", import.meta.url);
