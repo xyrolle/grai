@@ -51,6 +51,7 @@ export async function readUse(
 	let keyAt = use.at;
 	let readAt = use.at;
 	let name = "";
+	let links = 0;
 	for (const link of use.chain) {
 		if (value.kind === "key") break;
 		value = await graph.member(value, link.name);
@@ -58,6 +59,7 @@ export async function readUse(
 		keyAt = link.at;
 		readAt = link.expression;
 		name = link.name;
+		links++;
 	}
 	const via = ownKey === undefined ? "member" : "module";
 	if (value.kind === "key") {
@@ -71,6 +73,11 @@ export async function readUse(
 					binding: undefined,
 					type: use.type,
 					writtenAt: readAt,
+					// Called only when the key's name is the last the use reads: `m.title()`.
+					call:
+						use.end.kind === "value" && links === use.chain.length
+							? use.end.call
+							: undefined,
 				},
 			),
 		);
@@ -114,6 +121,7 @@ export async function readUse(
 						edits: named(taken.name, held.key, taken.at),
 						binding: taken.binds,
 						type: use.type,
+						written: text(source, taken.written),
 					},
 				),
 			);
@@ -147,14 +155,16 @@ export function read(
 		/** The text the read is written as: this, or the text at `writtenAt`, or else at its place. */
 		written?: string;
 		writtenAt?: Span;
+		call?: Span | undefined;
 	},
 ): Read {
-	const { written, writtenAt = place.at, ...rest } = fields;
-	if (written !== undefined) return { ...place, ...rest, written };
+	const { written, writtenAt = place.at, call, ...rest } = fields;
+	if (written !== undefined) return { ...place, ...rest, written, call };
 	// The text it reads by, taken from the file only when a report asks for it.
 	return {
 		...place,
 		...rest,
+		call,
 		get written() {
 			return text(place.source, writtenAt);
 		},
