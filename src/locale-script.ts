@@ -31,6 +31,7 @@ export function localeScript(config: Config, minify: boolean): string {
 		queryParameter: config.queryParameter,
 		prefixes: config.urlRouting.prefixes,
 		prefixesEveryLocale: config.urlRouting.localePrefix === "always",
+		basePath: config.urlRouting.basePath,
 		unlocalizedPaths: config.urlRouting.unlocalizedPaths.map((glob) => {
 			const { source, flags } = globPattern(glob);
 			return { source, flags };

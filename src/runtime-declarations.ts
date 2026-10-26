@@ -85,6 +85,8 @@ export declare const unlocalizedPaths: readonly RegExp[];
 export declare const localeCopies: boolean;
 /** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
 export declare function localeOfPath(pathname: string): Locale | undefined;
+/** Whether a path is a page without the prefix every locale's paths have: server.js sends it to one. */
+export declare function lacksPrefix(pathname: string): boolean;
 /** A path in its locale's words as its route, its prefix kept, for an adapter that routes by the prefix. */
 export declare function routeOfPath(pathname: string): string;
 /** A route's path, its prefix kept, in its locale's words. */

@@ -68,6 +68,8 @@ type Visit = {
 	stored?: Record<string, string>;
 	/** The visitor's cookies. */
 	cookies?: Record<string, string>;
+	/** The path the site is served under, which every page of it shows: the build's `base`. */
+	base?: string;
 };
 
 /**
@@ -77,7 +79,13 @@ type Visit = {
 async function visit(
 	dist: string,
 	url: string,
-	{ headers = {}, served = (html) => html, stored, cookies = {} }: Visit,
+	{
+		headers = {},
+		served = (html) => html,
+		stored,
+		cookies = {},
+		base = "/",
+	}: Visit,
 ) {
 	const browser = await chromium.launch();
 	onTestFinished(() => browser.close());
@@ -104,7 +112,9 @@ async function visit(
 	await tab.route("http://grai.test/**", (route) => {
 		const path = new URL(route.request().url()).pathname;
 		requested.push(path);
-		const file = path === "/" ? "index.html" : path.slice(1);
+		// A page of the site is its one document; any other file is at its path under the base.
+		const within = path.startsWith(base) ? path.slice(base.length - 1) : path;
+		const file = within.endsWith("/") ? "index.html" : within.slice(1);
 		const html = file.endsWith(".html");
 		const body = readFileSync(join(dist, file), "utf8");
 		return route.fulfill({
@@ -268,6 +278,16 @@ describe("a page's locale, when no server picks it", () => {
 			),
 		).toBe("locale-unkept");
 		expect(await tab.evaluate(`holds()`)).toBe("en en Your cart");
+	});
+
+	it("is the one the URL names after the base path the site is served under", async () => {
+		const { dist } = await built(
+			site({ strategy: ["url"], basePath: "/shop" }),
+			{ base: "/shop/" },
+		);
+		const { seen } = await visit(dist, "/shop/ar/", { base: "/shop/" });
+
+		expect(await seen()).toBe("ar rtl سلتك");
 	});
 
 	it("is picked the same way by the dev server", async () => {

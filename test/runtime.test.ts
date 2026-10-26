@@ -652,6 +652,75 @@ it("translates the base locale's paths too, and sends an unprefixed page to its 
 	]).toEqual(["/en/about-us", "/about", "https://shop.test/de/ueber-uns"]);
 });
 
+it("puts the locale after the app's base path, and reads it there", async () => {
+	const config = {
+		strategy: ["url"],
+		basePath: "/shop",
+		pathnames: { "/about": { de: "/ueber-uns" } },
+	};
+	const { runtime } = await output(config);
+	const { middleware } = await served(config);
+	const localeAt = async (path: string) =>
+		(
+			await middleware(
+				new Request(`https://example.test${path}`),
+				({ locale }) => new Response(locale),
+			)
+		).text();
+
+	expect([
+		runtime.localizeHref("/shop/about", { locale: "de" }),
+		runtime.localizeHref("/shop", { locale: "de" }),
+		runtime.localizeHref("/shop/de/ueber-uns", { locale: "en" }),
+		runtime.deLocalizeUrl("https://example.test/shop/de/ueber-uns").pathname,
+		runtime.extractLocaleFromUrl("https://example.test/shop/ar/x"),
+		await localeAt("/shop/de/cart"),
+		await localeAt("/shop/cart"),
+	]).toEqual([
+		"/shop/de/ueber-uns",
+		"/shop/de",
+		"/shop/about",
+		"/shop/about",
+		"ar",
+		"de",
+		"en",
+	]);
+});
+
+it("takes a path without the base path as the app's own, as a framework that adds the base itself writes it", async () => {
+	const { runtime } = await output({ strategy: ["url"], basePath: "/shop" });
+
+	expect([
+		runtime.localizeHref("/about", { locale: "de" }),
+		runtime.deLocalizeUrl("https://example.test/de/about").pathname,
+		runtime.extractLocaleFromUrl("https://example.test/de/about"),
+	]).toEqual(["/de/about", "/about", "de"]);
+});
+
+it("sends an unprefixed page under the base path to its locale's path there", async () => {
+	const { middleware } = await served({
+		strategy: ["url", "cookie"],
+		cookieName: "lang",
+		localePrefix: "always",
+		basePath: "/shop",
+		unlocalizedPaths: ["/api/**"],
+	});
+	const answer = async (path: string) => {
+		const response = await middleware(
+			new Request(`https://example.test${path}`, {
+				headers: { cookie: "lang=de" },
+			}),
+			({ locale }) => new Response(locale),
+		);
+		return response.headers.get("location") ?? (await response.text());
+	};
+
+	expect([
+		await answer("/shop/cart"),
+		await answer("/shop/api/orders"),
+	]).toEqual(["https://example.test/shop/de/cart", "de"]);
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies, its storage and its reloads. */
 	function page(lang: string) {
