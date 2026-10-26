@@ -12,20 +12,23 @@ import { formatsLiteral, plainText } from "./pattern.ts";
 export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
 
 /**
- * A key compiled: its line in keys.js and in a server build, the runtime functions, plurals.js's
- * functions and the formatters it calls, and its parts one locale at a time, for an adapter that
- * writes a module per locale.
+ * A key compiled: the value its module exports, in keys.js and in a server build, the runtime
+ * functions, plurals.js's functions, formatters and globals it calls, which are every name its
+ * code refers to, and its parts one locale at a time, for an adapter that writes a module per
+ * locale.
  */
 export type KeyModule = {
-	/** Its line in keys.js, each locale's function an arrow function. */
-	code: string;
-	/** Its line in a server build, each locale's function a function expression. */
-	serverCode: string;
+	/** Its value in keys.js, each locale's function an arrow function. */
+	value: string;
+	/** Its value in a server build, each locale's function a function expression. */
+	serverValue: string;
 	uses: ReadonlySet<RuntimeFunction>;
 	/** The functions of plurals.js it calls, by name. */
 	plurals: ReadonlySet<string>;
 	/** The formatters it calls, by name. */
 	formats: ReadonlyMap<string, Formatter>;
+	/** The globals it calls, such as `String`. */
+	globals: ReadonlySet<string>;
 	/** How the dispatcher holds the key: a string per locale, or a function per locale, with parts. */
 	kind: "text" | "message" | "markup";
 	/** Per locale, in the config's order: a string literal for text, else a function of the inputs. */
@@ -34,7 +37,7 @@ export type KeyModule = {
 	parts: readonly string[];
 };
 
-/** Compiles one key's messages, one per locale in the config's order, into its export. */
+/** Compiles one key's messages, one per locale in the config's order, into the value its module exports. */
 export function keyModule(
 	key: string,
 	messages: readonly LocaleMessage[],
@@ -43,6 +46,7 @@ export function keyModule(
 		uses: new Set(),
 		plurals: new Set(),
 		formats: new Map(),
+		globals: new Set(),
 	};
 	const hasMarkup = messages.some((message) => message.markup);
 	const hasInputs = messages.some((message) => message.inputs.size > 0);
@@ -55,10 +59,10 @@ export function keyModule(
 		const texts = messages.map((message) =>
 			JSON.stringify(plainText(message.variants[0]?.pattern ?? [])),
 		);
-		const code = exportCode(key, "text", texts, []);
+		const value = messageValue("text", texts, []);
 		return {
-			code,
-			serverCode: code,
+			value,
+			serverValue: value,
 			...used,
 			kind: "text",
 			variants: texts,
@@ -76,9 +80,8 @@ export function keyModule(
 	const variants = strings.map(arrow);
 	const partArrows = parts.map(arrow);
 	return {
-		code: exportCode(key, kind, variants, partArrows),
-		serverCode: exportCode(
-			key,
+		value: messageValue(kind, variants, partArrows),
+		serverValue: messageValue(
 			kind,
 			strings.map(functionExpression),
 			parts.map(functionExpression),
@@ -90,9 +93,8 @@ export function keyModule(
 	};
 }
 
-/** A key's export: the runtime call that holds its variants, and for markup its parts. */
-function exportCode(
-	key: string,
+/** A key's value: the runtime call that holds its variants, and for markup its parts. */
+function messageValue(
 	kind: KeyModule["kind"],
 	variants: readonly string[],
 	parts: readonly string[],
@@ -101,5 +103,5 @@ function exportCode(
 		kind === "markup"
 			? `markup([${variants.join(", ")}], [${parts.join(", ")}])`
 			: `${kind}(${variants.join(", ")})`;
-	return `export const ${key} = /*#__PURE__*/ ${call};\n`;
+	return `/*#__PURE__*/ ${call}`;
 }

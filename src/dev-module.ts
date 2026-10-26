@@ -7,8 +7,79 @@ import {
 	readHook,
 	updateEvent,
 } from "./dev-events.ts";
+import { freshName } from "./key-exports.ts";
 import { identifierKey } from "./literal-key.ts";
-import { outputImports } from "./output-imports.ts";
+import { calledNames, everyName, outputImports } from "./output-imports.ts";
+
+/**
+ * The dev module's table: its text keys' rows as one JSON string, and the other keys' rows. A
+ * spread, not `Object.assign`, which would set a key named `__proto__` through the setter.
+ */
+const table = (textRows: string, callRows: string) =>
+	`const T = {
+	...JSON.parse(${JSON.stringify(`{${textRows}}`)}),
+${callRows}
+};
+`;
+
+/**
+ * The dev module's code after its table: the hook a call names its key to, each key's live
+ * variants, and each key's message made from them.
+ */
+const madeCode = `const read = Symbol.for(${JSON.stringify(readHook)});
+const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
+	globalThis[read]?.(key);
+	const variant = T[key][field][n];
+	return typeof variant === "function" ? variant(inputs) : variant;
+}), key];
+const made = Object.create(null);
+for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
+`;
+
+/** The dev module's handler of an edit's patch, which writes it into the table. */
+const patchCode = `if (import.meta.hot) {
+	import.meta.hot.on(${JSON.stringify(updateEvent)}, async ({ url }) => {
+		const { rows } = await import(/* @vite-ignore */ url);
+		for (const [key, row] of Object.entries(rows)) Object.assign(T[key], row);
+		if (typeof window === "undefined") return import.meta.hot.send(${JSON.stringify(patchedEvent)});
+		const detail = { keys: Object.keys(rows) };
+		if (window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true, detail }))) location.reload();
+	});
+}
+`;
+
+/**
+ * Every word of the dev module's own code, as written: each name it binds or calls, `T`, `made`,
+ * `Object` or `location`, and some it need not, so that a key named like any of them binds a name
+ * of its own.
+ */
+const devWords = new Set(
+	`${table("", "")}${madeCode}${patchCode}`.match(/[A-Za-z_$][\w$]*/g),
+);
+
+/**
+ * The keys' exports, each destructured from `made` under its own name, unless the module's code
+ * takes that name: such a key is destructured under a name of its own, `$` and the key, and
+ * exported under the key.
+ */
+function madeExports(keys: readonly string[], taken: ReadonlySet<string>) {
+	const own = keys.filter((key) => !taken.has(key));
+	const exports = [`export const { ${own.join(", ")} } = made;\n`];
+	const bound = new Set([...taken, ...keys]);
+	const renamed = keys
+		.filter((key) => taken.has(key))
+		.map((key) => {
+			const name = freshName(`$${key}`, bound);
+			bound.add(name);
+			return { key, name };
+		});
+	if (renamed.length > 0)
+		exports.push(
+			`const { ${renamed.map(({ key, name }) => `${key}: ${name}`).join(", ")} } = made;\n`,
+			`export { ${renamed.map(({ key, name }) => `${name} as ${key}`).join(", ")} };\n`,
+		);
+	return exports.join("");
+}
 
 /**
  * keys.js in dev: every key, with its locales in a table, and the handler that writes an edit's
@@ -30,30 +101,18 @@ export function devModule(outdir: string, build: Build): string {
 				`${JSON.stringify(key)}:{"v":[${compiled.variants.join(",")}]}`,
 		)
 		.join(",");
-	return `${outputImports((file) => join(outdir, file), build.rendered.modules, build.compilation.keys.values(), ["markup", "message"])}
-const T = {
-	...JSON.parse(${JSON.stringify(`{${textRows}}`)}),
-${calls.map(([key, compiled]) => `\t${identifierKey(key)}: ${row(compiled)},`).join("\n")}
-};
-const read = Symbol.for(${JSON.stringify(readHook)});
-const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
-	globalThis[read]?.(key);
-	const variant = T[key][field][n];
-	return typeof variant === "function" ? variant(inputs) : variant;
-}), key];
-const made = Object.create(null);
-for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
-export const { ${keys.map(([key]) => key).join(", ")} } = made;
-if (import.meta.hot) {
-	import.meta.hot.on(${JSON.stringify(updateEvent)}, async ({ url }) => {
-		const { rows } = await import(/* @vite-ignore */ url);
-		for (const [key, row] of Object.entries(rows)) Object.assign(T[key], row);
-		if (typeof window === "undefined") return import.meta.hot.send(${JSON.stringify(patchedEvent)});
-		const detail = { keys: Object.keys(rows) };
-		if (window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true, detail }))) location.reload();
-	});
-}
-`;
+	const names = calledNames(build.compilation.keys.values(), [
+		"markup",
+		"message",
+	]);
+	const callRows = calls
+		.map(([key, compiled]) => `\t${identifierKey(key)}: ${row(compiled)},`)
+		.join("\n");
+	return `${outputImports(names, (file) => join(outdir, file), build.rendered.modules)}
+${table(textRows, callRows)}${madeCode}${madeExports(
+	keys.map(([key]) => key),
+	new Set([...everyName(names), ...devWords]),
+)}${patchCode}`;
 }
 
 /**
@@ -83,7 +142,7 @@ export function patchModule(
 		(key) =>
 			`\t${identifierKey(key)}: ${row(build.compilation.keys.get(key))},`,
 	);
-	return `${outputImports((file) => join(outdir, file), build.rendered.modules, keys, [])}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
+	return `${outputImports(calledNames(keys, []), (file) => join(outdir, file), build.rendered.modules)}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }
 
 /** A key's row in the dev table: its locales' variants, and their parts for markup. */

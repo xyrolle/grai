@@ -24,12 +24,21 @@ export type LocaleReads = {
 };
 
 /**
- * The reads of a message's function, adding the functions of plurals.js and the formatters they
- * call to `used`.
+ * A global the code calls, such as `String`, by its name, added to the globals the key's code
+ * calls: a module binds no key under such a name.
+ */
+export function globalCalled(name: string, globals: Set<string>): string {
+	globals.add(name);
+	return name;
+}
+
+/**
+ * The reads of a message's function, adding the functions of plurals.js, the formatters and the
+ * globals they call to `used`.
  */
 export function localeReads(
 	message: LocaleMessage,
-	{ plurals, formats }: Used,
+	{ plurals, formats, globals }: Used,
 ): LocaleReads {
 	const { locale, selectors } = message;
 	const reads = new Set<string>();
@@ -56,7 +65,7 @@ export function localeReads(
 				return `${value(selector.name)} === ${literal}`;
 			case "input":
 				if (!selector.normalized) {
-					return `String(${value(selector.input)}) === ${literal}`;
+					return `${globalCalled("String", globals)}(${value(selector.input)}) === ${literal}`;
 				}
 				value(selector.input);
 				normalized.set(index, selector.input);
@@ -108,13 +117,13 @@ export function localeReads(
 			return formatter.name;
 		}
 		return selector.number === "number"
-			? "Number"
+			? globalCalled("Number", globals)
 			: called(numberReaders[selector.number]);
 	};
 	const textConsts = () =>
 		[...normalized].map(
 			([index, input]) =>
-				`const $${index} = String(${value(input)}).normalize("NFC"); `,
+				`const $${index} = ${globalCalled("String", globals)}(${value(input)}).normalize("NFC"); `,
 		);
 	const prologue = () => {
 		const declarations = [
