@@ -34,14 +34,33 @@ const unicodeEscape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
 /**
  * A source file: its path, the path the project shows (relative to its root), its text, and its
  * code: the text with comments and literals blanked at the same offsets (`code-text.ts`), which a
- * scan for what the code reads goes through.
+ * scan for what the code reads goes through. The code is worked out the first time a scan reads
+ * it, as most commands read only the files that write a name they look for.
  */
 export type SourceFile = {
-	path: string;
-	file: string;
-	text: string;
-	code: string;
+	readonly path: string;
+	readonly file: string;
+	readonly text: string;
+	readonly code: string;
 };
+
+/** A source file of a text, its code blanked when first read. */
+export function sourceFile(
+	path: string,
+	file: string,
+	text: string,
+): SourceFile {
+	let code: string | undefined;
+	return {
+		path,
+		file,
+		text,
+		get code() {
+			code ??= codeText(text, path);
+			return code;
+		},
+	};
+}
 
 /**
  * The source files under the roots, each read whole, outside the outdir, dependencies, build
@@ -64,8 +83,7 @@ export function sourceFiles(
 				if (!skipped) visit(path);
 			} else if (sourceExtensions.has(extname(entry.name))) {
 				const text = readFileSync(path, "utf8");
-				const code = codeText(text, path);
-				files.push({ path, file: relative(projectRoot, path), text, code });
+				files.push(sourceFile(path, relative(projectRoot, path), text));
 			}
 		}
 	};

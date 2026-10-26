@@ -1,7 +1,7 @@
 import {
 	type MessageBindings,
 	messageBindings,
-	namespaceNames,
+	projectNamespaces,
 	readsNamespace,
 	statementAt,
 } from "./message-imports.ts";
@@ -28,9 +28,13 @@ export type FileUses = { source: SourceFile; uses: Use[]; bindsKey: boolean };
 
 /** The files that write a key's name, each with every place it does. */
 export function usesIn(files: readonly SourceFile[], key: string): FileUses[] {
-	const namespaces = namespaceNames(files.map(({ code }) => code));
-	return files
-		.filter(({ code }) => code.includes(key))
+	const namespaces = projectNamespaces(files);
+	// The text holds every name the code does, so it picks the files whose code is read, the code
+	// only worked out for those.
+	const writing = files.filter(
+		(source) => source.text.includes(key) && source.code.includes(key),
+	);
+	return writing
 		.map((source) => {
 			const bindings = messageBindings(source.code, namespaces);
 			const uses = occurrencesOf(source.code, key).map((at) => ({

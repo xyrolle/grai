@@ -7,7 +7,11 @@ import { descriptionsWithout } from "./descriptions.ts";
 import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
-import { messageBindings, namespaceNames } from "./message-imports.ts";
+import {
+	mayRenameNamespace,
+	messageBindings,
+	namespaceNames,
+} from "./message-imports.ts";
 import {
 	namesIn,
 	positionOf,
@@ -66,7 +70,9 @@ export async function removeUnusedKeys(
 	// Read in the text and in the code alike: a comment in an import hides it from the text's
 	// scan, and a key a read may reach stays if either finds the read.
 	const namespaces = namespaceNames(
-		shipped.flatMap(({ text, code }) => [text, code]),
+		shipped
+			.filter(mayRenameNamespace)
+			.flatMap(({ text, code }) => [text, code]),
 	);
 	const reads = shipped.flatMap((source) =>
 		[source.text, source.code].flatMap((scanned) =>
