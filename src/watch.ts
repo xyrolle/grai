@@ -17,6 +17,13 @@ import { savedBuild } from "./saved-build.ts";
 const settleMilliseconds = 20;
 
 /**
+ * How a watch holds its process. A persistent watch, the default, keeps the process running while
+ * it watches, as `grai watch` needs; `persistent: false` leaves the process's lifetime to a host
+ * that holds it, such as a dev server, so that a process that only reads the config can exit.
+ */
+export type WatchOptions = { persistent?: boolean };
+
+/**
  * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
  * whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
@@ -45,6 +52,7 @@ export function watch(
 		build: Build | undefined,
 	) => void,
 	failed: (error: unknown) => void,
+	{ persistent = true }: WatchOptions = {},
 ): { close: () => Promise<void> } {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
@@ -75,7 +83,9 @@ export function watch(
 			return;
 		}
 		const paths = [resolve(configFile), ...catalogsOf(configFile)];
-		watchers = paths.flatMap((path) => watchedFile(path, changed) ?? []);
+		watchers = paths.flatMap(
+			(path) => watchedFile(path, changed, persistent) ?? [],
+		);
 	};
 
 	/** A file's event: a compile now, or, while the files are settling, a longer wait for them. */
@@ -85,7 +95,13 @@ export function watch(
 			return;
 		}
 		clearTimeout(settling);
-		settling = setTimeout(settle, settleMilliseconds);
+		settling = settleLater();
+	};
+	/** The wait for the files to be quiet, which holds the process only when the watch does. */
+	const settleLater = () => {
+		const timer = setTimeout(settle, settleMilliseconds);
+		if (!persistent) timer.unref();
+		return timer;
 	};
 	const settle = () => {
 		settling = undefined;
@@ -111,7 +127,7 @@ export function watch(
 				});
 				if (!quiet && unparsed(next.result)) {
 					again = false;
-					settling = setTimeout(settle, settleMilliseconds);
+					settling = settleLater();
 					return;
 				}
 				build = next.build ?? build;
@@ -167,14 +183,18 @@ function unparsed(result: CompileResult): boolean {
  * and one whose directory does not exist either is not watched: its catalog is missing, which the
  * compile reports.
  */
-function watchedFile(path: string, changed: () => void): FSWatcher | undefined {
+function watchedFile(
+	path: string,
+	changed: () => void,
+	persistent: boolean,
+): FSWatcher | undefined {
 	try {
-		return watchPath(path, () => changed());
+		return watchPath(path, { persistent }, () => changed());
 	} catch (error) {
 		if (!isMissing(error)) throw error;
 	}
 	try {
-		return watchPath(dirname(path), (_event, name) => {
+		return watchPath(dirname(path), { persistent }, (_event, name) => {
 			if (name === null || name === basename(path)) changed();
 		});
 	} catch (error) {

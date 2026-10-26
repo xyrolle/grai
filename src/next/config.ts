@@ -47,6 +47,9 @@ function watching(configFile: string): Promise<void> {
 			(result) => reportErrors(result.errors),
 			// A compile that throws, as when the outdir cannot be written: the next save compiles again.
 			(error) => console.error(error),
+			// Next's server holds its process. Other processes read the config for `next dev` too, as
+			// Next's telemetry flush does when the server stops, and must be free to exit.
+			{ persistent: false },
 		);
 	});
 	return watched;

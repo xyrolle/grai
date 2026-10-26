@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+	PHASE_DEVELOPMENT_SERVER,
 	PHASE_PRODUCTION_BUILD,
 	PHASE_PRODUCTION_SERVER,
 } from "next/constants.js";
@@ -61,6 +62,27 @@ describe("withGrai", () => {
 			],
 			["grai: 1 error"],
 		]);
+	});
+
+	it("lets a process that reads the config for next dev and does nothing else exit, as Next's telemetry flush does", async () => {
+		const { dir } = project({ en: { title: "Your cart" } });
+		const config = new URL("../src/next/config.ts", import.meta.url).href;
+		const reader = spawn(
+			process.execPath,
+			[
+				"--input-type=module",
+				"-e",
+				`const { withGrai } = await import(${JSON.stringify(config)});
+await withGrai()(${JSON.stringify(PHASE_DEVELOPMENT_SERVER)});`,
+			],
+			{ cwd: dir, stdio: "ignore" },
+		);
+		onTestFinished(() => {
+			reader.kill("SIGKILL");
+		});
+
+		const code = await new Promise((resolve) => reader.once("exit", resolve));
+		expect(code).toBe(0);
 	});
 
 	it("gives a command that bundles nothing, such as next start, the config as it is, without reading grai's", async () => {
