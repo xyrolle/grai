@@ -247,6 +247,29 @@ describe("handleLocale, in a build without the locale copies", {
 	});
 });
 
+describe("handleLocale, under a base path", { timeout: 30_000 }, () => {
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
+		// The same app under /shop: Kit's paths.base, and grai.base.json's basePath.
+		app = await served("base");
+		origin = app.origin;
+	}, 60_000);
+	afterAll(() => app && stopped(app.server));
+
+	it("renders a page in the locale named after the base path, its links under the base path too", async () => {
+		const page = await open(origin, "/shop/ro");
+		expect(await html(page, "lang")).toBe("ro");
+		expect(
+			await page.getByRole("link", { name: "Despre" }).getAttribute("href"),
+		).toBe("/shop/ro/despre");
+
+		await page.getByRole("link", { name: "Despre" }).click();
+		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
+		await page.context().close();
+	});
+});
+
 describe("handleLocale, by the cookie and Accept-Language", {
 	timeout: 30_000,
 }, () => {
