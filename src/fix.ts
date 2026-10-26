@@ -63,10 +63,16 @@ export async function removeUnusedKeys(
 		config.tests,
 	);
 	const names = namesIn(shipped);
-	const namespaces = namespaceNames(shipped.map(({ text }) => text));
+	// Read in the text and in the code alike: a comment in an import hides it from the text's
+	// scan, and a key a read may reach stays if either finds the read.
+	const namespaces = namespaceNames(
+		shipped.flatMap(({ text, code }) => [text, code]),
+	);
 	const reads = shipped.flatMap((source) =>
-		dynamicReadsIn(source.text, messageBindings(source.text, namespaces)).map(
-			(read) => located(source, read),
+		[source.text, source.code].flatMap((scanned) =>
+			dynamicReadsIn(scanned, messageBindings(scanned, namespaces)).map(
+				(read) => located(source, read),
+			),
 		),
 	);
 	const keys = new Set(

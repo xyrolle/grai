@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, sep } from "node:path";
+import { codeText } from "./code-text.ts";
 import { globMatcher } from "./globs.ts";
 
 /**
@@ -22,11 +23,25 @@ const sourceExtensions = new Set([
 ]);
 /** Directories of dependencies and of build output, which name no message of the project's own. */
 const skippedDirectories = new Set(["node_modules", "dist", "build"]);
-/** An identifier: a name that starts with a letter, `_` or `$`, and is not the end of a longer one. */
-const identifier = /(?<![\w$])[A-Za-z_$][\w$]*/g;
+/**
+ * An identifier: a name that starts with a letter, `_` or `$`, and is not the end of a longer one,
+ * any of its characters maybe written as an escape, `\u0069`.
+ */
+const identifier =
+	/(?<![\w$\\])(?:[A-Za-z_$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})(?:[\w$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})*/g;
+const escape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
 
-/** A source file: its path, the path the project shows (relative to its root), and its text. */
-export type SourceFile = { path: string; file: string; text: string };
+/**
+ * A source file: its path, the path the project shows (relative to its root), its text, and its
+ * code: the text with comments and literals blanked at the same offsets (`code-text.ts`), which a
+ * scan for what the code reads goes through.
+ */
+export type SourceFile = {
+	path: string;
+	file: string;
+	text: string;
+	code: string;
+};
 
 /**
  * The source files under the roots, each read whole, outside the outdir, dependencies, build
@@ -49,7 +64,8 @@ export function sourceFiles(
 				if (!skipped) visit(path);
 			} else if (sourceExtensions.has(extname(entry.name))) {
 				const text = readFileSync(path, "utf8");
-				files.push({ path, file: relative(projectRoot, path), text });
+				const code = codeText(text, path);
+				files.push({ path, file: relative(projectRoot, path), text, code });
 			}
 		}
 	};
@@ -66,13 +82,32 @@ export function occurrencesOf(text: string, name: string): number[] {
 	return [...text.matchAll(pattern)].map((match) => match.index);
 }
 
-/** Every identifier the files write: a key counts as named when it is one of them. */
+/**
+ * Every identifier the files write, in their strings and comments too, and an escaped one as the
+ * name it spells: a key counts as named when it is one of them, so check --fix keeps it.
+ */
 export function namesIn(files: readonly SourceFile[]): Set<string> {
 	const names = new Set<string>();
 	for (const { text } of files) {
-		for (const name of text.match(identifier) ?? []) names.add(name);
+		for (const written of text.match(identifier) ?? []) {
+			names.add(unescaped(written));
+		}
 	}
 	return names;
+}
+
+/** Each identifier code writes with an escape, as the name it spells, and where it is. */
+export function escapedNames(code: string): { name: string; at: number }[] {
+	return [...code.matchAll(identifier)]
+		.filter(([written]) => written.includes("\\"))
+		.map((match) => ({ name: unescaped(match[0]), at: match.index }));
+}
+
+/** An identifier as the name it spells, its escapes read. */
+export function unescaped(written: string): string {
+	return written.replace(escape, (_, braced, four) =>
+		String.fromCodePoint(Number.parseInt(braced ?? four, 16)),
+	);
 }
 
 /** A test file, by the path the project shows, and the identifiers it writes. */

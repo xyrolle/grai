@@ -9,7 +9,12 @@ import { dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
 import { messageBindings, namespaceNames } from "./message-imports.ts";
 import { redeclarations } from "./redeclarations.ts";
-import { occurrencesOf, positionOf, type SourceFile } from "./sources.ts";
+import {
+	escapedNames,
+	occurrencesOf,
+	positionOf,
+	type SourceFile,
+} from "./sources.ts";
 
 /** A file's places the rename cannot change safely: mentions, and a binding the new name would shadow. */
 export function siteProblems(
@@ -40,14 +45,32 @@ export function siteProblems(
 	return problems;
 }
 
+/** An error for each place the files write the key's name with an escape, which the rename cannot find. */
+export function escapeProblems(
+	files: readonly SourceFile[],
+	from: string,
+): GraiError[] {
+	return files.flatMap((source) =>
+		escapedNames(source.code)
+			.filter(({ name }) => name === from)
+			.map(({ at }) =>
+				placed(
+					source,
+					at,
+					`it writes ${from} with an escape, which the rename cannot change safely. Write it plainly, or rename it by hand.`,
+				),
+			),
+	);
+}
+
 /** An error for each read by a computed name in the files that may reach the key. */
 export function reachProblems(
 	files: readonly SourceFile[],
 	from: string,
 ): GraiError[] {
-	const namespaces = namespaceNames(files.map(({ text }) => text));
+	const namespaces = namespaceNames(files.map(({ code }) => code));
 	return files.flatMap((source) =>
-		dynamicReadsIn(source.text, messageBindings(source.text, namespaces))
+		dynamicReadsIn(source.code, messageBindings(source.code, namespaces))
 			.filter(({ prefix }) => from.startsWith(prefix))
 			.map(({ at, written }) =>
 				placed(
@@ -68,9 +91,9 @@ export function ownershipProblems(
 	sites: readonly FileUses[],
 	from: string,
 ): GraiError[] {
-	const namespaces = namespaceNames(sites.map(({ source }) => source.text));
+	const namespaces = namespaceNames(sites.map(({ source }) => source.code));
 	return sites.flatMap(({ source }) => {
-		const bindings = messageBindings(source.text, namespaces);
+		const bindings = messageBindings(source.code, namespaces);
 		const keyNames = [...bindings.keys]
 			.filter(([, key]) => key === from)
 			.map(([local]) => [local, local] as const);
@@ -81,7 +104,7 @@ export function ownershipProblems(
 			...keyNames,
 		];
 		return names.flatMap(([name, use]) => {
-			const [again] = redeclarations(source.text, name, bindings);
+			const [again] = redeclarations(source.code, name, bindings);
 			if (again === undefined) return [];
 			return [
 				placed(
