@@ -200,6 +200,22 @@ describe("the Vite plugin's chunks by page", () => {
 		expect(keysOf).toEqual([["other", "picked", "shown"]]);
 	});
 
+	it("chunks the keys a module may take apart from the namespace by a computed name or a rest with the keys of its pages", async () => {
+		const { keysOf } = await built(
+			{ shown: "Shown", picked: "Picked", other: "Other" },
+			{ list: ["shown"], detail: [], summary: [] },
+			{
+				namespace: true,
+				files: {
+					"detail.js": `import { m } from "./out/messages.js";\nconst { [document.title]: picked } = m;\nconsole.log(picked());\n`,
+					"summary.js": `import { m } from "./out/messages.js";\nconst { ...all } = m;\nconsole.log(Object.keys(all));\n`,
+				},
+			},
+		);
+
+		expect(keysOf).toEqual([["other", "picked", "shown"]]);
+	});
+
 	it("sees through a module that only re-exports, to the modules that hold what each page takes from it", async () => {
 		const group = (name: string, key: string) =>
 			`import { m } from "../out/messages.js";\nexport const ${name} = { one: m.${key} };\n`;

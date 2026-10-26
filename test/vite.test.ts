@@ -394,6 +394,13 @@ describe("the Vite plugin's build", () => {
 		).rejects.toThrow(
 			'a.js:7:9: "absent": absent names a key no catalog has. Add it with grai add absent --en "…" --de "…", or fix the name.',
 		);
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\nconst { "absent": missing } = m;\nconsole.log(missing());\n`,
+			}),
+		).rejects.toThrow(
+			'a.js:2:10: "absent": "absent" names a key no catalog has.',
+		);
 	});
 
 	it("reads the namespace by scope, so a parameter or declaration of its name is not grai's", async () => {

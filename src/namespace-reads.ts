@@ -54,7 +54,9 @@ export function namespaceReads(
 			if (read === "computed") computed = true;
 			else if (read !== undefined) reads.push(read);
 		}
-		reads.push(...patternReads(node, inner, namespaces));
+		const taken = patternReads(node, inner, namespaces);
+		if (taken === "computed") computed = true;
+		else reads.push(...taken);
 		for (const [field, value] of Object.entries(node)) {
 			if (typeFields.has(field)) continue;
 			for (const item of Array.isArray(value) ? value : [value]) {
@@ -95,12 +97,16 @@ const patternSides: Readonly<Record<string, readonly [string, string]>> = {
 	AssignmentPattern: ["left", "right"],
 };
 
-/** The keys an object pattern takes apart from an unshadowed namespace: `const { key } = m`. */
+/**
+ * The keys an object pattern takes apart from an unshadowed namespace, `const { key } = m` or
+ * `const { "key": name } = m`, or `"computed"` when it takes one by a computed name or takes the
+ * rest, which may be any key.
+ */
 function patternReads(
 	node: TreeNode,
 	shadowed: ReadonlySet<string>,
 	namespaces: ReadonlySet<string>,
-): NamespaceRead[] {
+): NamespaceRead[] | "computed" {
 	const sides = Object.hasOwn(patternSides, node.type)
 		? patternSides[node.type]
 		: undefined;
@@ -112,22 +118,23 @@ function patternReads(
 	const properties = Array.isArray(pattern.properties)
 		? pattern.properties
 		: [];
-	return properties.flatMap((property): NamespaceRead[] => {
-		if (!isTreeNode(property) || property.type !== "Property") return [];
+	const reads: NamespaceRead[] = [];
+	for (const property of properties) {
+		if (!isTreeNode(property) || property.type !== "Property")
+			return "computed";
 		const key = child(property, "key");
 		const start = key === undefined ? undefined : numberOf(key, "start");
 		const end = key === undefined ? undefined : numberOf(key, "end");
-		if (start === undefined || end === undefined) return [];
-		const named =
-			property.computed === true
-				? key?.type === "Literal" && typeof key.value === "string"
-					? key.value
-					: undefined
-				: identifierName(key);
-		return named === undefined
-			? []
-			: [{ key: named, start, end, keyStart: start }];
-	});
+		if (key === undefined || start === undefined || end === undefined) continue;
+		if (key.type === "Literal" && typeof key.value === "string") {
+			reads.push({ key: key.value, start, end, keyStart: start + 1 });
+			continue;
+		}
+		const named = property.computed === true ? undefined : identifierName(key);
+		if (named === undefined) return "computed";
+		reads.push({ key: named, start, end, keyStart: start });
+	}
+	return reads;
 }
 
 /**
