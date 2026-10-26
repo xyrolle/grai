@@ -4,6 +4,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -255,6 +256,39 @@ describe("reading a project's facts", () => {
 		expect(readerVersion(reader)).toBe(before);
 		writeFileSync(join(reader, "uses.js"), "export const uses = 2;\n");
 		expect(readerVersion(reader)).not.toBe(before);
+	});
+
+	it("takes every file's facts from the cache on a reading after one that changed nothing, and writes nothing", async () => {
+		const { dir, config } = projectWith({
+			"src/a.ts": 'import { m } from "../out/messages.js";\nm.title();\n',
+			"src/b.ts": "export const b = 1;\n",
+		});
+		const cache = join(dir, "out/.grai/facts");
+		await codeOf(config, dir);
+		const saved: {
+			version: string;
+			entries: [string, { hash: string; facts: unknown }][];
+		} = deserialize(readFileSync(cache));
+		// Facts no reading would give, so a file read again shows.
+		const planted = { modules: [] };
+		const bytes = serialize({
+			...saved,
+			entries: saved.entries.map(([path, entry]) => [
+				path,
+				{ ...entry, facts: planted },
+			]),
+		});
+		writeFileSync(cache, bytes);
+		// A save writes a new file in its place, so the same file is one never written again.
+		const file = statSync(cache).ino;
+
+		const { sources } = await codeOf(config, dir);
+
+		expect([...sources.values()].map(({ facts }) => facts)).toEqual([
+			planted,
+			planted,
+		]);
+		expect(statSync(cache).ino).toBe(file);
 	});
 
 	// Enough work for the pool to start, read twice, which takes seconds on a loaded machine.
