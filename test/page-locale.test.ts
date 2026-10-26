@@ -209,6 +209,21 @@ describe("a page's locale, when no server picks it", () => {
 		);
 	});
 
+	it("is the <html lang> the page was built with, where no place of the strategy names one", async () => {
+		const { dist } = await built(
+			site(
+				{ strategy: ["cookie"], cookieName: "lang" },
+				page.replace("<html>", '<html lang="ar">'),
+			),
+		);
+		const { seen, messageFiles } = await visit(dist, "/", {});
+
+		expect(await seen()).toBe("ar rtl سلتك");
+		expect(messageFiles().every((path) => path.includes("/grai-ar/"))).toBe(
+			true,
+		);
+	});
+
 	it("is the one a server drew the page in, with an <html lang> other than the page was built with", async () => {
 		const { dist } = await built(
 			site(
