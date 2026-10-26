@@ -29,8 +29,11 @@ export { localeCopies } from "./config.js";
 const requests = new AsyncLocalStorage();
 bindRequests(requests);
 
-/** The request headers the strategy reads, which a shared cache must key each response by. */
-const vary = headersRead().join(", ");
+/**
+ * The request headers the strategy reads, which a shared cache must key each response by: the
+ * `Vary` the middleware adds, for a framework that sends its response apart from the middleware.
+ */
+export const vary = headersRead().join(", ");
 
 /**
  * Resolves the request's locale by the config's strategy and binds it for the handler and all it
@@ -44,13 +47,40 @@ const vary = headersRead().join(", ");
  */
 export async function middleware(request, handler) {
 	const { pathname } = new URL(request.url);
-	const locale = assertIsLocale(localeOf(request, pathname));
+	const locale = assertIsLocale(findLocale(request, pathname));
 	const response = unprefixedPage(request, pathname)
 		? Response.redirect(localizeUrl(request.url, { locale }), 307)
 		: await requests.run({ index: locales.indexOf(locale) }, () =>
 				handler({ request, locale }),
 			);
 	return vary === "" ? response : withVary(response);
+}
+
+/**
+ * The locale the middleware binds for a request: the first the strategy finds in it, else the base
+ * locale. For a framework that renders apart from the middleware.
+ *
+ * @param {Request} request
+ * @returns {string}
+ */
+export function localeOf(request) {
+	return assertIsLocale(findLocale(request, new URL(request.url).pathname));
+}
+
+/**
+ * The redirect the middleware answers a request with, its `Vary` included, else undefined: with
+ * every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
+ * For a framework that renders apart from the middleware.
+ *
+ * @param {Request} request
+ * @returns {Response | undefined}
+ */
+export function redirectOf(request) {
+	const { pathname } = new URL(request.url);
+	if (!unprefixedPage(request, pathname)) return undefined;
+	const locale = assertIsLocale(findLocale(request, pathname));
+	const redirect = Response.redirect(localizeUrl(request.url, { locale }), 307);
+	return vary === "" ? redirect : withVary(redirect);
 }
 
 /**
@@ -80,7 +110,7 @@ function unprefixedPage(request, pathname) {
  * @param {Request} request
  * @param {string} pathname
  */
-function localeOf(request, pathname) {
+function findLocale(request, pathname) {
 	for (const source of strategy) {
 		const locale = fromSource(source, request, pathname);
 		if (locale !== undefined) return locale;
@@ -232,7 +262,7 @@ function covers(range, locale) {
 }
 
 /**
- * The headers `localeOf` reads, in the strategy's order: `query` and `url` read the URL, which a
+ * The headers `findLocale` reads, in the strategy's order: `query` and `url` read the URL, which a
  * cache keys on already, and a request does not carry `localStorage`.
  */
 function headersRead() {
