@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { shownDigits } from "../src/intl-formatters.ts";
+import type { Format } from "../src/format-options.ts";
+import { checkFormat, shownDigits } from "../src/intl-formatters.ts";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -25,4 +26,20 @@ it("makes one formatter for a run of digits shown with the same options, as a ca
 
 	expect(shown.at(-1)).toBe("99.000");
 	expect(made).toHaveBeenCalledTimes(1);
+});
+
+it("checks each of two number formats used in turn by making its formatter once, not at every key", () => {
+	const made = vi.spyOn(Intl, "NumberFormat");
+	const number = (options: Format["options"]): Format => ({
+		formatter: "number",
+		options,
+		input: undefined,
+		shift: 0,
+	});
+	const decimal = number({ minimumFractionDigits: 4 });
+	const currency = number({ style: "currency", currency: "CHF" });
+
+	for (let key = 0; key < 50; key++) checkFormat(key % 2 ? currency : decimal);
+
+	expect(made).toHaveBeenCalledTimes(2);
 });
