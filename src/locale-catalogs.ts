@@ -5,6 +5,7 @@ import { type Catalog, readCatalogSources } from "./catalog.ts";
 import { parseCatalogs } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
+import { fallbackPositions, messageSource } from "./fallbacks.ts";
 
 /** A project's config, its base catalog, and the locale's own, which may not exist yet. */
 export type LocaleCatalogs = {
@@ -15,7 +16,12 @@ export type LocaleCatalogs = {
 	target: Catalog | undefined;
 	/** The locale's keys whose message is the base text on purpose. */
 	identical: ReadonlySet<string>;
+	/** The message the locale takes from its fallbacks for a key its catalog lacks, if one has it. */
+	inherited: Inherited;
 };
+
+/** The message a locale takes for a key from the first locale along its fallbacks that has it. */
+export type Inherited = (key: string) => unknown;
 
 /**
  * Reads a project for a command on `locale`, which must be one of its locales other than the base.
@@ -59,5 +65,14 @@ export async function readLocaleCatalogs(
 		throw new Error("grai read no base catalog, and no error");
 	const target = parsed.catalogs.find((catalog) => catalog.locale === locale);
 	const identical = config.identicalToBase.get(locale) ?? new Set();
-	return { config, path, base, target, identical };
+	const byLocale = config.locales.map((each) =>
+		parsed.catalogs.find((catalog) => catalog.locale === each),
+	);
+	const fallbackOf = fallbackPositions(config.locales, config.fallbacks);
+	const fallback = fallbackOf[config.locales.indexOf(locale)];
+	const inherited: Inherited = (key) =>
+		fallback === undefined
+			? undefined
+			: messageSource(key, fallback, byLocale, fallbackOf)?.messages.get(key);
+	return { config, path, base, target, identical, inherited };
 }

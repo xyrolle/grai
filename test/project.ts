@@ -46,6 +46,7 @@ export type Messages = Record<string, Message>;
 
 /** The output's runtime, as the tests call it. */
 export type Runtime = {
+	GraiError: new (code: string, message: string) => Error & { code: string };
 	getLocale(): string;
 	setLocale(locale: string, options?: { reload?: boolean }): void;
 	localizeHref(href: string, options?: { locale?: string }): string;

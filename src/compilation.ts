@@ -44,6 +44,11 @@ export type Compilation = {
 	changed: ReadonlySet<string>;
 	/** The keys whose code calls a formatter, so formats.js is written from them alone. */
 	formatted: ReadonlySet<string>;
+	/**
+	 * Whether a changed key calls other formatters than it did, so formats.js is made again: a
+	 * formatter's name stands for its locale and options. Always for a compilation from nothing.
+	 */
+	formatsChanged: boolean;
 	errors: readonly GraiError[];
 };
 
@@ -111,7 +116,29 @@ export function compileCatalogs(
 		if ((keys.get(key)?.formats.size ?? 0) > 0) formatted.add(key);
 		else formatted.delete(key);
 	}
-	return { catalogs, keys, changed, formatted, errors: sortErrors(errors) };
+	const formatsChanged =
+		previous === undefined ||
+		[...changed].some(
+			(key) => !sameFormatters(previous.keys.get(key), keys.get(key)),
+		);
+	return {
+		catalogs,
+		keys,
+		changed,
+		formatted,
+		formatsChanged,
+		errors: sortErrors(errors),
+	};
+}
+
+/** Whether two compilations of a key call the same formatters, by name; a missing key calls none. */
+function sameFormatters(
+	before: CompiledKey | undefined,
+	after: CompiledKey | undefined,
+): boolean {
+	const a = before?.formats ?? new Map();
+	const b = after?.formats ?? new Map();
+	return a.size === b.size && [...a.keys()].every((name) => b.has(name));
 }
 
 /**

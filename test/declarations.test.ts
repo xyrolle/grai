@@ -302,6 +302,35 @@ console.log(codes, unbound, compiling);
 	expect(errors).toEqual(["5 TS2367"]);
 });
 
+it("types the runtime GraiError's constructor as the runtime has it: a code, then the message", async () => {
+	const { dir, load } = project({
+		en: { cart_title: "Your cart" },
+		de: { cart_title: "Ihr Warenkorb" },
+	});
+	const { runtime } = await load();
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { GraiError } from "./out/runtime.js";
+const thrown = new GraiError("locale-unknown", "Bad locale");
+const messageOnly = new GraiError("Bad locale");
+const unknownCode = new GraiError("bad-locale", "Bad locale");
+console.log(thrown, messageOnly, unknownCode);
+`,
+	);
+	const thrown = new runtime.GraiError("locale-unknown", "Bad locale");
+
+	// Line 3: a message alone, which the runtime would take as the code. Line 4: no code it throws.
+	expect(errors).toEqual(["3 TS2554", "4 TS2345"]);
+	expect([
+		thrown.name,
+		thrown.code,
+		thrown.message,
+		thrown instanceof Error,
+	]).toEqual(["GraiError", "locale-unknown", "Bad locale", true]);
+});
+
 it("types setLocale under reload as giving back nothing to await", async () => {
 	const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
 	const use = `import { setLocale } from "./out/runtime.js";

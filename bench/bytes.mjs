@@ -1,8 +1,11 @@
-// Client bytes per page: the messages each page of a real build downloads with every locale, against
-// only the reader's locale, as Paraglide's per-locale build and as grai's per-locale functions. The
-// pages and their keys come from a build record (record-build.mjs). Each scheme is bundled and
-// minified by Rolldown from the same keys, so compression is held equal; "page JS" is the brotli
-// size of everything the page loads in the build itself, for scale.
+// Client bytes per page, an experiment on the schemes grai chose between: the messages each page of
+// a real build downloads with every locale, against only the reader's locale, as Paraglide's
+// per-locale build and as the per-locale functions of the design's prototype (prototype.mjs), not
+// grai's build: what a page of grai's build loads, its locale's copies of the message chunks, is
+// measured from the build itself (variants.mjs, library-bytes.mjs). The pages and their keys come
+// from a build record (record-build.mjs). Each scheme is bundled and minified by Rolldown from the
+// same keys, so compression is held equal; "page JS" is the brotli size of everything the page
+// loads in the build itself, for scale.
 //   node bytes.mjs <app> <grai-build.json>
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -152,7 +155,7 @@ console.log(
 	`\n### ${app.name}: message bytes per page, KB brotli (raw), Paraglide ${paraglideVersion}, one locale = ${reader}\n`,
 );
 console.log(
-	"| page, by keys | keys loaded | keys used | page JS as built | messages, every locale | one locale, Paraglide per-locale build | one locale, grai | grai, no-input messages as strings | grai, no-input messages inlined | grai saves |",
+	"| page, by keys | keys loaded | keys used | page JS as built | messages, every locale | one locale, Paraglide per-locale build | one locale, prototype | prototype, no-input messages as strings | prototype, no-input messages inlined | prototype saves |",
 );
 console.log("|---|---|---|---|---|---|---|---|---|---|");
 // A message without inputs inlined at its call site: its text once, as a literal, and no function.
@@ -201,5 +204,5 @@ for (const [index, page] of ranked.entries()) {
 const less = (value) =>
 	`${(100 * (1 - value / totals.every)).toFixed(0)}% less`;
 console.log(
-	`\n${ranked.length} pages, summed brotli: page JS ${kb(totals.js)} KB; messages every locale ${kb(totals.every)} KB; Paraglide per-locale build ${kb(totals.perLocale)} KB (${less(totals.perLocale)}); grai ${kb(totals.grai)} KB (${less(totals.grai)}); grai with no-input messages as strings ${kb(totals.strings)} KB (${less(totals.strings)}); grai with no-input messages inlined ${kb(totals.inlined)} KB (${less(totals.inlined)}).`,
+	`\n${ranked.length} pages, summed brotli: page JS ${kb(totals.js)} KB; messages every locale ${kb(totals.every)} KB; Paraglide per-locale build ${kb(totals.perLocale)} KB (${less(totals.perLocale)}); the prototype ${kb(totals.grai)} KB (${less(totals.grai)}); with no-input messages as strings ${kb(totals.strings)} KB (${less(totals.strings)}); with no-input messages inlined ${kb(totals.inlined)} KB (${less(totals.inlined)}).`,
 );

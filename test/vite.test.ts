@@ -295,6 +295,35 @@ describe("the Vite plugin's build", () => {
 		).rejects.toThrow(/catalog/);
 	});
 
+	it("refuses a text that holds the bundler's placeholder for a chunk's hash, which the build would replace with the hash", async () => {
+		// Built as it is, the shared chunk and each locale's copy would read "Text <hash> <hash>": the
+		// bundler writes each chunk's hash over its placeholder wherever it is in the code, and grai
+		// each copy's.
+		const { dir } = project({
+			en: {
+				title: String.raw`Text !~\{000\}~ !~\{001\}~`,
+				greeting: "Hello {name}",
+			},
+			de: { title: "Titel", greeting: String.raw`Hallo {name} !~\{002\}~` },
+		});
+
+		await expect(
+			built(
+				dir,
+				{
+					a: `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`,
+					b: `import { m } from "./out/messages.js";\ndocument.body.textContent = m.greeting({ name: "Ada" });\nimport("./a.js");\n`,
+				},
+				{ localeChunks: true },
+			),
+		).rejects.toThrow(
+			[
+				"messages/de.json: \"greeting\" (de): the text holds !~{002}~, the bundler's placeholder for a chunk's hash, which a build replaces with that hash. Write it without that shape, such as with a space after !~.",
+				"messages/en.json: \"title\" (en): the text holds !~{000}~, the bundler's placeholder for a chunk's hash, which a build replaces with that hash. Write it without that shape, such as with a space after !~.",
+			].join("\n"),
+		);
+	});
+
 	it("fails the build where a source names a key no catalog has, as grai check does", async () => {
 		const { dir } = project(catalogs);
 

@@ -26,16 +26,19 @@ export declare function deLocalizeUrl(url: string | URL): URL;
 export declare function localizeUrl(url: string | URL, options?: { locale?: Locale }): URL;
 /** A path such as \`/cart\` with a locale's prefix under the \`url\` strategy; any other href as it is. */
 export declare function localizeHref(href: string, options?: { locale?: Locale }): string;
+/** The codes the runtime's GraiError carries: the runtime's own failures, not the compiler's. */
+type GraiErrorCode =
+	| "locale-unknown"
+	| "locale-not-loaded"
+	| "locale-unkept"
+	| "value-unmatched"
+	| "format-option-invalid"
+	| "locale-unbound"
+	| "output-changed";
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
 export declare class GraiError extends Error {
-	readonly code:
-		| "locale-unknown"
-		| "locale-not-loaded"
-		| "locale-unkept"
-		| "value-unmatched"
-		| "format-option-invalid"
-		| "locale-unbound"
-		| "output-changed";
+	constructor(code: GraiErrorCode, message: string);
+	readonly code: GraiErrorCode;
 }
 type MessageOptions = { locale?: Locale };
 /**

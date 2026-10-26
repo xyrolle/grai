@@ -1,11 +1,14 @@
 // Dev: one message edited until the page shows it, end to end in Vite: the catalog written, the
-// watcher, the plugin, the socket, the browser, the DOM. Every design serves the same module, every
-// locale of every key in one table. "whole" lets Vite re-send and re-evaluate it on each edit;
-// "patch" sends a custom HMR event naming a module of only the changed functions, which the page
-// imports and writes into the table; "patch, fs.watch" does the same from its own watcher on the
-// catalogs instead of Vite's. Beside them: Paraglide's own Vite plugin, which compiles again on an
-// edit, and i18next and use-intl, whose page imports the locale's JSON and accepts its update. The
-// edits go to a copy of the catalogs under .cache, never the app's.
+// watcher, the plugin, the socket, the browser, the DOM. "grai" is grai's own Vite plugin, as an
+// app runs it, and it also times the edit until a server render through Vite's module runner
+// shows it. The designs it was chosen from follow, as experiments: each serves the same module,
+// every locale of every key in one table, from a compiler of this bench's own (prototype.mjs).
+// "whole" lets Vite re-send and re-evaluate it on each edit; "patch" sends a custom HMR event
+// naming a module of only the changed functions, which the page imports and writes into the
+// table; "patch, fs.watch" does the same from its own watcher on the catalogs instead of Vite's.
+// Beside them: Paraglide's own Vite plugin, which compiles again on an edit, and i18next and
+// use-intl, whose page imports the locale's JSON and accepts its update. The edits go to a copy of
+// the catalogs under .cache, never the app's.
 //   node hmr.mjs [app...]
 import {
 	cpSync,
@@ -18,12 +21,20 @@ import {
 import { join } from "node:path";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { chromium } from "playwright-core";
-import { createServer } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
+import { graiSource } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
+
+const { grai } = await import(join(graiSource, "vite.ts"));
+// The dev server comes from the Vite grai's source imports, as an app has one Vite: grai's plugin
+// tells a server environment it can patch in place by Vite's own class, and the bench's copy of
+// Vite is another, so a server made by it would have its messages taken again on every edit.
+const { createServer } = await import(
+	join(graiSource, "../node_modules/vite/dist/node/index.js")
+);
 
 const EDITS = 20;
 const SHOWN = 500;
@@ -197,6 +208,11 @@ render();`;
 	const accept = (specifier, update) =>
 		`if (import.meta.hot) import.meta.hot.accept(${JSON.stringify(specifier)}, (next) => { ${update}; render(); });`;
 	const pages = {
+		// grai's plugin dispatches grai:change on window after an edit; the page draws again and
+		// cancels it, as a framework's adapter does, or the page would reload.
+		"grai's plugin": `import { m } from "./out/messages.js";
+${render((key) => `m[${key}]()`)}
+addEventListener("grai:change", (event) => { event.preventDefault(); render(); });`,
 		grai: `import * as messages from "virtual:messages";
 let m = messages;
 m.setLocale(${lang});
@@ -252,8 +268,23 @@ function writeFixture(root, app, locale, design) {
 	const shown = Object.keys(app.messages[locale]).filter(plain).slice(0, SHOWN);
 	writeFileSync(
 		join(root, "index.html"),
-		`<!doctype html><meta charset="utf-8"><p id="target"></p><ul id="list"></ul><script type="module" src="/main.js"></script>`,
+		`<!doctype html><html lang="${locale}"><meta charset="utf-8"><p id="target"></p><ul id="list"></ul><script type="module" src="/main.js"></script>`,
 	);
+	if (design === "grai's plugin") {
+		writeFileSync(
+			join(root, "grai.config.json"),
+			JSON.stringify({
+				locales: app.locales,
+				baseLocale: app.baseLocale,
+				catalogs: "messages/{locale}.json",
+				outdir: "out",
+			}),
+		);
+		writeFileSync(
+			join(root, "render.js"),
+			`import { m } from "./out/messages.js";\nexport const render = (key, locale) => m[key]({}, { locale });\n`,
+		);
+	}
 	writeFileSync(join(root, "main.js"), pageModule(design, locale, shown));
 	return shown[0];
 }
@@ -278,6 +309,8 @@ function pluginsFor(design, app, root, locale, timings) {
 	}
 	if (design === "i18next" || design === "use-intl")
 		return [timingPlugin(catalogFile, timings)];
+	if (design === "grai's plugin")
+		return [grai({ config: join(root, "grai.config.json") })];
 	return [devPlugin(root, app.locales, design, timings)];
 }
 
@@ -294,7 +327,11 @@ async function measure(browser, app, design) {
 		configFile: false,
 		logLevel: "silent",
 		// A port the system picks, so that runs side by side never meet.
-		server: { host: "127.0.0.1", port: 0 },
+		server: {
+			host: "127.0.0.1",
+			port: 0,
+			watch: { ignored: ["**/render.js", "**/main.js", "**/index.html"] },
+		},
 		plugins: pluginsFor(design, app, root, locale, timings),
 	});
 	await server.listen();
@@ -307,6 +344,16 @@ async function measure(browser, app, design) {
 
 	const catalogFile = join(root, "messages", `${locale}.json`);
 	const catalogBytes = readFileSync(catalogFile).length;
+	// grai's: when a server render through Vite's runner shows the edit, polled each millisecond.
+	const ssr = server.environments.ssr;
+	const rendered = async (text) => {
+		for (;;) {
+			const { render } = await ssr.runner.import("/render.js");
+			if (render(key, locale) === text)
+				return performance.timeOrigin + performance.now();
+			await new Promise((resolve) => setTimeout(resolve, 1));
+		}
+	};
 	const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
 	const original = catalog[key];
 	const latencies = [];
@@ -316,20 +363,24 @@ async function measure(browser, app, design) {
 		catalog[key] = `Edit ${edit}: ${original}`;
 		const written = performance.timeOrigin + performance.now();
 		writeFileSync(catalogFile, JSON.stringify(catalog, null, "\t"));
-		const changed = await page
-			.waitForFunction(
-				(text) => window.changed?.text === text && window.changed,
-				catalog[key],
-				{ timeout: 120_000 },
-			)
-			.then((handle) => handle.jsonValue());
+		const [changed, serverAt] = await Promise.all([
+			page
+				.waitForFunction(
+					(text) => window.changed?.text === text && window.changed,
+					catalog[key],
+					{ timeout: 120_000 },
+				)
+				.then((handle) => handle.jsonValue()),
+			design === "grai's plugin" ? rendered(catalog[key]) : undefined,
+		]);
 		const reached = timings.edits.at(-1);
 		if (edit >= 3)
 			latencies.push({
 				total: changed.at - written,
-				watcher: reached.reached - written,
-				plugin: reached.answered - reached.reached,
-				browser: changed.at - reached.answered,
+				server: serverAt === undefined ? undefined : serverAt - written,
+				watcher: reached && reached.reached - written,
+				plugin: reached && reached.answered - reached.reached,
+				browser: reached && changed.at - reached.answered,
 			});
 	}
 	await page.close();
@@ -340,13 +391,16 @@ async function measure(browser, app, design) {
 		? `${megabytes(timings.generate.bytes)}, ${timings.generate.ms.toFixed(0)} ms`
 		: `${megabytes(catalogBytes)} catalog`;
 	const cell = (field) =>
-		median(latencies.map((latency) => latency[field])).toFixed(1);
-	return `| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`;
+		latencies[0]?.[field] === undefined
+			? "—"
+			: median(latencies.map((latency) => latency[field])).toFixed(1);
+	return `| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("server")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} |`;
 }
 
 const browser = await chromium.launch();
 for (const app of selectedApps()) {
 	const designs = [
+		"grai's plugin",
 		"whole",
 		"patch",
 		"patch, fs.watch",
@@ -361,9 +415,9 @@ for (const app of selectedApps()) {
 		`\n### ${app.name}: one message edited until the page shows it, Vite dev, Chromium ${browser.version()}, median of ${EDITS} edits, ms\n`,
 	);
 	console.log(
-		"| design | dev module, generated in | page load | edit to page | watcher | plugin | browser |",
+		"| design | dev module, generated in | page load | edit to page | edit to server render | watcher | plugin | browser |",
 	);
-	console.log("|---|---|---|---|---|---|---|");
+	console.log("|---|---|---|---|---|---|---|---|");
 	for (const row of rows) console.log(row);
 }
 await browser.close();

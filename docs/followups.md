@@ -8,6 +8,12 @@ grai/vite chunks keys by the pages that load them when an adapter passes `pageEn
 
 Done when: grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
 
+## Patch a server render whose Vite is another copy
+
+The dev plugin patches a server environment's runner in place only when `isRunnableDevEnvironment` says it is one, which checks Vite's own class. A dev server made by another copy of Vite than the one grai imports, as in a workspace whose packages resolve Vite with different peers, fails that check: every edit then has the server take the messages again, about 110 ms on the synthetic catalog against 9 ms patched (`bench/hmr.mjs`, which now makes its server with grai's Vite for that reason). An app has one Vite, so this only shows in such setups.
+
+Done when: a server environment that runs its modules in a runner is patched whichever copy of Vite made it, with a test that makes the server with another copy.
+
 ## A page's later imports at its first paint
 
 The merge rule may put a key a page needs only through a later import in a chunk that page's first paint loads, when another page's first paint needs the key: on app B four pages load one such key at first paint. Keeping a set that later imports load off the first paints it is not on, without knowing which pages make which later imports, cost the rule most of its merges: 46 chunks a page against 13. Telling it exactly needs each later import's pages, from its dynamic importers' reach.
@@ -157,17 +163,17 @@ Done when: the Vite, Next and Astro adapters write the framework's base path int
 
 Done when: a rename changes them, with a test of each.
 
-## Export and seed a locale that falls back
-
-`grai export en-GB --untranslated` lists every key en-GB takes from en as untranslated, so a translator is asked for all of en again; `grai seed en-GB` copies en's text into en-GB, which then no longer follows en. Both should treat a key a locale takes from its fallback as covered, and still let a translator give the locale its own text.
-
-Done when: `export --untranslated` leaves out a key the locale takes from its fallback, a full export offers it with the fallback's text as its source, `seed` refuses a locale that falls back or seeds nothing it takes from its fallback, and a test covers each.
-
 ## Descriptors `defineMessages` names, in `grai migrate`
 
 react-intl apps often write their descriptors once, `const messages = defineMessages({ title: { id: "shop.title", defaultMessage: "Shop" } })`, and call `intl.formatMessage(messages.title)` or `<FormattedMessage {...messages.title} />`. `grai migrate` lists those calls, although a `const` that `defineMessages` initializes with the ids written in it names each message as plainly as a descriptor written in the call.
 
 Done when: `grai migrate` rewrites both calls of such a `const` in the module that declares it, and removes the `const` once nothing reads it.
+
+## The messages a `<Trans>` renders, as grai markup
+
+A `<Trans>`'s message reads its tags as elements: `Hello <1>{{name}}</1>` numbers one by the `<Trans>`'s children, and `<bold>` names one of its `components`, each taking the attributes the translation gives it, while `<strong>` or `<br/>` may be a basic HTML node it keeps. `grai import` keeps every tag as text, which is right for a `t()` call, and `grai migrate` lists the `<Trans>` for a person to write its message's tags as grai markup in each catalog. Only the call sites tell which keys are rich text: reading every string with angle brackets as markup would break a `t()` message that shows them.
+
+Done when: `grai migrate` writes the messages of each key a `<Trans>` renders, in every locale and variant, as grai markup, with its numbered, named, basic and self-closing tags and their attributes, under names the markup component of the next entry can render; it leaves every other key's text as it is and lists a tag it cannot name, with why; and a test covers each kind of tag.
 
 ## Calls that render markup, in `grai migrate`
 
@@ -216,3 +222,9 @@ Done when: each adapter that can draw a page no server serves writes the script 
 The locale script writes the page's import map. A page that has one of its own then has two, which only browsers that merge import maps read both of; another takes the first and refuses the second.
 
 Done when: the plugin merges the page's own import map into the one the locale script writes, with a browser test of a page that has one.
+
+## A text that holds the bundler's placeholder for a hash
+
+A Vite build refuses a text with `!~{…}~` in it (`placeholderTexts` in `src/vite-build.ts`). Rolldown writes each chunk's hash over its placeholder wherever that is in a chunk's code, a string's value included, and grai does the same in each locale's copy. Every other way of writing the text, such as `\x7e` for the `~`, an escaped template, a concatenation or a join, comes out of Rolldown's printer and minifier as the one string again before the hashes go in.
+
+Done when: Rolldown leaves the placeholder's shape in a string's value alone, and the build takes the text as it is.

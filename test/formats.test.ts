@@ -298,6 +298,26 @@ describe("a formatted placeholder's errors", () => {
 		]);
 	});
 
+	it("is an error for options Intl refuses after more formats than validation keeps, in turn", async () => {
+		const refused = intlError(
+			() => new Intl.NumberFormat(undefined, { style: "currency" }),
+		);
+		// 80 keys of 40 formats Intl takes, more than the 32 kept, then one it refuses.
+		const taken = Object.fromEntries(
+			Array.from({ length: 80 }, (_, index) => [
+				`k${String(index).padStart(2, "0")}`,
+				`{amount :number minimumFractionDigits=${index % 2} maximumFractionDigits=${((index >> 1) % 20) + 2}}`,
+			]),
+		);
+		expect(
+			await errorsOf({
+				en: { ...taken, z_currency: "{amount :number style=currency}" },
+			}),
+		).toEqual([
+			`message-invalid: messages/en.json: "z_currency" (en): {amount :number style=currency}: Intl cannot format with these options: ${refused}`,
+		]);
+	});
+
 	it("is an error to select on a date or on a number in another notation, or to format a local", async () => {
 		expect(
 			await errorsOf({

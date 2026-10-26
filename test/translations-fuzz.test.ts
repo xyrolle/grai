@@ -175,24 +175,40 @@ const targets = (units: readonly Unit[]) =>
 		unit.target === undefined ? undefined : piecesPattern(unit.target),
 	]);
 
+/** The fuzzed locale has no fallbacks. */
+const noFallback = () => undefined;
+
 /** The units a merge of these returned units gives back, exported again. */
 function roundTrip(
 	base: Catalog,
 	target: Catalog,
 	returned: readonly ReturnedUnit[],
 ): Unit[] {
-	const merged = mergeUnits(base, target, "de", new Set(), returned);
+	const merged = mergeUnits(
+		base,
+		target,
+		"de",
+		new Set(),
+		noFallback,
+		returned,
+	);
 	expect(merged.refused).toEqual([]);
 	const messages = Object.fromEntries(target.messages);
 	for (const [key, value] of merged.messages) messages[key] = value;
-	return exportUnits(base, catalog("de", messages), "de", new Set());
+	return exportUnits(
+		base,
+		catalog("de", messages),
+		"de",
+		new Set(),
+		noFallback,
+	);
 }
 
 describe("translation files, fuzzed", () => {
 	it("give back every translation as it was, through XLIFF and through JSON", () => {
 		for (let seed = 1; seed <= 150; seed++) {
 			const { base, target } = project(seed);
-			const units = exportUnits(base, target, "de", new Set());
+			const units = exportUnits(base, target, "de", new Set(), noFallback);
 			const xliff = readXliff(writeXliff("en", "de", units, new Map())).units;
 			const json = readUnitsJson(
 				writeUnitsJson("en", "de", units, new Map()),
@@ -221,7 +237,7 @@ describe("translation files, fuzzed", () => {
 			const document = writeXliff(
 				"en",
 				"de",
-				exportUnits(base, target, "de", new Set()),
+				exportUnits(base, target, "de", new Set(), noFallback),
 				new Map(),
 			);
 			const next = generator(seed * 7919);
@@ -249,7 +265,7 @@ describe("translation files, fuzzed", () => {
 					expect(error).toBeInstanceOf(Error);
 				}
 				if (units !== undefined)
-					mergeUnits(base, target, "de", new Set(), units);
+					mergeUnits(base, target, "de", new Set(), noFallback, units);
 			}
 		}
 	});

@@ -27,6 +27,7 @@ import {
 	keysModule,
 	messageChunkCopies,
 	messageChunking,
+	placeholderTexts,
 	textModule,
 } from "./vite-build.ts";
 import {
@@ -233,6 +234,8 @@ export function graiPlugin(
 			});
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
+			const held = placeholderTexts(compiled);
+			if (held.length > 0) this.error(messagesOf(held));
 		},
 		// A module's code as the last plugins see it, a component's compiled, names the keys it ships.
 		transform: {

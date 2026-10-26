@@ -1,14 +1,16 @@
 // Runtime size: what the browser downloads for the runtime surface the two apps call (getLocale,
 // setLocale, locales, baseLocale, isLocale, localizeHref, deLocalizeUrl), minified and gzipped:
-// Paraglide's runtime for a cookie and for a URL strategy, against a sketch of grai's, in which a
-// document's locale is fixed by the bundle it loads, so reading it is a constant and switching is
-// a cookie and a reload. Messages are not counted; they carry their own plural rules.
+// Paraglide's runtime for a cookie and for a URL strategy, against grai's runtime as it compiles
+// it for the same strategies, and the sketch the design started from, in which a document's
+// locale is fixed by the bundle it loads, so reading it is a constant and switching is a cookie
+// and a reload. Messages are not counted; they carry their own plural rules.
 //   node runtime-size.mjs
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { rolldown } from "rolldown";
 import { cacheDir, selectedApps } from "./apps.mjs";
+import { graiSource, writeGraiProject } from "./grai.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 
 const SURFACE = [
@@ -68,6 +70,18 @@ async function minGzip(from) {
 }
 
 const [app] = selectedApps(["synthetic"]);
+
+/** The runtime.js grai compiles for the app with these strategies. */
+async function graiRuntime(strategy) {
+	const config = writeGraiProject(
+		{ ...app, compilerOptions: { ...app.compilerOptions, strategy } },
+		`runtime-size-${strategy[0]}`,
+	);
+	const { compile } = await import(join(graiSource, "index.ts"));
+	const { errors } = await compile(config);
+	if (errors.length > 0) throw new Error(errors[0].message);
+	return join(config, "..", "out", "runtime.js");
+}
 const sketchPath = join(cacheDir, "runtime-sketch.js");
 writeFileSync(sketchPath, sketch);
 const rows = [
@@ -87,7 +101,18 @@ const rows = [
 			"runtime.js",
 		),
 	],
-	["grai sketch, locale fixed per bundle", sketchPath],
+	[
+		"grai, its runtime as compiled, cookie strategy",
+		await graiRuntime(["cookie", "preferredLanguage", "baseLocale"]),
+	],
+	[
+		"grai, its runtime as compiled, URL strategy",
+		await graiRuntime(["url", "baseLocale"]),
+	],
+	[
+		"grai's first sketch, locale fixed per bundle (not what it ships)",
+		sketchPath,
+	],
 ];
 console.log(
 	"\n### runtime surface, bytes\n\n| runtime | min | min+gzip |\n|---|---|---|",

@@ -10,6 +10,7 @@ import { keyExports } from "./key-exports.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import {
 	type OutputModules,
+	type RenderedFormats,
 	type RuntimeSources,
 	renderModules,
 } from "./output-modules.ts";
@@ -45,6 +46,8 @@ type ShardFiles = {
 export type Rendered = {
 	files: ReadonlyMap<string, string>;
 	modules: OutputModules;
+	/** formats.js, which the next render keeps if the messages call the same formatters. */
+	formats: RenderedFormats;
 	/** Each shard's keys, sorted. */
 	shards: readonly (readonly string[])[];
 	/** The files of each shard that holds keys, by its index. */
@@ -63,7 +66,8 @@ const messagesModule = `export * as m from "./keys.js";\n`;
 /**
  * Renders the output. The keys are split into shards by a hash of their name, so a key stays in
  * its shard while others come and go; only the shards whose keys changed are rendered again, and
- * every shard when a module they import is renamed.
+ * those that import a module renamed: every shard for the runtime, and for the plural rules or the
+ * formatters, the shards whose keys call them.
  */
 export function renderOutput(
 	config: Config,
@@ -73,19 +77,30 @@ export function renderOutput(
 	{ localeCopies }: { localeCopies: boolean },
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
-	const { modules, immutable, entries } = renderModules(
+	const { modules, immutable, entries, formats } = renderModules(
 		config,
 		runtime,
 		compilation,
 		localeCopies,
+		previous?.formats,
 	);
 	const count = shardCount(compilation.keys.size);
 	const before =
-		previous?.shards.length === count && sameModules(previous.modules, modules)
+		previous?.shards.length === count &&
+		previous.modules.runtime === modules.runtime
 			? previous
 			: undefined;
 	const dirty = new Set<number>();
 	for (const key of compilation.changed) dirty.add(shardOf(key, count));
+	if (before !== undefined) {
+		before.shards.forEach((keys, index) => {
+			if (
+				!dirty.has(index) &&
+				importsRenamed(keys, compilation, before.modules, modules)
+			)
+				dirty.add(index);
+		});
+	}
 	const shards =
 		before === undefined
 			? groupKeys(compilation.keys.keys(), count)
@@ -140,18 +155,34 @@ export function renderOutput(
 		rendered: {
 			files: new Map([...output.immutable, ...output.mutable]),
 			modules,
+			formats,
 			shards,
 			shardFiles,
 		},
 	};
 }
 
-function sameModules(a: OutputModules, b: OutputModules): boolean {
-	return (
-		a.runtime === b.runtime &&
-		a.plurals === b.plurals &&
-		a.formats === b.formats
-	);
+/**
+ * Whether a shard's keys call the plural rules or the formatters, and that module was renamed. A
+ * change of one key's format options renames formats.js, and only the shards that import it name it.
+ */
+function importsRenamed(
+	keys: readonly string[],
+	compilation: Compilation,
+	before: OutputModules,
+	after: OutputModules,
+): boolean {
+	const plurals = before.plurals !== after.plurals;
+	const formats = before.formats !== after.formats;
+	if (!plurals && !formats) return false;
+	return keys.some((key) => {
+		const compiled = compilation.keys.get(key);
+		return (
+			compiled !== undefined &&
+			((plurals && compiled.plurals.size > 0) ||
+				(formats && compiled.formats.size > 0))
+		);
+	});
 }
 
 /** Every key in its shard, each shard's keys sorted. */

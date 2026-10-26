@@ -14,7 +14,7 @@
 		}
 	],
 	"cart_add": "Adaugă un produs",
-	"terms": "Comandând, accepți {#link}condițiile{/link}.",
+	"terms": "Comandând, accepți {#link href=|/terms|}condițiile{/link}.",
 	"about_link": "Despre noi",
 	"home_link": "Înapoi la magazin",
 	"about_title": "Despre magazin",

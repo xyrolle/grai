@@ -3,7 +3,9 @@
 // temporary directory, removed after: app A's or B's src/ and catalogs, from the checkouts that
 // GRAI_BENCH_A and GRAI_BENCH_B name, or a synthetic project of app B's size (13,000 keys in three
 // locales, 9,000 source files, 68 MB) that anyone can run. find and rename take the key the most
-// files name; check --fix removes 50 unused keys added to each catalog. Medians of three runs.
+// files name; check --fix removes 50 unused keys added to each catalog, then checks, as the
+// command does: it runs the command itself, its output kept from the terminal. Medians of three
+// runs.
 //   node refactor.mjs [app...]
 import { execFileSync } from "node:child_process";
 import {
@@ -26,23 +28,33 @@ const commands = {
 	check: ["check.ts", "check"],
 	find: ["find.ts", "find"],
 	rename: ["rename.ts", "rename"],
-	fix: ["fix.ts", "removeUnusedKeys"],
+	fix: ["cli/check.ts", "checkCommand"],
 };
 
-/** Runs in the child: one command, timed after its module loads, printed as milliseconds. */
+/**
+ * Runs in the child: one command, timed after its module loads, printed as milliseconds on the
+ * last line. `check --fix` is the command's own run, which prints what it removed and checked.
+ */
 async function child(command, config, ...args) {
 	const [file, name] = commands[command];
-	const run = (await import(join(graiSource, file)))[name];
+	const exported = (await import(join(graiSource, file)))[name];
 	const start = performance.now();
-	const result = await run(config, ...args);
+	if (command === "fix") {
+		// Its exit code says whether the check found problems, which the parent does not judge: it
+		// checks that the unused keys are gone.
+		await exported.run(["--fix", "--config", config]);
+		console.log(JSON.stringify({ ms: performance.now() - start }));
+		return;
+	}
+	const result = await exported(config, ...args);
 	const ms = performance.now() - start;
 	const errors = Array.isArray(result) ? result : result.errors;
 	if (command !== "check" && errors.length > 0) throw errors[0];
 	console.log(JSON.stringify({ ms }));
 }
 
-/** The median of the runs, each after its own setup, in milliseconds. */
-function median(setup, args) {
+/** The median of the runs, each after its own setup and then its check, in milliseconds. */
+function median(setup, args, after = () => {}) {
 	const runs = Array.from({ length: RUNS }, (_, run) => {
 		setup(run);
 		const output = execFileSync(
@@ -52,7 +64,8 @@ function median(setup, args) {
 				encoding: "utf8",
 			},
 		);
-		return JSON.parse(output).ms;
+		after();
+		return JSON.parse(output.trim().split("\n").at(-1) ?? "").ms;
 	});
 	return runs.toSorted((a, b) => a - b)[Math.floor(RUNS / 2)];
 }
@@ -149,6 +162,15 @@ function addUnusedKeys(dir, catalogs, locales) {
 	}
 }
 
+/** Throws unless check --fix took the unused keys out of every catalog. */
+function removedUnusedKeys(dir, catalogs, locales) {
+	for (const locale of locales) {
+		const path = join(dir, catalogs.replace("{locale}", locale));
+		if (readFileSync(path, "utf8").includes('"zz_unused_'))
+			throw new Error(`check --fix left unused keys in ${path}`);
+	}
+}
+
 if (process.argv[2] === "--child") {
 	await child(...process.argv.slice(3));
 } else {
@@ -183,6 +205,7 @@ if (process.argv[2] === "--child") {
 				"check --fix": median(
 					() => addUnusedKeys(dir, catalogs, locales),
 					() => ["fix", config],
+					() => removedUnusedKeys(dir, catalogs, locales),
 				),
 			};
 			const times = Object.entries(ms).map(

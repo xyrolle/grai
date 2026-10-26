@@ -2,11 +2,15 @@
 // and minified by Rolldown, and its messages for the whole catalog. i18next and use-intl load a
 // locale's whole catalog (or namespace) on every page; grai and Paraglide ship only the keys a
 // page imports, which `bytes` measures per page. grai's runtime is the one its compiler writes;
-// its messages are the per-locale module the adapters build.
+// its messages are the locale's copies of the message chunks a Vite build with grai's plugin
+// writes for a page that names every key. Beside them, the per-locale module the design started
+// from, as prototype.mjs writes it.
 //   node library-bytes.mjs [app...]
-import { join } from "node:path";
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { rolldown } from "rolldown";
+import { build } from "vite";
 import { selectedApps } from "./apps.mjs";
 import { graiSource, writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
@@ -39,6 +43,32 @@ async function bundle(source, external = () => false) {
 	return output[0].code;
 }
 
+const { grai } = await import(join(graiSource, "vite.ts"));
+const { localeDirectory } = await import(
+	join(graiSource, "message-directories.ts")
+);
+
+/** The locale's copies of the message chunks a client build writes for a page naming every key. */
+async function graiBuiltMessages(config, locale) {
+	const root = dirname(config);
+	const page = join(root, "page.js");
+	writeFileSync(page, `export { m } from "./out/messages.js";\n`);
+	const { output } = await build({
+		root,
+		configFile: false,
+		logLevel: "silent",
+		plugins: [grai({ config, localeChunks: true })],
+		build: {
+			write: false,
+			rolldownOptions: { input: page, preserveEntrySignatures: "strict" },
+		},
+	});
+	return output
+		.filter((file) => file.fileName.includes(`/${localeDirectory(locale)}/`))
+		.map((file) => (file.type === "chunk" ? file.code : String(file.source)))
+		.join("");
+}
+
 const size = (code) =>
 	`${(brotli(code) / 1024).toFixed(1)} (${(Buffer.byteLength(code) / 1024).toFixed(0)})`;
 
@@ -62,8 +92,13 @@ for (const app of selectedApps()) {
 	const json = (file) => /\.json$/.test(file);
 	const rows = [
 		[
-			"grai",
+			"grai, as its build writes the locale's copies",
 			await bundle(`export * from ${JSON.stringify(graiOut)};`),
+			await graiBuiltMessages(config, locale),
+		],
+		[
+			"grai's first prototype: one per-locale module (not what it ships)",
+			undefined,
 			await bundle(
 				`export * from ${JSON.stringify(join(writePrototype(app), `${locale}.js`))};`,
 			),

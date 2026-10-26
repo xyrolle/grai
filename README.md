@@ -214,13 +214,13 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
 - **Client components call messages as they are.** In the browser a page keeps the locale it was loaded in; a link into another locale loads that page, and `setLocale(locale)` switches to it.
 - **Server actions and route handlers name the locale:** `m.saved({}, { locale })`. React keeps no request state there.
 - **Per-key imports** (`import { title } from "#i18n/messages/title.js"`) map to the output's keys.js through package.json `imports`, as in the example.
-- **A markup message** renders with `grai/react`'s `Markup`, in server and client components alike:
+- **A markup message** renders with `grai/react`'s `Markup`, in server and client components alike. Each element's function takes what it encloses and the options and attributes the message writes on it, so `{#link href=|/terms|}terms{/link}` gives `options.href`:
 
   ```tsx
-  <Markup parts={m.terms.parts()} markup={{ link: (children) => <a href="/terms">{children}</a> }} />
+  <Markup parts={m.terms.parts()} markup={{ link: (children, { options }) => <a href={String(options.href)}>{children}</a> }} />
   ```
 
-On a page of 400 messages in a server component and 100 in a client component, the browser downloads 129.8 KB brotli against next-intl's 230.3 KB, or its 134.4 KB with the client's keys picked, and an edit to a catalog is written in about 27 ms, 20 of them waiting for the save to settle; the rest of the edit is Next's refresh (`bench/nextjs.mjs`, `docs/runtime.md`).
+On a page of 400 messages in a server component and 100 in a client component, the browser downloads 129.8 KB brotli against next-intl's 230.3 KB, or its 134.4 KB with the client's keys picked, and an edit to a catalog was written in about 27 ms, 20 of them waiting for the save to settle, which the watcher now does only after a read of a catalog that does not parse; the rest of the edit is Next's refresh (`bench/nextjs.mjs`, `docs/runtime.md`).
 
 ### Astro
 
@@ -368,6 +368,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A message with inputs costs more than Paraglide's call given `{ locale }`:** 18–19 ns in a page against 11.7–12.3 ns (`client`), and on the server 110–130 ns against 67–122 ns (`server`). Every such message dispatches through one shared closure, so its call of the locale's function goes megamorphic. A dispatcher per key is the fix, tracked in `docs/followups.md`.
 - **A Next app started on a loopback address, `127.0.0.1` or `[::1]`, never answers a page:** there Next 16.4 sends each of the proxy's rewrites back to itself, and grai/next's proxy rewrites each one again. Start Next on its default host, `0.0.0.0` or the machine's address, as behind a reverse proxy (`docs/followups.md`).
 - **Under a CSP of hashes, a built SvelteKit page downloads its locale's message chunks and the shared ones.** The browser refuses the import map, which carries Kit's nonce but no hash yet. A CSP of nonces works, as Kit's `auto` mode gives a page it renders on request.
+- **A Vite build refuses a text that holds `!~{…}~`, such as `!~{000}~`:** that is Rolldown's placeholder for a chunk's hash, which it replaces with the hash wherever it is in a chunk's code. No way of writing it survives: Rolldown prints a string by its value, and folds an escaped template, a concatenation or a join back into one string, before the hashes go in (`docs/followups.md`).
 - **Not supported yet:**
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, other than a currency, a unit and a time zone (`currency=$code` and `:relativetime`'s `unit=$unit` work), such as `style=$style`.

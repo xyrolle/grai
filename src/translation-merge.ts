@@ -6,6 +6,7 @@
 
 import type { Catalog } from "./catalog.ts";
 import type { GraiErrorCode } from "./error.ts";
+import type { Inherited } from "./locale-catalogs.ts";
 import { mergedMessage } from "./merged-message.ts";
 import { parseMessage } from "./message.ts";
 import { type Piece, piecesPattern } from "./pattern-pieces.ts";
@@ -48,9 +49,10 @@ export function mergeUnits(
 	target: Catalog | undefined,
 	locale: string,
 	identical: ReadonlySet<string>,
+	inherited: Inherited,
 	returned: readonly ReturnedUnit[],
 ): Merged {
-	const current = exportUnits(base, target, locale, identical);
+	const current = exportUnits(base, target, locale, identical, inherited);
 	const byId = new Map(current.map((unit) => [unit.id, unit]));
 	const keyCodes = codesByKey(current);
 	const refused: Refusal[] = [];
@@ -113,7 +115,7 @@ export function mergeUnits(
 		const value = mergedMessage(
 			base,
 			key,
-			{ locale, value: target?.messages.get(key) },
+			{ locale, value: target?.messages.get(key) ?? inherited(key) },
 			keyUnits,
 			accepted,
 		);
