@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import { covers, type Edit, importWithout } from "./edits.ts";
 import type { LibraryModule, Role } from "./library.ts";
 import type { Binding, Scopes, Use } from "./scopes.ts";

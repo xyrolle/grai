@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import type { MappedKey } from "../import/mapping.ts";
 import type { Left, ModuleView, Outcome } from "./library.ts";
 import type { Node, Span } from "./syntax.ts";

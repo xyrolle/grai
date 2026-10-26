@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { minifySync, parseSync } from "vite";
+import { minifySync } from "vite";
+import { parse } from "./code/parse.ts";
 import type { Config } from "./config.ts";
 import { directionOf } from "./config-module.ts";
 import { globPattern } from "./globs.ts";
@@ -68,7 +69,7 @@ function functionSource(file: string, name: string): string {
 		new URL(`./runtime/${file}`, import.meta.url),
 		"utf8",
 	);
-	for (const statement of parseSync(file, text).program.body) {
+	for (const statement of parse(file, text).program.body) {
 		const declaration =
 			statement.type === "ExportNamedDeclaration"
 				? statement.declaration
