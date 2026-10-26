@@ -174,12 +174,15 @@ it("writes the output again where another compile wrote over it while no watcher
 	const { config: file, compile } = project(catalogs, config);
 	await started(file);
 	// A build's compile leaves the pseudo-locale out.
-	expect((await compile()).written).toContain("config.js");
+	expect((await compile()).written).toContainEqual(
+		expect.stringMatching(/^config-\w+\.js$/),
+	);
 
 	const after = await started(file);
 
+	// The entries name the pseudo-locale's modules again, which the build's compile left in place.
 	expect(after.build?.compilation.changed.size).toBe(0);
-	expect(after.result.written).toContain("config.js");
+	expect(after.result.written).toContain("keys.js");
 	expect(await fresh(file)).toEqual({
 		written: [],
 		files: after.build?.rendered.files,
