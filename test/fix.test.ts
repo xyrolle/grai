@@ -107,6 +107,21 @@ describe("grai check --fix", () => {
 		expect(fixed.scanned).toBeUndefined();
 	});
 
+	it("keeps the keys a dynamic import may load by a built path, with a comment inside its call", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/load.js": `export const load = async (name) =>\n\t(await import(/* split */ \`#i18n/messages/\${name}.js\`))[name]();\n`,
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual([]);
+		expect(fixLines(fixed)).toEqual([
+			"kept: src/load.js:2:9: import( `#i18n/messages/${ may name 2 unused keys, so they stay",
+		]);
+	});
+
 	it("takes each unused entry out with the separator before it, leaving every other byte as it is written", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
