@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, pathnames, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -174,6 +174,36 @@ describe("the config", () => {
 				localePrefix: "always",
 			}),
 		).toEqual([]);
+	});
+
+	it("takes pathnames only as paths of the url strategy's locales, each with its route's segments", async () => {
+		const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+		const errors = (pathnames: unknown) =>
+			errorsOf(catalogs, { strategy: ["url"], pathnames });
+
+		expect(await errors({ about: { de: "/ueber-uns" } })).toEqual([
+			'config-invalid: grai.config.json: "pathnames" maps "about", but a path starts with / and has no ?, # or empty segment, and a segment that is [name] is named by a JavaScript identifier.',
+		]);
+		expect(await errors({ "/about": { fr: "/a-propos" } })).toEqual([
+			'config-invalid: grai.config.json: "pathnames" gives "/about" a path in "fr", which is not one of "locales": en, de.',
+		]);
+		expect(
+			await errors({ "/products/[id]": { de: "/produkte/[sku]" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "pathnames" gives "/products/[id]" "/produkte/[sku]" in de, whose segments are [sku] where the route\'s are [id]. Name the same segments in each.',
+		]);
+		expect(
+			await errors({ "/about": { de: "/info" }, "/contact": { de: "/info" } }),
+		).toEqual([
+			'config-invalid: grai.config.json: "pathnames" gives de the path "/info" for "/about" and for "/contact". Give each route a path of its own.',
+		]);
+		expect(
+			await errorsOf(catalogs, {
+				pathnames: { "/about": { de: "/ueber-uns" } },
+			}),
+		).toEqual([
+			'config-invalid: grai.config.json: "pathnames" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
 	});
 
 	it("takes unlocalizedPaths only with the url strategy, as globs of paths", async () => {

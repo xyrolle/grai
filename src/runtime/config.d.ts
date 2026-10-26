@@ -40,3 +40,17 @@ export declare const leavesPathsAlone: boolean;
 export declare const prefixes: readonly string[];
 /** The paths the `url` strategy leaves alone, as regular expressions of a URL's path. */
 export declare const unlocalizedPaths: readonly RegExp[];
+/** Whether the config gives routes their paths in a locale's words: `pathnames`. */
+export declare const translatesPaths: boolean;
+/**
+ * Each route's path, and its path in each locale's words, in `locales` order: the pattern a path
+ * matches, its named segments, and the path to fill.
+ */
+export declare const pathnames: readonly {
+	route: { pattern: RegExp; names: readonly string[]; path: string };
+	locales: readonly {
+		pattern: RegExp;
+		names: readonly string[];
+		path: string;
+	}[];
+}[];
