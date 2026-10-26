@@ -309,6 +309,33 @@ describe("grai find, rename and check --fix", () => {
 			"m.basket_title()",
 		);
 	});
+
+	it("checks after a fix what the fix wrote: the catalogs, the config's identicalToBase and the descriptions", async () => {
+		const { dir } = project(
+			{
+				en: { cart_title: "Your cart", cart_old: "Old" },
+				de: { cart_title: "Ihr Warenkorb", cart_old: "Old" },
+			},
+			{
+				identicalToBase: { de: ["cart_old"] },
+				descriptions: "messages/descriptions.json",
+			},
+		);
+		writeFileSync(
+			join(dir, "messages", "descriptions.json"),
+			JSON.stringify({ cart_title: "The cart's heading", cart_old: "Unused" }),
+		);
+		writeFileSync(
+			join(dir, "app.ts"),
+			'import { m } from "./out/messages.js";\nm.cart_title();\n',
+		);
+
+		expect(await grai(dir, "check", "--fix")).toEqual({
+			code: 0,
+			stdout: 'removed: "cart_old" from every catalog\ngrai: no problems\n',
+			stderr: "",
+		});
+	});
 });
 
 describe("grai add", () => {

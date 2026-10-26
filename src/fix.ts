@@ -12,14 +12,8 @@ import {
 	messageBindings,
 	namespaceNames,
 } from "./message-imports.ts";
-import {
-	namesIn,
-	positionOf,
-	type SourceFile,
-	sourceFiles,
-	splitTests,
-	testsNaming,
-} from "./sources.ts";
+import { readAny, type ScannedSources, scanSources } from "./source-scan.ts";
+import { positionOf, type SourceFile, testsNaming } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
 /** A read that kept unused keys: where it is, as `file:line:column`, what it reads, and the keys. */
@@ -35,6 +29,11 @@ export type FixResult = {
 	/** The files written, relative to the project's root: catalogs, and the config if it listed one. */
 	changed: string[];
 	errors: GraiError[];
+	/**
+	 * The sources it read, for the check after it to take: none when it stopped before reading
+	 * them, or wrote one of them.
+	 */
+	scanned: ScannedSources | undefined;
 };
 
 /**
@@ -56,17 +55,16 @@ export async function removeUnusedKeys(
 		kept: [],
 		changed: [],
 		errors: [],
+		scanned: undefined,
 	};
 	const read = await readProject(configFile);
 	if ("errors" in read) return { ...result, errors: read.errors };
 	const { catalogs, errors } = parseCatalogs(read.sources);
 	if (errors.length > 0) return { ...result, errors };
 	const { config } = read;
-	const { shipped, tests } = splitTests(
-		sourceFiles(roots ?? [config.root], config.root, config.outdir),
-		config.tests,
-	);
-	const names = namesIn(shipped);
+	const scanned = scanSources(roots ?? [config.root], config);
+	result.scanned = scanned;
+	const { shipped, tests, names } = scanned;
 	// Read in the text and in the code alike: a comment in an import hides it from the text's
 	// scan, and a key a read may reach stays if either finds the read.
 	const namespaces = namespaceNames(
@@ -134,7 +132,11 @@ export async function removeUnusedKeys(
 	if (described !== undefined) texts.set(described.file, described.text);
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
-	return { ...result, changed };
+	return {
+		...result,
+		changed,
+		scanned: readAny(scanned, texts.keys()) ? undefined : scanned,
+	};
 }
 
 /** How much of a read the report shows. */
