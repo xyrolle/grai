@@ -75,6 +75,21 @@ export function project(
 		);
 	}
 	const locales = Object.keys(catalogs);
+	// What a project's imports resolve by: a key's own path mapped to keys.js, and `$lib`, as an
+	// app declares them for TypeScript and Node.
+	const outdir = typeof config.outdir === "string" ? config.outdir : "out";
+	writeFileSync(
+		join(dir, "package.json"),
+		JSON.stringify({
+			imports: { "#i18n/messages/*": `./${outdir}/keys.js` },
+		}),
+	);
+	writeFileSync(
+		join(dir, "tsconfig.json"),
+		JSON.stringify({
+			compilerOptions: { paths: { "$lib/*": ["./src/lib/*"] } },
+		}),
+	);
 	const file = join(dir, "grai.config.json");
 	writeFileSync(
 		file,
