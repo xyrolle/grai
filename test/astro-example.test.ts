@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
@@ -21,6 +22,35 @@ function built(args: string[]): void {
 			`astro build ${args.join(" ")} failed:\n${stdout}${stderr}`,
 		);
 	}
+}
+
+/**
+ * Builds the example as `astro build` does, and gives the paths of the pages Astro tells its
+ * integrations it built, as a sitemap reads them.
+ */
+function builtPages(): string[] {
+	const { status, stdout, stderr } = spawnSync(
+		process.execPath,
+		[fileURLToPath(new URL("astro-build-pages.js", import.meta.url))],
+		{ cwd: example, encoding: "utf8" },
+	);
+	if (status !== 0) throw new Error(`the build failed:\n${stdout}${stderr}`);
+	return JSON.parse(stdout.trim().split("\n").at(-1) ?? "[]");
+}
+
+/**
+ * The page at a path: its status, its <html> start tag and its heading, without the attributes
+ * `astro dev` gives an element to name its source.
+ */
+async function pageAt(origin: string, path: string): Promise<string[]> {
+	const response = await fetch(origin + encodeURI(path));
+	const html = await response.text();
+	const heading = /<h1[^>]*>([^<]*)<\/h1>/.exec(html)?.[1];
+	return [
+		String(response.status),
+		...(html.match(/<html[^>]*>/) ?? []),
+		...(heading === undefined ? [] : [`<h1>${heading}</h1>`]),
+	];
 }
 
 /** A server the suite started, and the origin it printed. */
@@ -151,8 +181,9 @@ function aSite(site: { origin: string }) {
 describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 	const site = { origin: "" };
 	let served: Served | undefined;
+	let pages: string[] = [];
 	beforeAll(async () => {
-		built([]);
+		pages = builtPages();
 		// --ignore-lock: a one-off server in the foreground, which the suite stops. Astro starts its
 		// preview server in the background, out of the suite's reach, when an agent runs the suite.
 		served = await listening(astro, [
@@ -168,6 +199,52 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 	afterAll(() => served && stopped(served.server));
 
 	aSite(site);
+
+	it("writes each page at its paths in its locale's words, which pathnames give", async () => {
+		expect(await pageAt(site.origin, "/ro/despre/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Despre acest exemplu</h1>",
+		]);
+		expect(await pageAt(site.origin, "/ar/حول/")).toEqual([
+			"200",
+			'<html lang="ar" dir="rtl">',
+			"<h1>حول هذا المثال</h1>",
+		]);
+		expect(await pageAt(site.origin, "/ro/produse/2/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Produsul 2</h1>",
+		]);
+		expect(await pageAt(site.origin, "/ro/about/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Despre acest exemplu</h1>",
+		]);
+	});
+
+	it("tells integrations of each page at its words, as a sitemap reads the pages", () => {
+		expect(pages.toSorted()).toEqual(
+			[
+				"",
+				"about/",
+				"ar/",
+				"ar/about/",
+				"ar/products/1/",
+				"ar/products/2/",
+				"ar/حول/",
+				"products/1/",
+				"products/2/",
+				"ro/",
+				"ro/about/",
+				"ro/despre/",
+				"ro/products/1/",
+				"ro/products/2/",
+				"ro/produse/1/",
+				"ro/produse/2/",
+			].toSorted(),
+		);
+	});
 
 	it("type-checks with astro check, the types grai compiled for it included", () => {
 		const { status, stdout, stderr } = spawnSync(astro, ["check"], {
@@ -220,6 +297,27 @@ describe("the Astro example, rendered on demand by the Node adapter", {
 
 	aSite(site);
 
+	it("serves a page at its words, on demand, and from the file a prerendered page's words have", async () => {
+		// Astro's server skips grai's prerendered routes for a path no file was written at, and
+		// renders it on demand, as grai's middleware routes it.
+		expect(await pageAt(site.origin, "/ro/despre/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Despre acest exemplu</h1>",
+		]);
+		expect(existsSync(join(example, "dist-server/client/ro/despre"))).toBe(
+			false,
+		);
+		expect(await pageAt(site.origin, "/ro/produse/1/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Produsul 1</h1>",
+		]);
+		expect(
+			existsSync(join(example, "dist-server/client/ro/produse/1/index.html")),
+		).toBe(true);
+	});
+
 	it("renders interleaved requests each in its own locale", async () => {
 		const titles: [path: string, title: string][] = [
 			["/about/", "About this example"],
@@ -238,5 +336,40 @@ describe("the Astro example, rendered on demand by the Node adapter", {
 				titles.flatMap(([, title]) => (html.includes(title) ? [title] : [])),
 			),
 		).toEqual(requests.map(([, title]) => [title]));
+	});
+});
+
+describe("the Astro example in dev", { timeout: 30_000 }, () => {
+	let origin = "";
+	let served: Served | undefined;
+	beforeAll(async () => {
+		// --ignore-lock: in the foreground, as `astro preview` above. Astro's dev server leaves
+		// requests to Vite's alone inside Vitest, by the VITEST that the suite's runner sets.
+		served = await listening(
+			astro,
+			["dev", "--port", "0", "--host", "127.0.0.1", "--ignore-lock"],
+			{ VITEST: "" },
+		);
+		origin = served.origin;
+	}, 60_000);
+	afterAll(() => served && stopped(served.server));
+
+	it("matches a path in its locale's words to grai's route, and renders the page's route there", async () => {
+		expect(await pageAt(origin, "/ro/despre/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Despre acest exemplu</h1>",
+		]);
+		expect(await pageAt(origin, "/ro/produse/2/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Produsul 2</h1>",
+		]);
+		expect(await pageAt(origin, "/ro/about/")).toEqual([
+			"200",
+			'<html lang="ro" dir="ltr">',
+			"<h1>Despre acest exemplu</h1>",
+		]);
+		expect((await pageAt(origin, "/en/despre/"))[0]).toBe("404");
 	});
 });

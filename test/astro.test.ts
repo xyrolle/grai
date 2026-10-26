@@ -376,7 +376,7 @@ async function compiledProject(config: Record<string, unknown>) {
 		"server.js",
 	);
 	const internal = await outputModule<
-		Pick<LocaleProject, "localeOfPath" | "routeOfPath" | "pathOfRoute">
+		Pick<LocaleProject, "localeOfPath" | "routeOfPath">
 	>(dir, "internal.js");
 	return {
 		m,
@@ -386,7 +386,6 @@ async function compiledProject(config: Record<string, unknown>) {
 				getTextDirection: runtime.getTextDirection,
 				localeOfPath: internal.localeOfPath,
 				routeOfPath: internal.routeOfPath,
-				pathOfRoute: internal.pathOfRoute,
 				configName: "grai.config.json",
 				requestStrategies: { beforeUrl: [], afterUrl: [] },
 				...project,
@@ -563,20 +562,26 @@ describe("the middleware", () => {
 		}
 	});
 
-	it("fails a prerendered page whose path its locale's words translate, which a static build has no page at", async () => {
+	it("prerenders a page at its route's path and, through its route, at its path in its locale's words", async () => {
 		const { m, middleware } = await compiledProject({
 			strategy: ["url"],
 			pathnames: { "/about": { ro: "/despre" } },
 		});
-		const onRequest = middleware();
+		const routed: (string | undefined)[] = [];
+		const prerendered = async (path: string) => {
+			const response = await middleware()(
+				context(path, {}, { isPrerendered: true, routePattern: path }),
+				(rewrite?: string) => {
+					routed.push(rewrite);
+					return page(m)();
+				},
+			);
+			return response.text();
+		};
 
-		expect(await prerendering(onRequest, m, "/ro/about")).toMatchObject({
-			name: "GraiError",
-			code: "config-invalid",
-			message: `grai.config.json: the page /ro/about is prerendered at /ro/about, but "pathnames" gives it /ro/despre in ro, where a static build has no page. Render the page on demand (export const prerender = false), or leave its path out of "pathnames".`,
-		});
-		expect(await prerendering(onRequest, m, "/about")).toBeInstanceOf(Response);
-		expect(await prerendering(onRequest, m, "/ro/")).toBeInstanceOf(Response);
+		expect(await prerendered("/ro/about")).toContain('lang="ro"');
+		expect(await prerendered("/ro/despre")).toContain('lang="ro"');
+		expect(routed).toEqual([undefined, "/ro/about"]);
 	});
 
 	it("fails a prerendered page whose locale a strategy ahead of the URL would find in the request", async () => {

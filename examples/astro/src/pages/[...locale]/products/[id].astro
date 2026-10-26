@@ -1,0 +1,25 @@
+---
+import type { GetStaticPaths } from "astro";
+import { m } from "#lib/i18n/messages.js";
+import { baseLocale, locales } from "#lib/i18n/runtime.js";
+import Page from "../../../layouts/Page.astro";
+
+// Prerendered in every build, the Node adapter's too, where the other pages render on demand.
+export const prerender = true;
+
+/** Each product once per locale: grai.config.json's "pathnames" gives it /ro/produse/[id] too. */
+export const getStaticPaths = (() =>
+	locales.flatMap((locale) =>
+		["1", "2"].map((id) => ({
+			params: { locale: locale === baseLocale ? undefined : locale, id },
+			props: { id },
+		})),
+	)) satisfies GetStaticPaths;
+
+type Props = { id: string };
+const { id } = Astro.props;
+---
+
+<Page title={m.product_title({ id })} path={`products/${id}`}>
+	<h1>{m.product_title({ id })}</h1>
+</Page>

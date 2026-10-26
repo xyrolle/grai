@@ -109,6 +109,7 @@ async function askEditor(
 					"grai/react": [source("react/markup.ts")],
 					"grai/astro": [source("astro.ts")],
 					"grai/astro/middleware": [source("astro/middleware.ts")],
+					"grai/astro/translated-paths": [source("astro/translated-paths.ts")],
 				},
 			},
 			files: ["use.ts"],

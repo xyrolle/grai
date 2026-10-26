@@ -72,6 +72,10 @@
 			"types": "./dist/astro/middleware.d.ts",
 			"default": "./dist/astro/middleware.js"
 		},
+		"./astro/translated-paths": {
+			"types": "./dist/astro/translated-paths.d.ts",
+			"default": "./dist/astro/translated-paths.js"
+		},
 		"./vue": {
 			"types": "./dist/vue/markup.d.ts",
 			"default": "./dist/vue/markup.js"
