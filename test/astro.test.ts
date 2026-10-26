@@ -309,7 +309,16 @@ describe("grai's config beside Astro's", () => {
 		]);
 	});
 
-	it("refuses a base and domains, which the url strategy cannot read yet, saying what to set", () => {
+	it("agrees with a base that is grai's basePath, after which the url strategy reads the locale", () => {
+		expect(
+			disagreements(graiConfig({ strategy: ["url"], basePath: "/shop" }), {
+				...astroRouting(["en", "ro"]),
+				base: "/shop/",
+			}),
+		).toEqual([]);
+	});
+
+	it("refuses a base that is not grai's basePath, and domains grai's config does not name, saying what to set", () => {
 		expect(
 			disagreements(graiConfig({ strategy: ["url"] }), {
 				...astroRouting(["en", "ro"], {
@@ -318,8 +327,35 @@ describe("grai's config beside Astro's", () => {
 				base: "/shop/",
 			}),
 		).toEqual([
-			`The "url" strategy reads the locale from the path's first segment, which Astro's base "/shop/" takes. Serve the site from Astro's base "/" ("The framework's base path" in grai's docs/followups.md).`,
-			`Astro's i18n.domains serves ro from domains of their own, where grai's "url" strategy finds the locale in the path. Remove i18n.domains and serve each locale under its path prefix ("A domain per locale" in grai's docs/followups.md).`,
+			`Astro's base "/shop/" and grai's "basePath" (none) must name the same path: the "url" strategy reads the locale after it.`,
+			`Astro's i18n.domains serves ro from domains of their own, which grai's "url" strategy reads only with "domains" in grai's config. Give each locale its host there, such as { "ro": "example.ro" } beside the default locale's.`,
+		]);
+	});
+
+	it("agrees with Astro's i18n.domains by the same host for each locale, and says which to set", () => {
+		const grai = graiConfig({
+			strategy: ["url"],
+			domains: { en: "example.com", ro: "example.ro" },
+		});
+
+		expect(
+			disagreements(
+				grai,
+				astroRouting(["en", "ro"], { domains: { ro: "https://example.ro" } }),
+			),
+		).toEqual([]);
+		expect(
+			disagreements(
+				grai,
+				astroRouting(["en", "ro"], {
+					domains: { ro: "https://ro.example.com" },
+				}),
+			),
+		).toEqual([
+			`Astro's i18n.domains serves ro from "ro.example.com", and grai's "domains" gives it "example.ro". Give each locale the same host in both.`,
+		]);
+		expect(disagreements(grai, astroRouting(["en", "ro"]))).toEqual([
+			`grai's "domains" gives ro the host "example.ro", which Astro's i18n.domains does not list. Add "ro": "https://example.ro" there.`,
 		]);
 	});
 });
@@ -339,10 +375,9 @@ async function compiledProject(config: Record<string, unknown>) {
 		dir,
 		"server.js",
 	);
-	const internal = await outputModule<Pick<LocaleProject, "localeOfPath">>(
-		dir,
-		"internal.js",
-	);
+	const internal = await outputModule<
+		Pick<LocaleProject, "localeOfPath" | "routeOfPath" | "pathOfRoute">
+	>(dir, "internal.js");
 	return {
 		m,
 		middleware: (project: Partial<LocaleProject> = {}) =>
@@ -350,6 +385,8 @@ async function compiledProject(config: Record<string, unknown>) {
 				middleware: server.middleware,
 				getTextDirection: runtime.getTextDirection,
 				localeOfPath: internal.localeOfPath,
+				routeOfPath: internal.routeOfPath,
+				pathOfRoute: internal.pathOfRoute,
 				configName: "grai.config.json",
 				requestStrategies: { beforeUrl: [], afterUrl: [] },
 				...project,
@@ -467,6 +504,25 @@ describe("the middleware", () => {
 		expect(allowed).toEqual(["sha256-ro"]);
 	});
 
+	it("renders a path in its locale's words as the route Astro routes, its prefix kept", async () => {
+		const { m, middleware } = await compiledProject({
+			strategy: ["url"],
+			pathnames: { "/products/[id]": { ro: "/produse/[id]" } },
+		});
+		const routed: (string | undefined)[] = [];
+
+		const response = await middleware()(
+			context("/ro/produse/7?view=all"),
+			(rewrite?: string) => {
+				routed.push(rewrite);
+				return page(m)();
+			},
+		);
+
+		expect(routed).toEqual(["/ro/products/7?view=all"]);
+		expect(await response.text()).toContain('lang="ro"');
+	});
+
 	it("passes on anything but a page as it is", async () => {
 		const { middleware } = await compiledProject({ strategy: ["url"] });
 		const json = Response.json({ title: "Your cart" });
@@ -505,6 +561,22 @@ describe("the middleware", () => {
 				Response,
 			);
 		}
+	});
+
+	it("fails a prerendered page whose path its locale's words translate, which a static build has no page at", async () => {
+		const { m, middleware } = await compiledProject({
+			strategy: ["url"],
+			pathnames: { "/about": { ro: "/despre" } },
+		});
+		const onRequest = middleware();
+
+		expect(await prerendering(onRequest, m, "/ro/about")).toMatchObject({
+			name: "GraiError",
+			code: "config-invalid",
+			message: `grai.config.json: the page /ro/about is prerendered at /ro/about, but "pathnames" gives it /ro/despre in ro, where a static build has no page. Render the page on demand (export const prerender = false), or leave its path out of "pathnames".`,
+		});
+		expect(await prerendering(onRequest, m, "/about")).toBeInstanceOf(Response);
+		expect(await prerendering(onRequest, m, "/ro/")).toBeInstanceOf(Response);
 	});
 
 	it("fails a prerendered page whose locale a strategy ahead of the URL would find in the request", async () => {
