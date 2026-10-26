@@ -18,8 +18,8 @@ export const migrateCommand: Command = {
 			...sourceOption,
 			"default-namespace": { type: "string" },
 		});
-		const migrate = await loadMigrate();
-		if (migrate === undefined) return 1;
+		// Loaded when it runs, as only this command reads another library's calls.
+		const { migrate } = await import("../migrate.ts");
 		const namespace = values["default-namespace"];
 		const result = migrate(config, sourcesOf(values), {
 			defaultNamespace: typeof namespace === "string" ? namespace : undefined,
@@ -39,25 +39,4 @@ function summaryLine({ rewritten, changed, left }: MigrateResult): string {
 	const files = `${changed.length} ${changed.length === 1 ? "file" : "files"}`;
 	const rest = left.length > 0 ? `, and left ${left.length}, listed above` : "";
 	return `grai: rewrote ${calls} in ${files}${rest}`;
-}
-
-/**
- * grai migrate, loaded when it runs: it parses sources with Vite's parser, which only this command
- * needs, so the others run in a project without Vite.
- */
-async function loadMigrate() {
-	try {
-		return (await import("../migrate.ts")).migrate;
-	} catch (error) {
-		const missingVite =
-			error instanceof Error &&
-			"code" in error &&
-			error.code === "ERR_MODULE_NOT_FOUND" &&
-			error.message.includes("'vite'");
-		if (!missingVite) throw error;
-		console.error(
-			"grai: migrate parses your sources with Vite's parser: add vite as a dev dependency while you migrate.",
-		);
-		return undefined;
-	}
 }
