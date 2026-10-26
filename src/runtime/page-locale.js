@@ -34,8 +34,8 @@
  * its default; a page whose server or prerender wrote another of the project's locales in its place
  * keeps that one, as the page was drawn in it. Otherwise the strategy's places are read in order:
  * the choice the visitor stored (`cookie`, `localStorage`), the URL (`query`, `url`) and the
- * browser's languages (`preferredLanguage`), each matched as the server matches it, else the base
- * locale.
+ * browser's languages (`preferredLanguage`), each matched as the server matches it. Where none
+ * names a locale, the page keeps the one it was built with, else takes the base locale.
  *
  * In a build that copies each message chunk per locale, the script's `data-grai-chunks` names the
  * page's chunks, and it maps them to the locale's copies with an import map, before any module
@@ -126,8 +126,9 @@ export function pickPageLocale(settings, localeReach) {
 		}
 	};
 
-	if (!locales.includes(root.lang) || root.lang === script?.dataset.graiLang) {
-		let locale = baseLocale;
+	const drawn = locales.includes(root.lang) ? root.lang : undefined;
+	if (drawn === undefined || drawn === script?.dataset.graiLang) {
+		let locale = drawn ?? baseLocale;
 		for (const source of strategy) {
 			const found = named(source);
 			if (found === undefined) continue;

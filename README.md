@@ -89,7 +89,7 @@ Where no server picks the locale, each page the plugin builds picks it itself, b
 - `preferredLanguage` is the browser's languages, matched as the server matches `Accept-Language`: `de-AT` finds `de`;
 - `url` is the path's first segment, `/de/cart`.
 
-A server reads the same list where it can, so a page it draws picks the same locale. The page's `<html lang>`, as its template has it, is only a default; a server or a prerender that writes another locale's `lang` in its place drew the page in that one, and the page keeps it.
+A server reads the same list where it can, so a page it draws picks the same locale. The page's `<html lang>`, as its template has it, is only a default, which the page keeps where no place of the strategy names a locale; a server or a prerender that writes another locale's `lang` in its place drew the page in that one, and the page keeps it.
 
 With `grai({ localeChunks: true })`, the page then loads only its locale's words: the build writes each message chunk's copy per locale, and the script points the page at its locale's. With a Content Security Policy that allows scripts by hash, add the hashes the build's log names to `script-src`; they change only with the config, Vite's `base` or grai. With Vite's `html.cspNonce`, nothing more is needed.
 
