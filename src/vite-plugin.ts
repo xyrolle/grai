@@ -1,12 +1,13 @@
-import { join, resolve } from "node:path";
-import type { Logger, Plugin } from "vite";
+import { basename, join, resolve } from "node:path";
+import type { Logger, Plugin, ResolvedConfig } from "vite";
+import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import { BuildReading } from "./code/build-reading.ts";
 import { parse } from "./code/parse.ts";
 import { withGroups } from "./code-splitting.ts";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
-import { messagesOf } from "./error.ts";
+import { GraiError, messagesOf } from "./error.ts";
 import {
 	isMessageModule,
 	keyModulePrefix,
@@ -74,13 +75,23 @@ export type GraiPlugin = {
 const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro|mdx)$/;
 
 /**
- * What a framework's adapter tells the plugin. `pageEntries`: the entries each page's first paint
- * loads together, by their module ids as the bundler names them (real paths), which the client
- * build chunks keys by. Called once a client build has loaded every module.
+ * What a framework's adapter tells the plugin:
+ * - `pageEntries`: the entries each page's first paint loads together, by their module ids as the
+ *   bundler names them (real paths), which the client build chunks keys by. Called once a client
+ *   build has loaded every module.
+ * - `frameworkBase`: the base path the framework serves the app under, as its config writes it,
+ *   which must be grai's `basePath` under the `url` strategy; undefined where it names none.
  */
 export type GraiAdapter = {
 	pageEntries?: () => Iterable<readonly string[]>;
+	frameworkBase?: (config: ResolvedConfig) => FrameworkBase | undefined;
 };
+
+/** Vite's own base, for an app Vite alone serves; none for a relative base, which names no path. */
+export const viteBase = (config: ResolvedConfig): FrameworkBase | undefined =>
+	config.base.startsWith("/")
+		? { option: "Vite's base", base: config.base }
+		: undefined;
 
 /** grai's Vite plugin (`vite.ts` says what it does), with its build. */
 export function graiPlugin(
@@ -182,6 +193,18 @@ export function graiPlugin(
 				: { build: { modulePreload: preloads } };
 		},
 		configResolved(resolved) {
+			const framework = adapter.frameworkBase?.(resolved);
+			const problem =
+				framework === undefined
+					? undefined
+					: baseDisagreement(readConfig(files.configFile), framework);
+			if (problem !== undefined) {
+				throw new GraiError(
+					"config-invalid",
+					{ file: basename(files.configFile) },
+					problem,
+				);
+			}
 			site = {
 				base: resolved.base,
 				preloads: resolved.build.modulePreload !== false,

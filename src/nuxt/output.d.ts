@@ -4,6 +4,8 @@
 
 declare module "grai/nuxt/output/internal.js" {
 	export const locales: readonly string[];
+	/** Whether the config gives each locale a host of its own: `domains`. */
+	export const hostsLocales: boolean;
 	export const strategy: readonly (
 		| "cookie"
 		| "localStorage"
@@ -16,14 +18,14 @@ declare module "grai/nuxt/output/internal.js" {
 	export function getTextDirection(locale?: string): "ltr" | "rtl";
 	export function extractLocaleFromUrl(url: string | URL): string;
 	/** A request's locale, by its place in `locales`, which setLocale changes for the request. */
-	export type RequestLocale = { index: number };
+	export type RequestLocale = { index: number; origin?: string };
 	export function bindRequests(storage: {
 		getStore(): RequestLocale | undefined;
 	}): void;
 }
 
 declare module "grai/nuxt/output/server.js" {
-	export function localeOf(request: Request): string;
-	export function redirectOf(request: Request): Response | undefined;
+	export function localeOf(request: Request): Promise<string>;
+	export function redirectOf(request: Request): Promise<Response | undefined>;
 	export const vary: string;
 }

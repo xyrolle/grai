@@ -3,5 +3,6 @@
 	"baseLocale": "en",
 	"catalogs": "messages/{locale}.json",
 	"outdir": "src/lib/i18n",
-	"strategy": ["url"]
+	"strategy": ["url"],
+	"pathnames": { "/about": { "ro": "/despre" } }
 }

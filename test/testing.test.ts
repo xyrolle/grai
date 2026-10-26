@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { JSDOM } from "jsdom";
-import { expect, it, onTestFinished } from "vitest";
+import { aroundEach, describe, expect, it, onTestFinished } from "vitest";
 import { type Messages, project } from "./project.ts";
 
 /**
@@ -49,7 +49,8 @@ it("renders a component in a locale other than the page's in jsdom, once the tes
 	expect(page.documentElement.lang).toBe("de");
 });
 
-it("binds a test's locale in a process that serves requests too, outside every request", async () => {
+/** A project in English and German, loaded as a process whose middleware binds requests. */
+async function served() {
 	const { dir, load } = project({
 		en: { title: "Your cart" },
 		de: { title: "Ihr Warenkorb" },
@@ -57,10 +58,35 @@ it("binds a test's locale in a process that serves requests too, outside every r
 	const { m } = await load();
 	const output = (file: string) =>
 		import(pathToFileURL(join(dir, "out", file)).href);
-	await output("server.js");
-	const { useLocale } = await output("testing.js");
+	return {
+		m,
+		server: await output("server.js"),
+		testing: await output("testing.js"),
+	};
+}
 
-	useLocale("de");
+it("binds with useLocale a page's or a script's locale, which a process that serves requests renders in nowhere", async () => {
+	const { m, testing } = await served();
 
-	expect(m.title?.()).toBe("Ihr Warenkorb");
+	testing.useLocale("de");
+
+	expect(() => m.title?.()).toThrow(
+		expect.objectContaining({ code: "locale-unbound" }),
+	);
+});
+
+describe("a test in a process that serves requests, bound with server.js's withLocale around it", () => {
+	let m: Messages = {};
+	aroundEach(async (test) => {
+		const loaded = await served();
+		m = loaded.m;
+		await loaded.server.withLocale("de", test);
+	});
+
+	it("renders in that locale, in its synchronous code and after an await", async () => {
+		const first = m.title?.();
+		await new Promise((resolve) => setTimeout(resolve));
+
+		expect([first, m.title?.()]).toEqual(["Ihr Warenkorb", "Ihr Warenkorb"]);
+	});
 });
