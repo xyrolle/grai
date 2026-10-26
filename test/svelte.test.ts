@@ -203,6 +203,7 @@ describe("grai/svelte's client build", () => {
 		);
 
 		expect(placed).toEqual({
+			"out/internal.js": ["runtime", "grai-runtime"],
 			"out/runtime.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"\0grai:text/title": ["text", "grai~client"],
