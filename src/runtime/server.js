@@ -16,6 +16,7 @@ import {
 import {
 	assertIsLocale,
 	bindRequests,
+	isLocale,
 	localeOfPath,
 	localizeUrl,
 } from "./runtime.js";
@@ -43,12 +44,9 @@ const vary = headersRead().join(", ");
  */
 export async function middleware(request, handler) {
 	const { pathname } = new URL(request.url);
-	const locale = localeOf(request, pathname);
+	const locale = assertIsLocale(localeOf(request, pathname));
 	const response = unprefixedPage(request, pathname)
-		? Response.redirect(
-				localizeUrl(request.url, { locale: assertIsLocale(locale) }),
-				307,
-			)
+		? Response.redirect(localizeUrl(request.url, { locale }), 307)
 		: await requests.run({ index: locales.indexOf(locale) }, () =>
 				handler({ request, locale }),
 			);
@@ -132,7 +130,7 @@ function fromQuery(url) {
 function fromCookie(header) {
 	for (const cookie of header.split(";")) {
 		const [name, value] = cookie.split("=").map((part) => part.trim());
-		if (name === cookieName && value !== undefined && locales.includes(value)) {
+		if (name === cookieName && isLocale(value)) {
 			return value;
 		}
 	}

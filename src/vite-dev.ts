@@ -69,10 +69,11 @@ export function serveMessages(
 
 	const update = async (before: Build, next: Build) => {
 		const changed = [...next.compilation.changed];
-		// A change of config or of grai renames the runtime: a page that took the new one beside the
-		// old would hold two, each with its own locale.
+		// A change of config or of grai rewrites the runtime's anchor: a page that took the new
+		// runtime beside the old would hold two, each with its own locale.
+		const anchor = before.rendered.modules.runtime;
 		const sameRuntime =
-			before.rendered.modules.runtime === next.rendered.modules.runtime;
+			before.rendered.files.get(anchor) === next.rendered.files.get(anchor);
 		if (changed.length === 0 && sameRuntime) return;
 		const environments = Object.values(server.environments);
 		const sameExports = changed.every(
@@ -86,8 +87,9 @@ export function serveMessages(
 						before.compilation.keys.has(key) !== next.compilation.keys.has(key),
 				)
 				.flatMap(([, modules]) => [...modules]);
+			const runtime = sameRuntime ? [] : [join(files.outdir, anchor)];
 			for (const environment of environments) {
-				for (const id of [devKeysId, ...reimporting])
+				for (const id of [devKeysId, ...runtime, ...reimporting])
 					await reload(environment, id);
 			}
 			client.hot.send({ type: "full-reload" });
