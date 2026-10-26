@@ -9,4 +9,4 @@ The first release.
 - `grai check`, `add`, `find`, `rename` and `check --fix` keep the catalogs and the code in step; `seed`, `export` and `merge` take messages to translators as XLIFF 2.0 and back; `import` converts i18next and ICU catalogs.
 - `grai/vite` compiles when Vite starts, patches an edited message into the open page, and gives each chunk only the keys its code uses. `grai/svelte` adds to it a client build that reads a message without inputs as its string.
 - `grai/sveltekit`, `grai/next` with `grai/next/config` and `grai/next/proxy`, `grai/react` and `grai/astro` fit it to SvelteKit, Next, React and Astro. `grai/sveltekit/client` draws an edited message again in place in dev, without a reload.
-- The output's runtime: `getLocale`, `setLocale`, the URL helpers and the server's `middleware`, under 1 KB minified and gzipped.
+- The output's runtime: `getLocale`, `setLocale`, the URL helpers and the server's `middleware`, about 1 KB minified and gzipped.
