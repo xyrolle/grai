@@ -8,7 +8,7 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 
 | | grai | because |
 |---|---|---|
-| Browser | One locale per bundle. A page's message chunks hold only that locale's functions. | As built, app A's whole catalog in Russian is 99.4 KB brotli in its locale's copies of the message chunks, against 276.9 KB for Paraglide's messages of every locale (`library-bytes`). Per page, the design's prototype loaded 52–55% fewer message bytes (`bytes`). Hydrating a page of 2,000 messages takes 20–34% less time than Paraglide's (`hydrate`). |
+| Browser | One locale per bundle. A page's message chunks hold only that locale's functions. | As built, app A's whole catalog in Russian is 99.4 KB brotli in its locale's copies of the message chunks, against 276.9 KB for Paraglide's messages of every locale (`library-bytes`). Per page, over app A's 73 pages, the locale's copies take 38% fewer message bytes than Paraglide's of every locale, and 13% more than its per-locale build (`bytes`). Hydrating a page of 2,000 messages takes 20–34% less time than Paraglide's (`hydrate`). |
 | Locale in the browser | Fixed by the bundle the page loads. A call reads the page's locale once, from `<html lang>`, and runs no strategy. | A text message costs 4.4–4.8 ns a call in Chromium, against 361–394 ns for Paraglide's, which runs its strategy on every call (`client`). |
 | Locale on the server | Resolved once per request into `AsyncLocalStorage`. A call reads it once, through one shared dispatcher, and indexes the key's per-locale table. | The read is the floor while concurrent requests share the module: a text message costs 19–25 ns a call in Node, about one read, as Paraglide's `getLocale()` alone takes 17–30 ns in the same runs (`server`), and a read costs 21 ns in workerd (`workerd`). A module variable bound per request costs 0.3 ns, but 50 of 200 interleaved renders then get another request's locale (`interleave`). |
 | Server build | Each message function is a function expression. The browser's modules and `keys.js` keep arrows. | V8 parses an arrow function in full as it loads a module, and only pre-parses a function expression until its first call. App A's messages load in 24–25 ms against 30 ms with arrows, and in 26–28 ms against 30–33 ms in workerd, with the first render unchanged, for 0.7% more brotli bytes in the server bundle (`startup`). With Node's compile cache warm (`module.enableCompileCache()`), V8 reads the compiled code from disk and both load in 13–14 ms. |
@@ -45,7 +45,7 @@ grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageforma
 | A new server process: loading every locale's messages, then the first render (`startup`) | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms |
 | Heap the messages hold (`startup`) | 5.2 MB | 8.3 MB | 3.4 MB | 10.3 MB |
 | The runtime in the browser, its whole API, brotli (`library-bytes`) | 1.0 KB | 3.6 KB | 12.1 KB | 10.2 KB |
-| The messages a page downloads (`bytes`) | its own keys, in its locale: 24.5 KB on the largest page | its own keys, in every locale: 51.5 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
+| The messages a page downloads (`bytes`) | its keys and some its chunks share, in its locale: 34.5 KB on the largest page with `localeChunks`, 71.3 KB in every locale without | its own keys, in every locale: 51.6 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
 | A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
 | One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
 | Type checking 500 calls with `tsc` 7 (`types`) | 82 ms | 278 ms | 609 ms | 521 ms |
@@ -123,15 +123,17 @@ Against the strings, inlining changes the 4× time by −9% to +4%, no more than
 
 ## Bytes per page
 
-Every page of app A's production build, its keys bundled and minified by Rolldown per scheme (`record-build` in a copy of the app, then `bytes`). Brotli KB:
+Every page of app A's production build, built twice from one commit, on Paraglide 2.25.4 and on grai with `localeChunks`, as `grai/sveltekit/vite` builds it (`record-build` in a copy of each, then `bytes`). grai's columns are the files its build writes: its message chunks, which hold every locale, and the locale's copies of them, which a page loads through the import map. Paraglide's build mixes its messages into other chunks, so its columns bundle the page's keys alone, with Rolldown, into one file, which compresses better than chunks do. Brotli KB, in `ru`:
 
-| page | keys | page JS | every locale | Paraglide's per-locale build | grai, one locale | no-input messages exported as strings | no-input messages inlined |
+| page | keys, Paraglide / grai | page JS, Paraglide | page JS, grai, the locale's copies | Paraglide, every locale | Paraglide's per-locale build | grai's chunks, every locale | grai, the locale's copies |
 |---|---|---|---|---|---|---|---|
-| largest | 991 | 531 | 51.5 | 30.0 | 24.5 | 24.4 | 17.2 |
-| 10th | 672 | 445 | 43.1 | 23.7 | 19.7 | 19.6 | 15.0 |
-| all 73, summed | | 21,055 | 2,005 | 1,102 | 916 | 913 | 692 |
+| largest | 992 / 1,348 | 531.2 | 478.2 | 51.6 | 30.0 | 71.3 | 34.5 |
+| 10th | 673 / 975 | 445.0 | 409.5 | 43.1 | 23.8 | 57.5 | 26.8 |
+| all 73, summed | | 21,059 | 19,477 | 2,008 | 1,104 | 2,685 | 1,250 |
 
-Exporting a message without inputs as its string instead of a function saves almost nothing. Its bytes go only when the text moves into the calling component's code, as inlining it into the template moves it: 224 KB over the 73 pages, 1.1% of their JS.
+- **The locale's copies are 53% smaller than grai's chunks** and 38% smaller than Paraglide's messages in every locale, but 13% larger than Paraglide's per-locale build. grai's chunks hold keys a page's own code does not name, as chunks that sets of entries share (1,348 keys on the largest page, against the 992 its code names); each chunk compresses alone; and a copy keeps a `void 0` where each other locale's variant was (`docs/followups.md`).
+- **A page's JS on grai is 8% smaller than on Paraglide** with the locale's copies, and 0.7% smaller with the chunks as written, which a build without `localeChunks` writes alone.
+- **Inlining the text into the template is a prototype.** Its per-locale module of plain functions takes 918 KB summed, and 692 KB with each message without inputs inlined at its call sites. The 224 KB between them, 1.1% of the pages' JS, is what inlining moves into the components.
 
 App B already copies its message chunks per locale after the build and points each document at its locale's copies with an import map (`variants`). The copies are 49% smaller than the shared chunks, but Kit's modulepreload links name the shared ones, and Chromium and WebKit then fetch both (`preload`): 3,509 KB over its 89 pages, against 2,326 KB without the split.
 
