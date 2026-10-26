@@ -10,9 +10,14 @@ import {
 	type ParserOptions,
 	parseSync,
 	rawTransferSupported,
+	visitorKeys,
 } from "oxc-parser";
 
 export type * as ESTree from "oxc-parser";
+
+/** The fields of each kind of node that hold its children, in source order, as oxc lists them. */
+export const childFields: Readonly<Record<string, readonly string[]>> =
+	visitorKeys;
 
 /** The options a reader may choose: the language, and whether parentheses stay in the tree. */
 export type ParseOptions = Pick<ParserOptions, "lang" | "preserveParens">;

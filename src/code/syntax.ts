@@ -1,4 +1,4 @@
-import { type ESTree, parse } from "./parse.ts";
+import { childFields, type ESTree, parse } from "./parse.ts";
 
 /** Any node of a module's syntax tree. */
 export type Node = ESTree.Node;
@@ -29,8 +29,8 @@ export function isNode(value: unknown): value is Node {
 
 /** Each node a node holds, with the field that holds it, in source order. */
 export function* childrenOf(node: Node): Generator<[string, Node]> {
-	const fields: [string, unknown][] = Object.entries(node);
-	for (const [field, value] of fields) {
+	for (const field of childFields[node.type] ?? Object.keys(node)) {
+		const value: unknown = Reflect.get(node, field);
 		if (Array.isArray(value)) {
 			for (const item of value) if (isNode(item)) yield [field, item];
 		} else if (isNode(value)) {
