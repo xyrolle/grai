@@ -2,6 +2,7 @@
 // is, beside the config.js it writes with the project's locales.
 import {
 	baseLocale,
+	basePath,
 	cookieAttributes,
 	cookieName,
 	cookieSecure,
@@ -16,6 +17,7 @@ import {
 	prefixesEveryLocale,
 	queryParameter,
 	readsUrl,
+	servedUnderBase,
 	strategy,
 	translatesPaths,
 	unlocalizedPaths,
@@ -53,6 +55,17 @@ const localeOfPrefix = (/** @type {string | undefined} */ segment) => {
 /** Whether a value is a locale whose paths have a prefix. */
 const isPrefixed = (/** @type {unknown} */ locale) =>
 	isLocale(locale) && (prefixesEveryLocale || locale !== baseLocale);
+/**
+ * A path within the app's base path (`/shop/de/about` is `/de/about` under `/shop`), or false for
+ * a path not under it: the app's own path, as a framework that adds the base itself writes it.
+ */
+const withinBase = (/** @type {string} */ pathname) =>
+	pathname === basePath
+		? "/"
+		: pathname.startsWith(`${basePath}/`) && pathname.slice(basePath.length);
+/** A path within the base path, as a URL has it: the home page under a base path is the base path. */
+const underBase = (/** @type {string} */ path) =>
+	path === "/" ? basePath : basePath + path;
 /** Whether a path is one the `url` strategy leaves alone, which never has a prefix. */
 const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
@@ -314,23 +327,44 @@ export function extractLocaleFromUrl(url) {
  * @returns {string | undefined}
  */
 export function localeOfPath(pathname) {
-	if (!readsUrl || (leavesPathsAlone && leftAlone(pathname))) return undefined;
-	const named = localeOfPrefix(pathname.split("/")[1]);
+	const path = (servedUnderBase && withinBase(pathname)) || pathname;
+	if (!readsUrl || (leavesPathsAlone && leftAlone(path))) return undefined;
+	const named = localeOfPrefix(path.split("/")[1]);
 	if (named !== undefined) return named;
 	return prefixesEveryLocale ? undefined : baseLocale;
 }
 
 /**
+ * Whether a path is a page without the prefix every locale's paths have under
+ * `localePrefix: "always"`, which the middleware sends to its locale's path: not a path the `url`
+ * strategy leaves alone.
+ *
+ * @param {string} pathname
+ * @returns {boolean}
+ */
+export function lacksPrefix(pathname) {
+	const path = (servedUnderBase && withinBase(pathname)) || pathname;
+	return (
+		readsUrl &&
+		prefixesEveryLocale &&
+		!(leavesPathsAlone && leftAlone(path)) &&
+		localeOfPrefix(path.split("/")[1]) === undefined
+	);
+}
+
+/**
  * A URL as the app's route: without its locale prefix, and in the route's words where the config
- * translates its path (`/de/ueber-uns` is `/about`). Without the `url` strategy a URL has neither,
- * and stays as it is, and so does a path the strategy leaves alone, though its first segment reads
- * as a prefix.
+ * translates its path (`/de/ueber-uns` is `/about`), under the base path where it was. Without the
+ * `url` strategy a URL has neither, and stays as it is, and so does a path the strategy leaves
+ * alone, though its first segment reads as a prefix.
  *
  * @param {string | URL} url
  * @returns {URL}
  */
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
+	const within = servedUnderBase && withinBase(copy.pathname);
+	if (within) copy.pathname = within;
 	const [, first, ...rest] = copy.pathname.split("/");
 	const prefixed = readsUrl ? localeOfPrefix(first) : undefined;
 	if (
@@ -347,6 +381,7 @@ export function deLocalizeUrl(url) {
 	) {
 		toRoute(copy, baseLocale);
 	}
+	if (within) copy.pathname = underBase(copy.pathname);
 	return copy;
 }
 
@@ -364,8 +399,8 @@ function toRoute(url, locale) {
 
 /**
  * A URL with a locale's prefix, in its words where the config translates the path: the current
- * locale's, unless `options.locale` names another. Without the `url` strategy no URL takes one,
- * and it stays as it is.
+ * locale's, unless `options.locale` names another. The prefix follows the base path, where the
+ * URL has it. Without the `url` strategy no URL takes one, and it stays as it is.
  *
  * @param {string | URL} url
  * @param {{ locale?: string }} [options]
@@ -374,6 +409,8 @@ function toRoute(url, locale) {
 export function localizeUrl(url, options) {
 	const locale = options?.locale ?? getLocale();
 	const copy = deLocalizeUrl(url);
+	const within = servedUnderBase && withinBase(copy.pathname);
+	if (within) copy.pathname = within;
 	if (translatesPaths && !(leavesPathsAlone && leftAlone(copy.pathname))) {
 		const words = localePath(copy.pathname, locales.indexOf(locale));
 		if (words !== copy.pathname) copy.pathname = words;
@@ -391,6 +428,7 @@ export function localizeUrl(url, options) {
 			: locale;
 		copy.pathname = `/${prefix}${path}`;
 	}
+	if (within) copy.pathname = underBase(copy.pathname);
 	return copy;
 }
 
@@ -436,8 +474,14 @@ export function pathOfRoute(pathname) {
  *
  * @param {string} pathname
  * @param {(pathname: string, locale: number) => string} translate
+ * @returns {string}
  */
 function translatedAfterPrefix(pathname, translate) {
+	const within = servedUnderBase && withinBase(pathname);
+	if (within) {
+		const translated = translatedAfterPrefix(within, translate);
+		return translated === within ? pathname : underBase(translated);
+	}
 	if (!translatesPaths || (leavesPathsAlone && leftAlone(pathname))) {
 		return pathname;
 	}

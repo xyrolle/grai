@@ -5,18 +5,17 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import {
 	baseLocale,
 	cookieName,
-	leavesPathsAlone,
 	locales,
 	prefixesEveryLocale,
 	queryParameter,
 	readsUrl,
 	strategy,
-	unlocalizedPaths,
 } from "./config.js";
 import {
 	assertIsLocale,
 	bindRequests,
 	isLocale,
+	lacksPrefix,
 	localeOfPath,
 	localizeUrl,
 } from "./runtime.js";
@@ -96,11 +95,7 @@ function unprefixedPage(request, pathname) {
 		prefixesEveryLocale &&
 		readsUrl &&
 		(request.method === "GET" || request.method === "HEAD") &&
-		localeOfPath(pathname) === undefined &&
-		!(
-			leavesPathsAlone &&
-			unlocalizedPaths.some((pattern) => pattern.test(pathname))
-		)
+		lacksPrefix(pathname)
 	);
 }
 

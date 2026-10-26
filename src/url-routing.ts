@@ -1,7 +1,7 @@
 /**
  * The config's fields the `url` strategy reads: which locales' paths have a prefix, each locale's
- * prefix, the paths it leaves alone, and each route's path in each locale's words. Without the
- * strategy none of them is read, so none is taken.
+ * prefix, the paths it leaves alone, each route's path in each locale's words, and the base path
+ * the app is served under. Without the strategy none of them is read, so none is taken.
  */
 
 import type { GraiError } from "./error.ts";
@@ -19,6 +19,8 @@ export type UrlRouting = {
 	unlocalizedPaths: readonly string[];
 	/** Each route's path in each locale's words, where the config gives one. */
 	pathnames: readonly Pathname[];
+	/** The path the app is served under, such as `/shop`, or `""` for none. */
+	basePath: string;
 };
 
 export const urlRoutingFields = [
@@ -26,7 +28,11 @@ export const urlRoutingFields = [
 	"localePrefixes",
 	"unlocalizedPaths",
 	"pathnames",
+	"basePath",
 ] as const;
+
+/** A base path: one or more path segments, without a trailing slash. */
+const basePathForm = /^(?:\/[^/?#\s]+)+$/;
 
 /** A prefix of the config's own: one path segment, as a URL writes it without escapes. */
 const segment = /^[a-z\d-]+$/;
@@ -53,10 +59,19 @@ export function readUrlRouting(
 		localePrefixes = {},
 		unlocalizedPaths = [],
 		pathnames = {},
+		basePath,
 	} = raw;
 	if (localePrefix !== "as-needed" && localePrefix !== "always") {
 		throw invalid(
 			'"localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one',
+		);
+	}
+	if (
+		basePath !== undefined &&
+		(typeof basePath !== "string" || !basePathForm.test(basePath))
+	) {
+		throw invalid(
+			'"basePath" must be the path the app is served under, as its framework has it, such as "/shop": it starts with / and does not end with one',
 		);
 	}
 	if (!isPathGlobList(unlocalizedPaths)) {
@@ -80,6 +95,7 @@ export function readUrlRouting(
 		prefixes: readPrefixes(localePrefixes, locales, invalid),
 		unlocalizedPaths,
 		pathnames: readPathnames(pathnames, locales, invalid),
+		basePath: basePath ?? "",
 	};
 }
 
