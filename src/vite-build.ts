@@ -171,6 +171,21 @@ export function messageChunking(
 	};
 }
 
+/**
+ * A server build's chunking: the keys that two or more entries use in one chunk, and each other
+ * key in its entry's chunk. A server loads each chunk as a module of its own, and by default each
+ * set of entries that shares keys gets a chunk, so a key that a few pages use is a module alone:
+ * hundreds of them in a real app.
+ */
+export function serverMessageChunking(): EnvironmentOptions {
+	const groups = [
+		{ name: messageDirectory, test: isMessageModule, minShareCount: 2 },
+	];
+	return {
+		build: { rolldownOptions: { output: { codeSplitting: { groups } } } },
+	};
+}
+
 /** A chunk's file name: in a `grai/` within its directory when it holds messages and nothing else. */
 export function chunkFileName(
 	moduleIds: readonly string[],

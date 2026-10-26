@@ -203,6 +203,37 @@ describe("the Vite plugin's build", () => {
 		]).toEqual(["Hello Ana", "Hallo Ana"]);
 	});
 
+	it("puts the keys a server build's entries share in one chunk, and a key one entry uses in that entry", async () => {
+		const { dir } = project({
+			en: { ...catalogs.en, only: "Only" },
+			de: { ...catalogs.de, only: "Nur" },
+		});
+		const page = (keys: string) =>
+			`import { m } from "./out/messages.js";\nexport const render = () => ${keys};\n`;
+		const { sources, entryFiles } = await built(
+			dir,
+			{
+				a: page(`m.title() + m.greeting({ name: "Ana" }) + m.only()`),
+				b: page(`m.greeting({ name: "Ana" }) + m.footer()`),
+				c: page(`m.title() + m.footer()`),
+			},
+			{ ssr: true },
+		);
+		const holding = (text: string) =>
+			[...sources]
+				.filter(([, code]) => code.includes(text))
+				.map(([file]) => file);
+
+		const [shared] = holding("Titel");
+		expect(shared).not.toBe(entryFiles.c);
+		expect([
+			holding("Titel"),
+			holding("Hallo"),
+			holding("Fußzeile"),
+			holding("Nur"),
+		]).toEqual([[shared], [shared], [shared], [entryFiles.a]]);
+	});
+
 	it("ships no pseudo-locale, even over the output of a dev server that compiled one", async () => {
 		const { dir, config } = project(catalogs, { pseudoLocale: "en-XA" });
 		await recompile(config, undefined, { pseudoLocale: true });
