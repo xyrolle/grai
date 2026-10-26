@@ -337,7 +337,7 @@ describe("grai import --from i18next", () => {
 		]);
 	});
 
-	it("reports each message whose values i18next escapes for HTML, which grai gives as they are", () => {
+	it("reports each message whose values i18next escapes for HTML or reads again, which grai gives as they are", () => {
 		const catalog = {
 			greeting: "Hi {{name}}",
 			raw: "Hi {{- name}}",
@@ -350,7 +350,34 @@ describe("grai import --from i18next", () => {
 
 		expect(
 			result.changed.map(({ key, detail }) => `${key}: ${detail}`),
-		).toEqual(["greeting", "guests"].map((key) => `${key}: ${escapingDetail}`));
+		).toEqual([
+			`greeting: ${escapingDetail}`,
+			"raw: i18next reads the value of {{- name}} again, so a {{…}} the value holds is filled in too, and grai gives the value as it is. Where a value can hold {{…}}, fill it in before the call.",
+			`guests: ${escapingDetail}`,
+		]);
+	});
+
+	it("leaves out a key that is both a message and a plural's forms, which i18next calls with and without count", () => {
+		const both = {
+			title: "A title",
+			title_one: "One title",
+			title_other: "Many titles",
+			other: "Other",
+		};
+		const { result, catalog } = imported("i18next", {
+			"en.json": both,
+			"ru.json": both,
+		});
+
+		expect(
+			result.leftOut.map(
+				({ key, locales, detail }) =>
+					`${key} (${locales.join(", ")}): ${detail}`,
+			),
+		).toEqual([
+			"title (en, ru): title is a message and title_one, title_other the forms of a plural, which grai would import as one key: i18next calls the message without count and the forms with it. Rename the message or the forms in the source.",
+		]);
+		expect(Object.keys(catalog("en"))).toEqual(["$schema", "other"]);
 	});
 
 	it("prefixes each key with its namespace when a locale's directory holds several files", async () => {

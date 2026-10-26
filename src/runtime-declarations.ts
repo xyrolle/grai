@@ -31,9 +31,11 @@ export declare class GraiError extends Error {
 	readonly code:
 		| "locale-unknown"
 		| "locale-not-loaded"
+		| "locale-unkept"
 		| "value-unmatched"
 		| "format-option-invalid"
-		| "locale-unbound";
+		| "locale-unbound"
+		| "output-changed";
 }
 type MessageOptions = { locale?: Locale };
 /**
@@ -60,7 +62,18 @@ export type MarkupMessage<
 > = Message<Inputs> & {
 	parts: Call<Inputs, MessagePart<Tag>[]>;
 };
-// What the rest of the output calls; not for apps.
+// What the rest of the output calls and reads; not for apps.
+/** Throws unless the keys of a module were compiled for the locales the runtime reads, in order. */
+export declare function assertCompiledFor(compiled: readonly string[]): void;
+/** The config, as the middleware and the adapters read it. */
+export declare const strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[];
+export declare const cookieName: string | undefined;
+export declare const readsUrl: boolean;
+export declare const prefixesEveryLocale: boolean;
+export declare const leavesPathsAlone: boolean;
+export declare const queryParameter: string | undefined;
+export declare const unlocalizedPaths: readonly RegExp[];
+export declare const localeCopies: boolean;
 /** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
 export declare function localeOfPath(pathname: string): Locale | undefined;
 /** Binds a locale outside a request, by its position in \`locales\`: testing.js binds a test's with it. */
@@ -125,7 +138,8 @@ export declare function setLocale(locale: Locale, options?: { reload?: boolean }
 		: `/**
  * Sets the locale: for the rest of the request on the server, for the process in a script. In a
  * browser it keeps the locale in the cookie or the URL and reloads, or with \`{ reload: false }\`
- * only keeps it, for the page's next load: the page keeps its words.
+ * only keeps it, for the page's next load: the page keeps its words. It throws in a page whose
+ * strategy keeps a choice nowhere.
  */
 export declare function setLocale(locale: Locale, options?: { reload?: boolean }): void;`;
 }

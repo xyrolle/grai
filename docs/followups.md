@@ -22,9 +22,9 @@ Done when: under `"live"`, a page re-renders in the locale it switches to, and a
 
 ## `setLocale(locale, { reload: false })` as its type says
 
-`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. The runtime still sets `<html lang>` and `dir` under both, renders the messages called next in the new locale, and returns nothing.
+`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. Under `"live"` the runtime still only keeps the choice too, and returns nothing.
 
-Done when: under `"reload"`, `{ reload: false }` keeps the choice and leaves the page's messages as they are; under `"live"`, it returns that promise (the entry above); and a browser test shows each.
+Done when: under `"live"`, it returns that promise (the entry above), with a browser test.
 
 ## A dispatcher per key for a message with inputs
 
@@ -181,12 +181,6 @@ Done when: `grai migrate` rewrites a call whose tags each render one element of 
 
 Done when: `grai migrate` rewrites the calls in a component's script, and lists each one its markup makes.
 
-## Remove what a compile that stopped halfway left
-
-A compile that stops while it writes, killed or crashed, leaves the output's lock (`docs/design.md`), its temporary files in `.grai/`, and the files named by their content that it wrote before any entry named them. The lock is refused, so a person sees it; the rest stays, as no manifest records it.
-
-Done when: a writer under the lock removes the temporary files in `.grai/`, which only a writer under the lock makes, and retires the files named by their content that neither the manifest nor the output names, with a test that kills a compile between its writes.
-
 ## Keep the locale through Astro's client router
 
 Under Astro's `<ClientRouter />`, a link into another locale swaps the page in place. The runtime read `<html lang>` when the page first loaded, and the import map, once read, cannot change, so the new page's islands render in the first page's locale. Until this is done, a link into another locale needs `data-astro-reload`.
@@ -211,3 +205,14 @@ Done when: the map's hash joins the page's `script-src`, in the `Content-Securit
 
 Done when: `grai/sveltekit/client` defers that refresh until Kit has started, with a test of the example that edits a load's text as soon as the page's markup is on screen and sees the edit.
 
+## The locale script outside Vite's pages
+
+Only a page that goes through Vite's HTML pipeline gets the locale script. A page another bundler or framework draws, such as Next's static export or a prerendered SvelteKit page, has none, so where no server picks its locale it renders in the one it was drawn in.
+
+Done when: each adapter that can draw a page no server serves writes the script into it, from `locale-script.ts`, with a browser test of a static build in each.
+
+## An app's own import map beside the locale script's
+
+The locale script writes the page's import map. A page that has one of its own then has two, which only browsers that merge import maps read both of; another takes the first and refuses the second.
+
+Done when: the plugin merges the page's own import map into the one the locale script writes, with a browser test of a page that has one.

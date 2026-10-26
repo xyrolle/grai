@@ -81,6 +81,16 @@ describe("the document's start", () => {
 		expect(decoder.decode(second.value)).toBe("<title>");
 	});
 
+	it("reads past comments before the doctype, such as a license", async () => {
+		expect(
+			await rewritten([
+				"<!-- license -->\n<!doctype html><html><head><title>Shop</title></head>",
+			]),
+		).toBe(
+			`<!-- license -->\n<!doctype html><html lang="ar" dir="rtl"><head><script type="importmap">{}</script><title>Shop</title></head>`,
+		);
+	});
+
 	it("writes the <html> and <head> start tags a document leaves out", async () => {
 		expect(await rewritten(["<!DOCTYPE html><title>Shop</title>"])).toBe(
 			`<!DOCTYPE html><html lang="ar" dir="rtl"><script type="importmap">{}</script><title>Shop</title>`,
@@ -214,6 +224,31 @@ describe("grai's config beside Astro's", () => {
 		expect(disagreements(withPrefix, astroRouting(["en", "ro"]))).toEqual([
 			`grai serves ro under /romana/ ("localePrefixes"), and Astro under /ro/. List it in Astro's i18n.locales as { path: "romana", codes: ["ro"] }.`,
 		]);
+	});
+
+	it("has a regional locale, which Astro's links lowercase, written as its path and prefix", () => {
+		const regional = (config: Record<string, unknown>) =>
+			readConfig(
+				project(
+					{ en: { title: "Cart" }, "pt-BR": { title: "Carrinho" } },
+					config,
+				).config,
+			);
+
+		expect(
+			disagreements(
+				regional({ strategy: ["url"] }),
+				astroRouting(["en", "pt-BR"]),
+			),
+		).toEqual([
+			`Astro links pt-BR's pages under /pt-br/, its tag lowercased, where the "url" strategy reads /pt-BR/. List it in Astro's i18n.locales as { path: "pt-br", codes: ["pt-BR"] }, and set "localePrefixes": { "pt-BR": "pt-br" } in grai's config.`,
+		]);
+		expect(
+			disagreements(
+				regional({ strategy: ["url"], localePrefixes: { "pt-BR": "pt-br" } }),
+				astroRouting(["en", { path: "pt-br", codes: ["pt-BR"] }]),
+			),
+		).toEqual([]);
 	});
 
 	it('maps the paths outside Astro\'s routing to "unlocalizedPaths", whose locale the strategies after "url" find', () => {
@@ -451,6 +486,26 @@ describe("the middleware", () => {
 			context(path, {}, { isPrerendered: true, routePattern: path }),
 			page(m),
 		).catch((thrown: unknown) => thrown);
+
+	it("fails a prerendered page whose URL names its locale as a file, as Astro's file builds write it", async () => {
+		for (const localePrefix of ["as-needed", "always"]) {
+			const { m, middleware } = await compiledProject({
+				strategy: ["url"],
+				localePrefix,
+				unlocalizedPaths: ["/404"],
+			});
+			const onRequest = middleware();
+
+			expect(await prerendering(onRequest, m, "/ro.html")).toMatchObject({
+				name: "GraiError",
+				code: "config-invalid",
+				message: `grai.config.json: the page /ro.html is prerendered at /ro.html, which names its locale as a file, ro.html, where the "url" strategy reads a path's first segment. Build each page into a folder: set Astro's build.format to "directory", and name a locale's page [locale]/index.astro rather than [locale].astro.`,
+			});
+			expect(await prerendering(onRequest, m, "/ro/about.html")).toBeInstanceOf(
+				Response,
+			);
+		}
+	});
 
 	it("fails a prerendered page whose locale a strategy ahead of the URL would find in the request", async () => {
 		const { m, middleware } = await compiledProject({

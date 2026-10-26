@@ -111,7 +111,14 @@ export function parseCall(
 					`${source}: :${name} takes add or subtract, not both.`,
 				);
 			}
-			shift = sign * Number(optionValue("digits", text, source, token));
+			const moved = Number(optionValue("digits", text, source, token));
+			if (!Number.isSafeInteger(moved)) {
+				throw new MessageProblem(
+					"message-invalid",
+					`${source}: "${token}" needs a whole number up to ${Number.MAX_SAFE_INTEGER}, which a number holds exactly.`,
+				);
+			}
+			shift = sign * moved;
 			continue;
 		}
 		const refused = ownEntry(spec.refused ?? {}, key);

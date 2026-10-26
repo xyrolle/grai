@@ -1,5 +1,5 @@
 import { hash } from "node:crypto";
-import { mkdir, readdir, rename, unlink } from "node:fs/promises";
+import { mkdir, rename, unlink } from "node:fs/promises";
 import { join, posix } from "node:path";
 import { isMissing } from "./config.ts";
 import {
@@ -8,12 +8,15 @@ import {
 	removeManifest,
 	writeManifest,
 } from "./manifest.ts";
+import {
+	assertOutdirIsGrais,
+	outdirContents,
+	presentIn,
+	stateDirectory,
+} from "./outdir-contents.ts";
 import { lockOutput } from "./output-lock.ts";
 import type { Output, OutputFile } from "./render.ts";
 import { removeTemporary, writeTemporary } from "./replace-file.ts";
-
-/** grai's own directory in the outdir: the manifest, the writer's lock and files being written. */
-const stateDirectory = ".grai";
 
 /**
  * How long a file stays once the output stops naming it, in ms: far longer than a module loader
@@ -33,19 +36,21 @@ export async function isUpToDate(
 	const manifest = await readManifest(join(outdir, stateDirectory));
 	if (manifest?.inputs !== inputs) return false;
 	const files = [...manifest.immutable, ...Object.keys(manifest.mutable)];
-	const { present } = await listed(outdir, files);
+	const present = await presentIn(outdir, files);
 	return files.every((file) => present.has(file));
 }
 
 /**
  * Publishes an output, under the outdir's lock. It writes the immutable files that are not there
  * yet, and the mutable files whose content the manifest does not record: the declaration maps, and
- * the entries, which name the rest. What is there is known from a listing of the directories and
- * from the manifest, never from the memory of an earlier compile, which another writer or a file
+ * the entries, which name the rest. What is there is known from a listing of the outdir and from
+ * the manifest, never from the memory of an earlier compile, which another writer or a file
  * deleted by hand makes wrong. Every text goes to a temporary file first, all at once; then the
  * immutable files are renamed into place, then the mutable ones, as no file names an immutable one
- * until an entry does. A file the output no longer names is retired, and removed once it has been
- * for `retention`. The manifest goes last. Returns the files written.
+ * until an entry does. The outdir is grai's: a file the output no longer names that the manifest
+ * records is retired, and removed once it has been for `retention`, and any other is removed at
+ * once, as is a temporary file a compile that stopped halfway left. The manifest goes last.
+ * Returns the files written.
  */
 export async function writeOutput(
 	outdir: string,
@@ -53,18 +58,20 @@ export async function writeOutput(
 	inputs: string,
 ): Promise<string[]> {
 	const state = join(outdir, stateDirectory);
+	await assertOutdirIsGrais(outdir);
 	const release = await lockOutput(state);
 	try {
-		const [manifest, { present, directories }] = await Promise.all([
+		const [manifest, contents] = await Promise.all([
 			readManifest(state),
-			listed(outdir, namesOf(output)),
+			outdirContents(outdir),
 		]);
+		const present = contents.files;
 		const hashes = new Map(
 			output.mutable.map(([file, text]) => [file, hash("sha1", text)]),
 		);
 		const recorded = new Map(Object.entries(manifest?.mutable ?? {}));
 		const now = Date.now();
-		const retired = retiredFiles(manifest, output, now);
+		const { retired, unknown } = unnamedFiles(manifest, output, present, now);
 		const missing = output.immutable.filter(([file]) => !present.has(file));
 		const changed = output.mutable.filter(
 			([file]) => !present.has(file) || recorded.get(file) !== hashes.get(file),
@@ -72,8 +79,10 @@ export async function writeOutput(
 		const expired = [...retired]
 			.filter(([, at]) => now - at >= retention)
 			.map(([file]) => file);
+		const removed = [...unknown, ...expired].map((file) => join(outdir, file));
+		removed.push(...contents.temporaries);
 		if (
-			missing.length + changed.length + expired.length === 0 &&
+			missing.length + changed.length + removed.length === 0 &&
 			manifest?.inputs === inputs
 		)
 			return [];
@@ -81,7 +90,7 @@ export async function writeOutput(
 		const [temporaries] = await Promise.all([
 			writeTemporaries(written, state),
 			changed.length > 0 ? removeManifest(state) : undefined,
-			makeDirectories(outdir, written, directories),
+			makeDirectories(outdir, written, contents.directories),
 		]);
 		try {
 			await renameInto(outdir, missing, temporaries);
@@ -90,9 +99,7 @@ export async function writeOutput(
 			await Promise.all([...temporaries.values()].map(removeTemporary));
 			throw error;
 		}
-		await Promise.all(
-			expired.map((file) => unlink(join(outdir, file)).catch(ignoreMissing)),
-		);
+		await Promise.all(removed.map((path) => unlink(path).catch(ignoreMissing)));
 		for (const file of expired) retired.delete(file);
 		await writeManifest(state, {
 			inputs,
@@ -107,22 +114,32 @@ export async function writeOutput(
 }
 
 /**
- * The files an earlier output named and this one does not, each with when it stopped being named:
- * the manifest's retired files, and the files of the output it records.
+ * The files in the outdir that this output does not name: those the manifest records, retired,
+ * each with when it stopped being named, and the rest, which no compile's entry a reader holds can
+ * name: an earlier layout's, or what a compile that stopped halfway wrote.
  */
-function retiredFiles(
+function unnamedFiles(
 	manifest: Manifest | undefined,
 	output: Output,
+	present: ReadonlySet<string>,
 	now: number,
-): Map<string, number> {
-	const retired = new Map(Object.entries(manifest?.retired ?? {}));
-	const recorded = [
+): { retired: Map<string, number>; unknown: string[] } {
+	const named = new Set(namesOf(output));
+	const recorded = new Set([
 		...(manifest?.immutable ?? []),
 		...Object.keys(manifest?.mutable ?? {}),
-	];
-	for (const file of recorded) if (!retired.has(file)) retired.set(file, now);
-	for (const file of namesOf(output)) retired.delete(file);
-	return retired;
+	]);
+	const retiredAt = new Map(Object.entries(manifest?.retired ?? {}));
+	const retired = new Map<string, number>();
+	const unknown: string[] = [];
+	for (const file of present) {
+		if (named.has(file)) continue;
+		const at = retiredAt.get(file);
+		if (at !== undefined) retired.set(file, at);
+		else if (recorded.has(file)) retired.set(file, now);
+		else unknown.push(file);
+	}
+	return { retired, unknown };
 }
 
 function namesOf(output: Output): string[] {
@@ -186,34 +203,6 @@ async function makeDirectories(
 			.filter((directory) => !there.has(directory))
 			.map((directory) => mkdir(join(outdir, directory), { recursive: true })),
 	);
-}
-
-/**
- * Which of these files are there, by listing each of their directories once rather than looking
- * for each file, and which of those directories are there.
- */
-async function listed(
-	outdir: string,
-	files: readonly string[],
-): Promise<{ present: Set<string>; directories: Set<string> }> {
-	const present = new Set<string>();
-	const directories = new Set<string>();
-	await Promise.all(
-		[...new Set(files.map((file) => posix.dirname(file)))].map(
-			async (directory) => {
-				const names = await readdir(join(outdir, directory)).catch(
-					(error: unknown) => {
-						ignoreMissing(error);
-						return undefined;
-					},
-				);
-				if (names === undefined) return;
-				directories.add(directory);
-				for (const name of names) present.add(posix.join(directory, name));
-			},
-		),
-	);
-	return { present, directories };
 }
 
 function ignoreMissing(error: unknown): void {

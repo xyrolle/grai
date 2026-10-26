@@ -7,3 +7,7 @@ export const messageDirectory = "grai";
 
 /** The directory of one locale's copies of the message chunks, beside `messageDirectory`. */
 export const localeDirectory = (locale: string): string => `grai-${locale}`;
+
+/** Whether a built file is a message chunk, shared by every locale, rather than a locale's copy. */
+export const isMessageChunk = (fileName: string): boolean =>
+	fileName.split("/").at(-2) === messageDirectory;

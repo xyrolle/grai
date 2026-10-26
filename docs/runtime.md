@@ -15,6 +15,7 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 | Plurals | CLDR's rules compiled into a function per locale, integers first. | 4–11 ns a call, against 124–249 ns for a cached `Intl.PluralRules`, for 158 more bytes min+gzip per locale (`plurals`). |
 | Formatters | One `Intl` formatter per locale and options, made the first time it formats, and per value of an option an input gives. | 207–213 ns a number, against 695–770 ns for a cache keyed by the options and 8–9 µs for a formatter per call (`intl`). With its currency from an input, 216–305 ns, and Paraglide's 688–1,054 ns (`option-inputs`). |
 | Per-locale chunks in SvelteKit | Same chunk names in a directory per locale, an import map, and modulepreload links the server writes for the locale's copies. | Browsers apply no import map to modulepreload, so Kit's own links also download the shared chunks: 51% more message bytes than no split at all (`preload`). |
+| A page no server draws | An inline script ahead of every module picks the locale from the strategy's places and, with `localeChunks`, writes the import map to its copies and preloads them. | Until the page's entry module runs, it costs 0.2 ms at full CPU speed and 3.7 ms at 4× slower, against the same import map written into the page (`page-locale`). It is 910 bytes brotli; of its run, the import map and preloads take 0.3–1.4 ms, and a cookie read 0.2–0.8 ms. |
 | Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 17–30 ms from the save to the page, against 202–459 ms re-evaluating the module (`hmr`). |
 | Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface fits in 378 bytes min+gzip; Paraglide's is 1.9–2.1 KB (`runtime-size`). |
 
@@ -103,6 +104,8 @@ In a Svelte client build, `grai/svelte` reads each message without inputs as its
 | inlined into the template | 21.2 KB | 2.9 / 12.9 ms | 1.9 / 7.9 ms |
 
 `ru` gives 23.3, 15.9, 24.1 and 12.5 ms at 4×.
+
+A page that imports each key by its own path (`#i18n/messages/<key>.js`, mapped to keys.js) reads the same strings. On the synthetic catalog, in `ro`, it loads 23.4 KB and hydrates in 4.9 / 20.8 ms, against 23.3 KB and 4.9 / 20.5 ms through the namespace. Before `grai/svelte` followed a key's path to the key's own module, that page kept its calls: 24.3 KB and 5.6 / 23.1 ms (`svelte-texts synthetic`).
 
 Seven of app A's real pages, built three ways (`inline-build` in copies of the app) and served side by side (`inline-pages`): the five heaviest its demo data fills, by the keys they load (ranks 1, 2, 3, 5 and 8 of 73), and two typical ones. On each, every build's page has the same text, whitespace included, as served and as hydrated, and hydration keeps the same server elements. Median of 15 interleaved loads, ms from SvelteKit's start until it has hydrated the page, at full speed and at a 4× slowdown, at a load of 15–22:
 

@@ -24,6 +24,7 @@ export type GraiErrorCode =
 	| "plural-category-unknown"
 	| "selection-not-exhaustive"
 	| "output-locked"
+	| "outdir-not-empty"
 	| "plugin-order"
 	| "translation-invalid"
 	| "translation-stale"

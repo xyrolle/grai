@@ -8,8 +8,17 @@ export type AstroRouting = Pick<AstroConfig, "base" | "i18n"> & {
 };
 type I18n = NonNullable<AstroRouting["i18n"]>;
 
-/** A locale Astro routes: as grai names it, which is `Astro.currentLocale`, and its URLs' prefix. */
-type RoutedLocale = { locale: string; prefix: string };
+/**
+ * A locale Astro routes: as grai names it, which is `Astro.currentLocale`, its URLs' prefix, and
+ * whether Astro's config writes it as a tag rather than as `{ path, codes }`.
+ */
+type RoutedLocale = { locale: string; prefix: string; asTag: boolean };
+
+/**
+ * The prefix Astro's links give a locale written as a tag: `getRelativeLocaleUrl` lowercases it,
+ * as its `normalizeLocale` option does by default, so `pt-BR`'s pages are linked under `/pt-br/`.
+ */
+const linkedPrefix = (tag: string) => tag.replaceAll("_", "-").toLowerCase();
 
 /**
  * Each way Astro's config disagrees with grai's on where a page's locale comes from, as a
@@ -76,8 +85,8 @@ function routingDisagreements(grai: Config, i18n: I18n): string[] {
 function routedLocales(i18n: I18n): RoutedLocale[] {
 	return i18n.locales.map((entry) =>
 		typeof entry === "string"
-			? { locale: entry, prefix: entry }
-			: { locale: entry.codes[0], prefix: entry.path },
+			? { locale: entry, prefix: entry, asTag: true }
+			: { locale: entry.codes[0], prefix: entry.path, asTag: false },
 	);
 }
 
@@ -105,9 +114,15 @@ function localeDisagreements(grai: Config, routed: RoutedLocale[]): string[] {
 		({ locale }) =>
 			locale !== grai.baseLocale || grai.urlRouting.localePrefix === "always",
 	);
-	return prefixed.flatMap(({ locale, prefix }) => {
+	return prefixed.flatMap(({ locale, prefix, asTag }) => {
 		const graiPrefix =
 			grai.urlRouting.prefixes[grai.locales.indexOf(locale)] ?? locale;
+		const linked = linkedPrefix(locale);
+		if (asTag && linked !== locale) {
+			return [
+				`Astro links ${locale}'s pages under /${linked}/, its tag lowercased, where the "url" strategy reads /${graiPrefix}/. List it in Astro's i18n.locales as { path: ${JSON.stringify(linked)}, codes: [${JSON.stringify(locale)}] }, and set "localePrefixes": { ${JSON.stringify(locale)}: ${JSON.stringify(linked)} } in grai's config.`,
+			];
+		}
 		if (graiPrefix === prefix) return [];
 		return prefix === locale
 			? [

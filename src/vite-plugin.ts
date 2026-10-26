@@ -1,5 +1,5 @@
 import { join, resolve } from "node:path";
-import type { Plugin } from "vite";
+import type { Logger, Plugin } from "vite";
 import {
 	type KeyReading,
 	keyReading,
@@ -38,6 +38,7 @@ import {
 	pathKey,
 	serveMessages,
 } from "./vite-dev.ts";
+import { pagePreloads, type Site, withPageLocale } from "./vite-html.ts";
 
 /**
  * The plugin's options:
@@ -47,8 +48,8 @@ import {
  *   no client code could draw again, such as Astro's.
  * - `localeChunks`: in the client build, write a copy of each message chunk per locale, beside
  *   it, with only that locale's words. For an adapter that points each page at its locale's
- *   copies, as `grai/sveltekit`'s `handleLocale` does; nothing else reads them, so they are off by
- *   default.
+ *   copies, as `grai/sveltekit`'s `handleLocale` does, or for the pages grai/vite builds, whose
+ *   locale script then points each at its locale's copies. Off by default.
  */
 export type GraiOptions = {
 	config?: string;
@@ -106,6 +107,11 @@ export function graiPlugin(
 		);
 		return pageChunks.get(id);
 	};
+
+	let site: Site = { base: "/", preloads: true, copies: false };
+	let logger: Logger | undefined;
+	/** The hashes the build's log has named, each once. */
+	const reported = new Set<string>();
 	const building = (environment: { name: string } | undefined) =>
 		!serving && environment?.name === "client";
 	/** Whether this build writes each message chunk's copies, one per locale. */
@@ -142,10 +148,42 @@ export function graiPlugin(
 			serving = environment.command === "serve";
 			testing = environment.mode === "test";
 		},
-		configEnvironment(name) {
-			return !serving && name === "client"
-				? messageChunking(files.outdir, pageChunkOf)
-				: undefined;
+		configEnvironment(name, environment) {
+			if (serving || name !== "client") return undefined;
+			const chunking = messageChunking(files.outdir, pageChunkOf);
+			// With copies, a page's own preloads leave the shared message chunks out, for its locale
+			// script to preload the locale's copies.
+			const preloads =
+				options.localeChunks === true
+					? pagePreloads(environment.build?.modulePreload)
+					: undefined;
+			return preloads === undefined
+				? chunking
+				: { build: { ...chunking.build, modulePreload: preloads } };
+		},
+		configResolved(resolved) {
+			site = {
+				base: resolved.base,
+				preloads: resolved.build.modulePreload !== false,
+				copies: options.localeChunks === true,
+			};
+			logger = resolved.logger;
+		},
+		transformIndexHtml: {
+			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
+			order: "post",
+			handler(html, context) {
+				const config = build?.config ?? readConfig(files.configFile);
+				const page = withPageLocale(html, context, config, site);
+				const unreported = page.hashes.filter((hash) => !reported.has(hash));
+				if (context.bundle !== undefined && unreported.length > 0) {
+					for (const hash of unreported) reported.add(hash);
+					logger?.info(
+						`grai: a Content Security Policy that allows scripts by hash needs ${unreported.join(" ")} in script-src, for the locale script and its import maps.`,
+					);
+				}
+				return page.html;
+			},
 		},
 		outputOptions(output) {
 			if (!building(this.environment)) return null;

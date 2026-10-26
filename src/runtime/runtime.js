@@ -7,15 +7,31 @@ import {
 	cookieSecure,
 	customPrefixes,
 	directions,
+	keepsChoice,
 	leavesPathsAlone,
 	locales,
+	localStorageKey,
 	prefixes,
 	prefixesEveryLocale,
+	queryParameter,
 	readsUrl,
 	strategy,
 	unlocalizedPaths,
 } from "./config.js";
 
+// What the rest of the output reads of the config, through the runtime's anchor: the runtime is the
+// one module of the output that imports the config, so a process that holds one runtime holds one
+// config.
+export {
+	cookieName,
+	leavesPathsAlone,
+	localeCopies,
+	prefixesEveryLocale,
+	queryParameter,
+	readsUrl,
+	strategy,
+	unlocalizedPaths,
+} from "./config.js";
 export { baseLocale, locales };
 
 // Each of the url strategy's options is a constant in config.js, which a bundler folds, so the code
@@ -40,7 +56,7 @@ const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
 
 /**
- * @typedef {"locale-unknown" | "locale-not-loaded" | "value-unmatched" | "format-option-invalid" | "locale-unbound"} GraiErrorCode
+ * @typedef {"locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound" | "output-changed"} GraiErrorCode
  */
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
@@ -122,10 +138,12 @@ export function getLocale() {
 
 /**
  * Sets the locale. In a request, for the rest of the request; in a script or a test, for the
- * process. In a browser, for the page: it sets the page's `<html lang>` and `dir`, so the document
- * and its messages never disagree, keeps the locale where the server reads it (its cookie, or its
- * URL) and reloads, unless `{ reload: false }`, after which only the messages called next are in
- * the new locale. The page's own locale is kept in the cookie, but loads nothing again.
+ * process. A page renders in its locale for as long as it lives, so in a page it keeps the choice
+ * where the strategy reads it: its cookie, its key in localStorage, its URL's prefix or query
+ * parameter. Then it loads the page again in it, at the URL that names it, unless
+ * `{ reload: false }`, which only keeps the choice, for the page's next load. A page whose
+ * strategy keeps the choice nowhere would load in its old locale again, so there it throws. The
+ * page's own locale is kept too, but loads nothing again.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
@@ -137,11 +155,14 @@ export function setLocale(locale, options) {
 		request.index = index;
 		return;
 	}
+	if (!page) {
+		current = index;
+		return;
+	}
+	// The page's own locale loads nothing again: a picker that chooses its current value, or a
+	// preference written again at start, keeps the page and its state.
 	const changed = index !== current;
-	current = index;
-	if (!page) return;
-	document.documentElement.lang = locale;
-	document.documentElement.dir = directions[index] ?? "ltr";
+	if (changed && !keepsChoice) throw unkept(locale);
 	if (strategy.includes("cookie")) {
 		// A browser drops a Secure cookie an http page sets, so it is Secure on https, and always
 		// where its policy needs it.
@@ -152,12 +173,28 @@ export function setLocale(locale, options) {
 		// biome-ignore lint/suspicious/noDocumentCookie: the reload that follows must see it, and the Cookie Store API is asynchronous and not in every browser.
 		document.cookie = `${cookieName}=${locale}${cookieAttributes}${secure}`;
 	}
+	// The config names the key exactly when its strategy lists `localStorage`.
+	if (localStorageKey !== undefined)
+		localStorage.setItem(localStorageKey, locale);
 	if (!changed || options?.reload === false) return;
-	if (readsUrl) {
-		location.href = localizeUrl(location.href, { locale }).href;
-	} else {
-		location.reload();
+	// The next load must find the locale where the strategy reads a URL: a stale `?lng=` would
+	// otherwise win over the choice.
+	const next = readsUrl
+		? localizeUrl(location.href, { locale })
+		: new URL(location.href);
+	if (queryParameter !== undefined) {
+		next.searchParams.set(queryParameter, locale);
 	}
+	if (next.href === location.href) location.reload();
+	else location.href = next.href;
+}
+
+/** @param {string} locale */
+function unkept(locale) {
+	return new GraiError(
+		"locale-unkept",
+		`setLocale(${JSON.stringify(locale)}) would load the page in its old locale again: "strategy" lists no place that keeps a choice, such as "cookie" or "localStorage".`,
+	);
 }
 
 /**
@@ -225,7 +262,8 @@ export function localeOfPath(pathname) {
 }
 
 /**
- * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is.
+ * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is,
+ * and so does a path the strategy leaves alone, though its first segment reads as a prefix.
  *
  * @param {string | URL} url
  * @returns {URL}
@@ -233,7 +271,11 @@ export function localeOfPath(pathname) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (readsUrl && localeOfPrefix(first) !== undefined) {
+	if (
+		readsUrl &&
+		localeOfPrefix(first) !== undefined &&
+		!(leavesPathsAlone && leftAlone(copy.pathname))
+	) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -362,6 +404,25 @@ export function pageText(...texts) {
  */
 export function markup(strings, parts) {
 	return Object.assign(message(...strings), { parts: message(...parts) });
+}
+
+/**
+ * Throws unless a module of the output's keys was compiled for the locales this runtime reads, at
+ * their positions. They differ only when a compile changed the locales while a process loaded the
+ * output, which then holds the keys of one compile and the runtime of another.
+ *
+ * @param {readonly string[]} compiled
+ */
+export function assertCompiledFor(compiled) {
+	if (
+		compiled.length === locales.length &&
+		compiled.every((locale, index) => locale === locales[index])
+	)
+		return;
+	throw new GraiError(
+		"output-changed",
+		`the output's keys were compiled for ${compiled.join(", ")}, but its runtime reads ${locales.join(", ")}: a compile changed the locales while this process loaded them. Load the output again, as by restarting the process.`,
+	);
 }
 
 /**

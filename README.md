@@ -72,6 +72,27 @@ const kindOf = graiModules(); // reads grai.config.json
 kindOf(id); // "runtime", "config", "plurals", "formats" (the grai-runtime chunk), "key" or "text" (a message chunk), or undefined
 ```
 
+### A static site, an Electron app or an extension
+
+Where no server picks the locale, each page the plugin builds picks it itself, before any module loads, from the places the config's `strategy` lists, in order:
+
+```json
+{
+	"strategy": ["query", "localStorage", "preferredLanguage"],
+	"queryParameter": "lng",
+	"localStorageKey": "locale"
+}
+```
+
+- `cookie` (with `cookieName`) and `localStorage` (with `localStorageKey`) hold the visitor's choice, which `setLocale` writes;
+- `query` (with `queryParameter`) is a link's `?lng=de`;
+- `preferredLanguage` is the browser's languages, matched as the server matches `Accept-Language`: `de-AT` finds `de`;
+- `url` is the path's first segment, `/de/cart`.
+
+A server reads the same list where it can, so a page it draws picks the same locale. The page's `<html lang>`, as its template has it, is only a default, which the page keeps where no place of the strategy names a locale; a server or a prerender that writes another locale's `lang` in its place drew the page in that one, and the page keeps it.
+
+With `grai({ localeChunks: true })`, the page then loads only its locale's words: the build writes each message chunk's copy per locale, and the script points the page at its locale's. With a Content Security Policy that allows scripts by hash, add the hashes the build's log names to `script-src`; they change only with the config, Vite's `base` or grai. With Vite's `html.cspNonce`, nothing more is needed.
+
 ### Svelte
 
 In a Svelte app, take the plugin from `grai/svelte`, listed before Svelte's, and in a SvelteKit app from `grai/sveltekit/vite` (below):
@@ -239,7 +260,7 @@ On a static site whose page renders 400 messages and a Svelte island 100, `astro
 
 ### Workers, Bun, Deno and Node
 
-The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
+The output's `server.js` finds each request's locale by the config's `strategy` (`cookie`, `query`, `preferredLanguage`, `url`), binds it for everything the handler calls, and lists in the response's `Vary` the request headers it read, so a shared cache keeps a copy per locale:
 
 ```ts
 // src/worker.ts
@@ -259,6 +280,17 @@ app.use((c, next) => middleware(c.req.raw, () => next().then(() => c.res)));
 ```
 
 It needs `AsyncLocalStorage`, from `node:async_hooks`, which Node, Bun and Deno have. Workers have it by default from compatibility date 2026-08-04; on an earlier date, add the `nodejs_als` compatibility flag, which adds only that.
+
+### Changing locale
+
+`setLocale(locale)` keeps the visitor's choice in each place the strategy lists that holds one, its cookie, its key in `localStorage`, its query parameter or its path, and loads the page again in it. A page keeps its words while it lives, so `setLocale(locale, { reload: false })` only keeps the choice, for the page's next load. The browser's languages hold no choice, so a strategy must list one of those places for `setLocale` to change a page's locale; without one, a page would load in its old locale again, and `setLocale` throws a `GraiError` (`locale-unkept`) instead. A static app keeps the choice in `localStorage`, and an app a server draws in a cookie, which the server reads too:
+
+```json
+{
+	"strategy": ["cookie", "preferredLanguage"],
+	"cookieName": "lang"
+}
+```
 
 ### Tests
 
@@ -280,11 +312,13 @@ beforeEach(() => useLocale("de"));
 | `baseLocale` | One of `locales`: the one the others are translated from, whose text the editor shows and `grai seed` copies, and the locale a request gets when its strategy finds none. |
 | `catalogs` | Each locale's catalog, a path with `{locale}` in it. |
 | `outdir` | Where the compiled output goes. |
-| `strategy` | Optional. Where the server looks for a request's locale, in order: `cookie`, `preferredLanguage` (its `Accept-Language`), `url` (its first path segment; the base locale has no prefix). |
+| `strategy` | Optional. Where the server and a page no server draws look for the locale, in order: `cookie`, `localStorage` (the page's alone), `query` (a query parameter), `preferredLanguage` (the request's `Accept-Language`, the browser's languages), `url` (the first path segment; the base locale has no prefix). |
 | `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. A `__Secure-` or `__Host-` name makes the cookie Secure. |
 | `cookieMaxAge` | Optional. The seconds a browser keeps the cookie, 400 days by default, which is the most a browser keeps one. |
 | `cookieDomain` | Optional. A host whose subdomains share the cookie, such as `example.com`. Not with a `__Host-` name, which a browser keeps for one host. |
 | `cookieSameSite` | Optional. `"lax"`, the default, `"strict"`, or `"none"` for a page embedded in another site's, which makes the cookie Secure. |
+| `localStorageKey` | The key in `localStorage` that `localStorage` reads and `setLocale` writes, when `strategy` lists `localStorage`. |
+| `queryParameter` | The query parameter `query` reads and `setLocale` names the locale in, when `strategy` lists `query`. |
 | `localePrefix` | Optional, with the `url` strategy. `"as-needed"`, the default: the base locale's paths have no prefix, so `url` comes last. `"always"`: every locale's paths have one, an unprefixed page is sent to the locale the strategies after `url` find, and `url` may come first. |
 | `localePrefixes` | Optional, with the `url` strategy. A locale's prefix of its own, one lowercase path segment, such as `{ "en-US": "us" }`; a locale's prefix is otherwise its tag. |
 | `unlocalizedPaths` | Optional, with the `url` strategy. Globs of the paths `url` leaves alone, such as `["/api/**"]`: they have no prefix, and the strategies after `url` find their locale. |

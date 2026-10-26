@@ -19,10 +19,13 @@ declare module "grai/next/output/internal.js" {
 	export function bindRequests(storage: {
 		getStore(): RequestLocale | undefined;
 	}): void;
-}
-
-declare module "grai/next/output/config.js" {
-	export const strategy: readonly ("cookie" | "preferredLanguage" | "url")[];
+	export const strategy: readonly (
+		| "cookie"
+		| "localStorage"
+		| "preferredLanguage"
+		| "query"
+		| "url"
+	)[];
 }
 
 declare module "grai/next/output/server.js" {
