@@ -109,7 +109,7 @@ const localePath = (
 ) => translatedPath(pathname, (entry) => [entry.route, entry.locales[locale]]);
 
 /**
- * @typedef {"locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound" | "output-changed"} GraiErrorCode
+ * @typedef {"locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound" | "output-changed" | "strategy-undefined"} GraiErrorCode
  */
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */

@@ -37,11 +37,25 @@
 			"examples": ["src/lib/i18n"]
 		},
 		"strategy": {
-			"description": "Where the server and a page no server draws look for the locale, in order, before the base locale: the cookie, the page's localStorage, the request's Accept-Language or the browser's languages, the URL's query parameter, the URL's first path segment.",
+			"description": "Where the server and a page no server draws look for the locale, in order, before the base locale: the cookie, the page's localStorage, the request's Accept-Language or the browser's languages, the URL's query parameter, the URL's first path segment. A \"custom-\" name, such as \"custom-session\", is a strategy the server defines with defineServerStrategy, which a page does not read.",
 			"type": "array",
 			"uniqueItems": true,
 			"items": {
-				"enum": ["cookie", "localStorage", "preferredLanguage", "query", "url"]
+				"anyOf": [
+					{
+						"enum": [
+							"cookie",
+							"localStorage",
+							"preferredLanguage",
+							"query",
+							"url"
+						]
+					},
+					{
+						"type": "string",
+						"pattern": "^custom-[a-z][a-z\\d-]*$"
+					}
+				]
 			}
 		},
 		"cookieName": {
