@@ -175,16 +175,16 @@ function declaredIn(node: TreeNode): string[] {
 		const parameters = Array.isArray(node.params) ? node.params : [];
 		return [
 			...[...own, ...parameters].flatMap(boundNames),
-			...hoisted(child(node, "body")),
+			...hoisted([child(node, "body")]),
 		];
 	}
 	if (node.type === "ClassExpression") return boundNames(child(node, "id"));
 	if (node.type === "CatchClause") return boundNames(child(node, "param"));
-	if (
-		node.type === "BlockStatement" ||
-		node.type === "StaticBlock" ||
-		node.type === "Program"
-	) {
+	if (node.type === "StaticBlock") {
+		const body = Array.isArray(node.body) ? node.body : [];
+		return [...lexical(body), ...hoisted(body)];
+	}
+	if (node.type === "BlockStatement" || node.type === "Program") {
 		return lexical(Array.isArray(node.body) ? node.body : []);
 	}
 	if (node.type === "SwitchStatement" && Array.isArray(node.cases)) {
@@ -214,12 +214,14 @@ function lexical(statements: readonly unknown[]): string[] {
 	});
 }
 
-/** The `var` names a function's body declares anywhere outside its nested functions. */
-function hoisted(body: TreeNode | undefined): string[] {
-	if (body === undefined) return [];
+/**
+ * The `var` names statements declare anywhere outside their nested functions and static blocks,
+ * which hold their own: a function's body, or a static block's.
+ */
+function hoisted(statements: readonly unknown[]): string[] {
 	const names: string[] = [];
 	const visit = (node: TreeNode) => {
-		if (functions.has(node.type)) return;
+		if (functions.has(node.type) || node.type === "StaticBlock") return;
 		if (node.type === "VariableDeclaration" && node.kind === "var")
 			names.push(...declarators(node));
 		for (const value of Object.values(node)) {
@@ -228,7 +230,9 @@ function hoisted(body: TreeNode | undefined): string[] {
 			}
 		}
 	};
-	visit(body);
+	for (const statement of statements) {
+		if (isTreeNode(statement)) visit(statement);
+	}
 	return names;
 }
 

@@ -375,6 +375,7 @@ describe("the Vite plugin's build", () => {
 		const shadowed = [
 			`import { m } from "./out/messages.js";`,
 			"export class Box { static { const m = { id: 7 }; globalThis.box = m.id; } }",
+			"export class Tray { static { if (true) { var m = { id: 8 }; } globalThis.tray = m.id; } }",
 			"const { title } = m;",
 			"({ title: globalThis.heading } = m);",
 			"console.log(title());",
@@ -391,7 +392,7 @@ describe("the Vite plugin's build", () => {
 				a: `${shadowed}\nconst { absent } = m;\nconsole.log(absent());\n`,
 			}),
 		).rejects.toThrow(
-			'a.js:6:9: "absent": absent names a key no catalog has. Add it with grai add absent --en "…" --de "…", or fix the name.',
+			'a.js:7:9: "absent": absent names a key no catalog has. Add it with grai add absent --en "…" --de "…", or fix the name.',
 		);
 	});
 
