@@ -412,7 +412,9 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - It is the parser Vite 8's Rolldown is built on. It parses TypeScript and JSX, and gives ESTree with UTF-16 offsets, names with their escapes read (`title` is `title`), and errors with their places.
   - Parsing app B's 6,980 scripts (53 MB) to full ESTree takes 0.6 s through its raw transfer. The same parse returned as JSON takes 2.8 s.
   - The build uses grai's copy too, not Vite's re-export. With one version, the build and the CLI read every file into the same tree. A Next project, which has no Vite, reads code with the same parser. Loading a second copy of the parser in a Vite build costs one native binding.
-  - The resolver is the one Rolldown resolves with, published for Node. It reads tsconfig `paths` (with `extends`, so SvelteKit's generated `.svelte-kit/tsconfig.json` brings `$lib`) and package.json `imports` and `exports` under the bundler's conditions. It caches by directory: app B's 24,573 distinct imports resolve in 0.6 s cold.
+  - The resolver is the one Rolldown resolves with, published for Node. It reads the project's tsconfig `paths` (with `extends`, so SvelteKit's generated `.svelte-kit/tsconfig.json` brings `$lib`) and package.json `imports` and `exports` under the bundler's conditions. It caches by directory: app B's 24,573 distinct imports resolve in 0.6 s cold.
+    - The project's tsconfig applies to every module, as SvelteKit, Astro and Next apply its paths: to a component too, which the `include` of a tsconfig found by the file's own place may leave out.
+    - A tsconfig the resolver cannot follow, such as one that extends what a framework generates before it is generated, or a Vite config that does not load, fails the command (`resolution-invalid`) with the fix. Otherwise every import would resolve to nothing, and the command would read nothing.
   - The CLI also reads the bundler's own aliases. When the project has a Vite config, Vite's own config loader, `loadConfigFromFile`, gives the aliases the config declares. Those aliases apply first, as Vite applies them: a string matches the whole path or a path below it, and a regular expression replaces what it matches. Then the resolver runs with the tsconfig and package.json rules above.
     - The loader runs none of the config's plugins, as SvelteKit's would sync its generated directory: a command that reads code writes nothing of the app's.
     - So a plugin's aliases come from the tsconfig the plugin generates, as SvelteKit's `$lib` does.
@@ -432,7 +434,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - A name reads the nearest declaration of it. A `const` set to the namespace (`const t = m`) is the namespace too, since it cannot change. Any other copy is a use of the namespace whole.
   - The "not checked: declares m again" path goes. Every read is placed exactly.
 - **Module reach comes from the module graph, never from a name or a path.**
-  - An import is grai's if it resolves to the output's `messages.js`, `keys.js` or a key's path, or to a module whose export of that name does, followed through re-exports:
+  - An import is grai's if it resolves to the output's `messages.js`, `keys.js` or a key's path, or to a module whose export of that name does, followed through re-exports. A key's path that the app maps to keys.js (`…/messages/<key>.js`) resolves to that key's own module, as the build resolves it; through keys.js, its namespace object would hold every key.
     - `export { m } from`, and an import exported again;
     - `export * as`;
     - `export *`, where a name a module exports itself wins over a star export of the same name, as the bundler binds it;
@@ -441,13 +443,13 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - `require()` of a literal path is an import, as the bundler converts it.
   - In a build, the bundler's resolution gives every import, and per-key paths resolve to its key modules (`\0grai:key/title`).
 - **What a read reaches:**
-  - **A key, read by name:** `m.key`, `m?.key`, `m["key"]` and a template without substitutions; `{ key }`, `{ "key": name }` or `{ ["key"]: name }` taken apart from `m`; a key's path imported statically or dynamically, destructured or not; a named import of keys.js; and each use of the name such an import binds.
+  - **A key, read by name:** `m.key`, `m?.key`, `m["key"]` and a template without substitutions; `{ key }`, `{ "key": name }` or `{ ["key"]: name }` taken apart from `m`; a key's path imported statically or dynamically, destructured or not, read once, at the key's name in the path; and a named import of keys.js. Each use of the name such an import binds is that binding's reference, not a read of its own, and a `const` that holds a key's read (`const t = m.title`) reads it once, however often it is used.
   - **A computed read, `m[expr]`, reaches every key the index can be.**
     - A literal is the one key.
     - A template that starts with text, or text joined to something, reaches every key that starts with that text.
     - A choice between literals (`a ? "x" : "y"`) reaches those keys.
     - Anything else reaches every key.
-  - **A use of `m` whole** reaches every key: passed on, spread, `Object.keys(m)`, `for…in`, a rest taken apart, or a copy that is not a `const`. So does a namespace import of keys.js used whole.
+  - **A use of `m` whole** reaches every key: passed on, spread, `Object.keys(m)`, `for…in`, a rest taken apart, or a copy that is not a `const`. So does a namespace import of keys.js used whole. A module's namespace object used whole, or read by a computed name, reaches the keys its exports hold, and an app module that exports none of grai's reaches none.
   - **A dynamic import with a literal path** is the import it names: a key's path reads that key, and messages.js or keys.js is the namespace, read through what the code does with it.
   - **A dynamic import with a template path** reaches the keys whose path the template matches, `${…}` standing for any text without `/`. This is how Vite's dynamic-import variables expand one into a glob. **`import.meta.glob`** reaches the keys its pattern matches.
   - **A dynamic import of anything else (`import(path)`) reaches nothing,** as the bundler treats it: it bundles no module for it, and the import is left to the runtime.
@@ -481,7 +483,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
     - **The pool is sized by the work.** Reading starts on the main thread. Once it has taken as long as a worker takes to start, about 0.25 s, and the rest would take more than twice that, the rest goes to workers. Each worker gets at least that much, and there are never more than the machine's parallelism less one.
       - Measured, the pool pays from about a thousand of app B's files and about four thousand of the synthetic project's, whose scripts are simpler, so a count of files would be wrong for one of them.
   - **Each file's facts are kept on disk, in the outdir's `.grai/` state, which Git ignores already, so a one-shot command reads again only the files that changed.** The facts are cached, never an AST.
-    - They are keyed by the content's hash, grai's version and the parsers' versions, so a change to any of them reads the file again.
+    - They are keyed by the content's hash, the hash of grai's reader code and the parsers' versions, so a change to any of them reads the file again. Hashing the reader's code, not grai's version, also covers an unreleased change to it.
     - They are written atomically after a command reads, and an entry for a file that is gone or changed is dropped then.
     - A warm run reads each file and hashes it, and parses nothing that is unchanged. The target is a warm `find` and `rename` at or under main's times. A cold run costs what reading every file exactly costs, and the pool keeps that as low as it can.
     - In memory, the facts are also kept across a watch, between `check --fix`'s fix and its check, and across a build's rebuilds.
