@@ -56,20 +56,32 @@ export const ${name} = (value) =>
 }
 
 /**
- * The options each formatter was last made with, which Intl took. A catalog repeats the same few
- * formats over and over, and each locale's message repeats its base's, so most checks are of the
- * options just checked. Only options Intl took are kept: refused ones are checked, and refused,
- * each time they come.
+ * The formats Intl took, by formatter and options, the one checked last at the end. A catalog
+ * repeats the same few formats over and over, and each locale's message repeats its base's, so
+ * nearly every check is of options checked a moment ago. Several, not the last of each formatter:
+ * a catalog that alternates a decimal format and a currency one, both Intl.NumberFormat, made its
+ * formatter again at nearly every key, and kept, its compile of 13,000 keys × 3 went from 390 to
+ * 321 ms. At most `takenLimit`, so a long compiler process keeps a
+ * few strings, not every format it ever met, and no Intl formatter. Only options Intl took are
+ * kept: refused ones are checked, and refused, each time they come.
  */
-const taken = new Map<Format["formatter"], string>();
+const taken = new Set<string>();
+const takenLimit = 32;
 
 /** Makes a format's formatter once, as formats.js does, so a value Intl refuses throws now. */
 export function checkFormat(format: Format): void {
 	const { options } = splitUnit(format);
-	const identity = JSON.stringify(options);
-	if (taken.get(format.formatter) === identity) return;
+	const signature = `${format.formatter} ${JSON.stringify(options)}`;
+	if (taken.delete(signature)) {
+		taken.add(signature);
+		return;
+	}
 	makeFormatter(format.formatter, options);
-	taken.set(format.formatter, identity);
+	taken.add(signature);
+	if (taken.size > takenLimit) {
+		const [oldest] = taken;
+		if (oldest !== undefined) taken.delete(oldest);
+	}
 }
 
 function makeFormatter(
