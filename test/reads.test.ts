@@ -92,4 +92,22 @@ describe("the reads of a project's code", () => {
 			"src/a.ts:5:54 may reach *: keys[season]",
 		]);
 	});
+
+	it("takes a module a dynamic import hands to then as used whole, and a key's own module as its path", async () => {
+		expect(
+			await readsOf({
+				"src/lib/i18n.ts": i18nTs,
+				"src/lib/format.ts": "export const money = (n: number) => String(n);\n",
+				"src/a.ts": [
+					'import("./lib/i18n.ts").then(({ m }) => m.title());',
+					'import("./lib/format.ts").then(({ money }) => money(1));',
+					'import("#i18n/messages/subtitle.js").then((module) => module.subtitle());',
+					"",
+				].join("\n"),
+			}),
+		).toEqual([
+			"src/a.ts:3:24 path subtitle",
+			'src/a.ts:1:1 may reach *: import("./lib/i18n.ts").then',
+		]);
+	});
 });
