@@ -9,12 +9,8 @@
 import type { AST } from "svelte/compiler";
 import { CodeWriter, type SourceCode } from "./source.ts";
 
-/** Svelte's parse of a component, in its modern tree. */
-type SvelteParse = typeof import("svelte/compiler").parse;
-
-/** A component's code; throws Svelte's error for a component Svelte cannot parse. */
-export function svelteCode(text: string, parse: SvelteParse): SourceCode {
-	const root = parse(text, { modern: true });
+/** A component's code, from Svelte's parse of it (`frameworks.ts`) and its text. */
+export function svelteCode(text: string, root: AST.Root): SourceCode {
 	const writer = new CodeWriter(text);
 	const scripts: AST.Script[] = [];
 	for (const script of [root.module, root.instance]) {
