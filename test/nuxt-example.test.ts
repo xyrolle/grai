@@ -114,14 +114,33 @@ describe("the Nuxt example, built, by the URL prefix", {
 		expect(checked.status, checked.stdout + checked.stderr).toBe(0);
 	}, 120_000);
 
-	it("renders the base locale unprefixed, and hydrates in it without an error", async () => {
-		await page.goto(`${origin}/`);
-		await page.locator("#hydrated").waitFor();
+	it("server-renders each locale in its words, routed by its prefix, and hydrates each in them without a mismatch, loading only its words", async () => {
+		const pages = [
+			["/", "en", "ltr", "A shop that speaks your language"],
+			["/ro", "ro", "ltr", "Un magazin care îți vorbește limba"],
+			["/ar", "ar", "rtl", "متجر يتحدث لغتك"],
+		];
+		for (const [path, lang, dir, title] of pages) {
+			const served = await fetch(origin + path).then((page) => page.text());
+			expect(served).toMatch(
+				new RegExp(`<html[^>]* lang="${lang}" dir="${dir}"`),
+			);
+			expect(served).toContain(`<h1>${title}</h1>`);
 
-		expect(await html("lang")).toBe("en");
-		expect(await html("dir")).toBe("ltr");
-		expect(await text("h1")).toBe("A shop that speaks your language");
-		expect(await text("#hydrated")).toBe("Drawn in the browser");
+			scripts = [];
+			await page.goto(origin + path);
+			await page.locator("#hydrated").waitFor();
+			const words = scripts.filter((script) =>
+				/^\/_nuxt\/grai(-[^/]+)?\//.test(script),
+			);
+
+			expect(await text("h1")).toBe(title);
+			expect(words.length).toBeGreaterThan(0);
+			expect(
+				words.filter((script) => !script.startsWith(`/_nuxt/grai-${lang}/`)),
+			).toEqual([]);
+		}
+		// Vue logs a mismatch it repaired, even in a production build.
 		expect(logged).toEqual([]);
 	});
 
@@ -136,28 +155,6 @@ describe("the Nuxt example, built, by the URL prefix", {
 		expect(await text("#terms a")).toBe("condițiile");
 		expect(await text("#hydrated")).toBe("Desenat în browser");
 		expect(logged).toEqual([]);
-	});
-
-	it("writes the direction of a right-to-left locale's script", async () => {
-		await page.goto(`${origin}/ar/`);
-
-		expect(await html("lang")).toBe("ar");
-		expect(await html("dir")).toBe("rtl");
-		expect(await text("h1")).toBe("متجر يتحدث لغتك");
-	});
-
-	it("loads only the page's locale's message chunks", async () => {
-		await page.goto(`${origin}/ro/`);
-		await page.locator("#hydrated").waitFor();
-
-		const fetched = (directory: string) =>
-			scripts.filter((path) => path.startsWith(`/_nuxt/${directory}/`));
-		expect(fetched("grai-ro").length).toBeGreaterThan(0);
-		expect([
-			...fetched("grai"),
-			...fetched("grai-en"),
-			...fetched("grai-ar"),
-		]).toEqual([]);
 	});
 
 	it("navigates in place within a locale, and the page's head takes its words", async () => {
