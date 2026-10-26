@@ -20,6 +20,7 @@ import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
 import { projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
+import { Outside, outsideNames } from "./outside.ts";
 import { Pool } from "./pool.ts";
 import { projectResolution, resolverFor } from "./resolution.ts";
 import { importKey, resolvedImports } from "./resolved.ts";
@@ -59,13 +60,9 @@ export async function readProjectCode(
 	if (resolution instanceof GraiError) return resolution;
 	const resolveFile = resolverFor(resolution);
 	const cache = new FactsCache(join(config.outdir, stateDirectory));
-	const seen: Seen = { links: [], manifests: [] };
-	const files = sourceFiles(
-		roots.map(realPath),
-		config.root,
-		config.outdir,
-		seen,
-	);
+	const seen: Seen = { links: [], manifests: [], skipped: [] };
+	const listedRoots = roots.map(realPath);
+	const files = sourceFiles(listedRoots, config.root, config.outdir, seen);
 	const listed = new Set(files.map(({ path }) => path));
 	const sources = new Map<string, SourceCode>();
 	const resolved = new Map<string, string | undefined>();
@@ -103,20 +100,30 @@ export async function readProjectCode(
 	const packages = workspacePackages(config.root);
 	const pool = new Pool();
 	try {
-		// The files whose text may name the output or a barrel, read and resolved, until the barrels
-		// they hold name no file more.
-		const outside = new OutsidePackages(packages, config.root);
+		// The files whose text may name the output, a barrel or a module outside the listed sources,
+		// read and resolved, until the barrels they hold name no file more.
+		const passers = new OutsidePackages(packages, config.root);
+		const listing = {
+			roots: listedRoots,
+			skipped: seen.skipped,
+			outdir: config.outdir,
+		};
+		const beyond = new Outside(listing, mappings ?? []);
+		const leaving = outsideNames(listing, mappings ?? [], links);
 		let barrels = new Set<string>();
 		for (;;) {
 			const names =
 				mappings &&
 				namesOf({ outdir: config.outdir, barrels }, mappings, links, packages);
 			if (names !== undefined) {
-				for (const name of outside.passing(names)) names.add(written(name));
+				for (const name of leaving) names.add(name);
+				for (const name of passers.passing(names)) names.add(written(name));
 			}
 			const test = names && textTest(names);
 			const taken = files.filter(
-				({ path, text }) => !sources.has(path) && (test?.test(text) ?? true),
+				({ path, text }) =>
+					!sources.has(path) &&
+					(test === undefined || test.test(text) || beyond.test(path, text)),
 			);
 			if (taken.length === 0) break;
 			const read = await factsOfSources(taken, cache, pool);
