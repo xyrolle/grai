@@ -81,6 +81,16 @@ describe("the document's start", () => {
 		expect(decoder.decode(second.value)).toBe("<title>");
 	});
 
+	it("reads past comments before the doctype, such as a license", async () => {
+		expect(
+			await rewritten([
+				"<!-- license -->\n<!doctype html><html><head><title>Shop</title></head>",
+			]),
+		).toBe(
+			`<!-- license -->\n<!doctype html><html lang="ar" dir="rtl"><head><script type="importmap">{}</script><title>Shop</title></head>`,
+		);
+	});
+
 	it("writes the <html> and <head> start tags a document leaves out", async () => {
 		expect(await rewritten(["<!DOCTYPE html><title>Shop</title>"])).toBe(
 			`<!DOCTYPE html><html lang="ar" dir="rtl"><script type="importmap">{}</script><title>Shop</title>`,
