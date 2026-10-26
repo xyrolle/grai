@@ -22,32 +22,32 @@ import { grai } from "../src/vite.ts";
 
 /**
  * Each one's budget, in bytes. The runtime's is the design's. An entry's is about a fifth over its
- * size when it was set: grai 35,382 B with the config's readers, grai/vite 49,264 B with its locale
- * script and the build's scope reader, grai/svelte 43,380 B with grai/vite's plugin, grai/sveltekit
- * 541 B with its import map, grai/sveltekit/vite 45,942 B with grai/vite's plugin,
+ * size when it was set: grai 35,382 B with the config's readers, grai/vite 57,154 B with its locale
+ * script and the build's reader of code, grai/svelte 57,581 B with grai/vite's plugins,
+ * grai/sveltekit 541 B with its import map, grai/sveltekit/vite 57,632 B with grai/vite's plugins,
  * grai/sveltekit/client 382 B, grai/sveltekit/navigation 210 B, grai/next 516 B, grai/next/config
- * 37,354 B with the config's readers, grai/next/proxy 265 B, grai/react 413 B, grai/astro 46,391 B
- * with grai/vite's plugin, grai/astro/middleware 1,838 B, grai/vue 426 B, grai/vue/client 292 B and
- * grai/nuxt 45,909 B with grai/vite's plugin.
+ * 37,354 B with the config's readers, grai/next/proxy 265 B, grai/react 413 B, grai/astro 58,864 B
+ * with grai/vite's plugins, grai/astro/middleware 1,838 B, grai/vue 426 B, grai/vue/client 292 B
+ * and grai/nuxt 57,834 B with grai/vite's plugins.
  */
 const budgets: Record<string, number> = {
 	runtime: 1024,
 	grai: 42_500,
-	"grai/vite": 59_000,
-	"grai/svelte": 52_000,
+	"grai/vite": 69_000,
+	"grai/svelte": 69_500,
 	"grai/sveltekit": 650,
-	"grai/sveltekit/vite": 55_000,
+	"grai/sveltekit/vite": 69_500,
 	"grai/sveltekit/client": 460,
 	"grai/sveltekit/navigation": 250,
 	"grai/next": 650,
 	"grai/next/config": 45_000,
 	"grai/next/proxy": 350,
 	"grai/react": 500,
-	"grai/astro": 55_500,
+	"grai/astro": 71_000,
 	"grai/astro/middleware": 2_200,
 	"grai/vue": 520,
 	"grai/vue/client": 350,
-	"grai/nuxt": 55_000,
+	"grai/nuxt": 69_500,
 };
 
 const root = new URL("../", import.meta.url);
