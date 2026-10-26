@@ -23,6 +23,10 @@ export type LocaleProject = {
 	getTextDirection(locale?: string): "ltr" | "rtl";
 	/** `localeOfPath` from the output's `internal.js`: the locale a path names, if it names one. */
 	localeOfPath(pathname: string): string | undefined;
+	/** `routeOfPath` from the output's `internal.js`: a path in its locale's words as its route. */
+	routeOfPath(pathname: string): string;
+	/** `pathOfRoute` from the output's `internal.js`: a route's path in its locale's words. */
+	pathOfRoute(pathname: string): string;
 	/** The name of the project's grai config, which errors name. */
 	configName: string;
 	/**
@@ -56,20 +60,27 @@ export function localeMiddleware(
 	project: LocaleProject,
 ): (
 	context: LocaleContext,
-	next: () => Promise<Response>,
+	next: (rewrite?: string) => Promise<Response>,
 ) => Promise<Response> {
 	return async (context, next) => {
+		const url = new URL(context.request.url);
 		if (context.isPrerendered) {
-			const pathname = new URL(context.request.url).pathname;
-			const file = localeAsFile(project, pathname);
+			const file = localeAsFile(project, url.pathname);
 			if (file !== undefined)
-				throw namedAsFile(project, context.routePattern, pathname, file);
+				throw namedAsFile(project, context.routePattern, url.pathname, file);
+			const words = project.pathOfRoute(url.pathname);
+			if (words !== url.pathname)
+				throw translatedAway(project, context.routePattern, url, words);
 		}
+		// A path in its locale's words renders its route, as Astro routes it by the prefix alone.
+		const route = project.routeOfPath(url.pathname);
+		const render = () =>
+			route === url.pathname ? next() : next(route + url.search);
 		return project.middleware(context.request, async ({ locale }) => {
 			const importMap = project.importMaps?.[locale];
 			if (importMap !== undefined)
 				context.csp?.insertScriptHash(importMap.hash);
-			const response = await next();
+			const response = await render();
 			const body = documentBody(response);
 			if (body === undefined) return response;
 			if (context.isPrerendered) {
@@ -135,6 +146,24 @@ function namedAsFile(
 		"config-invalid",
 		{ file: project.configName },
 		`the page ${page} is prerendered at ${pathname}, which names its locale as a file, ${file}, where the "url" strategy reads a path's first segment. Build each page into a folder: set Astro's build.format to "directory", and name a locale's page [locale]/index.astro rather than [locale].astro.`,
+	);
+}
+
+/**
+ * A prerendered page that `pathnames` gives other words: a static build writes it at its route's
+ * path alone, so the links `localizeHref` writes to its words would find no page.
+ */
+function translatedAway(
+	project: LocaleProject,
+	page: string,
+	url: URL,
+	words: string,
+): GraiError {
+	const locale = project.localeOfPath(url.pathname);
+	return new GraiError(
+		"config-invalid",
+		{ file: project.configName },
+		`the page ${page} is prerendered at ${url.pathname}, but "pathnames" gives it ${words} in ${locale}, where a static build has no page. Render the page on demand (export const prerender = false), or leave its path out of "pathnames".`,
 	);
 }
 
