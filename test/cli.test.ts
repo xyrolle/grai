@@ -69,14 +69,14 @@ describe("grai compile", () => {
 });
 
 describe("grai check", () => {
-	it("reports keys no source names and inputs the locales disagree on, and writes nothing", async () => {
+	it("reports keys no shipped code reads and inputs the locales disagree on, compiling the output first, which the code's imports resolve to", async () => {
 		const { dir } = project({
 			en: { cart_title: "Your cart", cart_greeting: "Hello {name}" },
 			de: { cart_title: "Ihr Warenkorb", cart_greeting: "Hallo" },
 		});
 		writeFileSync(
 			join(dir, "app.ts"),
-			'console.log(m.cart_greeting({ name: "Ana" }));',
+			'import { m } from "./out/messages.js";\nconsole.log(m.cart_greeting({ name: "Ana" }));\n',
 		);
 		const { code, stderr } = await grai(dir, "check");
 
@@ -84,19 +84,20 @@ describe("grai check", () => {
 		expect(stderr).toBe(
 			[
 				'messages/de.json: "cart_greeting" (de): the message never shows {name}, which en shows. Show it here too, or drop it everywhere.',
-				'messages/en.json: "cart_title": no source file under . names the key. Remove it from every catalog, or use it.',
+				'messages/en.json: "cart_title": no shipped code under . reads the key. Remove it from every catalog, or use it.',
 				"grai: 2 errors",
 				"",
 			].join("\n"),
 		);
-		expect(existsSync(join(dir, "out"))).toBe(false);
+		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
 	});
 
-	it("counts a key that only tests name as unused, naming the tests, unless the config says no file is one", async () => {
+	it("counts a key that only tests read as unused, naming the tests, unless the config says no file is one", async () => {
+		const imported = 'import { m } from "../out/messages.js";\n';
 		const sources = {
-			"app.ts": "m.cart_title();",
-			"src/greeting.spec.ts": "expect(m.cart_greeting({ name: 'Ana' }));",
-			"tests/helpers.ts": "export const greet = () => m.cart_greeting;",
+			"app.ts": 'import { m } from "./out/messages.js";\nm.cart_title();\n',
+			"src/greeting.spec.ts": `${imported}expect(m.cart_greeting({ name: "Ana" }));\n`,
+			"tests/helpers.ts": `${imported}export const greet = () => m.cart_greeting;\n`,
 		};
 		const shipping = project(catalogs);
 		const counting = project(catalogs, { tests: [] });
@@ -108,7 +109,7 @@ describe("grai check", () => {
 		}
 
 		expect((await grai(shipping.dir, "check")).stderr.split("\n")[0]).toBe(
-			'messages/en.json: "cart_greeting": no source file under . names the key but tests, which ship nothing: src/greeting.spec.ts, tests/helpers.ts. Remove it from every catalog and from those tests, or use it.',
+			'messages/en.json: "cart_greeting": no shipped code under . reads the key, only tests, which ship nothing: src/greeting.spec.ts, tests/helpers.ts. Remove it from every catalog and from those tests, or use it.',
 		);
 		expect((await grai(counting.dir, "check")).code).toBe(0);
 	});
@@ -122,7 +123,7 @@ describe("grai check", () => {
 		expect(await grai(dir, "check")).toMatchObject({ code: 0 });
 	});
 
-	it("takes a name a file declares again for none of grai's, and says it left that file's reads of it unchecked", async () => {
+	it("takes a name a file declares again for none of grai's, and checks every read of the import around it", async () => {
 		const { dir } = project(catalogs);
 		const shadowing = [
 			`import { m } from "../out/messages.js";`,
@@ -131,6 +132,7 @@ describe("grai check", () => {
 			"export const widths = ({ m }) => m.width;",
 			"{ const m = { label: 1 }; console.log(m.label); }",
 			"try { m.cart_title(); } catch (m) { console.log(m.message); }",
+			"export const late = () => m.cart_titel();",
 		].join("\n");
 		writeSources(dir, {
 			"package.json": JSON.stringify({ imports: { "#lib/*": "./src/*" } }),
@@ -143,28 +145,26 @@ describe("grai check", () => {
 		const { code, stdout, stderr } = await grai(dir, "check");
 
 		expect(code).toBe(1);
+		const fix = `Add it with grai add cart_titel --en "…" --de "…", or fix the name.`;
 		expect(stderr.split("\n")).toEqual([
-			`src/aliased.js:2:15: "cart_titel": t.cart_titel names a key no catalog has. Add it with grai add cart_titel --en "…" --de "…", or fix the name.`,
-			"grai: 1 error",
+			`src/aliased.js:2:15: "cart_titel": t.cart_titel names a key no catalog has. ${fix}`,
+			`src/rows.js:7:29: "cart_titel": m.cart_titel names a key no catalog has. ${fix}`,
+			"grai: 2 errors",
 			"",
 		]);
-		expect(stdout).toContain(
-			"grai: not checked: src/rows.js declares m again (2:40), so check cannot tell which of its m.key reads are grai's.",
-		);
+		expect(stdout).toBe("");
 	});
 
 	it("names each place a source names a key no catalog has, in Svelte, Vue and JavaScript, with the grai add that adds it", async () => {
 		const { dir } = project(catalogs);
 		const sources = {
 			"src/Cart.svelte": `<script>\n\timport { m } from "$lib/i18n";\n</script>\n<h1>{m.cart_titel()}</h1>\n`,
+			"src/lib/i18n.ts": 'export { m } from "../../out/messages.js";\n',
 			"src/Greeting.vue": `<script setup>\nimport { m } from "../out/messages.js";\n</script>\n<template><p>{{ m.cart_greeting({ name: "Ana" }) }} {{ m["cart_bye"]() }}</p></template>\n`,
 			"src/app.js": `import { cart_title } from "#i18n/messages/cart_title.js";\nimport { cart_totl } from "#i18n/messages/cart_totl.js";\n`,
 			"src/late.js": `const { cart_ttl } = await import("#i18n/messages/cart_ttl.js");\n`,
 		};
-		for (const [path, text] of Object.entries(sources)) {
-			mkdirSync(join(dir, "src"), { recursive: true });
-			writeFileSync(join(dir, path), text);
-		}
+		writeSources(dir, sources);
 
 		const { code, stderr } = await grai(dir, "check");
 
@@ -198,17 +198,47 @@ describe("grai check", () => {
 		]);
 	});
 
-	it("says it left unchecked a read in what may be JSX text, which the scan reads as JavaScript", async () => {
+	it("reports a file whose code does not parse at the parser's place, and one whose imports cannot resolve", async () => {
+		const broken = project(catalogs);
+		writeSources(broken.dir, {
+			"app.ts":
+				'import { m } from "./out/messages.js";\nm.cart_title(); m.cart_greeting;\nexport const total = ;\n',
+		});
+		const unsynced = project(catalogs);
+		writeSources(unsynced.dir, {
+			"tsconfig.json": JSON.stringify({
+				extends: "./.svelte-kit/tsconfig.json",
+			}),
+		});
+
+		const unparsed = await grai(broken.dir, "check");
+		const unresolved = await grai(unsynced.dir, "check");
+
+		expect([unparsed.code, unparsed.stderr.split("\n")[0]]).toEqual([
+			1,
+			"app.ts:3:22: Unexpected token, so grai cannot read its code. Fix it, as the bundler would fail it too.",
+		]);
+		expect([unresolved.code, unresolved.stderr.split("\n")[0]]).toEqual([
+			1,
+			expect.stringMatching(
+				/^tsconfig\.json: the project's tsconfig cannot be followed: .+\.svelte-kit\/tsconfig\.json\. Generate what it extends/,
+			),
+		]);
+	});
+
+	it("checks a read inside JSX text, whose apostrophes are text", async () => {
 		const { dir } = project(catalogs);
 		writeSources(dir, {
 			"src/View.jsx": `import { m } from "../out/messages.js";\nm.cart_title();\nexport const View = () => <p>don't {m.cart_titel()} don't</p>;\n`,
 		});
 
-		const { stdout } = await grai(dir, "check");
+		const { stderr } = await grai(dir, "check");
 
-		expect(stdout).toContain(
-			"grai: not checked: src/View.jsx:3:37 may be JSX text, which check reads as JavaScript, so it cannot tell whether its m reads there are grai's.",
-		);
+		expect(
+			stderr.split("\n").filter((line) => line.startsWith("src/")),
+		).toEqual([
+			`src/View.jsx:3:39: "cart_titel": m.cart_titel names a key no catalog has. Add it with grai add cart_titel --en "…" --de "…", or fix the name.`,
+		]);
 	});
 
 	it("counts no name that ends a longer word, such as 2xl's xl, as the key", async () => {
@@ -219,13 +249,16 @@ describe("grai check", () => {
 		writeFileSync(join(dir, "app.ts"), 'export const size = "2xl";');
 
 		expect((await grai(dir, "check")).stderr).toContain(
-			'messages/en.json: "xl": no source file under . names the key.',
+			'messages/en.json: "xl": no shipped code under . reads the key.',
 		);
 	});
 
 	it("says so when there is no problem", async () => {
 		const { dir } = project(catalogs);
-		writeFileSync(join(dir, "app.ts"), "m.cart_title(); m.cart_greeting;");
+		writeFileSync(
+			join(dir, "app.ts"),
+			'import { m } from "./out/messages.js";\nm.cart_title(); m.cart_greeting;\n',
+		);
 
 		expect(await grai(dir, "check")).toEqual({
 			code: 0,
@@ -239,7 +272,10 @@ describe("grai check", () => {
 			en: { cart_title: "Your cart", cart_greeting: "Hello {name}" },
 			de: { cart_title: "Your cart", cart_greeting: "Hallo {name}" },
 		});
-		writeFileSync(join(dir, "app.ts"), "m.cart_title(); m.cart_greeting;");
+		writeFileSync(
+			join(dir, "app.ts"),
+			'import { m } from "./out/messages.js";\nm.cart_title(); m.cart_greeting;\n',
+		);
 
 		expect(await grai(dir, "check")).toEqual({
 			code: 0,
@@ -249,7 +285,7 @@ describe("grai check", () => {
 		const json = await grai(dir, "check", "--json");
 		expect([json.code, JSON.parse(json.stdout)]).toEqual([
 			0,
-			{ problems: [], untranslated: { de: ["cart_title"] }, unchecked: [] },
+			{ problems: [], untranslated: { de: ["cart_title"] } },
 		]);
 	});
 });

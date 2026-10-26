@@ -1,8 +1,7 @@
 import { check } from "../check.ts";
+import type { ProjectCode } from "../code/project.ts";
 import type { GraiError } from "../error.ts";
 import { fixLines, removeUnusedKeys } from "../fix.ts";
-import type { Unchecked } from "../missing-key-calls.ts";
-import type { ScannedSources } from "../source-scan.ts";
 import {
 	type Command,
 	failed,
@@ -30,31 +29,22 @@ export const checkCommand: Command = {
 		if (values.fix === true && values.json === true) {
 			throw new UsageError("check takes --fix or --json, not both");
 		}
-		// A fix writes catalogs, the config and the descriptions, so the check after it takes the
-		// sources the fix read, which it hands on unless it wrote one.
-		let scanned: ScannedSources | undefined;
+		// A fix writes catalogs, the config and the descriptions, none of them code, so the check
+		// after it takes the code the fix read.
+		let code: ProjectCode | undefined;
 		if (values.fix === true) {
 			const fixed = await removeUnusedKeys(config, sources);
 			for (const line of fixLines(fixed)) console.log(line);
 			if (fixed.errors.length > 0) return failed(fixed.errors);
-			scanned = fixed.scanned;
+			code = fixed.code;
 		}
-		const { problems, untranslated, unchecked } = await check(
-			config,
-			sources,
-			scanned,
-		);
+		const { problems, untranslated } = await check(config, sources, code);
 		if (values.json === true) {
 			console.log(
-				JSON.stringify(
-					checkedJson(problems, untranslated, unchecked),
-					null,
-					"\t",
-				),
+				JSON.stringify(checkedJson(problems, untranslated), null, "\t"),
 			);
 			return problems.length > 0 ? 1 : 0;
 		}
-		for (const place of unchecked) console.log(uncheckedLine(place));
 		for (const [locale, keys] of untranslated) {
 			console.log(untranslatedLine(locale, keys));
 		}
@@ -64,19 +54,6 @@ export const checkCommand: Command = {
 	},
 };
 
-/** Why check left a file's reads of a namespace out, and where. */
-function uncheckedLine({ file, name, line, column, why }: Unchecked): string {
-	if (why === "declared") {
-		return `grai: not checked: ${file} declares ${name} again (${line}:${column}), so check cannot tell which of its ${name}.key reads are grai's.`;
-	}
-	const place = `${file}:${line}:${column}`;
-	const reason =
-		why === "jsx"
-			? "may be JSX text, which check reads as JavaScript"
-			: "follows a / that may start a regular expression or divide";
-	return `grai: not checked: ${place} ${reason}, so it cannot tell whether its ${name} reads there are grai's.`;
-}
-
 /** How many keys of a locale are untranslated, and the first of them. */
 function untranslatedLine(locale: string, keys: readonly string[]): string {
 	const shownKeys = keys.slice(0, 10).join(", ");
@@ -84,14 +61,10 @@ function untranslatedLine(locale: string, keys: readonly string[]): string {
 	return `grai: ${keys.length} untranslated in ${locale}: ${shownKeys}${more}`;
 }
 
-/**
- * A check's findings as JSON, for scripts: every problem, every untranslated key by locale, and
- * each file whose reads of a namespace it left out.
- */
+/** A check's findings as JSON, for scripts: every problem, and every untranslated key by locale. */
 function checkedJson(
 	problems: readonly GraiError[],
 	untranslated: ReadonlyMap<string, readonly string[]>,
-	unchecked: readonly Unchecked[],
 ) {
 	return {
 		problems: problems.map(({ code, file, key, locale, message }) => ({
@@ -102,6 +75,5 @@ function checkedJson(
 			message,
 		})),
 		untranslated: Object.fromEntries(untranslated),
-		unchecked,
 	};
 }

@@ -34,6 +34,11 @@ export function Header() {
 }
 `;
 
+/** A TSX component that imports one key by the key's own path. */
+export const promoTsx = `import { promo_spring } from "#i18n/messages/promo_spring.js";
+export const Promo = () => <p>{promo_spring()}</p>;
+`;
+
 /** A test's line that names a key, which check does not count, since a test ships nothing. */
 export const cartTest = 'expect(m.cart_title()).toBe("Your cart");\n';
 
@@ -42,6 +47,18 @@ export const i18nTs = `import { m } from "../../out/messages.js";
 
 export { m };
 `;
+
+/** The cart, and the module it imports `m` from as `$lib/i18n`. */
+export const cart: Record<string, string> = {
+	"src/Cart.svelte": cartSvelte,
+	"src/lib/i18n.ts": i18nTs,
+};
+
+/** A small app: the cart, and the promo, which imports its key by the key's own path. */
+export const cartApp: Record<string, string> = {
+	...cart,
+	"src/promo.tsx": promoTsx,
+};
 
 /**
  * A catalog's text laid out as no formatter would: two spaces, Windows line breaks, and each entry

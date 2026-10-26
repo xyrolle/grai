@@ -99,7 +99,7 @@ it("has Git ignore the output, and nothing else", async () => {
 	git("init", "--quiet");
 
 	expect(git("status", "--porcelain", "--untracked-files=all")).toBe(
-		"?? grai.config.json\n?? messages/de.json\n?? messages/en.json\n",
+		"?? grai.config.json\n?? messages/de.json\n?? messages/en.json\n?? package.json\n?? tsconfig.json\n",
 	);
 });
 
