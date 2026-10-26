@@ -1,10 +1,22 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AstroConfig, AstroIntegration } from "astro";
-import type { Plugin } from "vite";
+import type {
+	AstroConfig,
+	AstroIntegration,
+	IntegrationResolvedRoute,
+} from "astro";
+import type { Plugin, ViteDevServer } from "vite";
 import { disagreements } from "./astro/agreement.ts";
 import type { ImportMap, LocaleProject } from "./astro/middleware.ts";
+import {
+	translatablePages,
+	translatedPage,
+	translatedPathsId,
+	translatedPathsModule,
+	translatedPatterns,
+} from "./astro/translated-routes.ts";
 import { compile } from "./compile.ts";
 import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
@@ -25,12 +37,27 @@ const middlewareId = "grai:astro/middleware";
  * - it checks, once Astro's config is done, that the two configs agree on where a page's locale
  *   comes from (`astro/agreement.ts`);
  * - it adds the middleware that renders each request in its locale (`astro/middleware.ts`), ahead
- *   of the app's own.
+ *   of the app's own;
+ * - it adds a prerendered route for each path in a locale's words that `pathnames` gives, so a
+ *   static build writes each page there too (`astro/translated-routes.ts`).
  */
 export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 	let configFile = "";
 	let building = false;
 	let middleware: string | undefined;
+	let astro: AstroConfig | undefined;
+	let translatable: IntegrationResolvedRoute[] = [];
+	// The project's grai config, read when a hook first needs it, after the first has named it.
+	let read: Config | undefined;
+	const graiConfig = () => {
+		read ??= readConfig(configFile);
+		return read;
+	};
+	const modules = virtualModules({
+		[middlewareId]: () => middleware,
+		[translatedPathsId]: () =>
+			astro && translatedPathsModule(translatable, graiConfig(), astro),
+	});
 	return {
 		name: "grai",
 		hooks: {
@@ -39,6 +66,8 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 				command,
 				updateConfig,
 				addMiddleware,
+				injectRoute,
+				createCodegenDir,
 			}) => {
 				configFile = resolve(
 					fileURLToPath(config.root),
@@ -58,14 +87,26 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 								reloadOnEdit: true,
 								localeChunks: true,
 							}).plugin,
-							middlewareModule(() => middleware),
+							modules.plugin,
 						],
 					},
 				});
 				addMiddleware({ order: "pre", entrypoint: middlewareId });
+				const grai = graiConfig();
+				const patterns = grai.strategy.includes("url")
+					? translatedPatterns(grai)
+					: [];
+				if (patterns.length > 0) {
+					const page = new URL("translated.astro", createCodegenDir());
+					written(page, translatedPage);
+					for (const pattern of patterns) {
+						injectRoute({ pattern, entrypoint: page, prerender: true });
+					}
+				}
 			},
 			"astro:config:done": ({ config }) => {
-				const grai = readConfig(configFile);
+				astro = config;
+				const grai = graiConfig();
 				const problems = disagreements(grai, config);
 				if (problems.length > 0) {
 					throw new GraiError(
@@ -82,6 +123,10 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 						: undefined,
 				});
 			},
+			"astro:routes:resolved": ({ routes }) => {
+				translatable = translatablePages(routes, graiConfig());
+				modules.changed(translatedPathsId);
+			},
 		},
 	};
 }
@@ -91,20 +136,16 @@ function middlewareCode(
 	grai: Config,
 	project: Omit<
 		LocaleProject,
-		| "middleware"
-		| "getTextDirection"
-		| "localeOfPath"
-		| "routeOfPath"
-		| "pathOfRoute"
+		"middleware" | "getTextDirection" | "localeOfPath" | "routeOfPath"
 	>,
 ): string {
 	const output = (file: string) => JSON.stringify(join(grai.outdir, file));
 	return `import { localeMiddleware } from "grai/astro/middleware";
 import { middleware } from ${output("server.js")};
 import { getTextDirection } from ${output("runtime.js")};
-import { localeOfPath, pathOfRoute, routeOfPath } from ${output("internal.js")};
+import { localeOfPath, routeOfPath } from ${output("internal.js")};
 
-export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, routeOfPath, pathOfRoute, ...${JSON.stringify(project)} });
+export const onRequest = localeMiddleware({ middleware, getTextDirection, localeOfPath, routeOfPath, ...${JSON.stringify(project)} });
 `;
 }
 
@@ -121,14 +162,41 @@ function requestStrategies(
 		: { beforeUrl: strategy.slice(0, url), afterUrl: strategy.slice(url + 1) };
 }
 
-/** The Vite plugin that serves the project's middleware, once Astro's config is done. */
-function middlewareModule(code: () => string | undefined): Plugin {
-	const resolved = `\0${middlewareId}`;
+/**
+ * The Vite plugin that serves the modules the integration writes, once Astro's config is done:
+ * the project's middleware, and the paths of the pages in a locale's words. In dev, a module whose
+ * code changes, as Astro's routes do, is loaded again.
+ */
+function virtualModules(code: Record<string, () => string | undefined>): {
+	plugin: Plugin;
+	changed(id: string): void;
+} {
+	let server: ViteDevServer | undefined;
 	return {
-		name: "grai:astro",
-		resolveId: (id) => (id === middlewareId ? resolved : null),
-		load: (id) => (id === resolved ? code() : null),
+		plugin: {
+			name: "grai:astro",
+			configureServer: (dev) => {
+				server = dev;
+			},
+			resolveId: (id) => (id in code ? `\0${id}` : null),
+			load: (id) =>
+				id.startsWith("\0") ? (code[id.slice(1)]?.() ?? null) : null,
+		},
+		changed(id) {
+			for (const environment of Object.values(server?.environments ?? {})) {
+				const graph = environment.moduleGraph;
+				const loaded = graph.getModuleById(`\0${id}`);
+				if (loaded !== undefined) graph.invalidateModule(loaded);
+			}
+		},
 	};
+}
+
+/** Writes a file's text, unless it has it already, which a watcher would take for an edit. */
+function written(file: URL, text: string): void {
+	if (!existsSync(file) || readFileSync(file, "utf8") !== text) {
+		writeFileSync(file, text);
+	}
 }
 
 /**

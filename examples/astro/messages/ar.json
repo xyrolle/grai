@@ -5,6 +5,7 @@
 	"about_link": "حول",
 	"greeting": "مرحبا",
 	"about_title": "حول هذا المثال",
+	"product_title": "المنتج {id}",
 	"cart_items": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],

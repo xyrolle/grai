@@ -5,6 +5,7 @@
 	"about_link": "Despre",
 	"greeting": "Bună ziua",
 	"about_title": "Despre acest exemplu",
+	"product_title": "Produsul {id}",
 	"cart_items": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],

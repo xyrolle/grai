@@ -153,7 +153,7 @@ it("exports from grai/sveltekit, grai/sveltekit/vite, grai/sveltekit/navigation,
 	expect(await importableNames(dir, "grai/react")).toEqual(["Markup"]);
 });
 
-it("exports from grai/astro and grai/astro/middleware only their API", async () => {
+it("exports from grai/astro, grai/astro/middleware and grai/astro/translated-paths only their API", async () => {
 	const { dir } = project(catalogs);
 
 	expect(Object.keys(await import("../src/astro.ts"))).toEqual(["grai"]);
@@ -169,5 +169,13 @@ it("exports from grai/astro and grai/astro/middleware only their API", async () 
 		"LocaleContext",
 		"LocaleProject",
 		"localeMiddleware",
+	]);
+	expect(Object.keys(await import("../src/astro/translated-paths.ts"))).toEqual(
+		["translatedStaticPaths"],
+	);
+	expect(await importableNames(dir, "grai/astro/translated-paths")).toEqual([
+		"PageRoute",
+		"TranslatedPages",
+		"translatedStaticPaths",
 	]);
 });
