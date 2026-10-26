@@ -1,5 +1,13 @@
 import { execFile } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -7,7 +15,9 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { compile } from "../src/index.ts";
 
 // vue-tsc, the type checker of Vue apps, on templates that call messages and draw markup. The
-// project sits inside the Vue example, which has vue, vue-tsc and grai installed.
+// project links the Vue example's packages, vue, vue-tsc and grai, from a directory of its own:
+// within the example, the tsconfig.json it writes and removes would reload every page of the
+// example's dev server, which test/vue-example.test.ts may be running at the same time.
 const example = fileURLToPath(new URL("../examples/vue/", import.meta.url));
 const vueTsc = join(example, "node_modules/.bin/vue-tsc");
 
@@ -40,7 +50,8 @@ let dir: string;
 /** Each type error, as its file and line. */
 let errors: string[];
 beforeAll(async () => {
-	dir = mkdtempSync(join(example, ".types-"));
+	dir = realpathSync(mkdtempSync(join(tmpdir(), "grai-vue-types-")));
+	symlinkSync(join(example, "node_modules"), join(dir, "node_modules"));
 	mkdirSync(join(dir, "messages"));
 	writeFileSync(
 		join(dir, "messages", "en.json"),
