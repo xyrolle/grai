@@ -262,6 +262,27 @@ describe("a recompile after an edit", () => {
 		expect(kept.filter((same) => !same)).toHaveLength(1);
 	});
 
+	it("keeps formats.js as the last render made it through an edit that calls the same formatters", async () => {
+		const priced = (label: string) => ({
+			en: {
+				...catalogs.en,
+				price: `${label} {amount :number style=currency currency=EUR}`,
+			},
+			de: {
+				...catalogs.de,
+				price: `${label} {amount :number style=currency currency=EUR}`,
+			},
+		});
+		const { dir, config } = project(priced("Total"));
+		const { build: before } = await recompile(config, undefined);
+		const next = priced("Sum");
+		writeFileSync(join(dir, "messages", "en.json"), laidOut(next.en));
+		const { build: after } = await recompile(config, before);
+
+		expect(after?.compilation.changed).toEqual(new Set(["price"]));
+		expect(after?.rendered.formats).toBe(before?.rendered.formats);
+	});
+
 	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
 		const { dir, config } = project(catalogs);
 		const built = async (previous?: Build) => {
