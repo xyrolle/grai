@@ -1,4 +1,5 @@
 import { dirname, extname, join, relative, sep } from "node:path";
+import { factsOf } from "./code/facts.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import type { ImportFormat } from "./import/convert.ts";
@@ -27,9 +28,6 @@ const librariesOf: Readonly<
 /** Components grai migrate reports but does not parse: their markup calls messages too. */
 const components = new Set([".svelte", ".vue", ".astro", ".mdx"]);
 
-/** An `import … from "…"` statement, which a component's script writes as a module does. */
-const importStatement = /\bimport\b[^;]*?\bfrom\s*(["'])([^"']+)\1/g;
-
 /** A call grai migrate leaves for a person: where it is, from the project's root, and why. */
 export type LeftCall = {
 	file: string;
@@ -54,11 +52,11 @@ export type MigrateOptions = { defaultNamespace?: string | undefined };
  * catalogs grai import converted, as grai.import.json maps it, into a call of its grai message,
  * and reports every call it leaves with why. It writes every changed file or none.
  */
-export function migrate(
+export async function migrate(
 	configFile: string,
 	roots?: readonly string[],
 	{ defaultNamespace = "translation" }: MigrateOptions = {},
-): MigrateResult {
+): Promise<MigrateResult> {
 	let config: Config;
 	let mapping: Mapping;
 	try {
@@ -79,7 +77,7 @@ export function migrate(
 			source.text.includes(name),
 		);
 		if (!named) continue;
-		const migrated = migrateSource(source, config.outdir, migration);
+		const migrated = await migrateSource(source, config.outdir, migration);
 		if (migrated.text !== undefined) texts.set(source.path, migrated.text);
 		rewritten += migrated.rewritten;
 		left.push(...migrated.left.map((use) => leftCall(source, use)));
@@ -90,28 +88,37 @@ export function migrate(
 }
 
 /** A module, rewritten; or a component, whose imports of the library are left for a person. */
-function migrateSource(
+async function migrateSource(
 	source: SourceFile,
 	outdir: string,
 	migration: Migration,
-): MigratedModule {
+): Promise<MigratedModule> {
 	if (components.has(extname(source.path))) {
-		const left = componentImports(source, migration.libraries);
+		const left = await componentImports(source, migration.libraries);
 		return { text: undefined, rewritten: 0, left };
 	}
 	const messages = messagesPath(source.path, outdir);
 	return migrateModule(source.path, source.text, messages, migration);
 }
 
-/** Each import of a library in a component, which grai migrate leaves for a person. */
-function componentImports(
+/**
+ * Each import of a library in a component, read through the component's framework's own parser,
+ * which grai migrate leaves for a person, or the component's error where it does not parse.
+ */
+async function componentImports(
 	source: SourceFile,
 	libraries: Readonly<Record<string, LibraryModule>>,
-): LeftUse[] {
-	return [...source.text.matchAll(importStatement)]
-		.filter(([, , module = ""]) => Object.hasOwn(libraries, module))
-		.map(({ index }) => ({
-			at: index,
+): Promise<LeftUse[]> {
+	const facts = await factsOf(source.path, source.text);
+	if ("error" in facts) {
+		const { at, message } = facts.error;
+		return [{ at, detail: `it cannot be parsed: ${message}` }];
+	}
+	return facts.modules
+		.flatMap(({ imports }) => imports)
+		.filter((fact) => Object.hasOwn(libraries, fact.source))
+		.map(({ path }) => ({
+			at: path.start,
 			detail:
 				"grai migrate rewrites JavaScript and TypeScript modules: migrate this component's calls by hand.",
 		}));

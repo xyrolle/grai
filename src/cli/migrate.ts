@@ -21,7 +21,7 @@ export const migrateCommand: Command = {
 		// Loaded when it runs, as only this command reads another library's calls.
 		const { migrate } = await import("../migrate.ts");
 		const namespace = values["default-namespace"];
-		const result = migrate(config, sourcesOf(values), {
+		const result = await migrate(config, sourcesOf(values), {
 			defaultNamespace: typeof namespace === "string" ? namespace : undefined,
 		});
 		if (result.errors.length > 0) return failed(result.errors);
