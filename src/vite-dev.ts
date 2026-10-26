@@ -6,7 +6,7 @@ import {
 	type ViteDevServer,
 } from "vite";
 import type { Build } from "./compile.ts";
-import { patchedEvent, updateEvent } from "./dev-events.ts";
+import { patchedEvent, sinceEvent, updateEvent } from "./dev-events.ts";
 import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import { watch } from "./watch.ts";
@@ -43,9 +43,11 @@ const missingKeyPrefix = "\0grai:missing-key/";
  * server environment that runs its modules in Vite's runner patches its table the same way, so
  * the next server render has the new words without the runner evaluating the program again; any
  * other environment takes the messages again. Once a server has the edit, the page is told
- * (`grai:patched`), so its loads can run again. A per-key import of a key no catalog has gets a
- * module whose export throws when called (`missingKeyImport`), so the page still loads. `close`
- * stops following once the compile under way has finished.
+ * (`grai:patched`), so its loads can run again. Patches are numbered as they are made, and a dev
+ * module served now has every one before `version()`: one evaluated after a patch was sent asks
+ * for those made since (`grai:since`). A per-key import of a key no catalog has gets a module whose
+ * export throws when called (`missingKeyImport`), so the page still loads. `close` stops following
+ * once the compile under way has finished.
  */
 export function serveMessages(
 	server: ViteDevServer,
@@ -55,10 +57,17 @@ export function serveMessages(
 ): {
 	module: (id: string) => string | undefined;
 	missingKeyImport: (key: string, importer: string) => string | undefined;
+	version: () => number;
 	close: () => Promise<void>;
 } {
 	const client = server.environments.client;
 	const patches = new Map<string, string>();
+	/** The event that carries a patch, by its number. */
+	const patchEvent = (version: number): HotPayload => ({
+		type: "custom",
+		event: updateEvent,
+		data: { url: `/@id/__x00__${patchPrefix}${version}`, version },
+	});
 	/** Each key imported by its path, with the modules that import it so. */
 	const importers = new Map<string, Set<string>>();
 	let previous: Build | undefined;
@@ -67,6 +76,16 @@ export function serveMessages(
 	for (const environment of Object.values(server.environments)) {
 		if (environment !== client)
 			environment.hot.on(patchedEvent, () => client.hot.send(patched));
+	}
+	// The page and each server that runs its modules in Vite's runner, which take patches: a module
+	// evaluated after some were sent is sent them again, alone.
+	for (const environment of Object.values(server.environments)) {
+		if (environment !== client && !isRunnableDevEnvironment(environment))
+			continue;
+		environment.hot.on(sinceEvent, ({ version }, asking) => {
+			for (let missed = version; missed < patches.size; missed += 1)
+				asking.send(patchEvent(missed));
+		});
 	}
 
 	const update = async (before: Build, next: Build) => {
@@ -105,13 +124,11 @@ export function serveMessages(
 			client.hot.send({ type: "full-reload" });
 			return;
 		}
-		const id = `${patchPrefix}${patches.size}`;
-		patches.set(`\0${id}`, patchModule(files.outdir, next, changed));
-		const patch: HotPayload = {
-			type: "custom",
-			event: updateEvent,
-			data: { url: `/@id/__x00__${id}` },
-		};
+		const patch = patchEvent(patches.size);
+		patches.set(
+			`\0${patchPrefix}${patches.size}`,
+			patchModule(files.outdir, next, changed),
+		);
 		for (const environment of environments) {
 			if (environment === client) continue;
 			if (!isRunnableDevEnvironment(environment)) {
@@ -220,7 +237,12 @@ export function serveMessages(
 		id.startsWith(missingKeyPrefix)
 			? missingKeyModule(files.outdir, id.slice(missingKeyPrefix.length))
 			: patches.get(id);
-	return { module, missingKeyImport, close: watcher.close };
+	return {
+		module,
+		missingKeyImport,
+		version: () => patches.size,
+		close: watcher.close,
+	};
 }
 
 /** Whether a file is the plugin's to follow, so Vite's own update leaves it alone. */
