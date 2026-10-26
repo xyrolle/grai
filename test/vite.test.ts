@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import vue from "@vitejs/plugin-vue";
 import { chromium } from "playwright-core";
 import {
 	build,
@@ -19,6 +20,7 @@ import {
 	type HotPayload,
 	isRunnableDevEnvironment,
 	type Plugin,
+	type PluginOption,
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
@@ -80,15 +82,26 @@ function linked(dir: string): string {
 async function built(
 	dir: string,
 	entries: Record<string, string>,
-	{ write = false, ssr = false, localeChunks = false } = {},
+	options: {
+		write?: boolean;
+		ssr?: boolean;
+		localeChunks?: boolean;
+		plugins?: PluginOption[];
+	} = {},
 ) {
+	const {
+		write = false,
+		ssr = false,
+		localeChunks = false,
+		plugins = [],
+	} = options;
 	for (const [name, code] of Object.entries(entries))
 		writeFileSync(join(dir, `${name}.js`), code);
 	const output = await build({
 		root: dir,
 		configFile: false,
 		logLevel: "silent",
-		plugins: [grai({ localeChunks })],
+		plugins: [grai({ localeChunks }), ...plugins],
 		build: {
 			write,
 			ssr,
@@ -395,6 +408,41 @@ describe("the Vite plugin's build", () => {
 			),
 		).rejects.toThrow(
 			'a.js:3:31: "missing": t.missing names a key no catalog has. Add it with grai add missing --en "…" --de "…", or fix the name.',
+		);
+	});
+
+	it("fails no build over a key a comment or a string mentions, and places the read after them exactly", async () => {
+		const { dir } = project(catalogs);
+
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\n// m.absent() is gone\nconsole.log("m.absent()", m.title());\n`,
+			}),
+		).resolves.toBeDefined();
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\n// m.absent() is gone\nconsole.log("m.absent()", m.absent());\n`,
+			}),
+		).rejects.toThrow(
+			'a.js:3:29: "absent": m.absent names a key no catalog has.',
+		);
+	});
+
+	it("reads a Vue component before it compiles, its template's reads at their places in the component", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "App.vue"),
+			'<script setup>\nimport * as m from "./out/keys.js";\n</script>\n<template>\n\t<h1>{{ m.title() }}</h1>\n\t<p v-for="item in [1]">{{ m.absent() }}</p>\n</template>\n',
+		);
+
+		await expect(
+			built(
+				dir,
+				{ a: 'import App from "./App.vue";\nconsole.log(App);\n' },
+				{ plugins: [vue()] },
+			),
+		).rejects.toThrow(
+			'App.vue:6:30: "absent": m.absent names a key no catalog has.',
 		);
 	});
 

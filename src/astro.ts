@@ -85,11 +85,11 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 					vite: {
 						plugins: [
 							// Astro's own base is checked against grai's beside its i18n routing (`agreement.ts`).
-							graiPlugin({
+							...graiPlugin({
 								config: configFile,
 								reloadOnEdit: true,
 								localeChunks: true,
-							}).plugin,
+							}).plugins,
 							modules.plugin,
 						],
 					},

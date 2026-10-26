@@ -15,7 +15,7 @@ import {
 	usesFrom,
 } from "./facts.ts";
 import { readImports } from "./import-reads.ts";
-import type { Value } from "./modules.ts";
+import type { ModuleGraph, Value } from "./modules.ts";
 import type { ProjectCode, SourceCode } from "./project.ts";
 import { reachOfPattern } from "./reach.ts";
 import { type Context, reachAt, readUse } from "./use-reads.ts";
@@ -80,37 +80,52 @@ export async function readingOf(
 	code: ProjectCode,
 	key?: string,
 ): Promise<Reading> {
-	const reading: Reading = {
+	const reading = noReads();
+	for (const [path, source] of code.sources) {
+		await readSource(path, source, code.graph, reading, key);
+	}
+	return reading;
+}
+
+/** A reading with nothing read yet. */
+export function noReads(): Reading {
+	return {
 		reads: [],
 		reaches: [],
 		unreadable: [],
 		unresolved: [],
 		keysImports: [],
 	};
-	for (const [path, source] of code.sources) {
-		const { facts } = source;
-		if ("error" in facts) {
-			const { at, message } = facts.error;
-			const place = { path, source, at: { start: at, end: at } };
-			reading.unreadable.push({ ...place, message });
-			continue;
-		}
-		for (const module of facts.modules) {
-			await readModule(
-				{ path, source, graph: code.graph, reading, key },
-				module,
-			);
-		}
+}
+
+/** Adds the reads of one file to a reading, through the module graph; with a key, as `readingOf`. */
+export async function readSource(
+	path: string,
+	source: SourceCode,
+	graph: ModuleGraph,
+	reading: Reading,
+	key?: string,
+): Promise<void> {
+	const { facts } = source;
+	if ("error" in facts) {
+		const { at, message } = facts.error;
+		const place = { path, source, at: { start: at, end: at } };
+		reading.unreadable.push({ ...place, message });
+		return;
+	}
+	const reads = reading.reads.length;
+	for (const module of facts.modules) {
+		await readModule({ path, source, graph, reading, key }, module);
 	}
 	// A `const` that holds a key read (`const t = m.title`) reads it once, however often it is used.
 	const places = new Set<string>();
-	reading.reads = reading.reads.filter(({ path, at, key }) => {
-		const place = `${path}\0${at.start}\0${key}`;
+	const read = reading.reads.splice(reads).filter(({ at, key }) => {
+		const place = `${at.start}\0${key}`;
 		const first = !places.has(place);
 		places.add(place);
 		return first;
 	});
-	return reading;
+	reading.reads.push(...read);
 }
 
 async function readModule(
