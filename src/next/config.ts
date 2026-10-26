@@ -1,4 +1,7 @@
-import { basename, relative, resolve } from "node:path";
+import { once } from "node:events";
+import { basename, extname, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
 import type { NextConfig } from "next";
 import {
 	PHASE_DEVELOPMENT_SERVER,
@@ -8,7 +11,6 @@ import { baseDisagreement } from "../base-agreement.ts";
 import { type CompileResult, compile, isCompiled } from "../compile.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
-import { watch } from "../watch.ts";
 import { count, reportErrors } from "./errors.ts";
 
 /** The name grai/next imports the project's compiled output by, in every layer Next bundles. */
@@ -49,32 +51,32 @@ function watching(configFile: string): Promise<void> {
 	return watched;
 }
 
+/** The watch's module, beside this one and in its form: TypeScript in the sources, JavaScript built. */
+const watchWorker = new URL(
+	`./watch-worker${extname(fileURLToPath(import.meta.url))}`,
+	import.meta.url,
+);
+
 /**
- * Watches, and settles once the output can be read: at once when it is current, so that Next
- * starts while the watch's first compile builds what each edit after it starts from, and else
- * once that compile has written it. Either way the catalogs compile once. The check comes first:
- * started beside it, the watch's compile would hold it back.
+ * Watches on a thread of its own (`watch-worker.ts`), and settles once the output can be read: at
+ * once when it is current, so that Next starts while the watch's first compile builds what each
+ * edit after it starts from, and else once that compile has written it. Either way the catalogs
+ * compile once. The check comes first: started beside it, the watch's compile would hold it back.
  */
 async function startWatching(configFile: string): Promise<void> {
 	const compiled = await isCompiled(configFile);
-	const firstCompile = new Promise<void>((settled) => {
-		watch(
-			configFile,
-			(result) => {
-				reportErrors(result.errors);
-				settled();
-			},
-			// A compile that throws, as when the outdir cannot be written: the next save compiles again.
-			(error) => {
-				console.error(error);
-				settled();
-			},
-			// Next's server holds its process. Other processes read the config for `next dev` too, as
-			// Next's telemetry flush does when the server stops, and must be free to exit.
-			{ persistent: false },
-		);
+	// The watch runs grai's own modules, which take none of the process's flags, and a worker refuses
+	// some of them, such as `--input-type`.
+	const worker = new Worker(watchWorker, {
+		workerData: configFile,
+		execArgv: [],
 	});
-	if (!compiled) await firstCompile;
+	// Next's server holds its process. Other processes read the config for `next dev` too, as
+	// Next's telemetry flush does when the server stops, and must be free to exit.
+	worker.unref();
+	if (!compiled) await once(worker, "message");
+	// A watch that stops on an error it did not expect says so, and Next serves on.
+	worker.on("error", (error) => console.error(error));
 }
 
 /** Refuses a Next `basePath` other than grai's, under the `url` strategy (`base-agreement.ts`). */

@@ -144,6 +144,48 @@ await withGrai()(${JSON.stringify(PHASE_DEVELOPMENT_SERVER)});`,
 		expect(code).toBe(0);
 	});
 
+	it("compiles for next dev on a thread of its own, so that no compile takes Next's thread", async () => {
+		// Enough keys that compiling them all takes a thread a while.
+		const catalog = Object.fromEntries(
+			Array.from({ length: 20_000 }, (_, index) => [
+				`item_${index}`,
+				`Item {count} of ${index}`,
+			]),
+		);
+		const { dir, compile } = project({ en: catalog });
+		// The output is current and no watcher saved its build, so the watch's first compile compiles
+		// every key, while Next starts.
+		expect((await compile()).errors).toEqual([]);
+		const config = new URL("../src/next/config.ts", import.meta.url).href;
+		const dev = spawn(
+			process.execPath,
+			[
+				"--input-type=module",
+				"-e",
+				`const { withGrai } = await import(${JSON.stringify(config)});
+await withGrai()(${JSON.stringify(PHASE_DEVELOPMENT_SERVER)});
+const before = process.threadCpuUsage();
+setTimeout(() => {
+	const { user, system } = process.threadCpuUsage(before);
+	console.log((user + system) / 1000);
+	process.exit(0);
+}, 2000);`,
+			],
+			{ cwd: dir },
+		);
+		onTestFinished(() => {
+			dev.kill("SIGKILL");
+		});
+		let output = "";
+		dev.stdout.on("data", (chunk) => {
+			output += chunk;
+		});
+		await new Promise((resolve) => dev.once("exit", resolve));
+
+		// Milliseconds of CPU the process's own thread spent after withGrai came back.
+		expect(Number(output)).toBeLessThan(50);
+	}, 30_000);
+
 	it("comes back for next dev once an empty outdir is written, then compiles each edit", async () => {
 		const { dir } = project({ en: { title: "Your cart" } });
 		const dev = nextDev(dir);
