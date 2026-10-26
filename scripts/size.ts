@@ -22,32 +22,32 @@ import { grai } from "../src/vite.ts";
 
 /**
  * Each one's budget, in bytes. The runtime's is the design's. An entry's is about a fifth over its
- * size when it was set: grai 35,382 B with the config's readers, grai/vite 41,051 B with its locale
- * script, grai/svelte 43,380 B with grai/vite's plugin, grai/sveltekit 541 B with its import map,
- * grai/sveltekit/vite 45,942 B with grai/vite's plugin, grai/sveltekit/client 382 B,
- * grai/sveltekit/navigation 210 B, grai/next 516 B, grai/next/config 37,354 B with the config's
- * readers, grai/next/proxy 265 B, grai/react 413 B, grai/astro 46,391 B with grai/vite's plugin,
- * grai/astro/middleware 1,838 B, grai/vue 426 B, grai/vue/client 292 B and grai/nuxt 45,909 B
- * with grai/vite's plugin.
+ * size when it was set. The entries that carry the compiler, set with the templates of the output's
+ * declarations beside it as files: grai 32,551 B, grai/next/config 34,496 B, grai/vite 45,300 B
+ * with its locale script, and with grai/vite's plugin grai/svelte 46,515 B, grai/sveltekit/vite
+ * 46,570 B, grai/astro 47,043 B and grai/nuxt 45,981 B. The others: grai/sveltekit 541 B
+ * with its import map, grai/sveltekit/client 382 B, grai/sveltekit/navigation 210 B, grai/next
+ * 516 B, grai/next/proxy 265 B, grai/react 413 B, grai/astro/middleware 1,838 B, grai/vue 426 B
+ * and grai/vue/client 292 B.
  */
 const budgets: Record<string, number> = {
 	runtime: 1024,
-	grai: 42_500,
-	"grai/vite": 49_000,
-	"grai/svelte": 52_000,
+	grai: 39_100,
+	"grai/vite": 54_400,
+	"grai/svelte": 55_900,
 	"grai/sveltekit": 650,
-	"grai/sveltekit/vite": 55_000,
+	"grai/sveltekit/vite": 55_900,
 	"grai/sveltekit/client": 460,
 	"grai/sveltekit/navigation": 250,
 	"grai/next": 650,
-	"grai/next/config": 45_000,
+	"grai/next/config": 41_400,
 	"grai/next/proxy": 350,
 	"grai/react": 500,
-	"grai/astro": 55_500,
+	"grai/astro": 56_500,
 	"grai/astro/middleware": 2_200,
 	"grai/vue": 520,
 	"grai/vue/client": 350,
-	"grai/nuxt": 55_000,
+	"grai/nuxt": 55_200,
 };
 
 const root = new URL("../", import.meta.url);
