@@ -25,7 +25,10 @@ type Saved = Omit<Build, "key" | "catalogs" | "compilation"> & {
 };
 type SavedCatalog = Omit<Catalog, "revision" | "edit">;
 
-/** The file of the saved build in the outdir's state: its key on the first line, then the build. */
+/**
+ * The file of the saved build in the outdir's state: its key on the first line, the length of the
+ * build on the second, then the build, so a file cut short is never taken for one.
+ */
 const savedName = "build";
 
 /**
@@ -110,10 +113,11 @@ function savedFile(build: Build): {
 		compilation: { ...compilation, catalogs },
 	};
 	const state = join(build.config.outdir, stateDirectory);
+	const payload = serialize(saved);
 	return {
 		temporary: savingFile(state),
 		file: join(state, savedName),
-		bytes: Buffer.concat([Buffer.from(`${key}\n`), serialize(saved)]),
+		bytes: Buffer.concat([Buffer.from(`${key}\n${payload.length}\n`), payload]),
 	};
 }
 
@@ -153,7 +157,8 @@ export async function savedBuild(
 
 /**
  * The build a file saved under this key, or undefined if it holds another key's or none. A saved
- * build only spares a compile, so a file that cannot be read, or that a crash cut short, is none.
+ * build only spares a compile, so a file that cannot be read, or that a crash cut short, which its
+ * length on the second line tells, is none.
  */
 async function readSaved(
 	file: string,
@@ -163,8 +168,12 @@ async function readSaved(
 	try {
 		const bytes = await readFile(file);
 		if (!bytes.subarray(0, header.length).equals(header)) return undefined;
+		const lengthEnd = bytes.indexOf("\n", header.length);
+		const payload = bytes.subarray(lengthEnd + 1);
+		const length = Number(bytes.subarray(header.length, lengthEnd).toString());
+		if (lengthEnd === -1 || payload.length !== length) return undefined;
 		// The key names the grai that saved the build, so it is this module's `Saved`.
-		return deserialize(bytes.subarray(header.length));
+		return deserialize(payload);
 	} catch {
 		return undefined;
 	}
