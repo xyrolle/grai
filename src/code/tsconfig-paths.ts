@@ -1,8 +1,8 @@
 /**
  * The `paths` of a project's tsconfig, as specifiers the resolver maps (`mappings.ts`): those of the
- * root tsconfig, of every tsconfig it extends, and of every project it references and theirs. Each
- * target is an absolute path, from the `baseUrl` that applies to it or else from the tsconfig that
- * declares it. All of them are taken, a superset of what TypeScript's overriding keeps, which is
+ * root tsconfig, of every tsconfig it extends, and of every project it references and theirs, and a
+ * `baseUrl`'s, which maps any specifier. Each target is an absolute path, from the `baseUrl` that
+ * applies to it or else from the tsconfig that declares it. All of them are taken, a superset of what TypeScript's overriding keeps, which is
  * what a test of what a specifier may name needs.
  */
 
@@ -16,8 +16,9 @@ export type PathsEntry = { key: string; targets: string[] };
 
 /**
  * Every `paths` entry the tsconfig and those it extends or references declare, each target from
- * the declaring tsconfig's directory and from every `baseUrl` among them; or undefined when one of
- * them cannot be read, as nothing then says what a specifier may name.
+ * the declaring tsconfig's directory and from every `baseUrl` among them, and `*` to below each
+ * `baseUrl`; or undefined when one of them cannot be read, as nothing then says what a specifier
+ * may name.
  */
 export function tsconfigPaths(file: string): PathsEntry[] | undefined {
 	const declared: { key: string; targets: string[]; from: string }[] = [];
@@ -59,12 +60,18 @@ export function tsconfigPaths(file: string): PathsEntry[] | undefined {
 		return true;
 	};
 	if (!visit(file)) return undefined;
-	return declared.map(({ key, targets, from }) => ({
+	const paths = declared.map(({ key, targets, from }) => ({
 		key,
 		targets: [from, ...bases].flatMap((base) =>
 			targets.map((target) => resolve(base, target)),
 		),
 	}));
+	// A `baseUrl` maps every specifier that is no relative path to a path below it.
+	if (bases.size === 0) return paths;
+	return [
+		...paths,
+		{ key: "*", targets: [...bases].map((base) => join(base, "*")) },
+	];
 }
 
 /**
