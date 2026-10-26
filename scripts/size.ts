@@ -22,8 +22,8 @@ import { grai } from "../src/vite.ts";
 
 /**
  * Each one's budget, in bytes. The runtime's is the design's. An entry's is about a fifth over its
- * size when it was set: grai 35,382 B with the config's readers, grai/vite 41,051 B with its locale
- * script, grai/svelte 43,380 B with grai/vite's plugin, grai/sveltekit 541 B with its import map,
+ * size when it was set: grai 35,382 B with the config's readers, grai/vite 49,264 B with its locale
+ * script and the build's scope reader, grai/svelte 43,380 B with grai/vite's plugin, grai/sveltekit 541 B with its import map,
  * grai/sveltekit/vite 45,942 B with grai/vite's plugin, grai/sveltekit/client 382 B,
  * grai/sveltekit/navigation 210 B, grai/next 516 B, grai/next/config 37,354 B with the config's
  * readers, grai/next/proxy 265 B, grai/react 413 B, grai/astro 46,391 B with grai/vite's plugin,
@@ -33,7 +33,7 @@ import { grai } from "../src/vite.ts";
 const budgets: Record<string, number> = {
 	runtime: 1024,
 	grai: 42_500,
-	"grai/vite": 49_000,
+	"grai/vite": 59_000,
 	"grai/svelte": 52_000,
 	"grai/sveltekit": 650,
 	"grai/sveltekit/vite": 55_000,
