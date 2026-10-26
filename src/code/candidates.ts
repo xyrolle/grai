@@ -37,6 +37,18 @@ export type Package = { name: string; directory: string };
 const unwritten =
 	/\\u|\b(?:from|import|require)\s*(?:\(\s*)?(?:\/[*/]|'[^'\n\\]*\\|"[^"\n\\]*\\)|\b(?:import|require)\s*\((?!\s*(?:'[^'\n]*'|"[^"\n]*")\s*\))|\bglob\s*(?:\(|<|\/[*/])/;
 
+/** A specifier where `unwritten` finds none spelled otherwise: a string right after a load's word. */
+const specifier =
+	/\b(?:from|import|require)\s*(?:\(\s*)?(?:'([^'\n\\]*)'|"([^"\n\\]*)")/g;
+
+/** The specifiers a text that passes no `unwritten` test loads, each as it reads. */
+export function specifiersIn(text: string): string[] {
+	return Array.from(
+		text.matchAll(specifier),
+		([, single, double]) => single ?? double ?? "",
+	);
+}
+
 /** The test a file's text must pass to be read, from the names that may name a destination. */
 export function textTest(names: ReadonlySet<string>): RegExp {
 	return new RegExp([unwritten.source, ...names].join("|"));
