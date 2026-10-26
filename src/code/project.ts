@@ -5,7 +5,7 @@
  * follows outside the sources, such as a package's, is read and resolved when it is first followed.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
@@ -13,14 +13,17 @@ import { keyModulePrefix } from "../locale-chunks.ts";
 import { stateDirectory } from "../outdir-contents.ts";
 import { moduleOf } from "../output-paths.ts";
 import { realPath } from "../real-path.ts";
-import { sourceExtensions, sourceFiles } from "../sources.ts";
+import { type Seen, sourceExtensions, sourceFiles } from "../sources.ts";
+import { namesOf, textTest } from "./candidates.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache, textHash } from "./facts-cache.ts";
 import { factsOfFiles } from "./facts-pool.ts";
+import { projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Pool } from "./pool.ts";
 import { projectResolution, resolverFor } from "./resolution.ts";
 import { importKey, resolvedImports } from "./resolved.ts";
+import { OutsidePackages, workspacePackages } from "./workspace.ts";
 
 /** A source file: the path the project shows, its text, and its facts. */
 export type SourceCode = { file: string; text: string; facts: FileFacts };
@@ -56,35 +59,16 @@ export async function readProjectCode(
 	if (resolution instanceof GraiError) return resolution;
 	const resolveFile = resolverFor(resolution);
 	const cache = new FactsCache(join(config.outdir, stateDirectory));
-	const files = sourceFiles(roots.map(realPath), config.root, config.outdir);
-	// Each file's facts from the cache, or the file to read, by its text's hash.
-	const cached: (FileFacts | undefined)[] = [];
-	const unread: { path: string; text: string; hash: string }[] = [];
-	for (const { path, text } of files) {
-		const hash = textHash(text);
-		const facts = cache.get(path, hash);
-		cached.push(facts);
-		if (facts === undefined) unread.push({ path, text, hash });
-	}
-	const pool = new Pool();
+	const seen: Seen = { links: [], manifests: [] };
+	const files = sourceFiles(
+		roots.map(realPath),
+		config.root,
+		config.outdir,
+		seen,
+	);
+	const listed = new Set(files.map(({ path }) => path));
 	const sources = new Map<string, SourceCode>();
-	let resolved: ReadonlyMap<string, string | undefined>;
-	try {
-		const read = await factsOfFiles(unread, pool);
-		unread.forEach(({ path, hash }, index) => {
-			const each = read[index];
-			if (each !== undefined) cache.set(path, hash, each);
-		});
-		saveQuietly(cache);
-		let next = 0;
-		files.forEach(({ path, file, text }, index) => {
-			const each = cached[index] ?? read[next++]?.facts;
-			if (each !== undefined) sources.set(path, { file, text, facts: each });
-		});
-		resolved = await resolvedImports(sources, resolution, resolveFile, pool);
-	} finally {
-		await pool.close();
-	}
+	const resolved = new Map<string, string | undefined>();
 	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
 	const resolve: Resolve = async (source, importer) => {
 		const key = importKey(source, importer);
@@ -100,6 +84,8 @@ export async function readProjectCode(
 	const factsOfPath = (path: string) => {
 		const source = sources.get(path);
 		if (source !== undefined) return Promise.resolve(source.facts);
+		// A source its text leaves out of the reading holds nothing of grai's.
+		if (listed.has(path)) return Promise.resolve(holdsNothing);
 		const known = followed.get(path);
 		if (known !== undefined) return known;
 		const facts = sourceExtensions.has(extname(path))
@@ -108,7 +94,89 @@ export async function readProjectCode(
 		followed.set(path, facts);
 		return facts;
 	};
+	const manifest = join(config.root, "package.json");
+	const mappings = projectMappings(resolution, [
+		...(existsSync(manifest) ? [manifest] : []),
+		...seen.manifests.filter((each) => each !== manifest),
+	]);
+	const links = seen.links.map((path) => ({ path, real: realPath(path) }));
+	const packages = workspacePackages(config.root);
+	const pool = new Pool();
+	try {
+		// The files whose text may name the output or a barrel, read and resolved, until the barrels
+		// they hold name no file more.
+		const outside = new OutsidePackages(packages, config.root);
+		let barrels = new Set<string>();
+		for (;;) {
+			const names =
+				mappings &&
+				namesOf({ outdir: config.outdir, barrels }, mappings, links, packages);
+			if (names !== undefined) {
+				for (const name of outside.passing(names)) names.add(name);
+			}
+			const test = names && textTest(names);
+			const taken = files.filter(
+				({ path, text }) => !sources.has(path) && (test?.test(text) ?? true),
+			);
+			if (taken.length === 0) break;
+			const read = await factsOfSources(taken, cache, pool);
+			const added = new Map<string, SourceCode>();
+			taken.forEach(({ path, file, text }, index) => {
+				const facts = read[index];
+				if (facts !== undefined) added.set(path, { file, text, facts });
+			});
+			for (const [path, source] of added) sources.set(path, source);
+			const paths = await resolvedImports(added, resolution, resolveFile, pool);
+			for (const [key, path] of paths) resolved.set(key, path);
+			barrels = await barrelsOf(
+				sources.keys(),
+				new ModuleGraph(output, resolve, factsOfPath),
+			);
+		}
+		saveQuietly(cache);
+	} finally {
+		await pool.close();
+	}
 	return { sources, graph: new ModuleGraph(output, resolve, factsOfPath) };
+}
+
+/** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */
+const holdsNothing: FileFacts = { modules: [] };
+
+/** Each file's facts, from the cache or read in the pool, which the cache keeps then. */
+async function factsOfSources(
+	files: readonly { path: string; text: string }[],
+	cache: FactsCache,
+	pool: Pool,
+): Promise<(FileFacts | undefined)[]> {
+	const cached: (FileFacts | undefined)[] = [];
+	const unread: { path: string; text: string; hash: string }[] = [];
+	for (const { path, text } of files) {
+		const hash = textHash(text);
+		const facts = cache.get(path, hash);
+		cached.push(facts);
+		if (facts === undefined) unread.push({ path, text, hash });
+	}
+	const read = await factsOfFiles(unread, pool);
+	unread.forEach(({ path, hash }, index) => {
+		const each = read[index];
+		if (each !== undefined) cache.set(path, hash, each);
+	});
+	let next = 0;
+	return cached.map((facts) => facts ?? read[next++]?.facts);
+}
+
+/** The sources that pass grai's on: each whose module holds a key or more. */
+async function barrelsOf(
+	paths: Iterable<string>,
+	graph: ModuleGraph,
+): Promise<Set<string>> {
+	const barrels = new Set<string>();
+	for (const path of paths) {
+		const held = await graph.keysHeld({ kind: "module", path });
+		if (held === "every" || held.size > 0) barrels.add(path);
+	}
+	return barrels;
 }
 
 /** Writes the cache; a cache that cannot be written only costs the next command its reading. */

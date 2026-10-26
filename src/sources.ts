@@ -69,19 +69,25 @@ export function sourceFile(
 	};
 }
 
+/** What a listing of the sources saw beside them: the symlinks, and the package.json files. */
+export type Seen = { links: string[]; manifests: string[] };
+
 /**
  * The source files under the roots, each read whole, outside the outdir, dependencies, build
- * output and dot-directories.
+ * output and dot-directories; with `seen`, also the symlinks and package.json files among them.
  */
 export function sourceFiles(
 	roots: readonly string[],
 	projectRoot: string,
 	outdir: string,
+	seen?: Seen,
 ): SourceFile[] {
 	const files: SourceFile[] = [];
 	const visit = (directory: string) => {
 		for (const entry of readdirSync(directory, { withFileTypes: true })) {
 			const path = join(directory, entry.name);
+			if (entry.isSymbolicLink()) seen?.links.push(path);
+			if (entry.name === "package.json") seen?.manifests.push(path);
 			if (entry.isDirectory()) {
 				const skipped =
 					entry.name.startsWith(".") ||

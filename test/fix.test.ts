@@ -82,7 +82,24 @@ describe("grai check --fix", () => {
 		]);
 	});
 
-	it("removes nothing while a source's code does not parse, and says where", async () => {
+	it("removes nothing while a source that may read the messages does not parse, and says where", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			...cartApp,
+			"src/total.ts":
+				'import { m } from "../out/messages.js";\nexport const total = ;\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual([]);
+		expect(fixed.changed).toEqual([]);
+		expect(fixed.errors.map(({ code, file }) => `${code}: ${file}`)).toEqual([
+			"source-invalid: src/total.ts:2:22",
+		]);
+	});
+
+	it("removes the unused keys while a source that names nothing of grai's does not parse, as it reads none", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
 			...cartApp,
@@ -91,11 +108,8 @@ describe("grai check --fix", () => {
 
 		const fixed = await removeUnusedKeys(config);
 
-		expect(fixed.removed).toEqual([]);
-		expect(fixed.changed).toEqual([]);
-		expect(fixed.errors.map(({ code, file }) => `${code}: ${file}`)).toEqual([
-			"source-invalid: src/total.ts:1:22",
-		]);
+		expect(fixed.errors).toEqual([]);
+		expect(fixed.removed).not.toEqual([]);
 	});
 
 	it("keeps the keys a dynamic import may load by a built path, with a comment inside its call", async () => {
