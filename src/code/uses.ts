@@ -88,12 +88,25 @@ function endOf(
 		} else if (parent.type === "MemberExpression" && parent.object === node) {
 			const name = memberName(parent);
 			if (name === undefined) {
-				return { end: computed(parent.property), read };
+				const end: UseEnd = {
+					kind: "computed",
+					at: span(parent),
+					...computed(parent.property),
+				};
+				return { end, read };
 			}
-			read.push({ name, at: span(keySpan(parent.property)) });
+			read.push({
+				name,
+				at: span(keySpan(parent.property)),
+				expression: span(parent),
+			});
 			node = parent;
 		} else if (parent.type === "TSQualifiedName" && parent.left === node) {
-			read.push({ name: parent.right.name, at: span(parent.right) });
+			read.push({
+				name: parent.right.name,
+				at: span(parent.right),
+				expression: span(parent),
+			});
 			node = parent;
 		} else if (parent.type === "VariableDeclarator" && parent.init === node) {
 			const { id } = parent;
@@ -148,32 +161,26 @@ function keySpan(node: Node): Span {
  * A read by a computed name: the names it may be, those that start with its literal start (a
  * template's text before its first value, or text joined to one), or the literals of a choice.
  */
-function computed(property: Node): UseEnd {
+function computed(property: Node): {
+	prefix: string;
+	choices: string[] | undefined;
+} {
 	if (property.type === "TemplateLiteral") {
 		return {
-			kind: "computed",
 			prefix: property.quasis[0]?.value.cooked ?? "",
 			choices: undefined,
 		};
 	}
 	if (property.type === "BinaryExpression" && property.operator === "+") {
-		return {
-			kind: "computed",
-			prefix: literalText(property.left) ?? "",
-			choices: undefined,
-		};
+		return { prefix: literalText(property.left) ?? "", choices: undefined };
 	}
 	if (property.type === "ConditionalExpression") {
 		const choices = [property.consequent, property.alternate].map(literalText);
 		if (choices.every((choice) => choice !== undefined)) {
-			return {
-				kind: "computed",
-				prefix: "",
-				choices: choices.flatMap((c) => c ?? []),
-			};
+			return { prefix: "", choices: choices.flatMap((c) => c ?? []) };
 		}
 	}
-	return { kind: "computed", prefix: "", choices: undefined };
+	return { prefix: "", choices: undefined };
 }
 
 /** The names a pattern takes apart, each with what it binds; a rest, or a computed name, may be any. */
@@ -183,10 +190,10 @@ function pattern(
 	span: (node: Span) => Span,
 ): UseEnd {
 	const names: Extract<UseEnd, { kind: "pattern" }>["names"] = [];
-	let rest = false;
+	let rest: Span | undefined;
 	for (const property of node.properties) {
 		if (property.type === "RestElement") {
-			rest = true;
+			rest ??= span(property);
 			continue;
 		}
 		const { key } = property;
@@ -196,7 +203,7 @@ function pattern(
 				? key.name
 				: literalText(key);
 		if (name === undefined) {
-			rest = true;
+			rest ??= span(property);
 			continue;
 		}
 		names.push({
