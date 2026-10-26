@@ -148,7 +148,7 @@ describe("a file's facts", () => {
 	it("records how a use written in shorthand is written out in full around another name", async () => {
 		const written = async (path: string, text: string) => {
 			const module = await moduleOf(path, text);
-			return module.uses.map(({ at, shorthand }) =>
+			return allUses(module.uses).map(({ at, shorthand }) =>
 				shorthand === undefined
 					? text.slice(at.start, at.end)
 					: `${text.slice(shorthand.replaces.start, shorthand.replaces.end)} => ${shorthand.before}x${shorthand.after}`,
