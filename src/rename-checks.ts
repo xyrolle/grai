@@ -1,10 +1,12 @@
 /**
  * Why a rename cannot change a key's uses safely, each an error naming the place: a source names
- * the key where it may mean something else, a read by a computed name may reach it, or a file
- * declares the name its use goes through again, so the text cannot tell which is meant.
+ * the key where it may mean something else, a read by a computed name may reach it, a file
+ * declares the name its use goes through again, so the text cannot tell which is meant, or the
+ * scan cannot tell whether the key's name is in code there.
  */
 
 import type { FileUses } from "./call-sites.ts";
+import { uncertainAt } from "./code-text.ts";
 import { dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
 import {
@@ -69,14 +71,28 @@ export function escapeProblems(
 		);
 }
 
-/** An error for each read by a computed name in the files that may reach the key. */
+/**
+ * An error for each read by a computed name in the files that may reach the key: in their code,
+ * and in their text where the scan cannot tell whether that is code.
+ */
 export function reachProblems(
 	files: readonly SourceFile[],
 	from: string,
 ): GraiError[] {
 	const namespaces = projectNamespaces(files);
-	return files.flatMap((source) =>
-		dynamicReadsIn(source.code, messageBindings(source.code, namespaces))
+	const readsIn = (scanned: string) =>
+		dynamicReadsIn(scanned, messageBindings(scanned, namespaces));
+	return files.flatMap((source) => {
+		const reads = readsIn(source.code);
+		const uncertain =
+			source.uncertain.length === 0
+				? []
+				: readsIn(source.text).filter(
+						({ at }) =>
+							uncertainAt(source.uncertain, at) !== undefined &&
+							!reads.some((read) => read.at === at),
+					);
+		return [...reads, ...uncertain]
 			.filter(({ prefix }) => from.startsWith(prefix))
 			.map(({ at, written }) =>
 				placed(
@@ -84,8 +100,31 @@ export function reachProblems(
 					at,
 					`${written} may read "${from}", so the rename cannot change every read of it. Read it as m.${from}, or rename it by hand.`,
 				),
-			),
-	);
+			);
+	});
+}
+
+/**
+ * An error for each place a file writes the key's name where the scan cannot tell whether it is
+ * code: in what may be JSX text, or after a `/` that may start a regular expression.
+ */
+export function uncertainProblems(
+	files: readonly SourceFile[],
+	from: string,
+): GraiError[] {
+	return files
+		.filter(({ text }) => text.includes(from))
+		.flatMap((source) =>
+			occurrencesOf(source.text, from).flatMap((at) => {
+				const place = uncertainAt(source.uncertain, at);
+				if (place === undefined) return [];
+				const why =
+					place.why === "jsx"
+						? `the scan reads the file's JSX text as JavaScript, so it cannot tell whether this ${from} is code, text or a comment`
+						: `a / before it on the line may start a regular expression or divide, so the scan cannot tell whether this ${from} is code`;
+				return [placed(source, at, `${why}. Rename the key by hand.`)];
+			}),
+		);
 }
 
 /**

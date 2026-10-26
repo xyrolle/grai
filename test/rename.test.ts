@@ -219,6 +219,33 @@ describe("grai rename", () => {
 		);
 	});
 
+	it("refuses where the key may be in JSX text, which the scan reads as JavaScript, and names the place", async () => {
+		const { dir, config } = project(catalogs);
+		const view = `import { m } from "../out/messages.js";\nexport const View = () => <p>don't {m.cart_title()} don't</p>;\n`;
+		writeSources(dir, { "src/View.jsx": view });
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			"src/View.jsx:2:39: the scan reads the file's JSX text as JavaScript, so it cannot tell whether this cart_title is code, text or a comment. Rename the key by hand.",
+		]);
+		expect(result.changed).toEqual([]);
+		expect(readText(dir, "src/View.jsx")).toBe(view);
+	});
+
+	it("refuses where a / before the key may start a regular expression or divide, and names the place", async () => {
+		const { dir, config } = project(catalogs);
+		const match = `import { m } from "../out/messages.js";\nif (true) /m.cart_title/.test("anything");\nexport const heading = m.cart_title();\n`;
+		writeSources(dir, { "src/match.js": match });
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			"src/match.js:2:14: a / before it on the line may start a regular expression or divide, so the scan cannot tell whether this cart_title is code. Rename the key by hand.",
+		]);
+		expect(readText(dir, "src/match.js")).toBe(match);
+	});
+
 	it("refuses a name another key has, in any case, and a name that is no key name", async () => {
 		const { config } = app();
 
