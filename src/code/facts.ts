@@ -107,13 +107,15 @@ export type Reference = {
 };
 
 /**
- * A dynamic import or `require()`, by a literal path (an `ImportFact` too) or by a template or a
- * glob, which loads the modules whose paths match `pattern`: literal text, and `*` for any text
- * without `/`. A load by anything else names no module, as the bundler leaves it to the runtime.
+ * A dynamic import or `require()`, by a literal path (an `ImportFact` too) or by a template, which
+ * loads the modules whose paths match `pattern`: literal text, and `*` for any text without `/`; or
+ * `import.meta.glob`, by its globs, a `!` before one leaving out what it matches. A load by anything
+ * else names no module, as the bundler leaves it to the runtime.
  */
 export type LoadFact =
 	| { at: Span; source: string }
-	| { at: Span; pattern: string };
+	| { at: Span; pattern: string }
+	| { at: Span; globs: string[] };
 
 /**
  * A module's uses, by what each starts from (`originOf`). A list is facts, or the JSON the facts
