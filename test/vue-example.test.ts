@@ -13,6 +13,7 @@ import {
 	onTestFinished,
 } from "vitest";
 import { outsideTests } from "./app-environment.ts";
+import { stopped } from "./stopped.ts";
 
 // The Vue example (examples/vue): built by Vite, checked by vue-tsc against the package's built
 // declarations and served by its own server, then under Vite's dev server, its pages in Chromium.
@@ -21,27 +22,32 @@ const example = fileURLToPath(new URL("../examples/vue/", import.meta.url));
 const vite = join(example, "node_modules/.bin/vite");
 const vueTsc = join(example, "node_modules/.bin/vue-tsc");
 
-/** Starts the example's server, `node server.ts` with `args`, until the suite ends. */
-function served(port: number, args: string[] = []): void {
-	let server: ChildProcess | undefined;
-	beforeAll(async () => {
-		const started = spawn("node", ["server.ts", ...args], {
-			cwd: example,
-			env: outsideTests({ PORT: String(port) }),
-		});
-		server = started;
-		await new Promise<void>((resolve, reject) => {
-			started.stdout.on("data", (chunk) => {
-				if (String(chunk).includes("Listening on")) resolve();
-			});
-			started.on("exit", (code) =>
-				reject(new Error(`the example's server exited: ${code}`)),
-			);
-		});
-	}, 60_000);
-	afterAll(() => {
-		server?.kill();
+/** A server the suite started, and the origin it printed. */
+type Served = { server: ChildProcess; origin: string };
+
+/**
+ * Starts the example's server, `node server.ts` with `args`, on a port the system picks, so that
+ * runs of this file side by side never meet, and resolves once it prints the address it listens
+ * on. It leads a process group of its own, which `stopped` stops.
+ */
+async function served(args: string[] = []): Promise<Served> {
+	const server = spawn("node", ["server.ts", ...args], {
+		cwd: example,
+		env: outsideTests({ PORT: "0" }),
+		detached: true,
 	});
+	let printed = "";
+	const origin = await new Promise<string>((resolve, reject) => {
+		server.stdout?.on("data", (chunk) => {
+			printed += String(chunk);
+			const address = /http:\/\/localhost:\d+/.exec(printed)?.[0];
+			if (address !== undefined) resolve(address);
+		});
+		server.on("exit", (code) =>
+			reject(new Error(`the example's server exited: ${code}\n${printed}`)),
+		);
+	});
+	return { server, origin };
 }
 
 let browser: Browser;
@@ -74,8 +80,9 @@ async function openIn(origin: string, locale: string, path = "/") {
 }
 
 describe("the Vue example, built", { timeout: 30_000 }, () => {
-	const origin = "http://localhost:4820";
-	beforeAll(() => {
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
 		for (const args of [
 			["build", "--outDir", "dist/client"],
 			["build", "--ssr", "src/entry-server.ts", "--outDir", "dist/server"],
@@ -91,8 +98,10 @@ describe("the Vue example, built", { timeout: 30_000 }, () => {
 				);
 			}
 		}
-	}, 120_000);
-	served(4820);
+		app = await served();
+		origin = app.origin;
+	}, 180_000);
+	afterAll(() => app && stopped(app.server));
 
 	it("typechecks against the package's built declarations, as an app's vue-tsc sees them", () => {
 		const checked = spawnSync(vueTsc, ["--noEmit", "--pretty", "false"], {
@@ -185,8 +194,13 @@ describe("the Vue example, built", { timeout: 30_000 }, () => {
 });
 
 describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
-	const origin = "http://localhost:4821";
-	served(4821, ["--dev"]);
+	let origin = "";
+	let app: Served | undefined;
+	beforeAll(async () => {
+		app = await served(["--dev"]);
+		origin = app.origin;
+	}, 60_000);
+	afterAll(() => app && stopped(app.server));
 
 	/** Writes `text` as the Romanian title, and puts the catalog back after the test. */
 	function editTitle(text: string): void {
