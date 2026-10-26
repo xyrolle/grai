@@ -88,4 +88,21 @@ describe("Markup", () => {
 				'Markup has no function for the message\'s element "icon". Add icon to its markup.',
 		});
 	});
+
+	it("throws for an element named as a member every object inherits, which the app's functions do not hold", () => {
+		const standalone = (name: string): MarkupPart => ({
+			type: "markup-standalone",
+			name,
+			options: {},
+			attributes: {},
+		});
+
+		for (const name of ["constructor", "toString"]) {
+			expect(
+				thrown(() => Markup({ parts: [standalone(name)], markup })),
+			).toMatchObject({
+				message: `Markup has no function for the message's element "${name}". Add ${name} to its markup.`,
+			});
+		}
+	});
 });
