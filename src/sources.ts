@@ -69,12 +69,15 @@ export function sourceFile(
 	};
 }
 
-/** What a listing of the sources saw beside them: the symlinks, and the package.json files. */
-export type Seen = { links: string[]; manifests: string[] };
+/**
+ * What a listing of the sources saw beside them: the symlinks, the package.json files, and the
+ * directories it left out, the output's aside.
+ */
+export type Seen = { links: string[]; manifests: string[]; skipped: string[] };
 
 /**
  * The source files under the roots, each read whole, outside the outdir, dependencies, build
- * output and dot-directories; with `seen`, also the symlinks and package.json files among them.
+ * output and dot-directories; with `seen`, also what it saw beside them.
  */
 export function sourceFiles(
 	roots: readonly string[],
@@ -94,6 +97,7 @@ export function sourceFiles(
 					skippedDirectories.has(entry.name) ||
 					path === outdir;
 				if (!skipped) visit(path);
+				else if (path !== outdir) seen?.skipped.push(path);
 			} else if (sourceExtensions.has(extname(entry.name))) {
 				const text = readFileSync(path, "utf8");
 				files.push(sourceFile(path, relative(projectRoot, path), text));
