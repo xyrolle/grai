@@ -1,0 +1,135 @@
+import { describe, expect, it } from "vitest";
+import { factsOf, type ModuleFacts, type UseFact } from "../src/code/facts.ts";
+
+async function moduleOf(path: string, text: string): Promise<ModuleFacts> {
+	const facts = await factsOf(path, text);
+	if ("error" in facts) throw new Error(facts.error.message);
+	const [module] = facts.modules;
+	if (module === undefined) throw new Error("no module");
+	return module;
+}
+
+/** Each use, written short: where it comes from, the names it reads, and how it ends. */
+function short(text: string, uses: readonly UseFact[]): string[] {
+	return uses.map(({ from, chain, end, type }) => {
+		const source = "local" in from ? from.local : `load ${from.load}`;
+		const names = chain.map(
+			({ name, at }) => `${name}@${text.slice(at.start, at.end)}`,
+		);
+		const ending =
+			end.kind === "computed"
+				? `computed ${JSON.stringify(end.prefix)}${end.choices === undefined ? "" : ` ${end.choices.join("|")}`}`
+				: end.kind === "pattern"
+					? `pattern ${end.names.map(({ name, binds }) => `${name}${binds === undefined ? "" : `>${binds.name}x${binds.references.length}`}`).join(",")}${end.rest ? ",..." : ""}`
+					: end.kind;
+		return [source, ...names, ending, ...(type ? ["type"] : [])].join(" ");
+	});
+}
+
+describe("a file's facts", () => {
+	it("reads each use of an import: the names read from it, then how it ends", async () => {
+		const text = [
+			'import { m } from "./i18n";',
+			"m.title();",
+			'm["sub_title"]; m?.optional; (m as typeof m).cast;',
+			`m[\`promo_\${season}\`]; m["a_" + b]; m[flag ? "yes" : "no"]; m[name];`,
+			'const { heading, "key_two": two, [`x`]: three, ...rest } = m;',
+			"heading(); heading();",
+			"const t = m; t.aliased(); export { t };",
+			"show(m); export default m;",
+			"type Title = typeof m.typed;",
+		].join("\n");
+		const module = await moduleOf("src/a.ts", text);
+
+		expect(short(text, module.uses)).toEqual([
+			"m title@title value",
+			"m sub_title@sub_title value",
+			"m optional@optional value",
+			"m cast@cast value",
+			"m value type",
+			'm computed "promo_"',
+			'm computed "a_"',
+			'm computed "" yes|no',
+			'm computed ""',
+			"m pattern heading>headingx2,key_two>twox0,x>threex0,...",
+			"m aliased@aliased value",
+			"m export",
+			"m value",
+			"m export",
+			"m typed@typed value type",
+		]);
+		expect(module.aliases).toEqual({ t: "m" });
+	});
+
+	it("reads imports, exports, and loads by a literal path, a template or a glob", async () => {
+		const text = [
+			'import { a, b as c } from "./one";',
+			'import * as ns from "./two";',
+			'import type { T } from "./types";',
+			'export { m as t } from "./i18n";',
+			'export * from "./three";',
+			'export * as four from "./four";',
+			"export { a, c as d };",
+			"export const e = a;",
+			"export default c;",
+			'const { title } = await import("#i18n/messages/title.js");',
+			'const all = import.meta.glob("./messages/*.js");',
+			`const lazy = (key) => import(\`#i18n/messages/\${key}.js\`);`,
+			'const node = require("./five");',
+			"const dynamic = (path) => import(path);",
+		].join("\n");
+		const module = await moduleOf("src/a.ts", text);
+
+		expect(
+			module.imports.map(({ source, names, typeOnly }) =>
+				[
+					source,
+					...names.map(({ imported, local }) => `${imported}>${local}`),
+					...(typeOnly ? ["type"] : []),
+				].join(" "),
+			),
+		).toEqual([
+			"./one a>a b>c",
+			"./two *>ns",
+			"./types T>T type",
+			"./i18n",
+			"./three",
+			"./four",
+			"#i18n/messages/title.js",
+			"./five",
+		]);
+		expect(module.exports).toEqual([
+			{ exported: "t", source: "./i18n", imported: "m" },
+			{ exported: undefined, source: "./three", imported: "*" },
+			{ exported: "four", source: "./four", imported: "*" },
+			{ exported: "a", local: "a" },
+			{ exported: "d", local: "c" },
+			{ exported: "e", local: "e" },
+			{ exported: "default", local: "c" },
+		]);
+		expect(
+			module.loads.map((load) =>
+				"source" in load ? load.source : load.pattern,
+			),
+		).toEqual([
+			"#i18n/messages/title.js",
+			"./messages/*.js",
+			"#i18n/messages/*.js",
+			"./five",
+		]);
+		expect(module.aliases).toEqual({ e: "a" });
+	});
+
+	it("reads a component's facts at the places in its file", async () => {
+		const text = `<script>\n\timport { m } from "$lib/i18n";\n</script>\n{#each rows as m}{m.cell}{/each}<p>{m.title()}</p>\n`;
+		const module = await moduleOf("src/App.svelte", text);
+
+		expect(short(text, module.uses)).toEqual(["m title@title value"]);
+	});
+
+	it("is a file's error where it does not parse", async () => {
+		expect(await factsOf("src/a.ts", "const = 1;")).toEqual({
+			error: { at: 6, message: "Unexpected token" },
+		});
+	});
+});
