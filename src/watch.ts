@@ -3,7 +3,8 @@ import { basename, dirname, resolve } from "node:path";
 import { type Build, type CompileResult, recompile } from "./compile.ts";
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
-import { firstBuildSaver, savedBuild } from "./saved-build.ts";
+import { firstBuildSaver } from "./first-build-saver.ts";
+import { savedBuild } from "./saved-build.ts";
 
 /**
  * How long the followed files must be quiet before a catalog that did not parse is read again. A
