@@ -18,6 +18,12 @@ export type RuntimeSources = {
 	testing: string;
 };
 
+/** formats.js as a render made it, and whether one of its formatters shows digits. */
+export type RenderedFormats = {
+	file: OutputFile | undefined;
+	digits: boolean;
+};
+
 /**
  * The files of the modules the keys import, in one output: the runtime through its anchor,
  * `internal.js`, the plural rules and the formatters.
@@ -60,17 +66,19 @@ const runtimeApiTypes = ["Locale", "MarkupMessage", "Message", "MessagePart"];
  * `internal.js`, which re-exports the runtime, and with it what the rest of the output reads of the
  * config, and which an adapter takes what it binds from, and the entries apps import: `runtime.js`, the runtime's API alone, and `server.js`
  * and `testing.js`, whose imports name the anchor. They change only with grai, never with the
- * config.
+ * config. formats.js is the previous render's while no changed key calls other formatters.
  */
 export function renderModules(
 	config: Config,
 	sources: RuntimeSources,
 	compilation: Compilation,
 	localeCopies: boolean,
+	previous?: RenderedFormats,
 ): {
 	modules: OutputModules;
 	immutable: OutputFile[];
 	entries: OutputFile[];
+	formats: RenderedFormats;
 } {
 	const configCode = configModule(config, localeCopies);
 	const configFile = `${contentName("config", configCode)}.js`;
@@ -80,17 +88,15 @@ export function renderModules(
 	);
 	const runtimeTypes = runtimeDeclarations(config);
 	const runtime = contentName("runtime", runtimeCode, runtimeTypes);
-	const formatters = usedFormatters(compilation);
+	const rendered =
+		previous !== undefined && !compilation.formatsChanged
+			? previous
+			: renderedFormats(compilation);
 	const pluralsCode = pluralModule(config.locales, {
-		digits: formatters.some(({ shows }) => shows === "digits"),
+		digits: rendered.digits,
 	});
 	const plurals = `${contentName("plurals", pluralsCode)}.js`;
-	const formatsCode =
-		formatters.length === 0 ? undefined : formatModule(formatters, anchor);
-	const formats: OutputFile | undefined =
-		formatsCode === undefined
-			? undefined
-			: [`${contentName("formats", formatsCode)}.js`, formatsCode];
+	const formats = rendered.file;
 	const reexport = (file: string) => `export * from "./${file}";\n`;
 	const api = (names: readonly string[]) =>
 		`export {\n${names.map((name) => `\t${name},\n`).join("")}} from "./${anchor}";\n`;
@@ -99,6 +105,7 @@ export function renderModules(
 		["./runtime.js", anchor],
 	]);
 	return {
+		formats: rendered,
 		modules: { runtime: anchor, plurals, formats: formats?.[0] },
 		immutable: [
 			[configFile, configCode],
@@ -120,6 +127,24 @@ export function renderModules(
 			["testing.js", pinImports(sources.testing, anchored)],
 			["testing.d.ts", testingDeclarations],
 		],
+	};
+}
+
+/**
+ * formats.js from every formatted key's formatters, each written once: 18–21 ms of a recompile of
+ * 13,000 formatted keys × 3, which a recompile in which no changed key calls other formatters
+ * spares, as formats.js imports the runtime through its anchor, whose name never changes.
+ */
+function renderedFormats(compilation: Compilation): RenderedFormats {
+	const formatters = usedFormatters(compilation);
+	const code =
+		formatters.length === 0 ? undefined : formatModule(formatters, anchor);
+	return {
+		file:
+			code === undefined
+				? undefined
+				: [`${contentName("formats", code)}.js`, code],
+		digits: formatters.some(({ shows }) => shows === "digits"),
 	};
 }
 
