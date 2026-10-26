@@ -1,19 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { withoutKeys } from "./catalog-text.ts";
+import { type ProjectCode, readProjectCode } from "./code/project.ts";
+import { type Reach, readingOf } from "./code/reads.ts";
+import { codeProblems, mayReach } from "./code-problems.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { withListedKeysChanged } from "./config-file.ts";
 import { descriptionsWithout } from "./descriptions.ts";
-import { type DynamicRead, dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
-import { isKeyName } from "./key-checks.ts";
-import {
-	mayRenameNamespace,
-	messageBindings,
-	namespaceNames,
-} from "./message-imports.ts";
-import { readAny, type ScannedSources, scanSources } from "./source-scan.ts";
-import { positionOf, type SourceFile, testsNaming } from "./sources.ts";
+import { compileOutputIfMissing } from "./output-present.ts";
+import { positionOf, testsNaming } from "./sources.ts";
 import { writeAll } from "./write-all.ts";
 
 /** A read that kept unused keys: where it is, as `file:line:column`, what it reads, and the keys. */
@@ -22,28 +18,28 @@ export type KeptBy = { place: string; written: string; keys: string[] };
 export type FixResult = {
 	/** The keys removed from every catalog. */
 	removed: string[];
-	/** The removed keys that tests still name, with those tests, which need the same change. */
+	/** The removed keys that tests still read, with those tests, which need the same change. */
 	inTests: Map<string, string>;
-	/** The unused keys kept, because a read by a computed name may reach them. */
+	/** The unused keys kept, because a read that may reach more keys than one may reach them. */
 	kept: KeptBy[];
 	/** The files written, relative to the project's root: catalogs, and the config if it listed one. */
 	changed: string[];
 	errors: GraiError[];
 	/**
-	 * The sources it read, for the check after it to take: none when it stopped before reading
-	 * them, or wrote one of them.
+	 * The code it read, for the check after it to take, as it writes only JSON objects, which no
+	 * source that parses holds; none when it stopped before reading it.
 	 */
-	scanned: ScannedSources | undefined;
+	code: ProjectCode | undefined;
 };
 
 /**
  * Removes from every catalog, the config's lists and the descriptions file each key that no
- * shipped source file under the roots names, as `check` counts a key named, and that no read by a computed name
- * (`m[name]`, `m` used whole) in one may reach. The tests that still name a removed key are
- * reported, to change with it. A key that is no key name stays, since the scan finds only names
- * and so cannot tell whether a source writes it (`m["sign-in"]`); check reports it as invalid. It
- * writes every file or none, and none when a catalog would be left without messages, unless its
- * locale falls back on another for the words it lacks.
+ * shipped code under the roots reads, and that no read that may reach more keys than one (a
+ * computed read, `m` used whole, a load by a pattern) may reach, the code read as `check` reads it.
+ * The tests that still read a removed key are reported, to change with it. A file whose code does
+ * not parse leaves its reads unknown, so nothing is removed and the error says where. It writes
+ * every file or none, and none when a catalog would be left without messages, unless its locale
+ * falls back on another for the words it lacks.
  */
 export async function removeUnusedKeys(
 	configFile: string,
@@ -55,42 +51,43 @@ export async function removeUnusedKeys(
 		kept: [],
 		changed: [],
 		errors: [],
-		scanned: undefined,
+		code: undefined,
 	};
 	const read = await readProject(configFile);
 	if ("errors" in read) return { ...result, errors: read.errors };
 	const { catalogs, errors } = parseCatalogs(read.sources);
 	if (errors.length > 0) return { ...result, errors };
 	const { config } = read;
-	const scanned = scanSources(roots ?? [config.root], config);
-	result.scanned = scanned;
-	const { shipped, tests, names } = scanned;
-	// Read in the text and in the code alike: a comment in an import hides it from the text's
-	// scan, and a key a read may reach stays if either finds the read.
-	const namespaces = namespaceNames(
-		shipped
-			.filter(mayRenameNamespace)
-			.flatMap(({ text, code }) => [text, code]),
-	);
-	const reads = shipped.flatMap((source) =>
-		[source.text, source.code].flatMap((scanned) =>
-			dynamicReadsIn(scanned, messageBindings(scanned, namespaces)).map(
-				(read) => located(source, read),
-			),
-		),
-	);
+	const compiled = await compileOutputIfMissing(configFile, config);
+	if (compiled.length > 0) return { ...result, errors: [...compiled] };
+	const code = await readProjectCode(config, roots ?? [config.root]);
+	if (code instanceof GraiError) return { ...result, errors: [code] };
+	const reading = await readingOf(code);
 	const keys = new Set(
 		catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);
-	const unnamed = [...keys].filter((key) => isKeyName(key) && !names.has(key));
-	for (const key of unnamed) {
-		const reach = reads.find(({ prefix }) => key.startsWith(prefix));
-		if (reach === undefined) result.removed.push(key);
-		else reach.keys.push(key);
+	const problems = codeProblems(reading, keys, config);
+	// A file that does not parse, or an import of the output that does not resolve, reads what
+	// cannot be known, so nothing is removed.
+	const unknown = problems.errors.filter(
+		({ code }) => code === "source-invalid" || code === "import-unresolved",
+	);
+	if (unknown.length > 0) return { ...result, errors: unknown };
+	result.code = code;
+	const { shipped, tests } = problems;
+	const named = new Set(shipped.reads.map(({ key }) => key));
+	const reaches = shipped.reaches.map(
+		(reach): { reach: Reach; keys: string[] } => ({ reach, keys: [] }),
+	);
+	for (const key of keys) {
+		if (named.has(key)) continue;
+		const keeping = reaches.find(({ reach }) => mayReach(reach, key));
+		if (keeping === undefined) result.removed.push(key);
+		else keeping.keys.push(key);
 	}
-	result.kept = reads
+	result.kept = reaches
 		.filter(({ keys }) => keys.length > 0)
-		.map(({ place, written, keys }) => ({ place, written, keys }));
+		.map(({ reach, keys }) => ({ ...shown(reach), keys }));
 	const removed = new Set(result.removed);
 	// A locale that falls back takes the words it lacks from another, so its catalog may be empty.
 	const emptied = catalogs.filter(
@@ -132,30 +129,24 @@ export async function removeUnusedKeys(
 	if (described !== undefined) texts.set(described.file, described.text);
 	writeAll(texts);
 	const changed = [...texts.keys()].map((path) => relative(config.root, path));
-	return {
-		...result,
-		changed,
-		scanned: readAny(scanned, texts.keys()) ? undefined : scanned,
-	};
+	return { ...result, changed };
 }
 
 /** How much of a read the report shows. */
 const longestShown = 80;
 
-/** A dynamic read with its place and the keys it has kept so far. */
-function located(
-	source: SourceFile,
-	read: DynamicRead,
-): { place: string; written: string; prefix: string; keys: string[] } {
-	const { line, column } = positionOf(source.text, read.at);
+/** A read that keeps keys, as the report shows it: its place, and what it writes, cut short. */
+function shown({ source, at, written }: Reach): {
+	place: string;
+	written: string;
+} {
+	const { line, column } = positionOf(source.text, at.start);
 	return {
 		place: `${source.file}:${line}:${column}`,
 		written:
-			read.written.length > longestShown
-				? `${read.written.slice(0, longestShown - 1)}…`
-				: read.written,
-		prefix: read.prefix,
-		keys: [],
+			written.length > longestShown
+				? `${written.slice(0, longestShown - 1)}…`
+				: written,
 	};
 }
 
