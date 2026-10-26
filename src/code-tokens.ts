@@ -90,15 +90,22 @@ function lastTokens(passed: Passed, count: number): Token[] {
 
 /**
  * Whether a `/` after the code passed starts a regular expression: at the start, after a keyword
- * before an expression, or after an operator. After an operand, a `)`, a `]` or a `}` it divides.
- * After `<` it closes a JSX element.
+ * before an expression, or after an operator. After an operand, a `)`, a `]` or a `}` it divides,
+ * and so it does after `++` or `--`, as no regular expression is incremented. After `<` it closes a
+ * JSX element.
  */
 export function startsRegex(passed: Passed): boolean {
-	const [previous] = lastTokens(passed, 1);
-	if (previous === undefined || beforeExpression.has(previous.text))
-		return true;
-	if (isWord(previous.text) || previous.text === literalToken) return false;
-	return !`)]}<"'\``.includes(previous.text);
+	const [previous, before] = lastTokens(passed, 2);
+	if (previous === undefined) return true;
+	if (isWord(previous.text) || previous.text === literalToken) {
+		return !endsOperand(previous, before);
+	}
+	if (`)]}<"'\``.includes(previous.text)) return false;
+	const doubled =
+		(previous.text === "+" || previous.text === "-") &&
+		before?.text === previous.text &&
+		before.at === previous.at - 1;
+	return !doubled;
 }
 
 /**
@@ -122,6 +129,21 @@ export function isPathAfter(passed: Passed): boolean {
 export function isIndexAfter(passed: Passed): boolean {
 	const [previous] = lastTokens(passed, 1);
 	return previous?.text === "[";
+}
+
+/**
+ * Whether a token ends an operand: a name or a number, but a keyword before an expression unless a
+ * `.` makes it a property's name, a literal, or a `)` or `]`.
+ */
+function endsOperand(
+	token: Token | undefined,
+	before: Token | undefined,
+): boolean {
+	if (token === undefined) return false;
+	const { text } = token;
+	if (text === literalToken || text === ")" || text === "]") return true;
+	if (!isWord(text)) return false;
+	return !beforeExpression.has(text) || before?.text === ".";
 }
 
 function isWord(text: string): boolean {

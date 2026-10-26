@@ -181,6 +181,23 @@ describe("grai check", () => {
 		]);
 	});
 
+	it("reads a / after a property named like a keyword, or after ++, as a division, and checks the reads after it", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "app.js"),
+			`import { m } from "./out/messages.js";\nm.cart_title();\nconst x = { return: 4 };\nlet i = 0;\nconsole.log(x.return / 2, m.cart_titel());\nconsole.log(i++ / 2, m.cart_totl());\n`,
+		);
+
+		const { stderr } = await grai(dir, "check");
+
+		expect(
+			stderr.split("\n").filter((line) => line.includes("no catalog has")),
+		).toEqual([
+			`app.js:5:29: "cart_titel": m.cart_titel names a key no catalog has. Add it with grai add cart_titel --en "…" --de "…", or fix the name.`,
+			`app.js:6:24: "cart_totl": m.cart_totl names a key no catalog has. Add it with grai add cart_totl --en "…" --de "…", or fix the name.`,
+		]);
+	});
+
 	it("counts no name that ends a longer word, such as 2xl's xl, as the key", async () => {
 		const { dir } = project({
 			en: { xl: "Extra large" },
