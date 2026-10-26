@@ -135,6 +135,39 @@ describe("a recompile after an edit", () => {
 		expect(output).toEqual(await outputOf(fresh.dir));
 	});
 
+	it("keeps formats.js while the messages call the same formatters, and writes what a compile from nothing writes", async () => {
+		const versions = [
+			{ price: "{amount :number style=currency currency=EUR} total" },
+			{ price: "{amount :number style=currency currency=EUR} in all" },
+			{ price: "{amount :number style=currency currency=USD} in all" },
+			{
+				price: "{amount :number style=currency currency=USD} in all",
+				title: "{n :number}",
+			},
+		];
+		const catalogsAt = (version: Record<string, string>) => ({
+			en: { ...catalogs.en, ...version },
+			de: { ...catalogs.de, ...version },
+		});
+		const { dir, config } = project(catalogsAt(versions[0] ?? {}));
+		let { build } = await recompile(config, undefined);
+		const formatsFiles = [build?.rendered.modules.formats];
+		for (const version of versions.slice(1)) {
+			const next = catalogsAt(version);
+			writeFileSync(join(dir, "messages", "en.json"), laidOut(next.en));
+			writeFileSync(join(dir, "messages", "de.json"), laidOut(next.de));
+			({ build } = await recompile(config, build));
+			formatsFiles.push(build?.rendered.modules.formats);
+			const fresh = project(next);
+			await recompile(fresh.config, undefined);
+
+			expect(await outputOf(dir)).toEqual(await outputOf(fresh.dir));
+		}
+		const [first, sameFormatters, otherCurrency, oneMore] = formatsFiles;
+		expect(sameFormatters).toBe(first);
+		expect(new Set([first, otherCurrency, oneMore]).size).toBe(3);
+	});
+
 	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
 		const { dir, config } = project(catalogs);
 		const built = async (previous?: Build) => {
