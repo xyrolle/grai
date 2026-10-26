@@ -30,6 +30,7 @@ export async function readUse(
 	let keyAt = use.at;
 	let readAt = use.at;
 	let name = "";
+	let links = 0;
 	for (const link of use.chain) {
 		if (value.kind === "key") break;
 		value = await graph.member(value, link.name);
@@ -37,6 +38,7 @@ export async function readUse(
 		keyAt = link.at;
 		readAt = link.expression;
 		name = link.name;
+		links++;
 	}
 	const via = ownKey === undefined ? "member" : "module";
 	if (value.kind === "key") {
@@ -50,6 +52,11 @@ export async function readUse(
 					binding: undefined,
 					type: use.type,
 					written: text(source, readAt),
+					// Called only when the key's name is the last the use reads: `m.title()`.
+					call:
+						use.end.kind === "value" && links === use.chain.length
+							? use.end.call
+							: undefined,
 				},
 			),
 		);
@@ -93,6 +100,7 @@ export async function readUse(
 						edits: named(taken.name, held.key, taken.at),
 						binding: taken.binds,
 						type: use.type,
+						written: text(source, taken.written),
 					},
 				),
 			);
@@ -124,10 +132,11 @@ export function read(
 		binding: Binding | undefined;
 		type: boolean;
 		written?: string;
+		call?: Span | undefined;
 	},
 ): Read {
-	const { written = text(place.source, place.at), ...rest } = fields;
-	return { ...place, ...rest, written };
+	const { written = text(place.source, place.at), call, ...rest } = fields;
+	return { ...place, ...rest, written, call };
 }
 
 export function reachAt(

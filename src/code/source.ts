@@ -28,14 +28,16 @@ export type Shorthand = {
 };
 
 /**
- * A module's code: the text, its language, the pieces of it that are the file's, and the names its
- * template writes in shorthand, by the offset in the file where the name is.
+ * A module's code: the text, its language, the pieces of it that are the file's, the names its
+ * template writes in shorthand, by the offset in the file where the name is, and where in the file
+ * an import of its own may go: a script's start, or the start of a component's first script.
  */
 export type SourceCode = {
 	readonly text: string;
 	readonly lang: Lang;
 	readonly pieces: readonly Piece[];
 	readonly shorthands: ReadonlyMap<number, Shorthand>;
+	readonly importsAt: number | undefined;
 };
 
 /** A script file's code: its text as it is, in the language its extension names. */
@@ -45,6 +47,7 @@ export function scriptCode(path: string, text: string): SourceCode {
 		lang: langOf(path),
 		pieces: [{ at: 0, from: 0, length: text.length }],
 		shorthands: new Map(),
+		importsAt: 0,
 	};
 }
 
@@ -62,6 +65,7 @@ export class CodeWriter {
 	private text = "";
 	private readonly pieces: Piece[] = [];
 	private readonly shorthands = new Map<number, Shorthand>();
+	private importsAt: number | undefined;
 	/** The file's text, which the pieces are of. */
 	readonly source: string;
 
@@ -96,9 +100,15 @@ export class CodeWriter {
 		return this.expression(from, to);
 	}
 
+	/** Where in the file an import of the module's own may go. */
+	imports(at: number): this {
+		this.importsAt ??= at;
+		return this;
+	}
+
 	code(lang: Lang): SourceCode {
-		const { text, pieces, shorthands } = this;
-		return { text, lang, pieces, shorthands };
+		const { text, pieces, shorthands, importsAt } = this;
+		return { text, lang, pieces, shorthands, importsAt };
 	}
 }
 

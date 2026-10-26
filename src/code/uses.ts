@@ -85,14 +85,27 @@ function endOf(
 ): { end: UseEnd; read: UseFact["chain"]; alias?: ESTree.BindingIdentifier } {
 	const { span } = file;
 	const read = [...chain];
+	const value: UseEnd = { kind: "value", call: undefined };
 	let node = start;
+	// Whether what the use reads so far is a name or a plain member of one (`m.title`, not `m?.title`
+	// or `m["title"]`), whose call with no arguments `call` records.
+	let plain = chain.length === 0;
 	for (
 		let parent = scopes.parent(node);
 		parent !== undefined;
 		parent = scopes.parent(node)
 	) {
-		if (transparent.has(parent.type) || parent.type === "AwaitExpression") {
+		if (transparent.has(parent.type)) {
 			node = parent;
+		} else if (parent.type === "AwaitExpression") {
+			plain = false;
+			node = parent;
+		} else if (parent.type === "CallExpression" && parent.callee === node) {
+			const called = plain && !parent.optional && parent.arguments.length === 0;
+			return {
+				end: { ...value, call: called ? span(parent) : undefined },
+				read,
+			};
 		} else if (parent.type === "MemberExpression" && parent.object === node) {
 			const name = memberName(parent);
 			if (name === undefined) {
@@ -108,6 +121,7 @@ function endOf(
 				at: span(keySpan(parent.property)),
 				expression: span(parent),
 			});
+			plain = !parent.computed && !parent.optional;
 			node = parent;
 		} else if (parent.type === "TSQualifiedName" && parent.left === node) {
 			read.push({
@@ -126,9 +140,9 @@ function endOf(
 				declaration?.type === "VariableDeclaration" &&
 				declaration.kind === "const";
 			if (id.type === "Identifier" && constant) {
-				return { end: { kind: "value" }, read, alias: id };
+				return { end: value, read, alias: id };
 			}
-			return { end: { kind: "value" }, read };
+			return { end: value, read };
 		} else if (
 			parent.type === "AssignmentExpression" &&
 			parent.right === node &&
@@ -142,10 +156,10 @@ function endOf(
 		) {
 			return { end: { kind: "export" }, read };
 		} else {
-			return { end: { kind: "value" }, read };
+			return { end: value, read };
 		}
 	}
-	return { end: { kind: "value" }, read };
+	return { end: value, read };
 }
 
 /** The name a member reads, `.name`, `["name"]` or `` [`name`] ``, or undefined when computed. */

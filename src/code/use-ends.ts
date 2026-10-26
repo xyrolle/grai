@@ -63,6 +63,7 @@ export function pattern(
 		names.push({
 			name,
 			at: span(keySpan(key)),
+			written: span(key),
 			binds: boundBy(property.value, scopes, file),
 		});
 	}
@@ -100,4 +101,15 @@ export function propertyShorthand(
 		return undefined;
 	const name = use.type === "Identifier" ? use.name : "";
 	return { replaces: at, before: `${name}: `, after: "" };
+}
+
+/** The call a name is the callee of, when it passes no arguments and is not optional: `title()`. */
+export function callWithout(use: Node, scopes: Scopes): Node | undefined {
+	const parent = scopes.parent(use);
+	return parent?.type === "CallExpression" &&
+		parent.callee === use &&
+		!parent.optional &&
+		parent.arguments.length === 0
+		? parent
+		: undefined;
 }

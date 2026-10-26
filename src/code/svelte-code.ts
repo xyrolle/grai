@@ -23,7 +23,7 @@ export function svelteCode(text: string, parse: SvelteParse): SourceCode {
 	}
 	for (const { content } of scripts) {
 		const { start, end } = spanOf(content);
-		writer.piece(start, end).write("\n;\n");
+		writer.imports(start).piece(start, end).write("\n;\n");
 	}
 	new Template(writer).fragment(root.fragment);
 	const typescript = scripts.some(({ attributes }) =>
