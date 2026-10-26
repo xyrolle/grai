@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import type { Mapping } from "../import/mapping.ts";
 import type { Binding, Scopes, Use } from "./scopes.ts";
 import { literalText, type Node, propertiesOf, type Span } from "./syntax.ts";

@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import { arrayWithout, declarationWithout, type Edit } from "./edits.ts";
 import { valueImportOf } from "./imports.ts";
 import type { Outcome, Translator } from "./library.ts";

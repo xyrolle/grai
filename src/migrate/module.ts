@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import type { Mapping } from "../import/mapping.ts";
 import { applyEdits, covers } from "./edits.ts";
 import {
