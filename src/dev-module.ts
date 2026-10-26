@@ -5,6 +5,7 @@ import {
 	changeEvent,
 	patchedEvent,
 	readHook,
+	sinceEvent,
 	updateEvent,
 } from "./dev-events.ts";
 import { freshName } from "./key-exports.ts";
@@ -36,15 +37,25 @@ const made = Object.create(null);
 for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
 `;
 
-/** The dev module's handler of an edit's patch, which writes it into the table. */
-const patchCode = `if (import.meta.hot) {
-	import.meta.hot.on(${JSON.stringify(updateEvent)}, async ({ url }) => {
-		const { rows } = await import(/* @vite-ignore */ url);
+/**
+ * The dev module's handler of an edit's patch, which writes it into the table. The table's version
+ * is how many patches it has, from the server's count when it served the module. The module asks
+ * for the patches sent before it was evaluated, which reached no handler, and writes each patch in
+ * turn: one it has, or one that comes ahead of those it asked for, it leaves, as the server sends
+ * it again. Vite hands a module its events one at a time, so each is written before the next.
+ */
+const patchCode = (version: number) => `if (import.meta.hot) {
+	let version = ${version};
+	import.meta.hot.on(${JSON.stringify(updateEvent)}, async (patch) => {
+		if (patch.version !== version) return;
+		version += 1;
+		const { rows } = await import(/* @vite-ignore */ patch.url);
 		for (const [key, row] of Object.entries(rows)) Object.assign(T[key], row);
 		if (typeof window === "undefined") return import.meta.hot.send(${JSON.stringify(patchedEvent)});
 		const detail = { keys: Object.keys(rows) };
 		if (window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true, detail }))) location.reload();
 	});
+	import.meta.hot.send(${JSON.stringify(sinceEvent)}, { version });
 }
 `;
 
@@ -54,7 +65,7 @@ const patchCode = `if (import.meta.hot) {
  * of its own.
  */
 const devWords = new Set(
-	`${table("", "")}${madeCode}${patchCode}`.match(/[A-Za-z_$][\w$]*/g),
+	`${table("", "")}${madeCode}${patchCode(0)}`.match(/[A-Za-z_$][\w$]*/g),
 );
 
 /**
@@ -88,10 +99,15 @@ function madeExports(keys: readonly string[], taken: ReadonlySet<string>) {
  * framework adapter that renders them again cancels it, and otherwise the page reloads. Each call
  * first passes its key to `globalThis[Symbol.for("grai.read")]`, if an adapter set it, so the
  * adapter knows which renders read which keys. A server's runner sends `grai:patched` once it has
- * written the patch. Each key passes its name after its variants, for the runtime's errors to
- * name. A build leaves names out: they would add about a third to a page's gzipped message bytes.
+ * written the patch. `version` is how many patches the server has made, every one of which the
+ * build has. Each key passes its name after its variants, for the runtime's errors to name. A
+ * build leaves names out: they would add about a third to a page's gzipped message bytes.
  */
-export function devModule(outdir: string, build: Build): string {
+export function devModule(
+	outdir: string,
+	build: Build,
+	version: number,
+): string {
 	const keys = [...build.compilation.keys];
 	const texts = keys.filter(([, compiled]) => compiled.kind === "text");
 	const calls = keys.filter(([, compiled]) => compiled.kind !== "text");
@@ -112,7 +128,7 @@ export function devModule(outdir: string, build: Build): string {
 ${table(textRows, callRows)}${madeCode}${madeExports(
 	keys.map(([key]) => key),
 	new Set([...everyName(names), ...devWords]),
-)}${patchCode}`;
+)}${patchCode(version)}`;
 }
 
 /**

@@ -133,7 +133,7 @@ describe("a key named as something the output's code calls", () => {
 		const { build: compiled } = await recompile(config, undefined);
 		if (compiled === undefined) throw new Error("the compile failed");
 		const file = join(dir, "out", "dev.js");
-		writeFileSync(file, devModule(join(dir, "out"), compiled));
+		writeFileSync(file, devModule(join(dir, "out"), compiled, 0));
 		expect(said(file)).toEqual(expected);
 	});
 

@@ -1,8 +1,13 @@
 // The names the dev module and the framework adapters share in the page. Plain strings, so a
 // browser module imports them without the compiler that writes the dev module.
 
-/** The custom HMR event that carries an edit's patch. */
+/** The custom HMR event that carries an edit's patch, and its version. */
 export const updateEvent = "grai:update";
+/**
+ * The event the dev module sends as it is evaluated, with the version of its table: a patch sent
+ * before then reached no handler, so the server sends it the patches made since.
+ */
+export const sinceEvent = "grai:since";
 /** The event the page dispatches after it writes an edit's patch: `detail.keys` are the edited keys. */
 export const changeEvent = "grai:change";
 /**
