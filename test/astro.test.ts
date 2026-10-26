@@ -318,7 +318,7 @@ describe("grai's config beside Astro's", () => {
 		).toEqual([]);
 	});
 
-	it("refuses a base that is not grai's basePath, and domains, which the url strategy cannot read yet, saying what to set", () => {
+	it("refuses a base that is not grai's basePath, and domains grai's config does not name, saying what to set", () => {
 		expect(
 			disagreements(graiConfig({ strategy: ["url"] }), {
 				...astroRouting(["en", "ro"], {
@@ -328,7 +328,34 @@ describe("grai's config beside Astro's", () => {
 			}),
 		).toEqual([
 			`Astro's base "/shop/" and grai's "basePath" (none) must name the same path: the "url" strategy reads the locale after it.`,
-			`Astro's i18n.domains serves ro from domains of their own, where grai's "url" strategy finds the locale in the path. Remove i18n.domains and serve each locale under its path prefix ("A domain per locale" in grai's docs/followups.md).`,
+			`Astro's i18n.domains serves ro from domains of their own, which grai's "url" strategy reads only with "domains" in grai's config. Give each locale its host there, such as { "ro": "example.ro" } beside the default locale's.`,
+		]);
+	});
+
+	it("agrees with Astro's i18n.domains by the same host for each locale, and says which to set", () => {
+		const grai = graiConfig({
+			strategy: ["url"],
+			domains: { en: "example.com", ro: "example.ro" },
+		});
+
+		expect(
+			disagreements(
+				grai,
+				astroRouting(["en", "ro"], { domains: { ro: "https://example.ro" } }),
+			),
+		).toEqual([]);
+		expect(
+			disagreements(
+				grai,
+				astroRouting(["en", "ro"], {
+					domains: { ro: "https://ro.example.com" },
+				}),
+			),
+		).toEqual([
+			`Astro's i18n.domains serves ro from "ro.example.com", and grai's "domains" gives it "example.ro". Give each locale the same host in both.`,
+		]);
+		expect(disagreements(grai, astroRouting(["en", "ro"]))).toEqual([
+			`grai's "domains" gives ro the host "example.ro", which Astro's i18n.domains does not list. Add "ro": "https://example.ro" there.`,
 		]);
 	});
 });
