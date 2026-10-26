@@ -1,7 +1,7 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Node, Span } from "../code/syntax.ts";
 import type { MappedKey } from "../import/mapping.ts";
 import type { Left, ModuleView, Outcome } from "./library.ts";
-import type { Node, Span } from "./syntax.ts";
 
 /** What a source library's call passes on to grai's: the inputs, written in an object, and the locale. */
 export type CallInputs = {

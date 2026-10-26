@@ -1,4 +1,4 @@
-import type { ESTree } from "../code/parse.ts";
+import type { ESTree } from "./parse.ts";
 import { childrenOf, type Node, type Span } from "./syntax.ts";
 
 /** A name a module declares: the identifier that declares it, and the code it is visible in. */

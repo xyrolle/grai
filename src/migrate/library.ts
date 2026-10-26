@@ -1,7 +1,12 @@
 import type { ESTree } from "../code/parse.ts";
+import type { Binding, Scopes, Use } from "../code/scopes.ts";
+import {
+	literalText,
+	type Node,
+	propertiesOf,
+	type Span,
+} from "../code/syntax.ts";
 import type { Mapping } from "../import/mapping.ts";
-import type { Binding, Scopes, Use } from "./scopes.ts";
-import { literalText, type Node, propertiesOf, type Span } from "./syntax.ts";
 
 /** Why a use stays as it is, for the person who migrates it. */
 export type Left = { left: string };
