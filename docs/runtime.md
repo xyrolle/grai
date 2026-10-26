@@ -105,6 +105,8 @@ In a Svelte client build, `grai/svelte` reads each message without inputs as its
 
 `ru` gives 23.3, 15.9, 24.1 and 12.5 ms at 4×.
 
+A page that imports each key by its own path (`#i18n/messages/<key>.js`, mapped to keys.js) reads the same strings. On the synthetic catalog, in `ro`, it loads 23.4 KB and hydrates in 4.9 / 20.8 ms, against 23.3 KB and 4.9 / 20.5 ms through the namespace. Before `grai/svelte` followed a key's path to the key's own module, that page kept its calls: 24.3 KB and 5.6 / 23.1 ms (`svelte-texts synthetic`).
+
 Seven of app A's real pages, built three ways (`inline-build` in copies of the app) and served side by side (`inline-pages`): the five heaviest its demo data fills, by the keys they load (ranks 1, 2, 3, 5 and 8 of 73), and two typical ones. On each, every build's page has the same text, whitespace included, as served and as hydrated, and hydration keeps the same server elements. Median of 15 interleaved loads, ms from SvelteKit's start until it has hydrated the page, at full speed and at a 4× slowdown, at a load of 15–22:
 
 | keys | JS, brotli: strings / inlined | calls (`grai/vite`) | strings (`grai/svelte`) | inlined into the template |

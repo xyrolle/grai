@@ -41,12 +41,42 @@ export function convertI18next(
 	const texts = new Map(
 		entries.map((entry) => [entry.path.join("."), entry.value]),
 	);
-	return messagesOf(entries).map((message) => ({
-		...(message.kind === "text"
-			? convertText(message.path, message.value, texts)
-			: convertPlural(message, locale, texts)),
-		description: message.description,
-	}));
+	const messages = messagesOf(entries);
+	const byPath = Map.groupBy(messages, ({ path }) => JSON.stringify(path));
+	return messages.flatMap((message) => {
+		const sharing = byPath.get(JSON.stringify(message.path)) ?? [message];
+		// The first of messages that become one key reports them all.
+		if (sharing[0] !== message) return [];
+		const converted =
+			sharing.length > 1
+				? oneKeyOf(sharing)
+				: message.kind === "text"
+					? convertText(message.path, message.value, texts)
+					: convertPlural(message, locale, texts);
+		return [{ ...converted, description: message.description }];
+	});
+}
+
+/**
+ * A message and a plural's forms that become one key, which grai leaves out: i18next calls the
+ * message without `count` and the forms with it, so neither may take the other's place.
+ */
+function oneKeyOf(messages: readonly Message[]): Conversion {
+	const text = messages.find((message) => message.kind === "text");
+	const plural = messages.find((message) => message.kind !== "text");
+	const name = (message: Message | undefined) => message?.path.at(-1) ?? "";
+	const forms = [...(plural?.forms.keys() ?? [])].map(
+		(form) => `${name(plural)}_${form}`,
+	);
+	const of = plural?.kind === "ordinal" ? "an ordinal" : "a plural";
+	return {
+		path: text?.path ?? [],
+		result: new MessageProblem(
+			"unsupported",
+			`${name(text)} is a message and ${forms.join(", ")} the forms of ${of}, which grai would import as one key: i18next calls the message without count and the forms with it. Rename the message or the forms in the source.`,
+		),
+		notes: [],
+	};
 }
 
 /** The entries as messages, in source order: a key's plural forms together, at its first form's place. */
@@ -100,8 +130,9 @@ function convertText(
 		);
 	}
 	try {
-		const { pattern, escaped } = patternOf(value, texts);
+		const { pattern, escaped, reread } = patternOf(value, texts);
 		if (escaped.size > 0) notes.push(escapedValues);
+		if (reread.size > 0) notes.push(rereadValues);
 		return { path, result: plainMessage(pattern), notes };
 	} catch (error) {
 		if (!(error instanceof MessageProblem)) throw error;
@@ -146,10 +177,14 @@ function convertPlural(
 		const escapes = [...patterns.values()].some(({ escaped }) =>
 			[...escaped].some((name) => name !== "count"),
 		);
+		const rereads = [...patterns.values()].some(({ reread }) =>
+			[...reread].some((name) => name !== "count"),
+		);
 		const notes = [
 			...(kind === "cardinal" ? [] : [ordinalKey]),
 			...missing,
 			...(escapes ? [escapedValues] : []),
+			...(rereads ? [rereadValues] : []),
 		];
 		return { path, result: countChoice(patterns, kind), notes };
 	} catch (error) {
@@ -165,6 +200,14 @@ function convertPlural(
  */
 const escapedValues =
 	"i18next escapes the values of {{name}} for HTML by default, and grai gives them as they are, for the page to escape as React, Vue and Svelte do when they show text. Where this text is set as HTML, escape the values first.";
+
+/**
+ * What a message with a `{{- name}}` renders differently: i18next fills `{{name}}` in the text its
+ * pass for `{{- name}}` left, so it fills a `{{…}}` in that value too, which a message compiled
+ * ahead of time cannot.
+ */
+const rereadValues =
+	"i18next reads the value of {{- name}} again, so a {{…}} the value holds is filled in too, and grai gives the value as it is. Where a value can hold {{…}}, fill it in before the call.";
 
 /** How an ordinal is called once imported: by a key of its own, as i18next calls it by the plural's. */
 const ordinalKey =

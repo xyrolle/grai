@@ -67,6 +67,7 @@ const catalog = {
 	live: "Live",
 	location: "Location",
 	window: "Window",
+	assertCompiledFor: "Compiled for",
 };
 
 /** Each key's call, as its inputs, and what it should say. */
@@ -87,6 +88,7 @@ const calls: Record<string, [inputs: object | undefined, says: unknown]> = {
 	live: [undefined, "Live"],
 	location: [undefined, "Location"],
 	window: [undefined, "Window"],
+	assertCompiledFor: [undefined, "Compiled for"],
 };
 
 const expected = Object.fromEntries(

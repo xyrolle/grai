@@ -1,4 +1,5 @@
 import { type ESTree, parseSync } from "vite";
+import { keyModulePrefix } from "./locale-chunks.ts";
 
 /** What an import names in grai's output: the namespace of every key (`m`), or one key. */
 export type OutputName = { kind: "namespace" } | { kind: "key"; key: string };
@@ -23,7 +24,9 @@ export type ImportedName = (
  * Follows an import to grai's keys.js the way the bundler binds it, through the modules that
  * re-export it: `export { m } from …`, an import exported again (`import { m } from …; export { m }`),
  * `export * from …` and `export * as m from …`. The output's messages.js is one of them: it is
- * `export * as m from "./keys.js"`. Each module is parsed once, however many imports reach it.
+ * `export * as m from "./keys.js"`. A key's path resolves, in a build, to the key's own module
+ * (`\0grai:key/title`), which exports that key alone. Each module is parsed once, however many
+ * imports reach it.
  */
 export function importedName(
 	keysFile: string,
@@ -54,6 +57,10 @@ export function importedName(
 		if (id === keysFile) {
 			if (name === "*") return { kind: "namespace" };
 			return isKey(name) ? { kind: "key", key: name } : undefined;
+		}
+		if (id.startsWith(keyModulePrefix)) {
+			const key = id.slice(keyModulePrefix.length);
+			return name === key && isKey(key) ? { kind: "key", key } : undefined;
 		}
 		const visit = `${id}\0${name}`;
 		if (name === "*" || seen.has(visit)) return undefined;

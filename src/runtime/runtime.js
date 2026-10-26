@@ -19,6 +19,19 @@ import {
 	unlocalizedPaths,
 } from "./config.js";
 
+// What the rest of the output reads of the config, through the runtime's anchor: the runtime is the
+// one module of the output that imports the config, so a process that holds one runtime holds one
+// config.
+export {
+	cookieName,
+	leavesPathsAlone,
+	localeCopies,
+	prefixesEveryLocale,
+	queryParameter,
+	readsUrl,
+	strategy,
+	unlocalizedPaths,
+} from "./config.js";
 export { baseLocale, locales };
 
 // Each of the url strategy's options is a constant in config.js, which a bundler folds, so the code
@@ -43,7 +56,7 @@ const leftAlone = (/** @type {string} */ pathname) =>
 	unlocalizedPaths.some((pattern) => pattern.test(pathname));
 
 /**
- * @typedef {"locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound"} GraiErrorCode
+ * @typedef {"locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound" | "output-changed"} GraiErrorCode
  */
 
 /** A message called in a locale it cannot render in, or with a value its variants do not take. */
@@ -249,7 +262,8 @@ export function localeOfPath(pathname) {
 }
 
 /**
- * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is.
+ * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is,
+ * and so does a path the strategy leaves alone, though its first segment reads as a prefix.
  *
  * @param {string | URL} url
  * @returns {URL}
@@ -257,7 +271,11 @@ export function localeOfPath(pathname) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (readsUrl && localeOfPrefix(first) !== undefined) {
+	if (
+		readsUrl &&
+		localeOfPrefix(first) !== undefined &&
+		!(leavesPathsAlone && leftAlone(copy.pathname))
+	) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
@@ -386,6 +404,25 @@ export function pageText(...texts) {
  */
 export function markup(strings, parts) {
 	return Object.assign(message(...strings), { parts: message(...parts) });
+}
+
+/**
+ * Throws unless a module of the output's keys was compiled for the locales this runtime reads, at
+ * their positions. They differ only when a compile changed the locales while a process loaded the
+ * output, which then holds the keys of one compile and the runtime of another.
+ *
+ * @param {readonly string[]} compiled
+ */
+export function assertCompiledFor(compiled) {
+	if (
+		compiled.length === locales.length &&
+		compiled.every((locale, index) => locale === locales[index])
+	)
+		return;
+	throw new GraiError(
+		"output-changed",
+		`the output's keys were compiled for ${compiled.join(", ")}, but its runtime reads ${locales.join(", ")}: a compile changed the locales while this process loaded them. Load the output again, as by restarting the process.`,
+	);
 }
 
 /**

@@ -3,13 +3,15 @@ import { escapeText, textOf } from "./converted.ts";
 import { formatCall } from "./i18next-formats.ts";
 
 /**
- * A grai pattern, with the inputs it reads, and those of them that i18next escapes for HTML by
- * default and that can hold text: `{{name}}` and a list, not `{{- name}}` or a number or a date.
+ * A grai pattern, with the inputs it reads, those of them that i18next escapes for HTML by default
+ * and that can hold text (`{{name}}` and a list, not `{{- name}}` or a number or a date), and
+ * those whose value its next pass reads again (`{{- name}}`'s).
  */
 export type Pattern = {
 	pattern: string;
 	inputs: ReadonlySet<string>;
 	escaped: ReadonlySet<string>;
+	reread: ReadonlySet<string>;
 };
 
 /** A file's messages by dotted key, which `$t(key)` names. */
@@ -62,10 +64,11 @@ const nestingLimit = 10;
  */
 export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 	const text = textOf(value).split("");
-	const interpolated = fill(
-		fill(text, unescapedPlaceholder, (match) => placeholderOf(match, false)),
-		placeholder,
-		(match) => placeholderOf(match, true),
+	const unescaped = fill(text, unescapedPlaceholder, (match) =>
+		placeholderOf(match, false),
+	);
+	const interpolated = fill(unescaped, placeholder, (match) =>
+		placeholderOf(match, true),
 	);
 	const slots = fill(interpolated, nesting, (match) =>
 		nestedOf(match, texts, depth),
@@ -77,6 +80,12 @@ export function patternOf(value: unknown, texts: Texts, depth = 0): Pattern {
 		),
 		escaped: new Set(
 			slots.flatMap((slot) => (typeof slot === "string" ? [] : slot.escaped)),
+		),
+		// i18next's pass for {{name}} reads the text the one for {{-name}} left, values and all.
+		reread: new Set(
+			unescaped.flatMap((slot) =>
+				typeof slot === "string" ? [] : slot.inputs,
+			),
 		),
 	};
 }

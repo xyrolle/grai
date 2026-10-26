@@ -98,7 +98,7 @@ export function renderOutput(
 		const previousFiles = before?.shardFiles.get(index);
 		const shard =
 			dirty.has(index) || previousFiles === undefined
-				? renderShard(index, keys, compilation, modules)
+				? renderShard(index, keys, compilation, modules, config.locales)
 				: previousFiles;
 		const map = shardMap(
 			`${shard.name}.d.ts`,
@@ -188,25 +188,35 @@ function renderShard(
 	keys: readonly string[],
 	compilation: Compilation,
 	modules: OutputModules,
+	locales: readonly string[],
 ): Omit<ShardFiles, "map"> {
 	const compiled = new Map<string, CompiledKey>();
 	for (const key of keys) {
 		const compiledKey = compilation.keys.get(key);
 		if (compiledKey !== undefined) compiled.set(key, compiledKey);
 	}
-	const module = shardModule([...compiled.values()], modules);
+	const module = shardModule([...compiled.values()], modules, locales);
 	const { body, lines } = shardDeclarations(compiled, modules);
 	const declarations = `${body}//# sourceMappingURL=${index}.d.ts.map\n`;
 	const name = contentName(String(index), module, declarations);
 	return { name, module, declarations, lines };
 }
 
+/**
+ * A shard's module. It first checks that the runtime it reached through the anchor reads the
+ * locales its keys were compiled for, at their positions, as a process that loaded the anchor of
+ * one compile and the keys of another may not.
+ */
 function shardModule(
 	keys: readonly CompiledKey[],
 	modules: OutputModules,
+	locales: readonly string[],
 ): string {
-	const names = calledNames(keys);
-	return `${outputImports(names, (file) => `../${file}`, modules)}\n\n${keyExports(keys, everyName(names))}`;
+	// Each shard checks, as it is evaluated, that the runtime was compiled for its locales.
+	const uses = new Set<string>(["assertCompiledFor"]);
+	for (const key of keys) for (const name of key.uses) uses.add(name);
+	const names = calledNames(keys, uses);
+	return `${outputImports(names, (file) => `../${file}`, modules)}\n\nassertCompiledFor(${JSON.stringify(locales)});\n${keyExports(keys, everyName(names))}`;
 }
 
 /** A shard's declarations, but the line naming their map, and the line each key's is on. */

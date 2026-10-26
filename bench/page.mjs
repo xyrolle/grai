@@ -36,9 +36,10 @@ function inlineText(pattern, inputs) {
 }
 
 /**
- * The page's Svelte source. `from` is the module messages are imported from; `inline` gives the
- * locale's catalog when text is inlined instead (plurals still call their function), and
- * `translate` calls a library's `t(key, values)` from `from` instead.
+ * The page's Svelte source. `from` is the module messages are imported from, or a key's own path
+ * for each key, as `(key) => path`; `inline` gives the locale's catalog when text is inlined
+ * instead (plurals still call their function), and `translate` calls a library's
+ * `t(key, values)` from `from` instead.
  */
 export function pageSource(app, { from, inline, translate }) {
 	const calls = sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW);
@@ -65,8 +66,18 @@ export function pageSource(app, { from, inline, translate }) {
 		{ length: DATA_PER_ROW },
 		(_, index) => `<td>{row.c${index}}</td>`,
 	);
+	const named = (key) => `${JSON.stringify(key)} as ${alias.get(key)}`;
+	const imports =
+		typeof from === "function"
+			? keys.map(
+					(key) =>
+						`import { ${named(key)} } from ${JSON.stringify(from(key))};`,
+				)
+			: [
+					`import { ${keys.map(named).join(", ")} } from ${JSON.stringify(from)};`,
+				];
 	return `<script>
-	import { ${keys.map((key) => `${JSON.stringify(key)} as ${alias.get(key)}`).join(", ")} } from ${JSON.stringify(from)};
+	${imports.join("\n\t")}
 	let { inputs, rows } = $props();
 </script>
 <header>${shell.join("")}</header>
