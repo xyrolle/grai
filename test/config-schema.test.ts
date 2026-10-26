@@ -8,7 +8,7 @@ type Schema = {
 	required: string[];
 	properties: Record<
 		string,
-		{ items?: { enum?: string[] }; default?: unknown }
+		{ items?: { anyOf?: { enum?: string[] }[] }; default?: unknown }
 	>;
 };
 
@@ -29,7 +29,9 @@ it("describes every field the config takes, and no other", () => {
 		"catalogs",
 		"outdir",
 	]);
-	expect(schema.properties.strategy?.items?.enum).toEqual([...strategies]);
+	expect(schema.properties.strategy?.items?.anyOf?.[0]?.enum).toEqual([
+		...strategies,
+	]);
 	expect(schema.properties.tests?.default).toEqual(conventionalTests);
 });
 
