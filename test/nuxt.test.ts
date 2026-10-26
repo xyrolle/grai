@@ -46,6 +46,7 @@ describe("the pages of the url strategy", () => {
 		localePrefix: "as-needed",
 		prefixes: ["en", "ro"],
 		unlocalizedPaths: [],
+		pathnames: [],
 	} as const;
 	const index: NuxtPage = { name: "index", path: "/", file: "index.vue" };
 	const docs: NuxtPage = {
@@ -104,6 +105,48 @@ describe("the pages of the url strategy", () => {
 			{ name: "index___en", path: "/en", file: "index.vue" },
 			{ name: "index___ro", path: "/ro", file: "index.vue" },
 		]);
+	});
+
+	it("routes a page in each locale's words where pathnames give them, its segments kept", () => {
+		const product: NuxtPage = {
+			name: "products-id",
+			path: "/products/:id()",
+			file: "products/[id].vue",
+		};
+		const routing = {
+			...asNeeded,
+			pathnames: [
+				{
+					route: "/products/[id]",
+					paths: ["/goods/[id]", "/produse/[id]"],
+				},
+				{ route: "/about", paths: ["/about", "/%C8%99tiri"] },
+			],
+		};
+
+		expect(
+			localizedPages([index, product], ["en", "ro"], "en", routing),
+		).toEqual([
+			{
+				name: "products-id___en",
+				path: "/goods/:id()",
+				file: "products/[id].vue",
+			},
+			{ name: "index___ro", path: "/ro", file: "index.vue" },
+			{
+				name: "products-id___ro",
+				path: "/ro/produse/:id()",
+				file: "products/[id].vue",
+			},
+		]);
+		expect(
+			localizedPages(
+				[{ name: "about", path: "/about", file: "about.vue" }],
+				["en", "ro"],
+				"en",
+				routing,
+			),
+		).toEqual([{ name: "about___ro", path: "/ro/știri", file: "about.vue" }]);
 	});
 
 	it("leaves a page at a path the strategy leaves alone without copies", () => {
