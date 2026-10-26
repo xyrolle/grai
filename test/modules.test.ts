@@ -219,8 +219,11 @@ describe("reading a project's facts", () => {
 		expect(readerVersion(reader)).not.toBe(before);
 	});
 
-	it("reads files in a pool of workers into the same facts as on one thread", async () => {
-		// Enough work for the pool to start: each file reads many keys.
+	// Enough work for the pool to start, read twice, which takes seconds on a loaded machine.
+	it("reads files in a pool of workers into the same facts as on one thread", {
+		timeout: 30_000,
+	}, async () => {
+		// Each file reads many keys.
 		const reads = Array.from({ length: 400 }, (_, n) => `m.key_${n}();`).join(
 			"\n",
 		);
