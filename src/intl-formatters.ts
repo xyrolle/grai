@@ -39,9 +39,21 @@ function splitUnit(format: Format): {
  * key with it, and `digitsCode` writes the same for formats.js.
  */
 export function shownDigits(options: IntlOptions, value: number): string {
-	const text = new Intl.NumberFormat("en", options).format(value);
+	const identity = JSON.stringify(options);
+	if (digits?.identity !== identity) {
+		digits = { identity, formatter: new Intl.NumberFormat("en", options) };
+	}
+	const text = digits.formatter.format(value);
 	return options.style === "percent" ? text.replace("%", "") : text;
 }
+
+/**
+ * The formatter `shownDigits` last made, by its options. A catalog's rounding selectors repeat the
+ * same few options, in each locale's message and key after key, and making a formatter costs far
+ * more than formatting: one formatter, kept, took a compile of 13,000 keys × 3 that all select on
+ * one option set from 986 to 616 ms. One, so the compiler holds no more of ICU than it needs.
+ */
+let digits: { identity: string; formatter: Intl.NumberFormat } | undefined;
 
 /** formats.js's function that gives a value's digits as `shownDigits` does. */
 export function digitsCode(name: string, options: IntlOptions): string {
