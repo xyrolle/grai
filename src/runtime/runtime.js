@@ -249,7 +249,8 @@ export function localeOfPath(pathname) {
 }
 
 /**
- * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is.
+ * A URL without its locale prefix. Without the `url` strategy a URL has none, and stays as it is,
+ * and so does a path the strategy leaves alone, though its first segment reads as a prefix.
  *
  * @param {string | URL} url
  * @returns {URL}
@@ -257,7 +258,11 @@ export function localeOfPath(pathname) {
 export function deLocalizeUrl(url) {
 	const copy = new URL(url);
 	const [, first, ...rest] = copy.pathname.split("/");
-	if (readsUrl && localeOfPrefix(first) !== undefined) {
+	if (
+		readsUrl &&
+		localeOfPrefix(first) !== undefined &&
+		!(leavesPathsAlone && leftAlone(copy.pathname))
+	) {
 		copy.pathname = `/${rest.join("/")}`;
 	}
 	return copy;
