@@ -1,7 +1,8 @@
 // Browser: the message-heavy page (page.mjs) built by Vite through grai's own plugins, server-
 // rendered, then loaded and hydrated in Chromium in each locale through its import map:
 // - grai/vite: every message a call, as a client build has them;
-// - grai/svelte: each message without inputs read as its string in the page's locale;
+// - grai/svelte: each message without inputs read as its string in the page's locale, the page
+//   importing the namespace, then each key by its own path (`#i18n/messages/<key>.js`);
 // - strings after the compile: those calls replaced by their strings once Svelte compiled the
 //   component, as a bundler transform would (strings-after-compile.mjs);
 // - text inlined: those messages' text written into the template, which only a build of every
@@ -158,6 +159,11 @@ async function benchLocale(browser, app, dir, compiledKeys, locale) {
 	const inlined = pageSource(app, { from: keys, inline: texts });
 	const body = await serverBody(dir, "Calls", calls, locale, props);
 	const callsEntry = writeEntry(dir, "Calls", calls);
+	const perKeyEntry = writeEntry(
+		dir,
+		"PerKey",
+		pageSource(app, { from: (key) => `#i18n/messages/${key}.js` }),
+	);
 	const inlinedEntry = writeEntry(dir, `Inlined-${locale}`, inlined);
 	const variants = {
 		"grai/vite: calls": await clientBuild(dir, callsEntry, [
@@ -168,6 +174,11 @@ async function benchLocale(browser, app, dir, compiledKeys, locale) {
 			graiSvelte({ localeChunks: true }),
 			svelte(),
 		]),
+		"grai/svelte: strings, per-key imports": await clientBuild(
+			dir,
+			perKeyEntry,
+			[graiSvelte({ localeChunks: true }), svelte()],
+		),
 		"strings after the compile": await clientBuild(dir, callsEntry, [
 			graiVite({ localeChunks: true }),
 			svelte(),
@@ -221,6 +232,11 @@ async function benchLocale(browser, app, dir, compiledKeys, locale) {
 const browser = await chromium.launch();
 for (const app of selectedApps()) {
 	const config = writeGraiProject(app, "svelte-texts");
+	// A key's own path maps to keys.js, as an app maps its message paths in package.json.
+	writeFileSync(
+		join(dirname(config), "package.json"),
+		JSON.stringify({ imports: { "#i18n/messages/*": "./out/keys.js" } }),
+	);
 	const { build: compiled } = await recompile(config, undefined);
 	if (compiled === undefined)
 		throw new Error(`grai cannot compile ${app.name}`);
