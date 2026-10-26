@@ -22,6 +22,7 @@ import {
 } from "vitest";
 import { withGrai } from "../src/next/config.ts";
 import { project } from "./project.ts";
+import { stopped } from "./stopped.ts";
 
 /** Runs from a project's directory, as `next` does, until the test ends. */
 function inProject(dir: string): void {
@@ -207,31 +208,6 @@ function servedAt(server: ChildProcess): Promise<string> {
 			reject(new Error(`next start exited: ${code}\n${output}`)),
 		);
 	});
-}
-
-/** Stops a server's whole process group, and resolves once the server has exited. */
-async function stopped(server: ChildProcess): Promise<void> {
-	const running = server.exitCode === null && server.signalCode === null;
-	const exited = running
-		? new Promise<void>((resolve) => server.once("exit", () => resolve()))
-		: undefined;
-	if (server.pid === undefined) return;
-	try {
-		process.kill(-server.pid, "SIGTERM");
-	} catch (error) {
-		// ESRCH: a group whose processes have all exited. EPERM: macOS refuses a signal to a process
-		// that has exited but is not reaped yet, and so to its group, whose other processes still get it.
-		if (
-			!(
-				error instanceof Error &&
-				"code" in error &&
-				(error.code === "ESRCH" || error.code === "EPERM")
-			)
-		) {
-			throw error;
-		}
-	}
-	await exited;
 }
 
 let browser: Browser;

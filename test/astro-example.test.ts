@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { stopped } from "./stopped.ts";
 
 // The Astro example (examples/astro), built by `astro build` as an app builds it: as a static site
 // served by `astro preview`, and rendered on demand by the Node adapter. Its pages in Chromium.
@@ -53,28 +54,6 @@ async function listening(
 		);
 	});
 	return { server, origin };
-}
-
-/** Stops a server's whole process group, and resolves once the server has exited. */
-async function stopped(served: Served | undefined): Promise<void> {
-	if (served === undefined) return;
-	const { server } = served;
-	const exited =
-		server.exitCode === null && server.signalCode === null
-			? new Promise<void>((resolve) => server.once("exit", () => resolve()))
-			: undefined;
-	if (server.pid === undefined) return;
-	try {
-		process.kill(-server.pid, "SIGTERM");
-	} catch (error) {
-		// A group whose processes have all exited.
-		if (
-			!(error instanceof Error && "code" in error && error.code === "ESRCH")
-		) {
-			throw error;
-		}
-	}
-	await exited;
 }
 
 let browser: Browser;
@@ -186,7 +165,7 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 		]);
 		site.origin = served.origin;
 	}, 120_000);
-	afterAll(() => stopped(served));
+	afterAll(() => served && stopped(served.server));
 
 	aSite(site);
 
@@ -214,7 +193,7 @@ describe("the Astro example, rendered on demand by the Node adapter", {
 		);
 		site.origin = served.origin;
 	}, 120_000);
-	afterAll(() => stopped(served));
+	afterAll(() => served && stopped(served.server));
 
 	aSite(site);
 
