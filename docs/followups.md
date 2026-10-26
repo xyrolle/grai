@@ -87,7 +87,7 @@ Done when: a page served through a shared cache renders in each reader's locale 
 
 ## Ship one locale's client messages on Next.js
 
-A client component's messages ship with every locale's variants: one Next build serves every locale, and Next gives an adapter no way to point a page at one locale's chunks. On the bench's page, grai costs 6.7 KB brotli more than the same page with its words written in, for 100 client messages in three locales and the runtime (`docs/runtime.md`).
+A client component's messages ship with every locale's variants: one Next build serves every locale, and Next gives an adapter no way to point a page at one locale's chunks. On the bench's page, grai costs 7.3 KB brotli more than the same page with its words written in, for 100 client messages in three locales and the runtime (`docs/runtime.md`).
 
 Done when: a Next page's client chunks hold only its locale's variants, with a browser test that it loads no other locale's words.
 
