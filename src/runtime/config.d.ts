@@ -13,6 +13,7 @@ export declare const strategy: readonly (
 	| "preferredLanguage"
 	| "query"
 	| "url"
+	| `custom-${string}`
 )[];
 /** The direction each locale's script is written in, in `locales` order. */
 export declare const directions: readonly ("ltr" | "rtl")[];
