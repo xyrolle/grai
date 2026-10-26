@@ -26,7 +26,7 @@ import { withoutContentHash } from "../src/content-names.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { ownChunkBytes } from "../src/vite-build.ts";
-import { type Messages, project } from "./project.ts";
+import { type Messages, outputFile, project } from "./project.ts";
 
 /**
  * What a test's dev server leaves Vite's watcher off: the page, package and render files the test
@@ -497,6 +497,7 @@ describe("grai/vite's module kinds", () => {
 
 		expect(placed).toEqual({
 			"page.js": [undefined, "page"],
+			"out/internal.js": ["runtime", "grai-runtime"],
 			"out/runtime.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"out/plurals.js": ["plurals", "grai-runtime"],
@@ -557,7 +558,7 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 			const { dir } = project(catalogs);
 			await built(dir, { page }, { localeChunks });
 			const config = await import(
-				pathToFileURL(join(dir, "out", "config.js")).href
+				pathToFileURL(await outputFile(dir, "config.js")).href
 			);
 			return config.localeCopies;
 		};
