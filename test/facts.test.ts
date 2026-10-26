@@ -82,6 +82,7 @@ describe("a file's facts", () => {
 			`const lazy = (key) => import(\`#i18n/messages/\${key}.js\`);`,
 			'const node = require("./five");',
 			"const dynamic = (path) => import(path);",
+			'const pages = import.meta.glob(["./pages/*.ts", "!./pages/draft.ts"]);',
 		].join("\n");
 		const module = await moduleOf("src/a.ts", text);
 
@@ -114,13 +115,18 @@ describe("a file's facts", () => {
 		]);
 		expect(
 			module.loads.map((load) =>
-				"source" in load ? load.source : load.pattern,
+				"source" in load
+					? load.source
+					: "pattern" in load
+						? load.pattern
+						: `glob ${load.globs.join(" ")}`,
 			),
 		).toEqual([
 			"#i18n/messages/title.js",
-			"./messages/*.js",
+			"glob ./messages/*.js",
 			"#i18n/messages/*.js",
 			"./five",
+			"glob ./pages/*.ts !./pages/draft.ts",
 		]);
 		expect(module.aliases).toEqual({ e: "a" });
 	});

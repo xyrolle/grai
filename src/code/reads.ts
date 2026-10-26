@@ -10,7 +10,7 @@ import type { Binding, ModuleFacts, Span } from "./facts.ts";
 import { readImports } from "./import-reads.ts";
 import type { ModuleGraph, Value } from "./modules.ts";
 import type { ProjectCode, SourceCode } from "./project.ts";
-import { reachOfPattern } from "./reach.ts";
+import { globsTakeOutput, reachOfPattern } from "./reach.ts";
 import { type Context, reachAt, readUse } from "./use-reads.ts";
 
 /** Where a read is: the file, by its path and as the project shows it, its text, and the span. */
@@ -121,7 +121,10 @@ async function readModule(
 			);
 			continue;
 		}
-		const reach = await reachOfPattern(graph, load.pattern, path);
+		const reach =
+			"pattern" in load
+				? await reachOfPattern(graph, load.pattern, path)
+				: globReach(graph, load.globs, path, source);
 		if (reach !== undefined) {
 			const place = { path, source, at: load.at };
 			reading.reaches.push(reachAt(place, reach, false));
@@ -133,4 +136,17 @@ async function readModule(
 			"local" in use.from ? held.get(use.from.local) : loads[use.from.load];
 		if (origin !== undefined) await readUse(context, use, origin);
 	}
+}
+
+/** What an `import.meta.glob` reaches: every key when it takes the output in, else none of grai's. */
+function globReach(
+	graph: ModuleGraph,
+	globs: readonly string[],
+	path: string,
+	{ file }: SourceCode,
+): { prefix: string; choices: undefined } | undefined {
+	const root = path.slice(0, path.length - file.length);
+	return globsTakeOutput(graph, globs, path, root)
+		? { prefix: "", choices: undefined }
+		: undefined;
 }
