@@ -3,8 +3,8 @@
  * command reads again only the files that changed since the last. An entry is a file's facts, never
  * its tree, by the hash of its text, under the code that read it: grai's reader, by its contents,
  * and the versions of the parsers it loads, so any change to them reads every file again. The cache
- * is written whole and atomically after a command reads, with the files that command read, so an
- * entry for a file gone or changed is dropped.
+ * is written whole and atomically after a command that read a file again or found one gone, with the
+ * files that command read, so an entry for a file gone or changed is dropped.
  */
 
 import { createHash, hash } from "node:crypto";
@@ -36,6 +36,7 @@ export class FactsCache {
 	);
 	private readonly read: ReadonlyMap<string, Entry>;
 	private readonly kept = new Map<string, Entry>();
+	private added = false;
 
 	/** The cache of a project's facts, in its outdir's state, or an empty one. */
 	constructor(stateDirectory: string) {
@@ -53,10 +54,15 @@ export class FactsCache {
 
 	set(path: string, text: string, facts: FileFacts): void {
 		this.kept.set(path, { hash: textHash(text), facts });
+		this.added = true;
 	}
 
-	/** Writes the facts of the files read this time, and only those. */
+	/**
+	 * Writes the facts of the files read this time, and only those, unless they are the cache's
+	 * already: no file was read again, and every file it has was read.
+	 */
 	save(): void {
+		if (!this.added && this.kept.size === this.read.size) return;
 		mkdirSync(dirname(this.file), { recursive: true });
 		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
 		writeFileSync(
