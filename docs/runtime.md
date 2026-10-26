@@ -53,6 +53,7 @@ grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageforma
 | The messages a page downloads (`bytes`) | its keys and some its chunks share, in its locale: 34.5 KB on the largest page with `localeChunks`, 71.3 KB in every locale without | its own keys, in every locale: 51.6 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
 | A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
 | One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
+| A dev page's heap once collected, with the whole catalog, and what each edit adds (`hmr`) | 8.0 MB; 5.4 KB | 57.6 MB; 40.7 MB | 7.0 MB; 4.8 MB | 6.8 MB; 4.5 MB |
 | Type checking 500 calls with `tsc` 7 (`types`) | 82 ms | 278 ms | 609 ms | 521 ms |
 | The editor's first completion of a key, TypeScript 6 (`types`) | 0.2 s | 1.0 s | 49 s | 21 s |
 
@@ -174,6 +175,17 @@ One message edited in a catalog until the page shows it, through Vite's dev serv
 |---|---|---|
 | app A | 15.0 ms | 11.5 ms |
 | the synthetic project | 10.0 ms | 8.7 ms |
+
+What that page keeps once collected, at load and after its 23 edits (`hmr`, Chromium 156). The same page with no messages keeps 1.4 MB:
+
+| | grai's plugin | Paraglide | i18next | use-intl |
+|---|---|---|---|---|
+| app A, at load | 8.0 MB | 57.6 MB | 7.0 MB | 6.8 MB |
+| app A, after the edits | 8.1 MB | 993.2 MB | 116.5 MB | 109.8 MB |
+| app B, at load | 14.9 MB | 107.7 MB | 13.4 MB | 13.0 MB |
+| app B, after the edits | 15.1 MB | 1,947.9 MB | 251.1 MB | 241.5 MB |
+
+grai's dev page holds every locale of every key, and each call goes through a function that an edit's patch reaches. Over the page with no messages, that is 361 B a message (a key in one locale) on app A, 355 B on app B and 351 B on the synthetic project, and each edit adds 5.2–5.8 KB. i18next and use-intl hold only the page's locale, as a catalog they interpret when a message is called. They keep about 1 MB less at load on app A and 1.5 MB less on app B. Paraglide's dev output keeps about seven times as much as grai's. On every edit, those three pages import the changed modules again under new URLs, and a page keeps every module it has imported for as long as it is open. Each edit adds 4.5–10.3 MB for i18next and use-intl, and 41–80 MB for Paraglide. `hmr` holds grai's plugin to 400 B a message and 8 KB an edit, and exits with an error above either.
 
 The designs grai's plugin was chosen from, as experiments of the bench's own compiler and watcher (`hmr`'s other rows, earlier runs):
 
