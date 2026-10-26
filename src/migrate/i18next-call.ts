@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import type { MappedKey, Mapping } from "../import/mapping.ts";
 import {
 	droppedValue,

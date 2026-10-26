@@ -1,4 +1,4 @@
-import { parseSync } from "vite";
+import { parse } from "./code/parse.ts";
 
 /** How keys.js imports a key's module in a build, and that module's id. */
 export const keyPrefix = "grai:key/";
@@ -76,7 +76,7 @@ export function localeCopies(
 	code: string,
 	locales: readonly string[],
 ): Map<string, string> {
-	const calls = parseSync(fileName, code).program.body.flatMap((statement) =>
+	const calls = parse(fileName, code).program.body.flatMap((statement) =>
 		statement.type === "VariableDeclaration"
 			? statement.declarations.flatMap(({ init }) => {
 					if (init?.type !== "CallExpression") return [];

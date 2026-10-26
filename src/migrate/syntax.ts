@@ -1,4 +1,4 @@
-import { type ESTree, parseSync } from "vite";
+import { type ESTree, parse } from "../code/parse.ts";
 
 /** Any node of a module's syntax tree. */
 export type Node = ESTree.Node;
@@ -11,7 +11,7 @@ export function parseModule(
 	file: string,
 	text: string,
 ): ESTree.Program | { error: string; at: number } {
-	const { program, errors } = parseSync(file, text, { preserveParens: false });
+	const { program, errors } = parse(file, text, { preserveParens: false });
 	const [error] = errors;
 	if (error === undefined) return program;
 	return { error: error.message, at: error.labels[0]?.start ?? 0 };
