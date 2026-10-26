@@ -55,7 +55,9 @@ export function dynamicReadsIn(
 		}
 	}
 	for (const match of text.matchAll(builtPerKeyLoad)) {
-		reads.push({ at: match.index, written: match[0], prefix: "" });
+		// A comment in the call is blanked in the code, so its space is shown as one.
+		const written = match[0].replace(/\s+/g, " ");
+		reads.push({ at: match.index, written, prefix: "" });
 	}
 	return reads;
 }

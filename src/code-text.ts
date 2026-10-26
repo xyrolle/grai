@@ -8,23 +8,14 @@
  * a Svelte, Vue or Astro `<script>`, and Astro's frontmatter.
  */
 
-/** Words after which a `/` starts a regular expression, not a division. */
-const beforeExpression = new Set([
-	"return",
-	"typeof",
-	"instanceof",
-	"case",
-	"do",
-	"else",
-	"in",
-	"of",
-	"new",
-	"delete",
-	"void",
-	"throw",
-	"yield",
-	"await",
-]);
+import {
+	isIndexAfter,
+	isPathAfter,
+	passCode,
+	passedNothing,
+	passLiteral,
+	startsRegex,
+} from "./code-tokens.ts";
 import { regexEnd, stringEnd, templateTextEnd } from "./literal-ends.ts";
 
 const components = /\.(?:svelte|vue|astro)$/;
@@ -33,8 +24,6 @@ const frontmatter = /^(---\r?\n)([\s\S]*?)(\r?\n---)/;
 /** What can start a comment or a literal, and inside a template's `${}`, a brace too. */
 const significantInCode = /[/"'`]/g;
 const significantInTemplate = /[/"'`{}]/g;
-/** The end of code that opens a dynamic import or a Vite glob, whose argument is a module's path. */
-const opensLoad = /(?<![\w$.])import\s*(?:\.\s*meta\s*\.\s*glob\s*)?\(\s*$/;
 
 /** A file's code, blanked as above. */
 export function codeText(text: string, file: string): string {
@@ -61,13 +50,12 @@ export function escapesNames(code: string): boolean {
 /**
  * JavaScript or TypeScript with its comments and literals' text blanked. The scan goes from one
  * character that can start a comment or a literal to the next, and reads a `/` or a quote by the
- * word or character the code it went past ends with.
+ * last tokens of the code it passed, comments left out (`code-tokens.ts`).
  */
 function blankedCode(source: string): string {
 	let out = "";
 	let index = 0;
-	/** The last code the scan passed that is not space: a word, or one character. */
-	let previous = "";
+	const passed = passedNothing(source);
 	/** For each template the code is inside: the depth of `{` in its `${}`. */
 	const templates: number[] = [];
 	const blank = (from: number, to: number) => {
@@ -86,12 +74,7 @@ function blankedCode(source: string): string {
 			templates.length > 0 ? significantInTemplate : significantInCode;
 		significant.lastIndex = index;
 		const at = significant.exec(source)?.index ?? source.length;
-		const passed = source.slice(index, at);
-		previous = lastWritten(passed) ?? previous;
-		const path =
-			previous === "from" ||
-			previous === "import" ||
-			(previous === "(" && opensLoad.test(passed));
+		passCode(passed, index, at);
 		keep(at);
 		if (index === source.length) break;
 		const char = source.charAt(index);
@@ -105,62 +88,46 @@ function blankedCode(source: string): string {
 		} else if (char === '"' || char === "'") {
 			const end = stringEnd(source, index, char);
 			if (end === undefined) {
+				passCode(passed, index, index + 1);
 				keep(index + 1);
-				previous = char;
 				continue;
 			}
+			const kept = isPathAfter(passed) || isIndexAfter(passed);
+			passLiteral(passed, index);
 			keep(index + 1);
-			if (path || previous === "[") keep(end - 1);
+			if (kept) keep(end - 1);
 			else blank(index, end - 1);
 			keep(end);
-			previous = "literal";
 		} else if (char === "`" || (char === "}" && templates.at(-1) === 0)) {
 			if (char === "}") templates.pop();
+			const path = char === "`" && isPathAfter(passed);
 			keep(index + 1);
 			const end = templateTextEnd(source, index);
-			if (char === "`" && path) keep(end);
+			if (path) keep(end);
 			else blank(index, end);
 			if (source.startsWith("${", end)) {
+				passCode(passed, end + 1, end + 2);
 				keep(end + 2);
 				templates.push(0);
-				previous = "{";
 			} else {
+				passLiteral(passed, end);
 				keep(Math.min(end + 1, source.length));
-				previous = "literal";
 			}
-		} else if (char === "/" && startsExpression(previous)) {
+		} else if (char === "/" && startsRegex(passed)) {
 			const { close, end } = regexEnd(source, index);
+			passLiteral(passed, index);
 			keep(index + 1);
 			blank(index, close);
 			keep(end);
-			previous = "literal";
 		} else {
 			// A `/` that divides, or a brace inside a template's `${}`.
 			if (char !== "/") {
 				const depth = templates.pop() ?? 0;
 				templates.push(depth + (char === "{" ? 1 : -1));
 			}
+			passCode(passed, index, index + 1);
 			keep(index + 1);
-			previous = char;
 		}
 	}
 	return out;
-}
-
-/** The last word, or character other than space, that code writes, if it writes any. */
-function lastWritten(code: string): string | undefined {
-	const written = code.trimEnd();
-	let start = written.length;
-	while (start > 0 && /[\w$]/.test(written.charAt(start - 1))) start--;
-	return start < written.length ? written.slice(start) : written.at(-1);
-}
-
-/**
- * Whether a `/` after this code starts a regular expression: after an operator or a keyword, but
- * not after `<`, where it closes a JSX element.
- */
-function startsExpression(previous: string): boolean {
-	if (previous === "" || beforeExpression.has(previous)) return true;
-	if (previous === "<") return false;
-	return previous.length === 1 && !/[\w$)\]}"'`]/.test(previous);
 }
