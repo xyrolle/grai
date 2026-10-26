@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { check } from "../src/check.ts";
 import { project } from "./project.ts";
+import { writeSources } from "./sources.ts";
 
 /** The problems check reports for the catalogs, with a source that names each key. */
 async function problemsOf(
@@ -57,6 +58,53 @@ describe("grai check's inputs", () => {
 			}),
 		).toEqual([
 			'messages/fr.json: "files" (fr): the message never shows {count}, which en shows. Show it here too, or drop it everywhere.',
+		]);
+	});
+});
+
+describe("grai check's reads of components", () => {
+	it("reads a Nuxt app's pages and a Vue component through the aliases Nuxt generates", async () => {
+		const { dir, config } = project(
+			{
+				en: { title: "Title", about_title: "About", unused: "Unused" },
+				de: { title: "Titel", about_title: "Über", unused: "Unbenutzt" },
+			},
+			{ outdir: "app/i18n" },
+		);
+		writeSources(dir, {
+			"tsconfig.json": JSON.stringify({
+				files: [],
+				references: [{ path: "./.nuxt/tsconfig.app.json" }],
+			}),
+			".nuxt/tsconfig.app.json": JSON.stringify({
+				compilerOptions: { paths: { "~/*": ["../app/*"] } },
+				include: ["../app/**/*", "../app/**/*.vue"],
+			}),
+			"app/pages/index.vue": [
+				'<script setup lang="ts">',
+				'import * as m from "~/i18n/keys.js";',
+				"const others = [{ name: 1 }];",
+				"</script>",
+				"<template>",
+				"\t<h1>{{ m.title() }}</h1>",
+				'\t<a v-for="other in others" :key="other.name">{{ m.titel() }}</a>',
+				"</template>",
+				"",
+			].join("\n"),
+			"app/components/About.vue": [
+				"<script setup>",
+				'import { about_title } from "~/i18n/keys.js";',
+				"</script>",
+				"<template><h2>{{ about_title() }}</h2></template>",
+				"",
+			].join("\n"),
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([
+			'app/pages/index.vue:7:52: "titel": m.titel names a key no catalog has. Add it with grai add titel --en "…" --de "…", or fix the name.',
+			'messages/en.json: "unused": no shipped code under . reads the key. Remove it from every catalog, or use it.',
 		]);
 	});
 });
