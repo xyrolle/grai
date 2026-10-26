@@ -37,7 +37,8 @@ type GraiErrorCode =
 	| "value-unmatched"
 	| "format-option-invalid"
 	| "locale-unbound"
-	| "output-changed";
+	| "output-changed"
+	| "strategy-undefined";
 /**
  * A message called in a locale it cannot render in, with a value its variants do not take, or on a
  * server outside every request the middleware binds (\`locale-unbound\`).
@@ -75,16 +76,26 @@ export type MarkupMessage<
 /** Throws unless the keys of a module were compiled for the locales the runtime reads, in order. */
 export declare function assertCompiledFor(compiled: readonly string[]): void;
 /** The config, as the middleware and the adapters read it. */
-export declare const strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[];
+export declare const strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | \`custom-\${string}\`)[];
 export declare const cookieName: string | undefined;
 export declare const readsUrl: boolean;
 export declare const prefixesEveryLocale: boolean;
+/** Whether the config gives each locale a host of its own: \`domains\`. */
+export declare const hostsLocales: boolean;
 export declare const leavesPathsAlone: boolean;
 export declare const queryParameter: string | undefined;
 export declare const unlocalizedPaths: readonly RegExp[];
 export declare const localeCopies: boolean;
 /** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
 export declare function localeOfPath(pathname: string): Locale | undefined;
+/** Whether a path is a page without the prefix every locale's paths have: server.js sends it to one. */
+export declare function lacksPrefix(pathname: string): boolean;
+/** A URL's path in its locale's words as its route, its prefix kept, for an adapter that routes by the prefix. */
+export declare function routeOfPath(url: URL): string;
+/** A route's URL path, its prefix kept, in its locale's words. */
+export declare function pathOfRoute(url: URL): string;
+/** The locale whose host \`domains\` gives a host as, if any. */
+export declare function localeOfHost(host: string): Locale | undefined;
 /** Binds a locale outside a request, by its position in \`locales\`: testing.js binds a test's with it. */
 export declare function bindLocale(index: number): void;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */
@@ -92,7 +103,7 @@ export declare function bindRequests(storage: {
 	getStore(): RequestLocale | undefined;
 }): void;
 /** A request's locale, by its position in \`locales\`. */
-export type RequestLocale = { index: number };
+export type RequestLocale = { index: number; origin?: string };
 /** A message's inputs as its compiled code reads them; the key's declaration types them. */
 type CompiledInputs = { readonly [input: string]: unknown };
 /** A compiled message without inputs: its text in each locale, in \`locales\` order. */
@@ -171,6 +182,13 @@ export const serverDeclarations = `import type { Locale } from "./runtime.js";
 export declare const localeCopies: boolean;
 
 /**
+ * Runs \`code\` in \`locale\` as the middleware runs a request's handler: each message it calls,
+ * and each task it starts, renders in that locale. A job, such as a scheduled email, runs its code
+ * in this, and so does a test: under Vitest, \`aroundEach((test) => withLocale("de", test))\`.
+ */
+export declare function withLocale<Result>(locale: Locale, code: () => Result): Result;
+
+/**
  * Resolves a request's locale by the config's strategy and binds it for the handler and all it
  * calls. Returns the handler's response, its \`Vary\` listing the request headers the strategy
  * reads.
@@ -187,14 +205,29 @@ export declare function middleware(
  * The locale the middleware binds for a request: the first the strategy finds in it, else the base
  * locale. For a framework that renders apart from the middleware.
  */
-export declare function localeOf(request: Request): Locale;
+export declare function localeOf(request: Request): Promise<Locale>;
 
 /**
  * The redirect the middleware answers a request with, its \`Vary\` included, else undefined: with
  * every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
  */
-export declare function redirectOf(request: Request): Response | undefined;
+export declare function redirectOf(request: Request): Promise<Response | undefined>;
 
 /** The request headers the strategy reads, as the \`Vary\` the middleware adds: "" for none. */
-export declare const vary: string;
+export declare let vary: string;
+
+/**
+ * Defines one of the server's own strategies, which the config's \`strategy\` lists by its name,
+ * such as \`custom-session\`: the middleware asks it for a request's locale in the strategy's
+ * order, and goes on to the next where it names none. \`vary\` names the request headers it reads,
+ * for the response's \`Vary\`; without it, the response varies by every header. Define each before
+ * the first request.
+ */
+export declare function defineServerStrategy(
+	name: \`custom-\${string}\`,
+	strategy: {
+		getLocale(request: Request): Locale | undefined | Promise<Locale | undefined>;
+		vary?: readonly string[];
+	},
+): void;
 `;

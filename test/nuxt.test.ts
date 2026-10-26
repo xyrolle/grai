@@ -32,12 +32,33 @@ describe("the module", { timeout: 30_000 }, () => {
 		);
 	});
 
-	it("refuses the url strategy under a base URL, whose segment it would read as the locale", async () => {
+	it("refuses pathnames beside domains, which Nuxt cannot route by host", async () => {
+		await expect(
+			loaded(
+				{
+					strategy: ["url"],
+					domains: { en: "shop.test" },
+					pathnames: { "/about": { en: "/about-us" } },
+				},
+				{},
+			),
+		).rejects.toThrow(
+			`grai.config.json: Nuxt routes a page by its path alone, so on a locale's own host ("domains") it cannot route that locale's words ("pathnames"). Leave out one of them.`,
+		);
+	});
+
+	it("refuses a base URL that is not grai's basePath, under the url strategy, which reads the locale after it", async () => {
 		await expect(
 			loaded({ strategy: ["url"] }, { app: { baseURL: "/shop/" } }),
 		).rejects.toThrow(
-			"grai: the url strategy reads a locale from a path's first segment, and Nuxt's app.baseURL is /shop/. Serve the app from /, or use another strategy.",
+			`grai.config.json: Nuxt's app.baseURL "/shop/" and grai's "basePath" (none) must name the same path: the "url" strategy reads the locale after it.`,
 		);
+		await expect(
+			loaded(
+				{ strategy: ["url"], basePath: "/shop" },
+				{ app: { baseURL: "/shop/" } },
+			),
+		).resolves.toBeUndefined();
 	});
 });
 
@@ -46,6 +67,9 @@ describe("the pages of the url strategy", () => {
 		localePrefix: "as-needed",
 		prefixes: ["en", "ro"],
 		unlocalizedPaths: [],
+		pathnames: [],
+		basePath: "",
+		domains: [],
 	} as const;
 	const index: NuxtPage = { name: "index", path: "/", file: "index.vue" };
 	const docs: NuxtPage = {
@@ -104,6 +128,48 @@ describe("the pages of the url strategy", () => {
 			{ name: "index___en", path: "/en", file: "index.vue" },
 			{ name: "index___ro", path: "/ro", file: "index.vue" },
 		]);
+	});
+
+	it("routes a page in each locale's words where pathnames give them, its segments kept", () => {
+		const product: NuxtPage = {
+			name: "products-id",
+			path: "/products/:id()",
+			file: "products/[id].vue",
+		};
+		const routing = {
+			...asNeeded,
+			pathnames: [
+				{
+					route: "/products/[id]",
+					paths: ["/goods/[id]", "/produse/[id]"],
+				},
+				{ route: "/about", paths: ["/about", "/%C8%99tiri"] },
+			],
+		};
+
+		expect(
+			localizedPages([index, product], ["en", "ro"], "en", routing),
+		).toEqual([
+			{
+				name: "products-id___en",
+				path: "/goods/:id()",
+				file: "products/[id].vue",
+			},
+			{ name: "index___ro", path: "/ro", file: "index.vue" },
+			{
+				name: "products-id___ro",
+				path: "/ro/produse/:id()",
+				file: "products/[id].vue",
+			},
+		]);
+		expect(
+			localizedPages(
+				[{ name: "about", path: "/about", file: "about.vue" }],
+				["en", "ro"],
+				"en",
+				routing,
+			),
+		).toEqual([{ name: "about___ro", path: "/ro/știri", file: "about.vue" }]);
 	});
 
 	it("leaves a page at a path the strategy leaves alone without copies", () => {

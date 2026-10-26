@@ -13,6 +13,7 @@ export declare const strategy: readonly (
 	| "preferredLanguage"
 	| "query"
 	| "url"
+	| `custom-${string}`
 )[];
 /** The direction each locale's script is written in, in `locales` order. */
 export declare const directions: readonly ("ltr" | "rtl")[];
@@ -40,3 +41,25 @@ export declare const leavesPathsAlone: boolean;
 export declare const prefixes: readonly string[];
 /** The paths the `url` strategy leaves alone, as regular expressions of a URL's path. */
 export declare const unlocalizedPaths: readonly RegExp[];
+/** Whether the config gives routes their paths in a locale's words: `pathnames`. */
+export declare const translatesPaths: boolean;
+/**
+ * Each route's path, and its path in each locale's words, in `locales` order: the pattern a path
+ * matches, its named segments, and the path to fill.
+ */
+export declare const pathnames: readonly {
+	route: { pattern: RegExp; names: readonly string[]; path: string };
+	locales: readonly {
+		pattern: RegExp;
+		names: readonly string[];
+		path: string;
+	}[];
+}[];
+/** Whether the config names a base path the app is served under: `basePath`. */
+export declare const servedUnderBase: boolean;
+/** The path the app is served under, such as `/shop`, or `""` for none. */
+export declare const basePath: string;
+/** Whether the config gives each locale a host of its own: `domains`. */
+export declare const hostsLocales: boolean;
+/** Each locale's host, in `locales` order, or none. */
+export declare const domains: readonly string[];

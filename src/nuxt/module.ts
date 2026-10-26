@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
 	addPlugin,
 	addServerHandler,
@@ -7,9 +7,11 @@ import {
 	defineNuxtModule,
 } from "nuxt/kit";
 import type { NuxtModule } from "nuxt/schema";
+import { baseDisagreement } from "../base-agreement.ts";
 import { type CompileResult, recompile } from "../compile.ts";
 import { readConfig } from "../config.ts";
-import { grai } from "../vite.ts";
+import { GraiError } from "../error.ts";
+import { graiPlugin } from "../vite-plugin.ts";
 import { localizedPages } from "./pages.ts";
 
 /** The module's options. `config` is the path of the project's grai.config.json, from its root. */
@@ -40,9 +42,23 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 				"grai: grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
 			);
 		}
-		if (config.strategy.includes("url") && nuxt.options.app.baseURL !== "/") {
-			throw new Error(
-				`grai: the url strategy reads a locale from a path's first segment, and Nuxt's app.baseURL is ${nuxt.options.app.baseURL}. Serve the app from /, or use another strategy.`,
+		const base = baseDisagreement(config, {
+			option: "Nuxt's app.baseURL",
+			base: nuxt.options.app.baseURL,
+		});
+		if (base !== undefined) {
+			throw new GraiError(
+				"config-invalid",
+				{ file: basename(configFile) },
+				base,
+			);
+		}
+		const { pathnames, domains } = config.urlRouting;
+		if (pathnames.length > 0 && domains.length > 0) {
+			throw new GraiError(
+				"config-invalid",
+				{ file: basename(configFile) },
+				`Nuxt routes a page by its path alone, so on a locale's own host ("domains") it cannot route that locale's words ("pathnames"). Leave out one of them.`,
 			);
 		}
 		// As grai/vite's compile, so that the output it finds is already the one it would write.
@@ -56,9 +72,11 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		// Only the browser's build: Nuxt runs the server's dev modules in a runner of its own,
 		// which takes an edit when the output's files change, not through grai/vite's patch. A
 		// build writes each message chunk's copy per locale, which a page then loads alone.
-		addVitePlugin(() => grai({ config: configFile, localeChunks: true }), {
-			server: false,
-		});
+		// Nuxt's own base is checked against grai's above: Vite's is where Nuxt puts its assets.
+		addVitePlugin(
+			() => graiPlugin({ config: configFile, localeChunks: true }).plugins,
+			{ server: false },
+		);
 		addServerHandler({
 			middleware: true,
 			handler: runtime("./runtime/locale"),

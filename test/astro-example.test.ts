@@ -179,6 +179,29 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 	}, 60_000);
 });
 
+describe("the Astro example, under a base path", { timeout: 30_000 }, () => {
+	let origin = "";
+	let served: Served | undefined;
+	beforeAll(async () => {
+		built(["--config", "astro.base.config.ts"]);
+		served = await listening(process.execPath, ["dist-base/server/entry.mjs"], {
+			PORT: "0",
+			HOST: "127.0.0.1",
+		});
+		origin = served.origin;
+	}, 120_000);
+	afterAll(() => served && stopped(served.server));
+
+	it("renders each locale's pages in the locale named after the base path", async () => {
+		await page.goto(`${origin}/shop/ro/about/`);
+		expect([await html("lang"), await html("dir")]).toEqual(["ro", "ltr"]);
+		expect(await text("h1")).toBe("Despre acest exemplu");
+
+		await page.goto(`${origin}/shop/ar/`);
+		expect([await html("lang"), await html("dir")]).toEqual(["ar", "rtl"]);
+	});
+});
+
 describe("the Astro example, rendered on demand by the Node adapter", {
 	timeout: 30_000,
 }, () => {
