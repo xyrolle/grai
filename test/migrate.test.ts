@@ -98,7 +98,7 @@ describe("grai migrate, from i18next", () => {
 			"src/cart.tsx": `import { useTranslation } from "react-i18next";
 
 export function Cart({ count }: { count: number }) {
-	const { t } = useTranslation("cart");
+	const { t } = useTranslation(["cart", "common"]);
 	return (
 		<p title={t("title")}>
 			{t("items", { count })} {t("common:friend", { context: "male" })}
@@ -256,6 +256,68 @@ export function Greeting({ name }: { name: string }) {
 		expect(project.text("src/cards.tsx")).toBe(migratedText);
 	});
 
+	it("looks a key up in the first namespace a hook loads, as react-i18next does, unless its nsMode is fallback", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/namespaces.tsx": `import { useTranslation } from "react-i18next";
+
+export function Loaded({ name }: { name: string }) {
+	const { t } = useTranslation(["cart", "common"]);
+	return (
+		<>
+			{t("title")}
+			{t("greeting", { name, defaultValue: "Hello" })}
+			{t("common:greeting", { name })}
+			{t("greeting", { ns: "common", name })}
+			{t("greeting", { ns: ["cart", "common"], name })}
+		</>
+	);
+}
+
+export function Fallback({ name }: { name: string }) {
+	const { t } = useTranslation(["cart", "common"], { nsMode: "fallback" });
+	return <p>{t("greeting", { name })}</p>;
+}
+
+export function Single({ name }: { name: string }) {
+	const { t } = useTranslation("cart");
+	return <p>{t("common:greeting", { name })}</p>;
+}
+`,
+		});
+
+		expect(
+			project.text("src/namespaces.tsx"),
+		).toBe(`import { m } from "../out/messages.js";
+import { useTranslation } from "react-i18next";
+
+export function Loaded({ name }: { name: string }) {
+	const { t } = useTranslation(["cart", "common"]);
+	return (
+		<>
+			{m.cart_title()}
+			{t("greeting", { name, defaultValue: "Hello" })}
+			{m.common_greeting({ name })}
+			{m.common_greeting({ name })}
+			{m.common_greeting({ name })}
+		</>
+	);
+}
+
+export function Fallback({ name }: { name: string }) {
+	return <p>{m.common_greeting({ name })}</p>;
+}
+
+export function Single({ name }: { name: string }) {
+	const { t } = useTranslation("cart");
+	return <p>{t("common:greeting", { name })}</p>;
+}
+`);
+		expect(project.left()).toEqual([
+			'src/namespaces.tsx:8:5: grai.import.json has no key cart:greeting. common:greeting is in it, which i18next reaches only through its fallbackNS or the hook\'s nsMode: "fallback": call m.common_greeting() if the app sets one.',
+			"src/namespaces.tsx:23:13: it names common, which its useTranslation does not load: i18next finds the key only if another hook or the app's i18next init loads common. Call m.common_greeting() if one does.",
+		]);
+	});
+
 	it("reports each call it cannot rewrite with its line, and keeps what those calls need", () => {
 		const project = migrated("i18next", i18nextCatalogs, {
 			"src/left.tsx": `import { Trans, useTranslation } from "react-i18next";
@@ -291,7 +353,7 @@ export function Prefixed() {
 			"src/left.tsx:10:5: the message reads name, which the call does not pass.",
 			"src/left.tsx:11:5: its options are not an object written in the call, so what they pass is unknown.",
 			"src/left.tsx:12:5: grai.import.json has no key common:missing: the import left it out, or no catalog has it.",
-			"src/left.tsx:14:4: <Trans> renders markup and components: render the message's .parts() instead.",
+			"src/left.tsx:14:4: <Trans> renders markup and components, which grai import keeps as text: write the message's tags as grai markup, {#b}…{/b}, in each catalog, then render its .parts() with grai/react's Markup.",
 			"src/left.tsx:15:14: t is passed on, so where it is called cannot be followed: call the messages by name there.",
 			"src/left.tsx:22:13: its key names a namespace under a keyPrefix, where i18next does not find it: call the message by name, as m.<key>().",
 		]);
@@ -562,5 +624,126 @@ export const title = () => t("cart:title") + m;
 		expect(readText(dir, "src/a.ts")).toBe(
 			'import { t } from "i18next";\nt("a");\n',
 		);
+	});
+});
+
+describe("grai migrate leaves a call it cannot prove safe", () => {
+	it("calls grai's m only through its own import, and React's hooks only through React's", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/math.ts": `import { m } from "./numbers.js";
+import { t } from "i18next";
+
+export const title = () => t("cart:title") + m;
+`,
+			"src/typed.ts": `import type { m } from "../out/messages.js";
+import { t } from "i18next";
+
+export const title = (): string => t("cart:title");
+`,
+			"src/memo.ts": `import { t } from "i18next";
+
+function useMemo(read: () => string, values: unknown[]) {
+	return read() + values.length;
+}
+
+export const title = () => useMemo(() => t("cart:title"), [t]);
+`,
+		});
+
+		expect(project.left()).toEqual([
+			"src/math.ts:4:28: m names something else here: rename it, then run grai migrate again.",
+			"src/memo.ts:7:60: t is passed on, so where it is called cannot be followed: call the messages by name there.",
+			"src/typed.ts:4:36: m names something else here: rename it, then run grai migrate again.",
+		]);
+		expect(
+			project.text("src/memo.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+import { t } from "i18next";
+
+function useMemo(read: () => string, values: unknown[]) {
+	return read() + values.length;
+}
+
+export const title = () => useMemo(() => m.cart_title(), [t]);
+`);
+		expect(project.result.changed).toEqual(["src/memo.ts"]);
+	});
+
+	it("reads a name in a parameter's default where JavaScript does, outside the body's own var", async () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/render.ts": `import { t } from "i18next";
+
+export function render(value = t("cart:title")) {
+	var t = () => "local";
+	return value + t();
+}
+`,
+		});
+
+		expect(
+			project.text("src/render.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+
+export function render(value = m.cart_title()) {
+	var t = () => "local";
+	return value + t();
+}
+`);
+		expect(project.left()).toEqual([]);
+		expect((await project.load("src/render.ts")).render?.()).toBe("Cartlocal");
+	});
+
+	it("moves no locale that may read otherwise where the call is, and drops no default it would no longer evaluate", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/order.ts": `import { t } from "i18next";
+
+export const greet = (choose: () => string, name: () => string) =>
+	t("common:greeting", { lng: choose(), name: name() });
+export const tracked = (track: () => string) =>
+	t("cart:title", { defaultValue: track() });
+export const fixed = (lng: string) => t("cart:title", { lng });
+`,
+		});
+		const server = migrated("icu", icuCatalogs, {
+			"src/about.ts": `import { getTranslations } from "next-intl/server";
+
+export async function later() {
+	let locale = "en";
+	const t = await getTranslations({ locale, namespace: "About" });
+	locale = "de";
+	return t("title");
+}
+
+export async function fixed(locale: string) {
+	const t = await getTranslations({ locale, namespace: "About" });
+	return t("title");
+}
+`,
+		});
+
+		expect(project.left()).toEqual([
+			"src/order.ts:4:2: its locale is an expression grai migrate cannot prove reads the same where the rewrite puts it: write it as a string, or as a name nothing assigns again.",
+			"src/order.ts:6:2: its defaultValue is an expression the rewrite would no longer evaluate: write it as a string, or remove it.",
+		]);
+		expect(project.text("src/order.ts")).toContain(
+			"export const fixed = (lng: string) => m.cart_title({}, { locale: lng });",
+		);
+		expect(server.left()).toEqual([
+			"src/about.ts:7:9: its locale is an expression grai migrate cannot prove reads the same where the rewrite puts it: write it as a string, or as a name nothing assigns again.",
+		]);
+		expect(server.text("src/about.ts")).toContain(
+			"export async function fixed(locale: string) {\n\treturn m.About_title({}, { locale });\n}",
+		);
+		const shop = migrated("icu", formatjsCatalogs, {
+			"src/shop.tsx": `import { FormattedMessage } from "react-intl";
+
+export const Title = ({ label }: { label: () => string }) => (
+	<FormattedMessage id="app.title" defaultMessage={label()} />
+);
+`,
+		});
+		expect(shop.left()).toEqual([
+			"src/shop.tsx:4:2: its defaultMessage is an expression the rewrite would no longer evaluate: write it as a string, or remove it.",
+		]);
 	});
 });

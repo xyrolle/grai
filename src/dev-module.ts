@@ -103,7 +103,7 @@ export function devModule(outdir: string, build: Build): string {
 	const callRows = calls
 		.map(([key, compiled]) => `\t${key}: ${row(compiled)},`)
 		.join("\n");
-	return `${outputImports(names, (file) => join(outdir, file))}
+	return `${outputImports(names, (file) => join(outdir, file), build.rendered.modules)}
 ${table(textRows, callRows)}${madeCode}${madeExports(
 	keys.map(([key]) => key),
 	new Set([...everyName(names), ...devWords]),
@@ -136,7 +136,7 @@ export function patchModule(
 	const rows = changed.map(
 		(key) => `\t${key}: ${row(build.compilation.keys.get(key))},`,
 	);
-	return `${outputImports(calledNames(keys, []), (file) => join(outdir, file))}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
+	return `${outputImports(calledNames(keys, []), (file) => join(outdir, file), build.rendered.modules)}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }
 
 /** A key's row in the dev table: its locales' variants, and their parts for markup. */

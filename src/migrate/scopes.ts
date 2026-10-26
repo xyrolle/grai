@@ -37,6 +37,8 @@ export class Scopes {
 	private readonly declared = new Map<string, Binding[]>();
 	private readonly bindings = new Map<Node, Binding>();
 	private readonly uses = new Map<string, Use[]>();
+	/** The uses that assign their name a value: `x = …`, `x++`, `[x] = …`, `for (x of …)`. */
+	private readonly writes = new Set<Node>();
 
 	constructor(program: ESTree.Program) {
 		const module = { start: program.start, end: program.end };
@@ -69,6 +71,11 @@ export class Scopes {
 		return innermost;
 	}
 
+	/** Whether anything assigns a binding again after it is declared. */
+	isAssignedAgain(binding: Binding): boolean {
+		return this.usesOf(binding).some((use) => this.writes.has(use));
+	}
+
 	/** Every use that reads a binding, in source order. */
 	usesOf(binding: Binding): Use[] {
 		return (this.uses.get(binding.name) ?? []).filter(
@@ -77,11 +84,14 @@ export class Scopes {
 	}
 
 	private visit(node: Node, at: Enclosing): void {
+		const target = assignedIn(node);
+		if (target !== undefined) this.markWritten(target);
 		if (node.type === "Identifier") {
 			this.addUse(node);
 		} else if (node.type === "ImportDeclaration") {
 			for (const specifier of node.specifiers) {
 				this.parents.set(specifier, node);
+				this.parents.set(specifier.local, specifier);
 				this.addBinding(specifier.local, at.block);
 			}
 		} else if (node.type === "VariableDeclaration") {
@@ -102,6 +112,9 @@ export class Scopes {
 		} else if (node.type === "CatchClause") {
 			if (node.param !== null) this.declarePattern(node, node.param, node, at);
 			this.visitChildren(node, { fn: at.fn, block: node }, "param");
+		} else if (node.type === "StaticBlock") {
+			// A class's static block keeps its vars, as a function's body does.
+			this.visitChildren(node, { fn: node, block: node });
 		} else if (blocks.has(node.type)) {
 			this.visitChildren(node, { fn: at.fn, block: node });
 		} else if (node.type !== "ExportNamedDeclaration" || node.source === null) {
@@ -139,24 +152,25 @@ export class Scopes {
 	}
 
 	/**
-	 * A function's own scope holds its parameters and its body, and an expression's own name; a
-	 * declaration's name is the enclosing block's.
+	 * A function's parameters are in a scope of its own, with an expression's own name; its body is
+	 * another, where its `var`s are, which a parameter's default cannot see. A declaration's name is
+	 * the enclosing block's.
 	 */
 	private visitFunction(
 		node: ESTree.Function | ESTree.ArrowFunctionExpression,
 		at: Enclosing,
 	): void {
-		const own = { fn: node, block: node };
 		if (node.id !== null) {
 			const declared = node.type === "FunctionDeclaration";
 			this.addBinding(node.id, declared ? at.block : node);
 		}
+		const parameters = { fn: node, block: node };
 		for (const param of node.params) {
-			this.declarePattern(node, param, node, own);
+			this.declarePattern(node, param, node, parameters);
 		}
 		if (node.body !== null) {
 			this.parents.set(node.body, node);
-			this.visit(node.body, own);
+			this.visit(node.body, { fn: node.body, block: node.body });
 		}
 	}
 
@@ -205,6 +219,34 @@ export class Scopes {
 		}
 	}
 
+	/** Marks each name an assignment's target writes. */
+	private markWritten(target: Node): void {
+		if (target.type === "Identifier") {
+			this.writes.add(target);
+		} else if (target.type === "ObjectPattern") {
+			for (const property of target.properties) {
+				this.markWritten(
+					property.type === "RestElement" ? property.argument : property.value,
+				);
+			}
+		} else if (target.type === "ArrayPattern") {
+			for (const element of target.elements) {
+				if (element !== null) this.markWritten(element);
+			}
+		} else if (target.type === "AssignmentPattern") {
+			this.markWritten(target.left);
+		} else if (target.type === "RestElement") {
+			this.markWritten(target.argument);
+		} else if (
+			target.type === "TSAsExpression" ||
+			target.type === "TSSatisfiesExpression" ||
+			target.type === "TSNonNullExpression" ||
+			target.type === "TSTypeAssertion"
+		) {
+			this.markWritten(target.expression);
+		}
+	}
+
 	private addBinding(node: Node & { name: string }, scope: Span): void {
 		const binding = { name: node.name, node, scope };
 		this.bindings.set(node, binding);
@@ -219,7 +261,6 @@ export class Scopes {
 /** The nodes that open a block's scope: what `let`, `const` and `class` declare in them stays in them. */
 const blocks = new Set([
 	"BlockStatement",
-	"StaticBlock",
 	"ForStatement",
 	"ForInStatement",
 	"ForOfStatement",
@@ -230,6 +271,16 @@ function appendTo<T>(map: Map<string, T[]>, key: string, value: T): void {
 	const values = map.get(key);
 	if (values === undefined) map.set(key, [value]);
 	else values.push(value);
+}
+
+/** What an assignment, an update or a `for … in`/`of` without a declaration writes to. */
+function assignedIn(node: Node): Node | undefined {
+	if (node.type === "AssignmentExpression") return node.left;
+	if (node.type === "UpdateExpression") return node.argument;
+	const loop = node.type === "ForInStatement" || node.type === "ForOfStatement";
+	return loop && node.left.type !== "VariableDeclaration"
+		? node.left
+		: undefined;
 }
 
 function size({ scope }: Binding): number {

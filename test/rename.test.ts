@@ -30,6 +30,33 @@ function app() {
 }
 
 describe("grai rename", () => {
+	it("refuses a key a file writes with an escape, which it cannot find to change", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/app.js": `import { m } from "../out/messages.js";\nm.cart_t\\u0069tle();\n`,
+		});
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			"src/app.js:2:3: it writes cart_title with an escape, which the rename cannot change safely. Write it plainly, or rename it by hand.",
+		]);
+	});
+
+	it("renames reads of the key in code, never a string or a comment that mentions it", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/app.js": `import { m } from "../out/messages.js";\n// m.cart_title() is the cart's heading\nexport const label = "m.cart_title";\nexport const heading = m.cart_title();\n`,
+		});
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors).toEqual([]);
+		expect(readText(dir, "src/app.js")).toBe(
+			`import { m } from "../out/messages.js";\n// m.cart_title() is the cart's heading\nexport const label = "m.cart_title";\nexport const heading = m.basket_title();\n`,
+		);
+	});
+
 	it("renames a key in every catalog and where the namespace reads it, then compiles", async () => {
 		const shop = app();
 		const { dir, config } = shop;

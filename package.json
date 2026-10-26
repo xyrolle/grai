@@ -15,6 +15,9 @@
 		"url": "git+https://github.com/xyrolle/grai.git"
 	},
 	"type": "module",
+	"sideEffects": [
+		"./dist/sveltekit-client.js"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -49,9 +52,25 @@
 			"types": "./dist/sveltekit.d.ts",
 			"default": "./dist/sveltekit.js"
 		},
+		"./sveltekit/vite": {
+			"types": "./dist/sveltekit-vite.d.ts",
+			"default": "./dist/sveltekit-vite.js"
+		},
 		"./sveltekit/client": {
 			"types": "./dist/sveltekit-client.d.ts",
 			"default": "./dist/sveltekit-client.js"
+		},
+		"./sveltekit/navigation": {
+			"types": "./dist/sveltekit-navigation.d.ts",
+			"default": "./dist/sveltekit-navigation.js"
+		},
+		"./astro": {
+			"types": "./dist/astro.d.ts",
+			"default": "./dist/astro.js"
+		},
+		"./astro/middleware": {
+			"types": "./dist/astro/middleware.d.ts",
+			"default": "./dist/astro/middleware.js"
 		}
 	},
 	"bin": {
@@ -63,18 +82,22 @@
 	],
 	"packageManager": "pnpm@12.15.0",
 	"engines": {
-		"node": ">=24"
+		"node": ">=22.18"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "node scripts/build.ts",
 		"prepack": "pnpm build",
+		"prepublishOnly": "pnpm check && pnpm typecheck && pnpm build && pnpm test && pnpm check:package && pnpm size",
 		"check": "biome check .",
 		"typecheck": "tsc && tsc -p tsconfig.runtime.json && tsc -p tsconfig.browser.json",
 		"test": "vitest run",
-		"test:performance": "node scripts/performance.ts"
+		"test:performance": "node scripts/performance.ts",
+		"check:package": "publint run --strict && attw --pack . --profile esm-only",
+		"size": "node scripts/size.ts"
 	},
 	"peerDependencies": {
 		"@sveltejs/kit": "^3.1.0",
+		"astro": ">=7",
 		"magic-string": ">=1",
 		"next": ">=16.3",
 		"react": ">=19",
@@ -83,6 +106,9 @@
 	},
 	"peerDependenciesMeta": {
 		"@sveltejs/kit": {
+			"optional": true
+		},
+		"astro": {
 			"optional": true
 		},
 		"magic-string": {
@@ -102,21 +128,27 @@
 		}
 	},
 	"devDependencies": {
+		"@arethetypeswrong/cli": "0.18.5",
 		"@biomejs/biome": "2.6.2",
 		"@sveltejs/kit": "3.1.0",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
+		"@types/jsdom": "30.0.0",
 		"@types/node": "24.19.2",
 		"@types/react": "19.3.0",
 		"@types/react-dom": "19.3.0",
+		"astro": "7.4.2",
 		"bun": "runtime:1.4.4",
 		"cldr-core": "48.0.0",
 		"deno": "runtime:2.9.6",
 		"hono": "4.13.13",
+		"jsdom": "30.1.3",
 		"magic-string": "1.4.3",
 		"next": "16.4.3",
 		"playwright-core": "1.64.1",
+		"publint": "0.3.25",
 		"react": "19.3.1",
 		"react-dom": "19.3.1",
+		"rolldown": "1.2.15",
 		"svelte": "5.57.2",
 		"typescript": "7.0.2",
 		"vite": "8.3.5",

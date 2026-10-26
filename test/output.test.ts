@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
@@ -11,13 +11,35 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
-import { project } from "./project.ts";
+import { recompile } from "../src/compile.ts";
+import { withoutContentHash } from "../src/content-names.ts";
+import { outputFile, project } from "./project.ts";
+import { messagesOf } from "./reader.ts";
 
 const catalogs = {
 	en: { title: "Title", greeting: "Hello {name}" },
 	de: { title: "Titel", greeting: "Hallo {name}" },
 };
+
+/**
+ * A test's budget when it starts compiler processes: on a loaded machine each new process takes a
+ * second or more to load grai, so a test of several outlasts Vitest's 5 s.
+ */
+const processTest = { timeout: 60_000 };
+
+/** Compiles a project in a process of its own, as another grai would, and gives its errors' codes. */
+async function compileElsewhere(config: string): Promise<string[]> {
+	const { stdout } = await promisify(execFile)(process.execPath, [
+		"--input-type=module",
+		"-e",
+		"const { compile } = await import(process.argv[1]); console.log(JSON.stringify((await compile(process.argv[2])).errors.map((error) => error.code)));",
+		fileURLToPath(new URL("../src/index.ts", import.meta.url)),
+		config,
+	]);
+	return JSON.parse(stdout);
+}
 
 function modified(dir: string): Record<string, number> {
 	const out = join(dir, "out");
@@ -26,30 +48,48 @@ function modified(dir: string): Record<string, number> {
 	);
 }
 
+/** What a compile wrote, each file by its name without the hash of its content. */
+async function writtenBy(compiled: Promise<{ written: string[] }>) {
+	return (await compiled).written.map(withoutContentHash);
+}
+
 it("writes the whole output once, then only the files an edit changes", async () => {
 	const { dir, compile } = project(catalogs);
-	expect((await compile()).written).toEqual([
-		".gitignore",
+	expect(await writtenBy(compile())).toEqual([
 		"config.js",
-		"runtime.d.ts",
-		"server.d.ts",
-		"plurals.js",
 		"runtime.js",
-		"keys/0.d.ts",
-		"keys/0.d.ts.map",
-		"server.js",
+		"runtime.d.ts",
+		"plurals.js",
 		"keys/0.js",
-		"keys.d.ts",
+		"keys/0.d.ts",
+		".gitignore",
+		"keys/0.d.ts.map",
+		"config.js",
+		"runtime.js",
+		"runtime.d.ts",
+		"internal.js",
+		"internal.d.ts",
+		"server.js",
+		"server.d.ts",
+		"testing.js",
+		"testing.d.ts",
 		"keys.js",
-		"messages.d.ts",
+		"keys.d.ts",
 		"messages.js",
+		"messages.d.ts",
 	]);
 
 	writeFileSync(
 		join(dir, "messages", "de.json"),
 		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
 	);
-	expect((await compile()).written).toEqual(["keys/0.js"]);
+	expect(await writtenBy(compile())).toEqual([
+		"keys/0.js",
+		"keys/0.d.ts",
+		"keys/0.d.ts.map",
+		"keys.js",
+		"keys.d.ts",
+	]);
 });
 
 it("has Git ignore the output, and nothing else", async () => {
@@ -73,7 +113,7 @@ it("touches nothing when the catalogs and config are those of the output", async
 	expect(modified(dir)).toEqual(before);
 });
 
-it("writes the output again when grai itself changes, as an upgrade or a local build changes it", () => {
+it("writes the output again when grai itself changes, as an upgrade or a local build changes it", async () => {
 	const { dir, config } = project(catalogs);
 	// A copy of the compiler, in a process of its own as a new version would run.
 	const compiler = join(dir, "grai");
@@ -92,12 +132,13 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 			],
 			{ encoding: "utf8" },
 		);
-		return JSON.parse(run.stdout);
+		const written: string[] = JSON.parse(run.stdout);
+		return written.map(withoutContentHash);
 	};
 	expect(compile()).toContain("runtime.d.ts");
 	expect(compile()).toEqual([]);
 
-	const declarations = join(compiler, "declarations.ts");
+	const declarations = join(compiler, "runtime-declarations.ts");
 	writeFileSync(
 		declarations,
 		readFileSync(declarations, "utf8").replace(
@@ -106,10 +147,33 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 		),
 	);
 
-	expect(compile()).toEqual(["runtime.d.ts"]);
-	expect(readFileSync(join(dir, "out", "runtime.d.ts"), "utf8")).toContain(
+	expect(compile()).toContain("runtime.d.ts");
+	expect(readFileSync(await outputFile(dir, "runtime.d.ts"), "utf8")).toContain(
 		"A locale of the project.",
 	);
+});
+
+it("writes the declaration maps again when the config moves the catalog they point to", async () => {
+	const { dir, config, compile } = project(catalogs);
+	await compile();
+	mkdirSync(join(dir, "moved"));
+	for (const locale of Object.keys(catalogs)) {
+		cpSync(
+			join(dir, "messages", `${locale}.json`),
+			join(dir, "moved", `${locale}.json`),
+		);
+	}
+	writeFileSync(
+		config,
+		JSON.stringify({
+			...JSON.parse(readFileSync(config, "utf8")),
+			catalogs: "moved/{locale}.json",
+		}),
+	);
+
+	expect(await writtenBy(compile())).toEqual(["keys/0.d.ts.map"]);
+	const map = readFileSync(join(dir, "out", "keys", "0.d.ts.map"), "utf8");
+	expect(JSON.parse(map).sources).toEqual(["../../moved/en.json"]);
 });
 
 it("writes a file of the output again when it is missing", async () => {
@@ -120,14 +184,93 @@ it("writes a file of the output again when it is missing", async () => {
 	expect((await compile()).written).toEqual(["keys.js"]);
 });
 
-it("takes over the lock of a writer that is gone", async () => {
+it("writes what an edit needs, though another writer changed the output after this build was made", async () => {
+	const { dir, config, compile } = project(catalogs);
+	const catalog = join(dir, "messages", "en.json");
+	const first = await recompile(config, undefined);
+	writeFileSync(catalog, JSON.stringify({ ...catalogs.en, title: "New" }));
+	await compile();
+	writeFileSync(catalog, JSON.stringify(catalogs.en));
+	await recompile(config, first.build);
+
+	expect((await messagesOf(dir)).title?.()).toBe("Title");
+	expect((await compile()).written).toEqual([]);
+});
+
+it("writes again the files of the output deleted by hand, though the edit does not change them", async () => {
+	const { dir, config } = project(catalogs);
+	const out = join(dir, "out");
+	const first = await recompile(config, undefined);
+	for (const file of readdirSync(out))
+		if (file.startsWith("runtime") || file === "keys.d.ts")
+			rmSync(join(out, file));
+	const catalog = join(dir, "messages", "de.json");
+	writeFileSync(catalog, JSON.stringify({ ...catalogs.de, title: "Kopf" }));
+	await recompile(config, first.build);
+
+	expect((await messagesOf(dir)).title?.({}, { locale: "de" })).toBe("Kopf");
+	expect(readdirSync(out)).toContain("keys.d.ts");
+});
+
+it("lets two compiles in one process write one outdir, one after the other", async () => {
+	for (let trial = 0; trial < 10; trial++) {
+		const { compile } = project(catalogs);
+		const results = await Promise.all([compile(), compile()]);
+
+		expect(results.map((result) => result.errors)).toEqual([[], []]);
+	}
+});
+
+it(
+	"lets one writer at a time write, when several processes compile at once",
+	processTest,
+	async () => {
+		for (let trial = 0; trial < 3; trial++) {
+			const { config, load } = project(catalogs);
+			const errors = await Promise.all(
+				[1, 2, 3].map(() => compileElsewhere(config)),
+			);
+
+			expect(errors).toEqual([[], [], []]);
+			expect((await load()).m.title?.()).toBe("Title");
+		}
+	},
+);
+
+it(
+	"refuses a lock whose writer is gone, in every process, and says which file to delete",
+	processTest,
+	async () => {
+		const { dir, config, compile } = project(catalogs);
+		const lock = join(dir, "out", ".grai", "lock");
+		mkdirSync(dirname(lock), { recursive: true });
+		const gone = String(spawnSync(process.execPath, ["-e", ""]).pid);
+		writeFileSync(lock, gone);
+
+		const errors = await Promise.all(
+			[1, 2, 3].map(() => compileElsewhere(config)),
+		);
+		const [refused] = (await compile()).errors;
+
+		expect(errors).toEqual([
+			["output-locked"],
+			["output-locked"],
+			["output-locked"],
+		]);
+		expect(refused?.message).toContain(`delete ${lock}`);
+		expect(readFileSync(lock, "utf8")).toBe(gone);
+	},
+);
+
+it("removes the claims of writers no longer running as it takes the lock", async () => {
 	const { dir, compile } = project(catalogs);
+	const state = join(dir, "out", ".grai");
+	mkdirSync(state, { recursive: true });
 	const gone = spawnSync(process.execPath, ["-e", ""]).pid;
-	mkdirSync(join(dir, "out", ".grai"), { recursive: true });
-	writeFileSync(join(dir, "out", ".grai", "lock"), String(gone));
+	writeFileSync(join(state, `lock.${gone}.left`), String(gone));
 
 	expect((await compile()).errors).toEqual([]);
-	expect(existsSync(join(dir, "out", ".grai", "lock"))).toBe(false);
+	expect(readdirSync(state)).not.toContain(`lock.${gone}.left`);
 });
 
 it("waits for a live writer's lock before it writes", async () => {
@@ -137,8 +280,11 @@ it("waits for a live writer's lock before it writes", async () => {
 	writeFileSync(join(state, "lock"), String(process.pid));
 
 	const compiling = compile();
+	// Its claim beside the lock says it waits.
 	await vi.waitFor(() =>
-		expect(existsSync(join(state, `lock.${process.pid}`))).toBe(true),
+		expect(readdirSync(state).some((name) => name.startsWith("lock."))).toBe(
+			true,
+		),
 	);
 	expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
 	rmSync(join(state, "lock"));

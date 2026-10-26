@@ -2,8 +2,6 @@ import type { Plugin } from "vite";
 import { svelteTexts } from "./svelte-texts.ts";
 import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
 
-export type { GraiOptions };
-
 /**
  * grai's Vite plugin for a Svelte app: `grai/vite`'s, plus a client build that reads each call of
  * a message without inputs, such as `{m.title()}`, as that message's string in the page's locale.
@@ -12,7 +10,8 @@ export type { GraiOptions };
  *
  *     plugins: [grai(), sveltekit()]
  *
- * The server build, dev and `"switch": "live"` keep every call as it is.
+ * The server build reads the same calls as a property, in the request's locale, so that Svelte
+ * compiles the same blocks on both sides. Dev and `"switch": "live"` keep every call as it is.
  */
 export function grai(options: GraiOptions = {}): Plugin[] {
 	const core = graiPlugin(options);

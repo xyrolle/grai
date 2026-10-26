@@ -131,6 +131,32 @@ describe("grai import --from i18next", () => {
 		]);
 	});
 
+	it("reads {{-name}}, {{name}} and $t(key) as i18next does, each in the text the one before left", async () => {
+		const messages = {
+			title: "Shop",
+			spaced: "{{ -name}}",
+			empty: "a {{}} b",
+			across: "{{x {{-name}} y}}",
+			nested: "$t($t(title)",
+			refilled: "{{'{{- name}}{{name}}{{name}}",
+		};
+		const { result, load } = imported("i18next", {
+			"en.json": messages,
+			"ru.json": messages,
+		});
+		const m = await load();
+
+		expect(m.empty?.()).toBe("a {{}} b");
+		expect(m.across?.({ name: "Ana" })).toBe("{{x Ana y}}");
+		expect(m.nested?.()).toBe("$t(Shop");
+		expect(
+			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
+		).toEqual([
+			"spaced: {{ -name}} reads an input whose name is not a JavaScript identifier, which grai does not support. Pass it as one input, such as {{name}}.",
+			"refilled: {{name}} stands earlier too, in text i18next leaves as written, and i18next fills that one instead. Write the earlier text another way.",
+		]);
+	});
+
 	it("inlines $t(key) of a text, and leaves out in every locale what grai cannot express", async () => {
 		const { result, load } = imported("i18next", {
 			"en.json": {
@@ -400,6 +426,84 @@ describe("grai import --from icu", () => {
 		expect(m.nested?.({ g: "x", n: 3 }, { locale: "ru" })).toBe("их коты");
 	});
 
+	it("chooses on an input in several places of a message, as one selection", async () => {
+		const m = await imported("icu", {
+			"en.json": {
+				agree:
+					"{n, plural, =0 {No} one {# cat} other {# cats}} {n, plural, one {is} other {are}} here",
+				said: "{g, select, male {He} other {They}} said {g, select, male {his} other {their}}",
+				within:
+					"{n, plural, =0 {none} one {one} other {{n, plural, =1 {never} other {#}}}}",
+				crossed:
+					"{g, select, a {A} other {B}} {h, select, x {X} other {{g, select, b {Gb} other {Go}}}}",
+			},
+			"ru.json": {
+				agree:
+					"{n, plural, one {# кот} few {# кота} other {# котов}} {n, plural, one {здесь} other {тут}}",
+				said: "{g, select, male {Он} other {Они}}: {g, select, male {его} other {их}}",
+				within: "{n, plural, other {#}}",
+				crossed: "{g, select, other {B}} {h, select, other {X}}",
+			},
+		}).load();
+
+		expect(counts((n) => m.agree?.({ n }))).toEqual([
+			"No are here",
+			"1 cat is here",
+			"2 cats are here",
+			"5 cats are here",
+			"21 cats are here",
+		]);
+		expect(counts((n) => m.agree?.({ n }, { locale: "ru" }))).toEqual([
+			"0 котов тут",
+			"1 кот здесь",
+			"2 кота тут",
+			"5 котов тут",
+			"21 кот здесь",
+		]);
+		expect(m.said?.({ g: "male" })).toBe("He said his");
+		expect(m.said?.({ g: "x" })).toBe("They said their");
+		expect([0, 1, 2].map((n) => m.within?.({ n }))).toEqual([
+			"none",
+			"one",
+			"2",
+		]);
+		expect(
+			[
+				["a", "x"],
+				["b", "x"],
+				["b", "y"],
+				["c", "y"],
+			].map(([g, h]) => m.crossed?.({ g, h })),
+		).toEqual(["A X", "B X", "B Gb", "B Go"]);
+	});
+
+	it("converts a plural's offset: =n keys read the count, its categories and # the count less the offset", async () => {
+		const m = await imported("icu", {
+			"en.json": {
+				likes:
+					"{n, plural, offset:1 =0 {Nobody} =1 {Only you} one {You and # other} other {You and # others}}",
+				ahead: "{n, plural, offset:-2 one {# one} other {# other}}",
+			},
+			"ru.json": {
+				likes:
+					"{n, plural, offset:1 =0 {Никто} one {Вы и # другой} few {Вы и # других} other {Вы и # другого}}",
+				ahead: "{n, plural, offset:-2 other {#}}",
+			},
+		}).load();
+
+		expect([0, 1, 2, 3, 1001].map((n) => m.likes?.({ n }))).toEqual([
+			"Nobody",
+			"Only you",
+			"You and 1 other",
+			"You and 2 others",
+			"You and 1,000 others",
+		]);
+		expect(
+			[0, 2, 3, 22].map((n) => m.likes?.({ n }, { locale: "ru" })),
+		).toEqual(["Никто", "Вы и 1 другой", "Вы и 2 других", "Вы и 21 другой"]);
+		expect(m.ahead?.({ n: -1 })).toBe("1 one");
+	});
+
 	it("converts selectordinal with # and =n into an ordinal plural", async () => {
 		const m = await imported("icu", {
 			"en.json": {
@@ -440,6 +544,67 @@ describe("grai import --from icu", () => {
 			{ type: "markup-end", name: "b", options: {}, attributes: {} },
 			{ type: "text", value: ", it's {literal} and 'quoted'" },
 		]);
+	});
+
+	it("quotes with an apostrophe only before {, }, <, > and a plural's #, as intl-messageformat does", async () => {
+		const m = await imported(
+			"icu",
+			{
+				"en.json": {
+					pipe: "Select '|x'",
+					end: "the cats'",
+					counted:
+						"{n, plural, other {'#' is #}} {g, select, other {'#' is #}}",
+				},
+			},
+			["en"],
+		).load();
+
+		expect(m.pipe?.()).toBe("Select '|x'");
+		expect(m.end?.()).toBe("the cats'");
+		expect(m.counted?.({ n: 2, g: "x" })).toBe("# is 2 '#' is #");
+	});
+
+	it("reads a tag as intl-messageformat does: spaces before its >, its name's dots, and <b/> as text", async () => {
+		const m = await imported(
+			"icu",
+			{
+				"en.json": {
+					spaced: "<b >{name}</b >",
+					dotted: "<x.link>{name}</x.link>",
+					alone: "a <br /> b",
+				},
+			},
+			["en"],
+		).load();
+		const markup = (type: string, name: string) => ({
+			type,
+			name,
+			options: {},
+			attributes: {},
+		});
+
+		expect(m.spaced?.parts?.({ name: "Ana" })).toEqual([
+			markup("markup-start", "b"),
+			{ type: "text", value: "Ana" },
+			markup("markup-end", "b"),
+		]);
+		expect(m.dotted?.parts?.({ name: "Ana" })).toEqual([
+			markup("markup-start", "x.link"),
+			{ type: "text", value: "Ana" },
+			markup("markup-end", "x.link"),
+		]);
+		expect(m.alone?.()).toBe("a <br/> b");
+	});
+
+	it("reads a } outside every argument and tag as text, as intl-messageformat does", async () => {
+		const m = await imported(
+			"icu",
+			{ "en.json": { brace: "a } b {n, plural, other {x}}}" } },
+			["en"],
+		).load();
+
+		expect(m.brace?.({ n: 1 })).toBe("a } b x}");
 	});
 
 	it("formats # and number, date and time arguments as intl-messageformat does", async () => {
@@ -546,7 +711,7 @@ describe("grai import --from icu", () => {
 		});
 	});
 
-	it("leaves out a style it does not convert, a skeleton stem or a date field Intl has no option for, and offsets", () => {
+	it("leaves out a style it does not convert, a skeleton stem or a date field Intl has no option for, and an ordinal's offset", () => {
 		const { result } = imported(
 			"icu",
 			{
@@ -556,7 +721,8 @@ describe("grai import --from icu", () => {
 					inherited_stem: "{value, number, ::constructor}",
 					scaled: "{value, number, ::scale/100}",
 					week: "{d, date, ::yw}",
-					others: "{n, plural, offset:1 other {# others}}",
+					spaced: "{value, number, percent 'x}'}",
+					place: "{n, selectordinal, offset:1 one {#st} other {#th}}",
 				},
 			},
 			["en"],
@@ -570,7 +736,57 @@ describe("grai import --from icu", () => {
 			"inherited_stem: {value, number, ::constructor} uses the skeleton stem constructor, which grai import does not convert. Write the call with the Intl options it needs.",
 			"scaled: {value, number, ::scale/100} uses the skeleton stem scale/100, which grai import does not convert. Write the call with the Intl options it needs.",
 			"week: {d, date, ::yw} uses the date field w, which grai import does not convert. Write the call with the Intl options it needs.",
-			"others: {n, plural, offset:1} subtracts an offset from the count, which grai does not support.",
+			"spaced: {value, number, percent 'x}'} formats with a style grai import does not convert. Write it as {value :number} with the options it needs.",
+			"place: {n, selectordinal, offset:1} subtracts an offset from an ordinal's count, which grai does not support. Pass the count less the offset, and leave it out.",
+		]);
+	});
+
+	it("leaves out a message intl-messageformat rejects, saying what is wrong with it", () => {
+		const { result } = imported(
+			"icu",
+			{
+				"en.json": {
+					fine: "Fine",
+					dollar: "{$n}",
+					dotted: "{g, select, a.b {x} other {y}}",
+					offset: "{n, plural, offset {x} other {y}}",
+					decimal: "{n, plural, =1.0 {one} other {other}}",
+					huge: "{n, plural, =9007199254740993 {one} other {other}}",
+					unstyled: "{n, number,}",
+					quoted: "{n, number, 'x}",
+					twice: "{n, plural, few {a} few {b} other {c}}",
+					attribute: "<b x>y</b>",
+					unopened: "a</b>",
+					crossed: "<b>{n, plural, other {</b>}}</b>",
+					spelled: "{n, spellout}",
+					tagged: "<b>}</b>",
+					bare_number: "{n, number, ::}",
+					bare_date: "{d, date, :: }",
+					empty_option: "{n, number, ::currency/}",
+				},
+			},
+			["en"],
+		);
+
+		expect(
+			result.leftOut.map(({ key, detail }) => `${key}: ${detail}`),
+		).toEqual([
+			"dollar: it is not a valid ICU message: { must be followed by a name, which holds no space, punctuation or symbol.",
+			"dotted: it is not a valid ICU message: the key a of {g, select} must be followed by its message in braces, and a key holds no space, punctuation or symbol.",
+			"offset: it is not a valid ICU message: offset in {n, plural} must be followed by : and a whole number that JavaScript holds exactly, as in offset:1.",
+			"decimal: it is not a valid ICU message: the key =1 of {n, plural} must be followed by its message in braces, and a key holds no space, punctuation or symbol.",
+			"huge: it is not a valid ICU message: an = in {n, plural} must be followed by a whole number that JavaScript holds exactly, as in =0.",
+			"unstyled: it is not a valid ICU message: {n, number,} must name a style after its comma, or have no comma.",
+			"quoted: it is not a valid ICU message: the style of {n, number} has a ' that no other ' closes.",
+			"twice: it is not a valid ICU message: {n, plural} lists the key few twice.",
+			"attribute: it is not a valid ICU message: the tag <b must end with > or />.",
+			"unopened: it is not a valid ICU message: the </ at 1 closes no tag.",
+			"crossed: it is not a valid ICU message: the option other of {n} must be closed by }.",
+			"spelled: it is not a valid ICU message: {n, spellout} names no type intl-messageformat reads: number, date, time, plural, selectordinal or select.",
+			"tagged: it is not a valid ICU message: the tag <b> must be closed by </b>.",
+			"bare_number: it is not a valid ICU message: {n, number, ::} has no skeleton after its ::, such as ::percent.",
+			"bare_date: it is not a valid ICU message: {d, date, ::} has no skeleton after its ::, such as ::yMMMd.",
+			"empty_option: it is not a valid ICU message: {n, number, ::currency/} gives the stem currency an empty option after its /.",
 		]);
 	});
 });

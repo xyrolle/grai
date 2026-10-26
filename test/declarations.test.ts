@@ -278,3 +278,85 @@ console.log(texts);
 	// Line 3: a unit that is not one of time.
 	expect(errors).toEqual(["3 TS2322"]);
 });
+
+it("types a runtime GraiError's code as one of the codes the runtime throws", async () => {
+	const { dir, compile } = project({
+		en: { cart_title: "Your cart" },
+		de: { cart_title: "Ihr Warenkorb" },
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import type { GraiError } from "./out/runtime.js";
+declare const error: GraiError;
+const codes: ("locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound")[] = [error.code];
+const unbound: GraiError["code"] = "locale-unbound";
+const compiling = error.code === "key-missing";
+console.log(codes, unbound, compiling);
+`,
+	);
+
+	// Line 5: a code only the compiler reports, which the runtime never throws.
+	expect(errors).toEqual(["5 TS2367"]);
+});
+
+it("types setLocale under reload as giving back nothing to await", async () => {
+	const catalogs = { en: { title: "Title" }, de: { title: "Titel" } };
+	const use = `import { setLocale } from "./out/runtime.js";
+const live: Promise<void> = setLocale("de", { reload: false });
+console.log(live);
+`;
+	const reload = project(catalogs);
+	expect((await reload.compile()).errors).toEqual([]);
+
+	// Line 2: setLocale gives back nothing to await.
+	expect(await typeErrors(reload.dir, "use.ts", use)).toEqual(["2 TS2322"]);
+});
+
+it("intersects closed selections as their matching has them: :string's in NFC, and units of time as such", async () => {
+	const closed = (
+		input: string,
+		local: string,
+		match: Record<string, string>,
+	) => [
+		{
+			declarations: [`input ${input}`, ...(local === "" ? [] : [local])],
+			selectors: [local === "" ? input : "s"],
+			match,
+		},
+	];
+	const { dir, compile } = project({
+		en: {
+			place: closed("place", "local s = place: string", { "s=café": "café" }),
+			ago: closed("unit", "", {
+				"unit=day": "{n :relativetime unit=$unit}",
+				"unit=week": "{n :relativetime unit=$unit}",
+			}),
+		},
+		de: {
+			place: closed("place", "local s = place: string", {
+				"s=café": "Café",
+			}),
+			ago: closed("unit", "", {
+				"unit=day": "{n :relativetime unit=$unit}",
+				"unit=week": "{n :relativetime unit=$unit}",
+			}),
+		},
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+const texts: string[] = [m.place({ place: "café" }), m.ago({ n: 1, unit: "week" })];
+m.ago({ n: 1, unit: "month" });
+console.log(texts);
+`,
+	);
+
+	// Line 3: a unit the select does not list.
+	expect(errors).toEqual(["3 TS2322"]);
+});

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { compile } from "svelte/compiler";
 import { cacheDir } from "./apps.mjs";
 import { sampleCalls, takesInputs } from "./calls.mjs";
+import { escapeText, keptSpaces, splitEdges } from "./svelte-text.mjs";
 
 export const SHELL_CALLS = 400;
 export const ROWS = 100;
@@ -14,20 +15,7 @@ const CALLS_PER_ROW = 16;
 const DATA_PER_ROW = 8;
 export const PAGE_CALLS = SHELL_CALLS + ROWS * CALLS_PER_ROW;
 
-const escapeText = (text) =>
-	text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/\{/g, "&#123;")
-		.replace(/\}/g, "&#125;");
-
-/** Whitespace as an expression, which Svelte keeps where it trims static text. */
-const keptSpaces = (spaces) =>
-	spaces === "" ? "" : `{${JSON.stringify(spaces)}}`;
-
 const markupTag = /\{[#/][^{}]*\}/g;
-/** A text's edges as Svelte trims them, and what they hold. */
-const edges = /^([ \t\r\n]*)([\s\S]*?)([ \t\r\n]*)$/;
 
 /**
  * Message text without its markup, its inputs as Svelte expressions on `inputs`, for the inlined
@@ -35,7 +23,7 @@ const edges = /^([ \t\r\n]*)([\s\S]*?)([ \t\r\n]*)$/;
  * edge whitespace goes in as expressions.
  */
 function inlineText(pattern, inputs) {
-	const [, leading, body, trailing] = edges.exec(
+	const { leading, body, trailing } = splitEdges(
 		pattern.replace(markupTag, ""),
 	);
 	const template = body

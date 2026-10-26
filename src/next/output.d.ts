@@ -7,19 +7,28 @@ declare module "grai/next/output/runtime.js" {
 	export function setLocale(locale: string): void;
 	export function assertIsLocale(value: unknown): string;
 	export function deLocalizeUrl(url: string | URL): URL;
-	/** A request's locale, by its position in `locales`; `setLocale` in the request changes it in place. */
-	export type RequestLocale = { index: number };
-	export function bindRequests(storage: {
-		getStore(): RequestLocale | undefined;
-	}): void;
 	export class GraiError extends Error {
 		constructor(code: string, message: string);
 		readonly code: string;
 	}
 }
 
+declare module "grai/next/output/internal.js" {
+	/** A request's locale, by its position in `locales`; `setLocale` in the request changes it in place. */
+	export type RequestLocale = { index: number };
+	export function bindRequests(storage: {
+		getStore(): RequestLocale | undefined;
+	}): void;
+}
+
 declare module "grai/next/output/config.js" {
-	export const strategy: readonly ("cookie" | "preferredLanguage" | "url")[];
+	export const strategy: readonly (
+		| "cookie"
+		| "localStorage"
+		| "preferredLanguage"
+		| "query"
+		| "url"
+	)[];
 }
 
 declare module "grai/next/output/server.js" {

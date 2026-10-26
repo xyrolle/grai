@@ -2,29 +2,29 @@
 
 Open work that `docs/design.md` leaves to measurement or to a later change.
 
-## Ship one locale per page through an import map
+## grai/sveltekit names each page's entries
 
-The Vite plugin writes each message chunk once per locale under `grai-<locale>/` (`docs/design.md`). The SvelteKit adapter still has to write the import map to the page's locale and point Kit's `modulepreload` links at the copies.
+grai/vite chunks keys by the pages that load them when an adapter passes `pageEntries` (`docs/design.md`); without it each Kit node is a page of its own, 19 message chunks a page on app B against 13 with the pages. SvelteKit's adapter has to pass each route's leaf and layout nodes and the client entries.
 
-Done when: `grai/sveltekit` does both, with a browser test that a page of the example loads no other locale's words and no shared message chunk.
+Done when: grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
 
-## Chunk messages by the entries a page loads together
+## A page's later imports at its first paint
 
-A SvelteKit page loads its layouts with it, but the bundler sees each layout and page as an entry of its own: a set of keys that a layout and a few of its pages use is a set apart from the layout's own, though every page under the layout loads both. On app B, whose 60 pages share one layout, the layout's first paint loads 8 message chunks, and the app's tuned setup on Paraglide, which grouped keys by the routes that reach them and the layout's keys in one chunk, loads 21 a page (median) against grai's 26, in 10% fewer bytes. Simulated on app B's build, sets by the pages that load them rather than by entries give 13% fewer requests and 6% fewer bytes. Rolldown's sets cannot say which entries load together, and its merge picks the nearest set by the count of entries apart, not by the bytes a page would load.
+The merge rule may put a key a page needs only through a later import in a chunk that page's first paint loads, when another page's first paint needs the key: on app B four pages load one such key at first paint. Keeping a set that later imports load off the first paints it is not on, without knowing which pages make which later imports, cost the rule most of its merges: 46 chunks a page against 13. Telling it exactly needs each later import's pages, from its dynamic importers' reach.
 
-Done when: the message chunking knows which entries a page loads together, from the framework's adapter or from the bundler, and both reference apps measure it.
+Done when: a key reaches a page's first paint only if that page's first paint, not only a later import, needs it, with app B's chunks a page unchanged.
 
 ## Switch locale in place: `"switch": "live"`
 
-The config accepts `"live"`, and `grai/svelte` then keeps every message a call, but no page switches in place yet. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
+No page switches in place yet, so the config refuses `"live"`, for which `grai/svelte` keeps every message a call. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
 
 Done when: under `"live"`, a page re-renders in the locale it switches to, and a browser test shows that a production build and dev switch the same way.
 
-## Decide whether to inline text into Svelte's templates
+## `setLocale(locale, { reload: false })` as its type says
 
-Text inlined into a template before Svelte compiles it is static to Svelte: on the page of 2,000 calls it hydrates in 12.5–12.9 ms against 15.9–16.2 ms for `grai/svelte`'s strings at a 4× CPU slowdown (`docs/runtime.md`). It needs a step before Svelte's compile, and a copy per locale of every component chunk with such a text, behind the import map. Svelte trims the whitespace at the edges of an element's text, so a text's own edge whitespace has to stay an expression, `{" "}`.
+`runtime.d.ts` types `setLocale` by the config's `switch`: `void` under `"reload"`, where `{ reload: false }` only keeps the choice for the next load, and `Promise<void>` under `"live"`, resolving once the locale's message chunks are in. Under `"live"` the runtime still only keeps the choice too, and returns nothing.
 
-Done when: it is measured on app A's real pages against `grai/svelte` (the time until hydrated at full speed and at a 4× slowdown, the page JS, and the build time and files with the copies), with each page's text compared exactly, and the design records the decision.
+Done when: under `"live"`, it returns that promise (the entry above), with a browser test.
 
 ## A dispatcher per key for a message with inputs
 
@@ -57,7 +57,15 @@ Done when: each compiles, with a test, and the design lists it among the constru
 
 MessageFormat 2 lets a local be made from another, as in `local a = n: number` then `local b = a: integer`, and its functions compose: `b` takes `a`'s value and options, then its own. grai refuses such a local with an error naming both, and its message says to make it from the input instead.
 
-Done when: a plural, formatted or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
+`:offset` is one such function: its value keeps its operand's options, so `local o = n: offset subtract=1` after `local n = count: number select=ordinal` selects by the ordinal rules and shows the digits `n` shows. grai's `:offset` reads an input only, so it always selects by the cardinal rules and shows `:number`'s default, which is its own restriction, not MessageFormat 2's default.
+
+Done when: a plural, formatted, `:offset` or `:string` local can be made from any other local, with the options composing as MessageFormat 2's functions do, its input typed and exported as the input it reads, and a test for each pairing.
+
+## Read every source by scope in `grai check` (the owner's decision)
+
+`grai check` reads sources as text, so where a file declares the namespace's name again, as `rows.map((m) => m.id)` does, it cannot tell which reads are grai's, and leaves that file's reads of the name out, saying so. A Vite build reads each module by scope through Vite's parser, but a project without Vite, such as a Next.js one, has only check. Depending on `oxc-parser`, the parser Vite 8 uses, would make check exact there too, for JavaScript, TypeScript and a component's scripts: its 0.155.0 is 2.9 MB unpacked, plus one native binding per platform (1.8 MB on macOS arm64, 2.1 MB on Linux x64, 1.6 MB on Windows x64, 1.7 MB as WebAssembly). It would be grai's first runtime dependency, which is the owner's to decide; templates would still be read as text.
+
+Done when: the owner has decided, and, if yes, check reads JavaScript, TypeScript and component scripts with the same scope reading as the build, with no file left unchecked for a redeclared name.
 
 ## Bind the locale in Next's server actions and route handlers
 
@@ -83,6 +91,12 @@ On the bench's page, `next dev`'s first response for the route takes longer with
 
 Done when: a profile of that compile names where the time goes, and either a change brings it level with next-intl's or the design records why it stays.
 
+## Next on a loopback address
+
+Next 16.4 started on `127.0.0.1` or `[::1]` (`--hostname`, or `HOSTNAME` behind a reverse proxy) takes every proxy rewrite for an external one. Next's `NextURL` renames a loopback host `localhost`, so the rewrite the proxy returns names `localhost`, while Next's router knows itself by the address it was started on. It proxies the request to itself, where grai/next's proxy rewrites it again, under another `/<locale>`, and the page never answers. A Next app without grai, whose proxy only rewrites `/` to `/en`, answers, but runs its proxy twice for the page. Once its proxy rewrites every path, as an unprefixed base locale's does, it never answers either: 259 runs of the proxy in 10 s. On Next's default host, `0.0.0.0`, `localhost` and the machine's address, the rewrites stay internal.
+
+Done when: Next keeps a loopback host's rewrites internal, or grai/next's proxy leaves a request Next sends to itself as it is, with a test that serves the example on `127.0.0.1`.
+
 ## Report markup elements the base locale does not have
 
 `Markup` throws for an element the app does not draw, and the app draws the base locale's. A translation that adds an element then throws in that locale only.
@@ -101,6 +115,24 @@ vue-i18n's own syntax, with `|` plurals and `@:` links, is not ICU, and nothing 
 
 Done when: each converts, `bench/import-equivalence.mjs` covers it, and the design lists it.
 
+## Import ICU names that are not JavaScript identifiers
+
+`grai import` leaves out an ICU message whose argument is named `{0}` or `{имя}`, which intl-messageformat takes, since a grai input is a JavaScript identifier.
+
+Done when: such an argument imports under an identifier, `grai.import.json` maps the source's name to it for `grai migrate`, and the import fuzz generates such names.
+
+## Import an ICU ordinal's offset
+
+`grai import` leaves out `{n, selectordinal, offset:1 …}`, which chooses by the ordinal category of the count less the offset.
+
+Done when: it converts, a test checks it against intl-messageformat, and the import fuzz's ordinals with offsets render the same.
+
+## Import i18next's formats a project adds, and `$t()` with options
+
+`grai import` leaves out a format i18next does not build in, such as `{{value, uppercase}}`, which a project adds or i18next shows unformatted, and `$t(key, { … })` or `$t(key, format)`, which passes options or a format to the nested message.
+
+Done when: the import can map a project's format to a grai function, `$t()` with options nests the message with those inputs, and `bench/import-equivalence.mjs` covers both.
+
 ## Localized pathnames
 
 The `url` strategy prefixes a path with its locale and leaves the path as it is. A site that translates its paths (`/about` and `/de/ueber-uns`) for search engines cannot say so.
@@ -109,15 +141,15 @@ Done when: the config maps a path to its path in each locale, with named segment
 
 ## A domain per locale
 
-A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads.
+A site served as `example.de` and `example.fr`, or `de.example.com`, names its locale by its host, which no strategy reads. `grai/astro` refuses Astro's `i18n.domains` until then.
 
 Done when: the config maps hosts to locales, the middleware reads the request's host, `localizeHref` to a locale on another host gives an absolute URL, local development has a documented way in without the production hosts, and a test covers each.
 
 ## The framework's base path
 
-An app under a base path (SvelteKit's `paths.base`, Next's `basePath`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`. The framework owns the base path, so the config should not repeat it.
+An app under a base path (SvelteKit's `paths.base`, Next's `basePath`, Astro's `base`) gets `/de/shop/about` from `localizeHref("/shop/about")`, not `/shop/de/about`, and the middleware reads `shop` as the path's locale. The framework owns the base path, so the config should not repeat it. `grai/astro` refuses a `base` with the `url` strategy until then.
 
-Done when: the Vite and Next adapters write the framework's base path into `config.js` at build, the URL helpers put the locale after it, and a test in each example covers a localized link under a base path.
+Done when: the Vite, Next and Astro adapters write the framework's base path into `config.js` at build, the URL helpers and the middleware put the locale after it, and a test in each example covers a localized link under a base path.
 
 ## Rename what a module reads off a dynamic import
 
@@ -148,3 +180,46 @@ Done when: `grai migrate` rewrites a call whose tags each render one element of 
 `grai migrate` lists each Svelte, Vue, Astro or MDX component that imports the library, and rewrites none: its markup calls messages too, outside what an ES module parser reads.
 
 Done when: `grai migrate` rewrites the calls in a component's script, and lists each one its markup makes.
+
+## Remove what a compile that stopped halfway left
+
+A compile that stops while it writes, killed or crashed, leaves the output's lock (`docs/design.md`), its temporary files in `.grai/`, and the files named by their content that it wrote before any entry named them. The lock is refused, so a person sees it; the rest stays, as no manifest records it.
+
+Done when: a writer under the lock removes the temporary files in `.grai/`, which only a writer under the lock makes, and retires the files named by their content that neither the manifest nor the output names, with a test that kills a compile between its writes.
+
+## Keep the locale through Astro's client router
+
+Under Astro's `<ClientRouter />`, a link into another locale swaps the page in place. The runtime read `<html lang>` when the page first loaded, and the import map, once read, cannot change, so the new page's islands render in the first page's locale. Until this is done, a link into another locale needs `data-astro-reload`.
+
+Done when: a client-router navigation into another locale loads the page anew, with a browser test in the Astro example.
+
+## Server islands and actions in the page's locale
+
+A server island (`server:defer`) and an Astro action are requests of their own, to paths without the page's locale prefix. Under the `url` strategy they render in the base locale; the `cookie` and `preferredLanguage` strategies find the reader's.
+
+Done when: a server island and an action on a page under `/ro/` render in `ro` under the `url` strategy, with a test in the Astro example.
+
+## The import map under a CSP of hashes
+
+`handleLocale` gives the import map Kit's nonce, but no hash. Under a `csp` in `hash` mode, and on a prerendered page in `auto` mode, the browser refuses the map: the page then imports the shared message chunks, and its preloads still fetch the locale's copies, so it downloads both.
+
+Done when: the map's hash joins the page's `script-src`, in the `Content-Security-Policy` header and in a prerendered page's `<meta http-equiv>`, with a test of the example in `hash` mode that downloads only the locale's copies.
+
+## A dev edit while a SvelteKit page is still starting
+
+`grai/sveltekit/client` runs a page's loads again with Kit's `refreshAll()` once the server has an edit (`grai:patched`). Kit drops a `refreshAll()` called before its client has started, as it reads the page's URL from state the start sets, so an edit that lands while the page is still starting shows only after the next edit, or a navigation. The server-rendered page is already on screen by then, so the window is the page's own start.
+
+Done when: `grai/sveltekit/client` defers that refresh until Kit has started, with a test of the example that edits a load's text as soon as the page's markup is on screen and sees the edit.
+
+
+## The locale script outside Vite's pages
+
+Only a page that goes through Vite's HTML pipeline gets the locale script. A page another bundler or framework draws, such as Next's static export or a prerendered SvelteKit page, has none, so where no server picks its locale it renders in the one it was drawn in.
+
+Done when: each adapter that can draw a page no server serves writes the script into it, from `locale-script.ts`, with a browser test of a static build in each.
+
+## An app's own import map beside the locale script's
+
+The locale script writes the page's import map. A page that has one of its own then has two, which only browsers that merge import maps read both of; another takes the first and refuses the second.
+
+Done when: the plugin merges the page's own import map into the one the locale script writes, with a browser test of a page that has one.

@@ -6,7 +6,7 @@ import {
 	type Used,
 } from "./locale-function.ts";
 import type { LocaleMessage } from "./message.ts";
-import { plainText } from "./pattern.ts";
+import { formatsLiteral, plainText } from "./pattern.ts";
 
 /** The runtime functions compiled messages call. */
 export type RuntimeFunction = "markup" | "message" | "text" | "unmatched";
@@ -49,7 +49,11 @@ export function keyModule(
 ): KeyModule {
 	const hasMarkup = messages.some((message) => message.markup);
 	const hasInputs = messages.some((message) => message.inputs.size > 0);
-	if (!hasInputs && !hasMarkup) {
+	// A literal a function formats is the locale's to format each call, so it needs a function too.
+	const formats = messages.some(({ variants }) =>
+		variants.some(({ pattern }) => formatsLiteral(pattern)),
+	);
+	if (!hasInputs && !hasMarkup && !formats) {
 		const texts = messages.map((message) =>
 			JSON.stringify(plainText(message.variants[0]?.pattern ?? [])),
 		);

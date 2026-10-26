@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -120,11 +120,23 @@ describe("the config", () => {
 		]);
 	});
 
-	it("names a strategy it does not know, and a cookie strategy without its cookie", async () => {
+	it("names a strategy it does not know, and a strategy without the name of the place it reads", async () => {
 		const catalogs = { en: { title: "Title" } };
 
 		expect(await errorsOf(catalogs, { strategy: ["header"] })).toEqual([
-			'config-invalid: grai.config.json: "strategy" must list where a request names its locale, each once: "cookie", "preferredLanguage" or "url".',
+			'config-invalid: grai.config.json: "strategy" must list where a request or a page names its locale, each once: "cookie", "localStorage", "preferredLanguage", "query" or "url".',
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["localStorage"] })).toEqual([
+			'config-invalid: grai.config.json: "localStorageKey" must name the key the "localStorage" strategy reads.',
+		]);
+		expect(await errorsOf(catalogs, { localStorageKey: "locale" })).toEqual([
+			'config-invalid: grai.config.json: "localStorageKey" is read only by the "localStorage" strategy, which "strategy" does not list.',
+		]);
+		expect(await errorsOf(catalogs, { strategy: ["query"] })).toEqual([
+			'config-invalid: grai.config.json: "queryParameter" must name the URL\'s query parameter the "query" strategy reads.',
+		]);
+		expect(await errorsOf(catalogs, { queryParameter: "lng" })).toEqual([
+			'config-invalid: grai.config.json: "queryParameter" is read only by the "query" strategy, which "strategy" does not list.',
 		]);
 		expect(await errorsOf(catalogs, { strategy: ["cookie"] })).toEqual([
 			'config-invalid: grai.config.json: "cookieName" must name the cookie the "cookie" strategy reads.',
@@ -253,11 +265,16 @@ describe("the config", () => {
 		]);
 	});
 
-	it("names a locale switch it does not know", async () => {
+	it("names a locale switch it does not know, and refuses the live one it does not do yet", async () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { switch: "instant" }),
 		).toEqual([
 			'config-invalid: grai.config.json: "switch" must be "reload", where a page changes locale by reloading, or "live", where it changes in place.',
+		]);
+		expect(
+			await errorsOf({ en: { title: "Title" } }, { switch: "live" }),
+		).toEqual([
+			'config-invalid: grai.config.json: "switch" cannot be "live" in this version: no page switches to another locale\'s words in place yet (docs/followups.md). Leave "switch" out, or set it to "reload": setLocale then keeps the choice and loads the page again in the new locale.',
 		]);
 	});
 
@@ -382,7 +399,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "formatted" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "formatted" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 		]);
 	});
 
@@ -396,7 +413,7 @@ describe("a message", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "called" (en): {n :constructor} calls :constructor, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			expect.stringContaining(
 				'"option" (en): {n :number constructor=1}: "constructor=1" is not an option of :number, or is given twice. Its options are select, style,',
 			),

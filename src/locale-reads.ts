@@ -99,8 +99,9 @@ export function localeReads(
 		selectors.flatMap((selector, index) => {
 			if (selector.kind !== "number" || !reads.has(selector.name)) return [];
 			const reader = readerOf(selector);
+			const read = `${reader}(${value(selector.input)})`;
 			const consts = [
-				`const $${selector.name} = ${reader}(${value(selector.input)}); `,
+				`const $${selector.name} = ${shiftedCode(read, selector.shift)}; `,
 			];
 			if (selector.rules !== undefined && categorized.has(index)) {
 				const plural = called(pluralName(locale, selector.rules));
@@ -134,4 +135,10 @@ export function localeReads(
 		return { parameter: takesInputs ? "i" : "", declarations };
 	};
 	return { value, condition, prologue };
+}
+
+/** The code of a number, moved by what `:offset` adds to it. */
+export function shiftedCode(number: string, shift: number): string {
+	if (shift === 0) return number;
+	return `${number} ${shift > 0 ? "+" : "-"} ${Math.abs(shift)}`;
 }

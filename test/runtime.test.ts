@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium } from "playwright-core";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { type Messages, project, thrown } from "./project.ts";
 
@@ -209,6 +207,38 @@ describe("the middleware", () => {
 		);
 	};
 
+	it("passes over localStorage, which a request does not carry, to the strategy's next place", async () => {
+		const { m, middleware } = await output({
+			strategy: ["localStorage", "preferredLanguage"],
+			localStorageKey: "locale",
+		});
+
+		expect(
+			await localeOf(m, middleware, "/", { "accept-language": "de" }),
+		).toEqual(["de", "Ihr Warenkorb"]);
+	});
+
+	it("reads the locale a query parameter names, matched as a preferred language is", async () => {
+		const { m, middleware } = await output({
+			strategy: ["query", "cookie"],
+			queryParameter: "lng",
+			cookieName: "lang",
+		});
+		const cookie = { cookie: "lang=ar" };
+
+		expect(
+			await Promise.all([
+				localeOf(m, middleware, "/?lng=de-AT", cookie),
+				localeOf(m, middleware, "/?lng=fr", cookie),
+				localeOf(m, middleware, "/", cookie),
+			]),
+		).toEqual([
+			["de", "Ihr Warenkorb"],
+			["ar", "سلتك"],
+			["ar", "سلتك"],
+		]);
+	});
+
 	it("keeps each request's locale while requests interleave", async () => {
 		const rendered = await interleaved(await output(config), [
 			{ cookie: "lang=de" },
@@ -262,6 +292,8 @@ describe("the response's Vary", () => {
 		const { middleware } = await output({
 			strategy,
 			...(strategy.includes("cookie") ? { cookieName: "lang" } : {}),
+			...(strategy.includes("localStorage") ? { localStorageKey: "lang" } : {}),
+			...(strategy.includes("query") ? { queryParameter: "lng" } : {}),
 		});
 		return (
 			await middleware(new Request("https://shop.test/cart"), response)
@@ -278,6 +310,8 @@ describe("the response's Vary", () => {
 		[["cookie", "url"], "Cookie"],
 		[["preferredLanguage", "url"], "Accept-Language"],
 		[["cookie", "preferredLanguage", "url"], "Cookie, Accept-Language"],
+		[["localStorage", "preferredLanguage"], "Accept-Language"],
+		[["query", "cookie"], "Cookie"],
 	])("with the strategy %j, lists %j", async (strategy, vary) => {
 		expect(await varyOf(strategy)).toBe(vary);
 	});
@@ -454,14 +488,18 @@ it("reads and writes a locale's own prefix, where the config gives one", async (
 });
 
 describe("in a browser", () => {
-	/** A page drawn in a locale: its `<html lang>`, its cookies and its reloads. */
+	/** A page drawn in a locale: its `<html lang>`, its cookies, its storage and its reloads. */
 	function page(lang: string) {
 		const visited = {
 			cookie: "",
+			stored: new Map<string, string>(),
 			reloads: 0,
 			href: "https://shop.test/de/cart?step=2",
 		};
 		Object.assign(globalThis, {
+			localStorage: {
+				setItem: (key: string, value: string) => visited.stored.set(key, value),
+			},
 			document: {
 				documentElement: { lang },
 				set cookie(value: string) {
@@ -482,6 +520,7 @@ describe("in a browser", () => {
 			},
 		});
 		onTestFinished(() => {
+			Reflect.deleteProperty(globalThis, "localStorage");
 			Reflect.deleteProperty(globalThis, "document");
 			Reflect.deleteProperty(globalThis, "location");
 		});
@@ -499,9 +538,41 @@ describe("in a browser", () => {
 		runtime.setLocale("ar");
 		expect(visited).toEqual({
 			cookie: "lang=ar; path=/; max-age=34560000; samesite=lax; secure",
+			stored: new Map(),
 			reloads: 1,
 			href: "https://shop.test/de/cart?step=2",
 		});
+	});
+
+	it("keeps the page's own locale in its cookie without reloading the page", async () => {
+		const visited = page("de");
+		const { runtime } = await output({
+			strategy: ["cookie"],
+			cookieName: "lang",
+		});
+
+		runtime.setLocale("de");
+		expect(visited).toEqual({
+			cookie: "lang=de; path=/; max-age=34560000; samesite=lax; secure",
+			stored: new Map(),
+			reloads: 0,
+			href: "https://shop.test/de/cart?step=2",
+		});
+	});
+
+	it("keeps a new locale in localStorage with the localStorage strategy, then reloads", async () => {
+		const visited = page("de");
+		const { runtime } = await output({
+			strategy: ["localStorage"],
+			localStorageKey: "locale",
+		});
+		runtime.setLocale("ar");
+
+		expect([visited.cookie, visited.stored, visited.reloads]).toEqual([
+			"",
+			new Map([["locale", "ar"]]),
+			1,
+		]);
 	});
 
 	it("writes the cookie by the config's policy, Secure on https and wherever the policy needs it", async () => {
@@ -552,37 +623,51 @@ describe("in a browser", () => {
 		});
 	});
 
-	it("sets <html lang> and dir with setLocale, which without a reload renders the next messages in it", async () => {
-		const { dir, load } = project(catalogs);
-		await load();
-		const browser = await chromium.launch();
-		onTestFinished(() => browser.close());
-		const tab = await browser.newPage();
-		await tab.route("http://grai.test/**", (route) => {
-			const path = new URL(route.request().url()).pathname;
-			return path === "/"
-				? route.fulfill({
-						contentType: "text/html",
-						body: `<!doctype html><html lang="de" dir="ltr"><script type="module">
-import { m } from "/out/messages.js";
-import { getLocale, setLocale } from "/out/runtime.js";
-const seen = () => [document.documentElement.lang, document.documentElement.dir, getLocale(), m.title()].join(" ");
-const before = seen();
-setLocale("ar", { reload: false });
-document.body.textContent = before + " | " + seen();
-</script>`,
-					})
-				: route.fulfill({
-						contentType: "text/javascript",
-						body: readFileSync(join(dir, path)),
-					});
+	it("keeps the choice with setLocale and { reload: false }, and leaves the page in its locale", async () => {
+		const visited = page("de");
+		const { m, runtime } = await output({
+			strategy: ["cookie"],
+			cookieName: "lang",
 		});
-		await tab.goto("http://grai.test/");
-		await tab.waitForFunction(`document.body.textContent !== ""`);
+		runtime.setLocale("ar", { reload: false });
 
-		expect(await tab.textContent("body")).toBe(
-			"de ltr de Ihr Warenkorb | ar rtl ar سلتك",
+		expect([runtime.getLocale(), m.title?.(), visited.reloads]).toEqual([
+			"de",
+			"Ihr Warenkorb",
+			0,
+		]);
+		expect(visited.cookie).toBe(
+			"lang=ar; path=/; max-age=34560000; samesite=lax; secure",
 		);
+	});
+
+	it("refuses setLocale where the strategy keeps the choice nowhere, which the reload would lose, but for the page's own locale", async () => {
+		const visited = page("de");
+		const { runtime } = await output({ strategy: ["preferredLanguage"] });
+
+		expect(thrown(() => runtime.setLocale("ar"))).toMatchObject({
+			name: "GraiError",
+			code: "locale-unkept",
+		});
+		expect(
+			thrown(() => runtime.setLocale("ar", { reload: false })),
+		).toMatchObject({
+			code: "locale-unkept",
+		});
+		runtime.setLocale("de");
+		expect([runtime.getLocale(), visited.reloads]).toEqual(["de", 0]);
+	});
+
+	it("names the new locale in the URL's query parameter with the query strategy", async () => {
+		const visited = page("de");
+		const { runtime } = await output({
+			strategy: ["query"],
+			queryParameter: "lng",
+		});
+		runtime.setLocale("ar");
+
+		expect(visited.href).toBe("https://shop.test/de/cart?step=2&lng=ar");
+		expect(visited.reloads).toBe(0);
 	});
 
 	it("goes to the new locale's URL with the url strategy", async () => {

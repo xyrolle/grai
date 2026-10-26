@@ -60,6 +60,15 @@ it.each([
 		"cookie and URL strategies",
 		{ strategy: ["cookie", "url"], cookieName: "lang" },
 	],
+	[
+		"every strategy",
+		{
+			strategy: ["cookie", "localStorage", "preferredLanguage", "query", "url"],
+			cookieName: "lang",
+			localStorageKey: "locale",
+			queryParameter: "lng",
+		},
+	],
 ])(
 	"writes JavaScript that an app's strictest checkJs takes, unused locals checked, with %s",
 	async (_, config) => {
@@ -94,6 +103,7 @@ it.each([
 					cart_shipped: "Shipped {when :date}",
 					cart_converted: "In {amount :currency currency=$code}",
 					cart_guests: "With {names :list}, {days :relativetime unit=day}",
+					cart_limit: "Up to {|1000| :number} items, as {|Gmail|} allows",
 					cart_waited: "{n :relativetime unit=$unit numeric=auto}",
 					cart_weight: [
 						{
@@ -159,6 +169,7 @@ it.each([
 					cart_shipped: "شحن {when :date}",
 					cart_converted: "بعملة {amount :currency currency=$code}",
 					cart_guests: "مع {names :list}، {days :relativetime unit=day}",
+					cart_limit: "Up to {|1000| :number} items, as {|Gmail|} allows",
 					cart_waited: "{n :relativetime unit=$unit numeric=auto}",
 					cart_weight: [
 						{

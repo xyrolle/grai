@@ -1,4 +1,5 @@
 import type { CompiledKey } from "./compilation.ts";
+import type { OutputModules } from "./output-modules.ts";
 
 /**
  * The names a module of keys calls, by where each comes from: a file of the output, which the
@@ -46,15 +47,20 @@ export function everyName(names: CalledNames): Set<string> {
 	]);
 }
 
-/** The imports of `names` from the output, each file named by `specifier`. */
+/**
+ * The imports of `names` from the output, each from its module among the output's `modules`,
+ * named by `specifier`.
+ */
 export function outputImports(
 	names: CalledNames,
 	specifier: (file: string) => string,
+	modules: OutputModules,
 ): string {
 	const line = (imported: ReadonlySet<string>, file: string) =>
 		`import { ${[...imported].sort().join(", ")} } from ${JSON.stringify(specifier(file))};`;
-	const lines = [line(names.runtime, "runtime.js")];
-	if (names.plurals.size > 0) lines.push(line(names.plurals, "plurals.js"));
-	if (names.formats.size > 0) lines.push(line(names.formats, "formats.js"));
+	const lines = [line(names.runtime, modules.runtime)];
+	if (names.plurals.size > 0) lines.push(line(names.plurals, modules.plurals));
+	if (names.formats.size > 0 && modules.formats !== undefined)
+		lines.push(line(names.formats, modules.formats));
 	return lines.join("\n");
 }

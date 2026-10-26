@@ -219,9 +219,14 @@ async function stopped(server: ChildProcess): Promise<void> {
 	try {
 		process.kill(-server.pid, "SIGTERM");
 	} catch (error) {
-		// A group whose processes have all exited.
+		// ESRCH: a group whose processes have all exited. EPERM: macOS refuses a signal to a process
+		// that has exited but is not reaped yet, and so to its group, whose other processes still get it.
 		if (
-			!(error instanceof Error && "code" in error && error.code === "ESRCH")
+			!(
+				error instanceof Error &&
+				"code" in error &&
+				(error.code === "ESRCH" || error.code === "EPERM")
+			)
 		) {
 			throw error;
 		}

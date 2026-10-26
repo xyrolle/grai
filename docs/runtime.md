@@ -15,10 +15,11 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 | Plurals | CLDR's rules compiled into a function per locale, integers first. | 4–11 ns a call, against 124–249 ns for a cached `Intl.PluralRules`, for 158 more bytes min+gzip per locale (`plurals`). |
 | Formatters | One `Intl` formatter per locale and options, made the first time it formats, and per value of an option an input gives. | 207–213 ns a number, against 695–770 ns for a cache keyed by the options and 8–9 µs for a formatter per call (`intl`). With its currency from an input, 216–305 ns, and Paraglide's 688–1,054 ns (`option-inputs`). |
 | Per-locale chunks in SvelteKit | Same chunk names in a directory per locale, an import map, and modulepreload links the server writes for the locale's copies. | Browsers apply no import map to modulepreload, so Kit's own links also download the shared chunks: 51% more message bytes than no split at all (`preload`). |
+| A page no server draws | An inline script ahead of every module picks the locale from the strategy's places and, with `localeChunks`, writes the import map to its copies and preloads them. | Until the page's entry module runs, it costs 0.2 ms at full CPU speed and 3.7 ms at 4× slower, against the same import map written into the page (`page-locale`). It is 910 bytes brotli; of its run, the import map and preloads take 0.3–1.4 ms, and a cookie read 0.2–0.8 ms. |
 | Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 17–30 ms from the save to the page, against 202–459 ms re-evaluating the module (`hmr`). |
 | Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface fits in 378 bytes min+gzip; Paraglide's is 1.9–2.1 KB (`runtime-size`). |
 
-**Open: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.3–2.6 ms against 5.4–5.6 ms with the locale's copies, and the bundle 19.1–20.4 KB against 22.9–23.8 KB (`hydrate`); a server render takes 0.04 ms against 0.13 ms (`ssr`). On app A's largest page the messages take 17.2 KB against 24.5 KB (`bytes`). It needs a copy per locale of every component chunk with such a text, behind the import map; whether real pages gain enough over `grai/svelte`'s strings for that is open (`docs/followups.md`). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
+**Not adopted: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.3–2.6 ms against 5.4–5.6 ms with the locale's copies, and the bundle 19.1–20.4 KB against 22.9–23.8 KB (`hydrate`); a server render takes 0.04 ms against 0.13 ms (`ssr`). On app A's real pages, where messages are a small part of what hydration does, it hydrates within the noise of `grai/svelte`'s strings, for a copy per locale of every component chunk with such a text (Browser, below). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
 
 Not adopted:
 - **Strings put in place of the calls after the framework compiled them.** Svelte has compiled each call as a dynamic expression, so the page hydrates as it does with the calls: 23.9–24.1 ms against 23.3–24.3 ms at a 4× slowdown, where `grai/svelte`'s strings take 15.9–16.2 ms (`svelte-texts`). It would also cost the build: SvelteKit has one client build, so a build per locale, 2 more client builds of 8.1 s on app A, cannot serve its pages, and copies per locale of the 326 of its 1,598 client chunks that call a message are 978 more files behind the import map (`inline-cost`).
@@ -43,7 +44,7 @@ grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageforma
 | That page's JS, brotli (`hydrate`) | 22.9–24.9 KB | 38.0–40.5 KB | 125.1–133.3 KB | 124.6–132.5 KB |
 | A new server process: loading every locale's messages, then the first render (`startup`) | 25 + 4 ms | 54 + 2 ms | 16 + 11 ms | 16 + 25 ms |
 | Heap the messages hold (`startup`) | 5.2 MB | 8.3 MB | 3.4 MB | 10.3 MB |
-| The runtime in the browser, brotli (`library-bytes`) | 0.5 KB | 3.6 KB | 12.1 KB | 10.2 KB |
+| The runtime in the browser, its whole API, brotli (`library-bytes`) | 1.0 KB | 3.6 KB | 12.1 KB | 10.2 KB |
 | The messages a page downloads (`bytes`) | its own keys, in its locale: 24.5 KB on the largest page | its own keys, in every locale: 51.5 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
 | A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
 | One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
@@ -103,6 +104,20 @@ In a Svelte client build, `grai/svelte` reads each message without inputs as its
 | inlined into the template | 21.2 KB | 2.9 / 12.9 ms | 1.9 / 7.9 ms |
 
 `ru` gives 23.3, 15.9, 24.1 and 12.5 ms at 4×.
+
+Seven of app A's real pages, built three ways (`inline-build` in copies of the app) and served side by side (`inline-pages`): the five heaviest its demo data fills, by the keys they load (ranks 1, 2, 3, 5 and 8 of 73), and two typical ones. On each, every build's page has the same text, whitespace included, as served and as hydrated, and hydration keeps the same server elements. Median of 15 interleaved loads, ms from SvelteKit's start until it has hydrated the page, at full speed and at a 4× slowdown, at a load of 15–22:
+
+| keys | JS, brotli: strings / inlined | calls (`grai/vite`) | strings (`grai/svelte`) | inlined into the template |
+|---|---|---|---|---|
+| 1,315 | 522 / 509 KB | 485 / 635 | 457 / 658 | 429 / 600 |
+| 1,094 | 478 / 466 KB | 384 / 527 | 400 / 520 | 409 / 523 |
+| 1,046 | 435 / 428 KB | 376 / 494 | 334 / 460 | 331 / 449 |
+| 991 | 432 / 419 KB | 360 / 459 | 335 / 492 | 313 / 459 |
+| 977 | 405 / 399 KB | 313 / 442 | 310 / 444 | 294 / 461 |
+| 689 | 298 / 293 KB | 274 / 371 | 257 / 359 | 253 / 368 |
+| 601 | 442 / 431 KB | 410 / 551 | 385 / 547 | 400 / 517 |
+
+Against the strings, inlining changes the 4× time by −9% to +4%, no more than the calls differ from the strings in the same run, either way, and the page's JS falls by 1–3%. Its build would need a copy per locale of 248 of the 1,080 client chunks, 744 more files, made in 0.4–0.6 s, or 2 more client builds of 15–22 s (`inline-build`).
 
 ## Bytes per page
 
@@ -178,6 +193,31 @@ The server component's messages cost grai nothing beyond their HTML. The 6.7 KB 
 - **grai's share of the start** is `withGrai`'s work when `next dev` asks for its config, its import included: 30 ms with the output current, as on every start after the first, and 138 ms from an empty outdir, which compiles and writes it. The watch's first compile, which later edits start from, runs while Next starts.
 - **An edit** reaches the shard grai rewrites in 27–28 ms, 20 of them waiting for the save to settle (`watch.ts`). The rest is Next noticing the shard and refreshing the page, as it notices and refreshes next-intl's catalog.
 - **The page's first response** from an empty `.next` is slower on grai, here by 85 ms, and by 198 ms with `.next` kept: Turbopack compiles the output's 1.8 MB of message functions in each layer that imports them, where next-intl's catalog is JSON (`docs/followups.md`).
+
+## Astro
+
+One static Astro site, on grai, on Paraglide 2.29.1 in the setup its Astro guide gives for static sites, and with its words written in (`astro`, from `bench/astro-apps.mjs`). Each locale's page renders 400 messages in the page and 100 in a Svelte island, chosen evenly across the synthetic catalog, so it has the catalog's share of plurals and inputs; the page measured is `ru`'s. Astro 7.4.2, Chromium 156. The bench installs grai from the repository's build, so it runs after `pnpm build` at the root. One run, under a load of 10–18 from other work, so the times are rough.
+
+`astro build` from a clean checkout, the median of 3, then what the page downloads, brotli:
+
+| | build | document | scripts | total | more than the words written in |
+|---|---|---|---|---|---|
+| grai | 1,743 ms | 7.4 KB | 14.7 KB | 22.1 KB | 3.5 KB |
+| Paraglide | 5,968 ms | 7.3 KB | 18.1 KB | 25.4 KB | 6.8 KB |
+| words written in | 664 ms | 7.3 KB | 11.3 KB | 18.6 KB | |
+
+The page's 400 messages cost grai nothing beyond their HTML. The 3.5 KB is the runtime and the island's 100 messages in `ru` alone, from their locale's copies of the message chunks through the import map. Paraglide's island holds every locale's words, as its per-locale build needs to own Vite's `buildApp`, which Astro owns.
+
+`astro dev` from a clean checkout: until ready, then until the page's first response, then one message edited in its catalog until the open page shows it, the median of 7 edits, ms:
+
+| | ready | first response | edit, in the page | edit, in the island |
+|---|---|---|---|---|
+| grai | 523 | 1,133 | 84 | 84 |
+| Paraglide | 4,487 | 1,424 | not shown in 30 s | 3,797 |
+| words written in | 813 | 631 | | |
+
+- **grai** patches the dev server's messages and reloads the open page (`reloadOnEdit`), whose server render then has the edit.
+- **Paraglide's edit in the page is never shown to the open page:** it recompiles the catalogs, about 5 s after the save, and a fresh request then renders the edit, but nothing reloads the page, so its words stay as they were until a reload by hand. Its island takes the edit through Vite's update of the island's module.
 
 ## Runtime size
 

@@ -7,3 +7,7 @@ export function subject(name, lng) {
 export function cartTitle() {
 	return t("title", { ns: "cart" });
 }
+
+export function greeting(name) {
+	return t("greeting", { ns: ["cart", "common"], name });
+}

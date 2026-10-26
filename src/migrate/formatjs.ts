@@ -3,6 +3,7 @@ import {
 	boundProperty,
 	calledAt,
 	declaratorOf,
+	droppedValue,
 	type Left,
 	type LibraryModule,
 	type ModuleView,
@@ -10,6 +11,7 @@ import {
 	type Outcome,
 	ownApi,
 	passedOn,
+	readsTheSame,
 	type Translator,
 	type WrittenProperties,
 	writtenProperties,
@@ -101,24 +103,41 @@ function formatMessageCall(
 	module: ModuleView,
 ): Outcome {
 	const [descriptor, values] = call.arguments;
-	const id = descriptorId(descriptor);
+	const id = descriptorId(descriptor, module);
 	if (typeof id !== "string") return id;
 	return messageOf(call, id, writtenProperties(values, "values"), module);
 }
 
 /** The id a descriptor written in the call gives, or why there is none. */
-function descriptorId(node: Node | undefined): string | Left {
+function descriptorId(
+	node: Node | undefined,
+	module: ModuleView,
+): string | Left {
 	const properties =
 		node?.type === "ObjectExpression" ? propertiesOf(node) : undefined;
 	if (properties === undefined) return notWritten;
-	for (const name of properties.keys()) {
+	for (const [name, { value }] of properties) {
 		if (!descriptorFields.has(name)) {
 			return {
 				left: `its descriptor holds ${name}, which grai migrate does not read.`,
 			};
 		}
+		const dropped = droppedField(name, value, module);
+		if (dropped !== undefined) return dropped;
 	}
 	return idOf(properties.get("id")?.value);
+}
+
+/** Why a field a rewrite drops stays: its value is an expression that would no longer run. */
+function droppedField(
+	name: string,
+	value: Node,
+	{ scopes }: ModuleView,
+): Left | undefined {
+	const dropped = name === "defaultMessage" || name === "description";
+	return dropped && !readsTheSame(value, scopes)
+		? droppedValue(name)
+		: undefined;
 }
 
 function idOf(node: Node | undefined): string | Left {
@@ -160,6 +179,9 @@ function formattedMessage(
 			return {
 				left: `it passes FormattedMessage's ${name}, which grai migrate does not read.`,
 			};
+		} else if (value !== undefined) {
+			const dropped = droppedField(name, value, module);
+			if (dropped !== undefined) return dropped;
 		}
 	}
 	if (typeof id !== "string") return id;

@@ -28,14 +28,14 @@ export type FileUses = { source: SourceFile; uses: Use[]; bindsKey: boolean };
 
 /** The files that write a key's name, each with every place it does. */
 export function usesIn(files: readonly SourceFile[], key: string): FileUses[] {
-	const namespaces = namespaceNames(files.map(({ text }) => text));
+	const namespaces = namespaceNames(files.map(({ code }) => code));
 	return files
-		.filter(({ text }) => text.includes(key))
+		.filter(({ code }) => code.includes(key))
 		.map((source) => {
-			const bindings = messageBindings(source.text, namespaces);
-			const uses = occurrencesOf(source.text, key).map((at) => ({
+			const bindings = messageBindings(source.code, namespaces);
+			const uses = occurrencesOf(source.code, key).map((at) => ({
 				at,
-				kind: kindOf(key, at, source.text, bindings),
+				kind: kindOf(key, at, source.code, bindings),
 			}));
 			return { source, uses, bindsKey: bindings.keys.get(key) === key };
 		})

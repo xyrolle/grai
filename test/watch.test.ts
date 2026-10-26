@@ -1,7 +1,14 @@
-import { existsSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	rmSync,
+	utimesSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
+import { withoutContentHash } from "../src/content-names.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -87,7 +94,8 @@ it("reads a catalog that a save truncates and then writes once the save has sett
 	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
 
 	await expect.poll(() => reported.length).toBe(2);
-	expect(reported[1]).toMatchObject({ errors: [], written: ["keys/0.js"] });
+	expect(reported[1]?.errors).toEqual([]);
+	expect(reported[1]?.written.map(withoutContentHash)).toContain("keys/0.js");
 });
 
 it("compiles a save that leaves the catalog whole on its first event, without waiting for the files to be quiet", async () => {
@@ -105,8 +113,10 @@ it("compiles a save that leaves the catalog whole on its first event, without wa
 	onTestFinished(() => clearInterval(touched));
 
 	await expect
-		.poll(() => reported[1]?.written, { timeout: 500 })
-		.toEqual(["keys/0.js"]);
+		.poll(() => reported[1]?.written.map(withoutContentHash), {
+			timeout: 500,
+		})
+		.toContain("keys/0.js");
 });
 
 it("reports no compile that changed nothing, as one that an event late from a save starts", async () => {
@@ -117,16 +127,21 @@ it("reports no compile that changed nothing, as one that an event late from a sa
 	const state = join(dir, "out", ".grai");
 
 	// Another writer holds the output, so the compile an event starts waits where the test sees it,
-	// having read the catalogs as they are: an event that changes nothing.
+	// having read the catalogs as they are: an event that changes nothing. With this process's claim
+	// gone, the compile makes it again as it comes to the lock, which shows it is there.
+	const claims = () =>
+		readdirSync(state).filter((name) =>
+			name.startsWith(`lock.${process.pid}.`),
+		);
+	for (const claim of claims()) rmSync(join(state, claim));
 	writeFileSync(join(state, "lock"), String(process.pid));
 	utimesSync(catalog, new Date(), new Date());
-	await expect
-		.poll(() => existsSync(join(state, `lock.${process.pid}`)))
-		.toBe(true);
+	await expect.poll(() => claims().length).toBe(1);
 	rmSync(join(state, "lock"));
 	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
 
-	await expect.poll(() => reported.at(-1)?.written).toEqual(["keys/0.js"]);
+	await expect.poll(() => reported.length).toBe(2);
+	expect(reported[1]?.written.map(withoutContentHash)).toContain("keys/0.js");
 	expect(reported.map((result) => result.written.length > 0)).toEqual([
 		true,
 		true,

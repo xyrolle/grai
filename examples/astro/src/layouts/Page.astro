@@ -1,0 +1,40 @@
+---
+import { getRelativeLocaleUrl } from "astro:i18n";
+import { m } from "#lib/i18n/messages.js";
+import { getLocale, locales } from "#lib/i18n/runtime.js";
+
+/** The page's title, and its path without a locale, which the links to it in each locale take. */
+type Props = { title: string; path: string };
+const { title, path } = Astro.props;
+// grai renders the page in Astro.currentLocale, and its middleware writes that locale's text
+// direction to <html dir>.
+---
+
+<!doctype html>
+<html lang={Astro.currentLocale}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title}</title>
+	</head>
+	<body>
+		<nav>
+			<a id="home" href={getRelativeLocaleUrl(getLocale(), "")}>{m.home_link()}</a>
+			<a id="about" href={getRelativeLocaleUrl(getLocale(), "about")}>{m.about_link()}</a>
+		</nav>
+		<main>
+			<slot />
+		</main>
+		<ul id="languages">
+			{
+				locales.map((locale) => (
+					<li>
+						<a href={getRelativeLocaleUrl(locale, path)} lang={locale}>
+							{m.language_name({}, { locale })}
+						</a>
+					</li>
+				))
+			}
+		</ul>
+	</body>
+</html>

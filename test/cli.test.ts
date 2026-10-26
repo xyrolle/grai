@@ -42,7 +42,7 @@ describe("grai compile", () => {
 		const { dir } = project(catalogs);
 
 		expect((await grai(dir, "compile")).stdout).toMatch(
-			/^grai: wrote 14 files in out \(.+ ms\)\n$/,
+			/^grai: wrote 21 files in out \(.+ ms\)\n$/,
 		);
 		expect((await grai(dir, "compile")).stdout).toMatch(
 			/^grai: out is up to date \(.+ ms\)\n$/,
@@ -113,6 +113,46 @@ describe("grai check", () => {
 		expect((await grai(counting.dir, "check")).code).toBe(0);
 	});
 
+	it("reports no key a string or a comment mentions, only one the code reads", async () => {
+		const { dir } = project(catalogs);
+		writeSources(dir, {
+			"src/app.js": `import { m } from "../out/messages.js";\n// m.absent() would fail\nconsole.log("m.absent()", \`m.absent()\`, m.cart_title(), m.cart_greeting);\n`,
+		});
+
+		expect(await grai(dir, "check")).toMatchObject({ code: 0 });
+	});
+
+	it("takes a name a file declares again for none of grai's, and says it left that file's reads of it unchecked", async () => {
+		const { dir } = project(catalogs);
+		const shadowing = [
+			`import { m } from "../out/messages.js";`,
+			"export const ids = (rows) => rows.map((m) => m.id);",
+			"export function sized(m) { return m.size; }",
+			"export const widths = ({ m }) => m.width;",
+			"{ const m = { label: 1 }; console.log(m.label); }",
+			"try { m.cart_title(); } catch (m) { console.log(m.message); }",
+		].join("\n");
+		writeSources(dir, {
+			"package.json": JSON.stringify({ imports: { "#lib/*": "./src/*" } }),
+			"src/rows.js": `${shadowing}\n`,
+			"src/aliased.js": `import * as t from "../out/keys.js";\nconsole.log(t.cart_titel(), t.cart_title(), t.cart_greeting);\n`,
+			"src/testing/keys.js": "export const helper = 1;\n",
+			"src/uses.js": `import { helper } from "#lib/testing/keys.js";\nconsole.log(helper);\n`,
+		});
+
+		const { code, stdout, stderr } = await grai(dir, "check");
+
+		expect(code).toBe(1);
+		expect(stderr.split("\n")).toEqual([
+			`src/aliased.js:2:15: "cart_titel": t.cart_titel names a key no catalog has. Add it with grai add cart_titel --en "…" --de "…", or fix the name.`,
+			"grai: 1 error",
+			"",
+		]);
+		expect(stdout).toContain(
+			"grai: not checked: src/rows.js declares m again (2:40), so check cannot tell which of its m.key reads are grai's.",
+		);
+	});
+
 	it("names each place a source names a key no catalog has, in Svelte, Vue and JavaScript, with the grai add that adds it", async () => {
 		const { dir } = project(catalogs);
 		const sources = {
@@ -177,7 +217,7 @@ describe("grai check", () => {
 		const json = await grai(dir, "check", "--json");
 		expect([json.code, JSON.parse(json.stdout)]).toEqual([
 			0,
-			{ problems: [], untranslated: { de: ["cart_title"] } },
+			{ problems: [], untranslated: { de: ["cart_title"] }, unchecked: [] },
 		]);
 	});
 });
@@ -193,7 +233,7 @@ describe("grai seed", () => {
 
 		expect(code).toBe(0);
 		expect(stdout).toMatch(
-			/^grai: seeded 1 key into messages\/de\.json with the text of en\ngrai: wrote 14 files in out \(.+ ms\)\n$/,
+			/^grai: seeded 1 key into messages\/de\.json with the text of en\ngrai: wrote 21 files in out \(.+ ms\)\n$/,
 		);
 	});
 });
@@ -221,7 +261,7 @@ describe("grai export and merge", () => {
 		);
 		expect(merged.code).toBe(0);
 		expect(merged.stdout).toMatch(
-			/^grai: merged 1 unit into 1 message of messages\/de\.json\ngrai: wrote 14 files in out/,
+			/^grai: merged 1 unit into 1 message of messages\/de\.json\ngrai: wrote 21 files in out/,
 		);
 		expect(
 			JSON.parse(readFileSync(join(dir, "messages", "de.json"), "utf8")),
@@ -283,7 +323,7 @@ describe("grai add", () => {
 		);
 
 		expect(code).toBe(0);
-		expect(stdout).toMatch(/^grai: wrote 14 files in out/);
+		expect(stdout).toMatch(/^grai: wrote 21 files in out/);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(
 			JSON.stringify({ ...catalogs.de, cart_empty: "Leer" }, null, "\t"),
 		);
@@ -367,7 +407,7 @@ describe("grai add", () => {
 			],
 			[
 				1,
-				'messages/en.json: "cart_total" (en): {sum :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+				'messages/en.json: "cart_total" (en): {sum :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			],
 		]);
 		expect(readFileSync(join(dir, "messages", "de.json"), "utf8")).toBe(before);
@@ -458,7 +498,7 @@ describe("grai migrate", () => {
 	});
 });
 
-it("grai watch writes the output, then the shard a catalog's edit changes", async () => {
+it("grai watch writes the output, then the files a catalog's edit changes", async () => {
 	const { dir } = project(catalogs);
 	const child = spawn(process.execPath, [cli, "watch"], { cwd: dir });
 	onTestFinished(() => {
@@ -470,12 +510,12 @@ it("grai watch writes the output, then the shard a catalog's edit changes", asyn
 	const next = async () => String((await lines.next()).value);
 
 	expect(await next()).toBe("grai: watching grai.config.json and its catalogs");
-	expect(await next()).toMatch(/^grai: wrote 14 files in out/);
+	expect(await next()).toMatch(/^grai: wrote 21 files in out/);
 	writeFileSync(
 		join(dir, "messages", "de.json"),
 		JSON.stringify({ ...catalogs.de, cart_title: "Warenkorb" }, null, "\t"),
 	);
-	expect(await next()).toMatch(/^grai: wrote keys\/0\.js in out \(.+ ms\)$/);
+	expect(await next()).toMatch(/^grai: wrote 5 files in out \(.+ ms\)$/);
 });
 
 it("grai watch says the output is up to date once a broken catalog is put back as it was", async () => {
@@ -489,7 +529,7 @@ it("grai watch says the output is up to date once a broken catalog is put back a
 	]();
 	const next = async () => String((await lines.next()).value);
 	expect(await next()).toBe("grai: watching grai.config.json and its catalogs");
-	expect(await next()).toMatch(/^grai: wrote 14 files in out/);
+	expect(await next()).toMatch(/^grai: wrote 21 files in out/);
 	const catalog = join(dir, "messages", "de.json");
 	const saved = readFileSync(catalog);
 

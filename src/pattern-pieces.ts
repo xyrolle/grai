@@ -3,7 +3,12 @@
  * place but not edit.
  */
 
-import { type Part, parsePattern, placeholderEnd } from "./pattern.ts";
+import {
+	isMarkup,
+	type Part,
+	parsePattern,
+	placeholderEnd,
+} from "./pattern.ts";
 import { idText } from "./xml-text.ts";
 
 /** A code a translator places but does not edit: a placeholder, or markup. */
@@ -76,13 +81,18 @@ export function patternPieces(
 
 const kinds: Readonly<Record<CodePart["type"], Code["kind"]>> = {
 	variable: "placeholder",
+	literal: "placeholder",
 	"markup-start": "open",
 	"markup-end": "close",
 	"markup-standalone": "standalone",
 };
 
-/** A code's name as its ids begin, written as an id holds text, so that a `.2` follows only its repeats. */
+/**
+ * A code's name as its ids begin, written as an id holds text, so that a `.2` follows only its
+ * repeats: a placeholder's input, `literal`, or its tag for markup.
+ */
 function nameOf(part: CodePart): string {
+	if (part.type === "literal") return "literal";
 	const name = idText(part.name);
 	return part.type === "variable" ? name : `tag-${name}`;
 }
@@ -131,7 +141,7 @@ function closingTags(
 	const closers = new Map<number, { index: number; source: string }>();
 	const open: { index: number; name: string }[] = [];
 	pieces.forEach((piece, index) => {
-		if ("text" in piece) return;
+		if ("text" in piece || !isMarkup(piece.part)) return;
 		const { type, name } = piece.part;
 		if (type === "markup-start") open.push({ index, name });
 		if (type !== "markup-end") return;

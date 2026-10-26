@@ -59,6 +59,12 @@ The code is small, readable and maintainable by a stranger. Every line earns its
 - The latest stable, fastest tooling: Biome (lint and format), Vitest, and TypeScript 7 (`tsgo`) for type checking.
 - `pnpm check`, `pnpm typecheck` and `pnpm test` all pass before a push.
 
+### Releases
+The owner publishes; nothing else does.
+1. On a branch, write the release's section at the top of `CHANGELOG.md` from the `feat:`, `fix:` and `perf:` commits since the last tag (`git log --format=%s v<last>..HEAD`), in words for those who use grai. Run `pnpm version <version> --no-git-tag-version`, commit both as `chore: release <version>`, and merge it through a pull request.
+2. On `main` at that commit: `git tag v<version>`, `git push origin v<version>`, then `pnpm publish`, whose `prepublishOnly` runs the whole gate first.
+
 ### Docs
 - Docs record decisions and their reasons, not implementation retellings.
 - Open follow-ups go in `docs/followups.md`, each with "done when"; delete an entry in the change that resolves it.
+- The docs site (`site/`, Starlight) is built from the README's sections and the docs they point to, by `site/pages.ts`: nothing is written there by hand. `pnpm --filter grai-site build` fails on a dead link.

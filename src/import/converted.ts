@@ -50,35 +50,12 @@ export type CatalogValue =
 			},
 	  ];
 
-/** A branch that needs no selector value. */
-export function plain(pattern: string): Branch {
-	return { keys: new Map(), pattern };
-}
-
-/** Each branch of `a` followed by each of `b`, with the selector values both need. */
-export function combine(a: readonly Branch[], b: readonly Branch[]): Branch[] {
-	return a.flatMap((first) =>
-		b.map((second) => ({
-			keys: new Map([...first.keys, ...second.keys]),
-			pattern: first.pattern + second.pattern,
-		})),
-	);
-}
-
-/** The branch, needing the selector values `keys` too. */
-export function withKeys(
-	branch: Branch,
-	keys: readonly [string, string][],
-): Branch {
-	return { keys: new Map([...branch.keys, ...keys]), pattern: branch.pattern };
-}
-
 /** A message of one pattern, without selectors. */
 export function plainMessage(pattern: string): Converted {
 	return {
 		declarations: [],
 		selectors: [],
-		branches: [plain(pattern)],
+		branches: [{ keys: new Map(), pattern }],
 	};
 }
 
@@ -141,9 +118,17 @@ export function pluralLocal(
 	type: PluralType,
 	taken: ReadonlySet<string>,
 ): { name: string; declaration: string } {
-	const base = `${input}${type === "cardinal" ? "Plural" : "Ordinal"}`;
-	let name = base;
-	for (let suffix = 2; taken.has(name); suffix++) name = `${base}${suffix}`;
+	const name = untaken(
+		`${input}${type === "cardinal" ? "Plural" : "Ordinal"}`,
+		taken,
+	);
 	const options = type === "cardinal" ? "" : " type=ordinal";
 	return { name, declaration: `local ${name} = ${input}: plural${options}` };
+}
+
+/** The name, or with the first number after it that makes one the names taken do not hold. */
+export function untaken(base: string, taken: ReadonlySet<string>): string {
+	let name = base;
+	for (let suffix = 2; taken.has(name); suffix++) name = `${base}${suffix}`;
+	return name;
 }

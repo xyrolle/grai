@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { errorsOf, project } from "./project.ts";
+import { errorsOf, outputFile, project } from "./project.ts";
 
 const when = new Date(Date.UTC(2026, 9, 24, 15, 5, 30));
 
@@ -235,7 +234,7 @@ describe("a formatted placeholder", () => {
 		const { dir, compile } = project({ en: catalog, de: catalog });
 		expect((await compile()).errors).toEqual([]);
 
-		const formats = readFileSync(join(dir, "out", "formats.js"), "utf8");
+		const formats = readFileSync(await outputFile(dir, "formats.js"), "utf8");
 		expect(
 			[...formats.matchAll(/export const (\w+)/g)].map(([, name]) => name),
 		).toEqual([
@@ -267,7 +266,7 @@ describe("a formatted placeholder's errors", () => {
 				},
 			}),
 		).toEqual([
-			'unsupported: messages/en.json: "a_function" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
+			'unsupported: messages/en.json: "a_function" (en): {amount :uppercase} calls :uppercase, which grai does not support; the formatting functions are :string, :number, :integer, :percent, :offset, :currency, :unit, :relativetime, :list, :datetime, :date, :time.',
 			'message-invalid: messages/en.json: "a_unit" (en): {days :relativetime unit=fortnight}: "unit=fortnight" needs a unit of time: year, years, quarter, quarters, month, months, week, weeks, day, days, hour, hours, minute, minutes, second, seconds.',
 			'unsupported: messages/en.json: "a_usage" (en): {distance :unit unit=meter usage=road}: usage converts the value into the units the locale prefers, which Intl cannot do, so grai does not support it. Convert the value before the call, and leave usage out.',
 			'message-invalid: messages/en.json: "a_value" (en): {amount :number minimumFractionDigits=two}: "minimumFractionDigits=two" needs a whole number.',

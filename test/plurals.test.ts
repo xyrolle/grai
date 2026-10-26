@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { cardinalRules, ordinalRules } from "../src/plural-rules.ts";
 import {
@@ -6,6 +7,20 @@ import {
 	pluralModule,
 	pluralName,
 } from "../src/plurals.ts";
+
+/**
+ * Whether the engine's CLDR is the release grai's rules are compiled from, the cldr-core this repo
+ * pins. Intl.PluralRules is the reference only then: a locale's rules change between releases, as
+ * Sicilian's ordinals did in CLDR 48, and an older engine keeps the old ones.
+ */
+const cldrCore: { version: string } = JSON.parse(
+	readFileSync(
+		new URL("../node_modules/cldr-core/package.json", import.meta.url),
+		"utf8",
+	),
+);
+const sameCldr =
+	process.versions.cldr?.split(".")[0] === cldrCore.version.split(".")[0];
 
 const others = [
 	...[
@@ -68,27 +83,33 @@ async function disagreements(
 	return { locales, differences };
 }
 
-it("chooses every locale's category as Intl.PluralRules does, for whole counts and fractions", async () => {
-	const { locales, differences } = await disagreements(
-		"cardinal",
-		cardinalRules,
-		[...Array.from({ length: 10_001 }, (_, count) => count), ...others],
-	);
+it.runIf(sameCldr)(
+	"chooses every locale's category as Intl.PluralRules does, for whole counts and fractions",
+	async () => {
+		const { locales, differences } = await disagreements(
+			"cardinal",
+			cardinalRules,
+			[...Array.from({ length: 10_001 }, (_, count) => count), ...others],
+		);
 
-	expect(locales.length).toBeGreaterThan(200);
-	expect(differences).toEqual([]);
-});
+		expect(locales.length).toBeGreaterThan(200);
+		expect(differences).toEqual([]);
+	},
+);
 
-it("chooses every locale's ordinal category as Intl.PluralRules does with type ordinal", async () => {
-	const { locales, differences } = await disagreements(
-		"ordinal",
-		ordinalRules,
-		[...Array.from({ length: 1001 }, (_, count) => count), ...others],
-	);
+it.runIf(sameCldr)(
+	"chooses every locale's ordinal category as Intl.PluralRules does with type ordinal",
+	async () => {
+		const { locales, differences } = await disagreements(
+			"ordinal",
+			ordinalRules,
+			[...Array.from({ length: 1001 }, (_, count) => count), ...others],
+		);
 
-	expect(locales.length).toBeGreaterThan(100);
-	expect(differences).toEqual([]);
-});
+		expect(locales.length).toBeGreaterThan(100);
+		expect(differences).toEqual([]);
+	},
+);
 
 it("gives a regional locale its language's rules, and one CLDR does not know only other", () => {
 	expect(categoriesOf("en-GB", "cardinal")).toEqual(["one", "other"]);

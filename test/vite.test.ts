@@ -22,6 +22,7 @@ import {
 } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
+import { withoutContentHash } from "../src/content-names.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { ownChunkBytes } from "../src/vite-build.ts";
@@ -90,7 +91,7 @@ function linked(dir: string): string {
 async function built(
 	dir: string,
 	entries: Record<string, string>,
-	{ write = false, ssr = false } = {},
+	{ write = false, ssr = false, localeChunks = false } = {},
 ) {
 	for (const [name, code] of Object.entries(entries))
 		writeFileSync(join(dir, `${name}.js`), code);
@@ -98,7 +99,7 @@ async function built(
 		root: dir,
 		configFile: false,
 		logLevel: "silent",
-		plugins: [grai()],
+		plugins: [grai({ localeChunks })],
 		build: {
 			write,
 			ssr,
@@ -218,6 +219,73 @@ describe("the Vite plugin's build", () => {
 		expect(shipped).not.toContain("Ţîţļé");
 	});
 
+	it("takes a per-key path to that key's own module, not to keys.js, which would load every key", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		writeFileSync(
+			join(dir, "page.js"),
+			`import { title } from "#i18n/messages/title.js";\nconsole.log(title());\n`,
+		);
+		let loaded: string[] = [];
+		await build({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			plugins: [
+				grai(),
+				{
+					name: "loaded",
+					buildEnd() {
+						loaded = [...this.getModuleIds()];
+					},
+				},
+			],
+			build: {
+				write: false,
+				rolldownOptions: { input: join(dir, "page.js") },
+			},
+		});
+
+		expect(
+			loaded.filter((id) => id.includes("keys.js") || id.includes("grai:key")),
+		).toEqual(["\0grai:key/title"]);
+	});
+
+	it("copies per locale the chunks of keys pages import later by their paths, with the namespaces the bundler makes for them", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "package.json"), perKeyImports);
+		const later = (key: string) =>
+			`import("#i18n/messages/${key}.js").then((module) => console.log(module.${key}()));\n`;
+		const { sources } = await built(
+			dir,
+			{ a: later("title"), b: later("footer") },
+			{ localeChunks: true },
+		);
+		const words = (locale: string) =>
+			[...sources]
+				.filter(([file]) => file.startsWith(`assets/grai-${locale}/`))
+				.map(([, code]) => code)
+				.join("");
+
+		expect([
+			words("en").includes("Title"),
+			words("en").includes("Titel"),
+			words("de").includes("Fußzeile"),
+			words("de").includes("Footer"),
+		]).toEqual([true, false, true, false]);
+	});
+
+	it("refuses the output's testing.js in a build, so a test's locale binding never ships", async () => {
+		const { dir } = project(catalogs);
+		await expect(
+			built(dir, {
+				a: `import { useLocale } from "./out/testing.js";\nuseLocale("de");\n`,
+			}),
+		).rejects.toThrow(
+			/testing\.js binds a test's locale, so a build refuses it/,
+		);
+	});
+
 	it("fails the build with the compiler's errors", async () => {
 		const { dir } = project({ en: { title: "Title" }, de: {} });
 		await expect(
@@ -240,6 +308,51 @@ describe("the Vite plugin's build", () => {
 				'a.js:2:41: "caption": m["caption"] names a key no catalog has. Add it with grai add caption --en "…" --de "…", or fix the name.',
 			].join("\n"),
 		);
+	});
+
+	it("takes a static block for a scope, and reads keys taken apart from the namespace", async () => {
+		const { dir } = project(catalogs);
+		const shadowed = [
+			`import { m } from "./out/messages.js";`,
+			"export class Box { static { const m = { id: 7 }; globalThis.box = m.id; } }",
+			"const { title } = m;",
+			"({ title: globalThis.heading } = m);",
+			"console.log(title());",
+		].join("\n");
+
+		await expect(built(dir, { a: `${shadowed}\n` })).resolves.toBeDefined();
+		await expect(
+			built(dir, {
+				a: `import { m } from "./out/messages.js";\nconst { absent } = m;\nconsole.log(absent());\n`,
+			}),
+		).rejects.toThrow('a.js:2:9: "absent": absent names a key no catalog has.');
+		await expect(
+			built(dir, {
+				a: `${shadowed}\nconst { absent } = m;\nconsole.log(absent());\n`,
+			}),
+		).rejects.toThrow(
+			'a.js:6:9: "absent": absent names a key no catalog has. Add it with grai add absent --en "…" --de "…", or fix the name.',
+		);
+	});
+
+	it("reads the namespace by scope, so a parameter or declaration of its name is not grai's", async () => {
+		const { dir } = project(catalogs);
+		const code = [
+			`import { m } from "./out/messages.js";`,
+			"export const ids = (rows) => rows.map((m) => m.id);",
+			"export function sized(m) { return m.size; }",
+			"export const widths = ({ m }) => m.width;",
+			"export function block() { const m = { label: 1 }; return m.label; }",
+			"export function caught() { try { return m.title(); } catch (m) { return m.message; } }",
+			"console.log(m.title(), m.subtitle());",
+		].join("\n");
+
+		await expect(built(dir, { a: `${code}\n` })).rejects.toThrow(
+			'a.js:7:26: "subtitle": m.subtitle names a key no catalog has. Add it with grai add subtitle --en "…" --de "…", or fix the name.',
+		);
+		await expect(
+			built(dir, { a: `${code.split("\n").slice(0, -1).join("\n")}\n` }),
+		).resolves.toBeDefined();
 	});
 });
 
@@ -307,6 +420,7 @@ describe("the Vite plugin's message chunks", () => {
 					`import { m } from "./out/messages.js";\nconsole.log(m.title(), m.${page}());\n`,
 				]),
 			),
+			{ localeChunks: true },
 		);
 		const messageChunks = [...keysOf(chunks).keys()];
 		const words = (file: string, locale: string) =>
@@ -375,7 +489,7 @@ describe("grai/vite's module kinds", () => {
 		const placed = Object.fromEntries(
 			chunks.flatMap((chunk) =>
 				chunk.moduleIds.map((id) => [
-					id.replace(`${dir}/`, ""),
+					withoutContentHash(id.replace(`${dir}/`, "")),
 					[kindOf(id), chunk.name],
 				]),
 			),
@@ -427,9 +541,43 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 		});
 	});
 
-	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
+	it("leaves as rendered a call that holds no variants, such as the namespace object of a key a page imports later", () => {
+		const chunk = (title: string) =>
+			`import { text } from "../grai-runtime.js";\nimport { t as __exportAll } from "../helpers.js";\nvar title_exports = /* @__PURE__ */ __exportAll({ title: () => title });\nvar title = /*#__PURE__*/ text(${title});\nexport { title_exports as t };\n`;
+
+		expect(
+			localeCopies("chunk.js", chunk(`"Title", "Titel"`), ["en", "de"]).get(
+				"de",
+			),
+		).toBe(chunk(`void 0, "Titel"`));
+	});
+
+	it("says in config.js whether the build wrote them, for the server", async () => {
+		const flag = async (localeChunks: boolean) => {
+			const { dir } = project(catalogs);
+			await built(dir, { page }, { localeChunks });
+			const config = await import(
+				pathToFileURL(join(dir, "out", "config.js")).href
+			);
+			return config.localeCopies;
+		};
+
+		expect([await flag(true), await flag(false)]).toEqual([true, false]);
+	});
+
+	it("writes none unless the app asks for them", async () => {
 		const { dir } = project(catalogs);
 		const { sources } = await built(dir, { page });
+		const directories = new Set(
+			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
+		);
+
+		expect([...directories].sort()).toEqual(["assets", "assets/grai"]);
+	});
+
+	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
+		const { dir } = project(catalogs);
+		const { sources } = await built(dir, { page }, { localeChunks: true });
 		const directories = new Set(
 			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
 		);
@@ -444,7 +592,11 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 
 	it("puts the runtime in a chunk of its own and the messages in chunks copied per locale, for a project reached through a symlink", async () => {
 		const { dir } = project(catalogs);
-		const { chunks, sources } = await built(linked(dir), { page });
+		const { chunks, sources } = await built(
+			linked(dir),
+			{ page },
+			{ localeChunks: true },
+		);
 		const directories = new Set(
 			[...sources.keys()].map((file) => file.slice(0, file.lastIndexOf("/"))),
 		);
@@ -464,7 +616,7 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 
 	it("writes each message chunk once per locale, with only that locale's words", async () => {
 		const { dir } = project(catalogs);
-		const { sources } = await built(dir, { page });
+		const { sources } = await built(dir, { page }, { localeChunks: true });
 		const messageChunks = [...sources.keys()].filter((file) =>
 			file.startsWith("assets/grai/"),
 		);
@@ -495,6 +647,7 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 					`import { m } from "./out/messages.js";\nconsole.log(m.${key}());\n`,
 				]),
 			),
+			{ localeChunks: true },
 		);
 		const copies = [...sources.keys()].filter((file) =>
 			/^assets\/grai-(en|de)\//.test(file),
@@ -511,7 +664,11 @@ var terms = /*#__PURE__*/ markup([void 0, (i) => "AGB"], [void 0, (i) => [{ type
 
 	it("serves a page its locale's words alone through an import map", async () => {
 		const { dir } = project(catalogs);
-		const { entryFiles } = await built(dir, { page }, { write: true });
+		const { entryFiles } = await built(
+			dir,
+			{ page },
+			{ write: true, localeChunks: true },
+		);
 		const html = `<!doctype html><html lang="de"><script type="importmap">{"imports":{"/assets/grai/":"/assets/grai-de/"}}</script><script type="module" src="/${entryFiles.page}"></script>`;
 		const browser = await chromium.launch();
 		onTestFinished(() => browser.close());
@@ -551,7 +708,7 @@ try {
 }
 `,
 			},
-			{ write: true },
+			{ write: true, localeChunks: true },
 		);
 		const browser = await chromium.launch();
 		onTestFinished(() => browser.close());
@@ -769,6 +926,37 @@ export const render = () => {
 		return { page, title };
 	}
 
+	it("keeps the server's program when the compile writes keys.js, which the plugin serves from memory", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";
+globalThis.evaluations = (globalThis.evaluations ?? 0) + 1;
+export const render = () => \`\${m.title()} \${globalThis.evaluations}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		expect(await rendered()).toBe("Title 1");
+
+		// What Vite's watcher does when it sees keys.js written, as every compile writes it now that it
+		// names its shards by their content: the module graph takes the file's modules as changed.
+		for (const environment of Object.values(server.environments))
+			environment.moduleGraph.onFileChange(join(dir, "out", "keys.js"));
+
+		expect(await rendered()).toBe("Title 1");
+	});
+
 	it("patches a server render's messages in place, and a later evaluation keeps the edit", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
@@ -897,15 +1085,14 @@ export const render = () => \`\${title()} \${footer()}\`;
 		return { resolved, rendered };
 	}
 
-	it("resolves a page's key paths to keys.js, one module for every key", async () => {
+	it("resolves a page's key paths to keys.js, one module for every key, by the dev module's own id", async () => {
 		const { dir } = project(catalogs);
 		const { resolved, rendered } = await keyPaths(dir, "development");
-		const keys = join(dir, "out", "keys.js");
 
 		expect(await rendered()).toBe("Title Footer");
 		expect([await resolved("title"), await resolved("footer")]).toEqual([
-			keys,
-			keys,
+			"\0grai:keys",
+			"\0grai:keys",
 		]);
 	});
 
@@ -1030,6 +1217,32 @@ try {
 		await page.waitForFunction(
 			`document.querySelector("vite-error-overlay")?.shadowRoot?.textContent.includes('imports "subtitle" by its path')`,
 		);
+	});
+
+	it("reloads the open page when the config changes what the runtime reads, so that no page holds two runtimes", async () => {
+		const { dir, config } = project(catalogs);
+		const { page, title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+document.getElementById("title").textContent = m.title();
+window.loaded = performance.timeOrigin;
+`,
+		);
+		await title("Titel");
+		const loaded = await page.evaluate("window.loaded");
+
+		writeFileSync(
+			config,
+			JSON.stringify({
+				...JSON.parse(readFileSync(config, "utf8")),
+				strategy: ["cookie"],
+				cookieName: "locale",
+			}),
+		);
+
+		await expect
+			.poll(() => page.evaluate("window.loaded").catch(() => loaded), devWait)
+			.not.toBe(loaded);
 	});
 
 	it("throws for a call in another locale than the page's, as a build does, naming the key", async () => {

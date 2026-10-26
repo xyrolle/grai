@@ -166,7 +166,8 @@ describe("a key named as something the output's code calls", () => {
 		if (compiled === undefined) throw new Error("the compile failed");
 		const outdir = join(dir, "out");
 		const file = join(outdir, "page-text.js");
-		const code = textModule(compiled, `${textModulePrefix}pageText`) ?? "";
+		const code =
+			textModule(compiled, `${textModulePrefix}pageText`, "client") ?? "";
 		// Its imports of the output by grai's prefix, as the plugin resolves them.
 		writeFileSync(file, code.replaceAll(outputPrefix, `${outdir}/`));
 		expect(said(file, ["pageText"])).toEqual({ pageText: "Page text" });

@@ -1,0 +1,24 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"language_name": "العربية",
+	"home_link": "الرئيسية",
+	"about_link": "حول",
+	"greeting": "مرحبا",
+	"about_title": "حول هذا المثال",
+	"cart_items": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "منتج واحد في سلتك",
+				"countPlural=two": "منتجان في سلتك",
+				"countPlural=few": "{count} منتجات في سلتك",
+				"countPlural=*": "{count} منتج في سلتك"
+			}
+		}
+	],
+	"cart_add": "أضف منتجا",
+	"drawn_by_svelte": "رسمه Svelte في المتصفح",
+	"welcome": "أهلا، {name}!",
+	"drawn_by_react": "رسمه React في المتصفح"
+}

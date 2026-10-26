@@ -18,18 +18,23 @@ export const textModulePrefix: string = `\0${textPrefix}`;
  */
 export const outputPrefix = "grai:output/";
 
-/** The directory a page's message chunks go to, and the one of each locale's copies. */
-export const messageDirectory = "grai";
-export const localeDirectory = (locale: string): string => `grai-${locale}`;
-
 /** Whether a module holds one key's message, as a function or as the page's string. */
 export function isMessageModule(id: string): boolean {
 	return id.startsWith(keyModulePrefix) || id.startsWith(textModulePrefix);
 }
 
-/** Whether a chunk holds message modules and nothing else. */
+/**
+ * Rolldown's own module of helpers, such as the one that makes the namespace object of a key a page
+ * imports later. It holds no words, so a chunk of messages may hold it too.
+ */
+const bundlerHelpers = "\0rolldown/runtime.js";
+
+/** Whether a chunk holds message modules and nothing else but the bundler's helpers. */
 export function messageOnly(moduleIds: readonly string[]): boolean {
-	return moduleIds.length > 0 && moduleIds.every(isMessageModule);
+	return (
+		moduleIds.some(isMessageModule) &&
+		moduleIds.every((id) => isMessageModule(id) || id === bundlerHelpers)
+	);
 }
 
 /**
@@ -61,7 +66,8 @@ type Spanned = { start: number; end: number };
  * A message-only chunk's code, as rendered before minification, once per locale. Each key is a
  * call of the runtime with one variant per locale (`text(…)`, `message(…)`, or `markup([…], […])`);
  * each copy keeps only its locale's variant, at its locale's position, so the runtime picks it
- * for the page's locale. Imports, exports and every name stay as rendered.
+ * for the page's locale. Imports, exports, every name, and any other code, such as a namespace
+ * object the bundler makes, stay as rendered.
  */
 export function localeCopies(
 	fileName: string,
@@ -70,33 +76,38 @@ export function localeCopies(
 ): Map<string, string> {
 	const calls = parseSync(fileName, code).program.body.flatMap((statement) =>
 		statement.type === "VariableDeclaration"
-			? statement.declarations.flatMap((declarator) =>
-					declarator.init?.type === "CallExpression" ? [declarator.init] : [],
-				)
+			? statement.declarations.flatMap(({ init }) => {
+					if (init?.type !== "CallExpression") return [];
+					const [first, second] = init.arguments;
+					const lists =
+						init.arguments.length === 2 &&
+						first?.type === "ArrayExpression" &&
+						second?.type === "ArrayExpression"
+							? [first.elements, second.elements]
+							: [init.arguments];
+					const variants = variantsIn(lists, locales.length);
+					return variants === undefined ? [] : [{ call: init, variants }];
+				})
 			: [],
 	);
 	const source = (node: Spanned) => code.slice(node.start, node.end);
-	const only = (variants: readonly (Spanned | null)[], index: number) =>
+	const only = (variants: readonly Spanned[], index: number) =>
 		[
 			...Array.from({ length: index }, () => "void 0"),
-			source(variantAt(variants, index, fileName)),
+			...variants.slice(index, index + 1).map(source),
 		].join(", ");
-	const argumentsIn = (call: (typeof calls)[number], index: number) => {
-		const [first, second] = call.arguments;
-		return call.arguments.length === 2 &&
-			first?.type === "ArrayExpression" &&
-			second?.type === "ArrayExpression"
-			? `[${only(first.elements, index)}], [${only(second.elements, index)}]`
-			: only(call.arguments, index);
-	};
 	// One pass over the calls in order, joined once. Rebuilding the code at each call took 8.4 s for a
 	// chunk of 13,000 keys, against 0.14 s.
 	const copyIn = (index: number) => {
 		const pieces: string[] = [];
 		let from = 0;
-		for (const call of calls) {
+		for (const { call, variants } of calls) {
 			const start = call.arguments[0]?.start ?? call.end - 1;
-			pieces.push(code.slice(from, start), argumentsIn(call, index));
+			const kept = variants.map((group) => only(group, index));
+			pieces.push(
+				code.slice(from, start),
+				variants.length === 2 ? `[${kept[0]}], [${kept[1]}]` : (kept[0] ?? ""),
+			);
 			from = call.arguments.at(-1)?.end ?? call.end - 1;
 		}
 		pieces.push(code.slice(from));
@@ -105,16 +116,31 @@ export function localeCopies(
 	return new Map(locales.map((locale, index) => [locale, copyIn(index)]));
 }
 
-function variantAt(
-	variants: readonly (Spanned | null)[],
-	index: number,
-	fileName: string,
-): Spanned {
-	const variant = variants[index];
-	if (variant === undefined || variant === null) {
-		throw new Error(
-			`grai: ${fileName} holds a message without a variant for every locale, so it cannot copy it per locale.`,
-		);
-	}
-	return variant;
+/** A node as the parser gives it, as much as telling a variant needs. */
+type Node = Spanned & { type: string; value?: unknown };
+
+/** The nodes of a key's locale functions, which a copy keeps. */
+const functions = new Set(["ArrowFunctionExpression", "FunctionExpression"]);
+
+/** Whether a node is one locale's variant of a key: its text, or the function that makes it. */
+const isVariant = (node: Node | null): node is Node =>
+	node !== null &&
+	(functions.has(node.type) ||
+		node.type === "TemplateLiteral" ||
+		(node.type === "Literal" && typeof node.value === "string"));
+
+/**
+ * A key's call's variants, in lists of one per locale: its arguments, or markup's two arrays. Nothing
+ * for a call whose lists are not one variant per locale, which is no key's.
+ */
+function variantsIn(
+	lists: readonly (readonly (Node | null)[])[],
+	locales: number,
+): Node[][] | undefined {
+	const variants = lists.map((list) => list.filter(isVariant));
+	return variants.every(
+		(list, at) => list.length === locales && list.length === lists[at]?.length,
+	)
+		? variants
+		: undefined;
 }

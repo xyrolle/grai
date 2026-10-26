@@ -8,6 +8,7 @@ import {
 	leavesPathsAlone,
 	locales,
 	prefixesEveryLocale,
+	queryParameter,
 	readsUrl,
 	strategy,
 	unlocalizedPaths,
@@ -18,6 +19,10 @@ import {
 	localeOfPath,
 	localizeUrl,
 } from "./runtime.js";
+
+// Whether the build wrote a copy of each message chunk per locale, for an adapter that points a
+// page at its locale's copies only when they exist.
+export { localeCopies } from "./config.js";
 
 /** @type {AsyncLocalStorage<import("./runtime.js").RequestLocale>} */
 const requests = new AsyncLocalStorage();
@@ -79,15 +84,48 @@ function unprefixedPage(request, pathname) {
  */
 function localeOf(request, pathname) {
 	for (const source of strategy) {
-		const locale =
-			source === "cookie"
-				? fromCookie(request.headers.get("cookie") ?? "")
-				: source === "url"
-					? localeOfPath(pathname)
-					: fromAcceptLanguage(request.headers.get("accept-language") ?? "");
+		const locale = fromSource(source, request, pathname);
 		if (locale !== undefined) return locale;
 	}
 	return baseLocale;
+}
+
+/**
+ * The locale one place of the strategy names in the request. `localStorage` is the page's alone,
+ * and a request does not carry it.
+ *
+ * @param {(typeof strategy)[number]} source
+ * @param {Request} request
+ * @param {string} pathname
+ * @returns {string | undefined}
+ */
+function fromSource(source, request, pathname) {
+	switch (source) {
+		case "cookie":
+			return fromCookie(request.headers.get("cookie") ?? "");
+		case "preferredLanguage":
+			return fromAcceptLanguage(request.headers.get("accept-language") ?? "");
+		case "query":
+			return fromQuery(request.url);
+		case "url":
+			return localeOfPath(pathname);
+		case "localStorage":
+			return undefined;
+	}
+}
+
+/**
+ * The locale the URL's query parameter names, matched as a preferred language is, since a link may
+ * name `de-AT` where the project has `de`.
+ *
+ * @param {string} url
+ */
+function fromQuery(url) {
+	const tag =
+		queryParameter === undefined
+			? null
+			: new URL(url).searchParams.get(queryParameter);
+	return tag === null ? undefined : reachedBy(tag)[0];
 }
 
 /** @param {string} header */
@@ -101,9 +139,8 @@ function fromCookie(header) {
 	return undefined;
 }
 
-/** Each locale lowercased, and its likely form (`en-latn-us` for `en-US`), as ranges reach them. */
-const written = locales.map((locale) => locale.toLowerCase());
-const likely = locales.map((locale) => likelyTag(locale));
+/** The locales a language range reaches, the nearest first. */
+const reachedBy = localeReach(locales);
 /** The locales the base locale first, as `*` takes them. */
 const baseFirst = [
 	baseLocale,
@@ -197,56 +234,19 @@ function covers(range, locale) {
 }
 
 /**
- * The locales a range reaches, the nearest first: the range itself, then each parent it is cut down
- * to (`zh-hant-tw`, `zh-hant`, `zh`), as written and then in its likely form (`zh-tw` is
- * `zh-hant-tw`), each matched against a locale as written or in its likely form. A sibling is never
- * reached: `en-au` reaches neither `en-GB` nor `en-US`.
- *
- * @param {string} range
- * @returns {string[]}
+ * The headers `localeOf` reads, in the strategy's order: `query` and `url` read the URL, which a
+ * cache keys on already, and a request does not carry `localStorage`.
  */
-function reachedBy(range) {
-	const forms = [...parentsOf(range), ...parentsOf(likelyTag(range) ?? range)];
-	return forms.flatMap((form) =>
-		locales.filter(
-			(_, index) => written[index] === form || likely[index] === form,
-		),
-	);
-}
-
-/**
- * A tag and each parent it is cut down to, longest first: `zh-hant-tw`, `zh-hant`, `zh`.
- *
- * @param {string} tag
- */
-function parentsOf(tag) {
-	const subtags = tag.split("-");
-	return subtags.map((_, index) =>
-		subtags.slice(0, subtags.length - index).join("-"),
-	);
-}
-
-/**
- * A tag's likely form, lowercased, from CLDR's likely subtags (`zh-hant-tw` for `zh-TW`), or
- * undefined for a tag the platform cannot read.
- *
- * @param {string} tag
- * @returns {string | undefined}
- */
-function likelyTag(tag) {
-	try {
-		return new Intl.Locale(tag).maximize().toString().toLowerCase();
-	} catch (error) {
-		if (!(error instanceof RangeError)) throw error;
-		return undefined;
-	}
-}
-
-/** The headers `localeOf` reads: each strategy's but `url`'s, which the config keeps last. */
 function headersRead() {
-	return strategy
-		.filter((source) => source !== "url")
-		.map((source) => (source === "cookie" ? "Cookie" : "Accept-Language"));
+	/** @type {Record<(typeof strategy)[number], string[]>} */
+	const headersOf = {
+		cookie: ["Cookie"],
+		localStorage: [],
+		preferredLanguage: ["Accept-Language"],
+		query: [],
+		url: [],
+	};
+	return strategy.flatMap((source) => headersOf[source]);
 }
 
 /**
@@ -267,4 +267,50 @@ function withVary(response) {
 		copy.headers.append("vary", vary);
 		return copy;
 	}
+}
+
+/**
+ * How language ranges reach the project's locales: for a range, the locales it reaches, the
+ * nearest first. A range reaches itself, then each parent it is cut down to (`zh-hant-tw`,
+ * `zh-hant`, `zh`), as written and then in its likely form from CLDR's likely subtags (`zh-tw` is
+ * `zh-hant-tw`), each matched against a locale as written or in its likely form. A sibling is never
+ * reached: `en-au` reaches neither `en-GB` nor `en-US`.
+ *
+ * A page's locale script matches the browser's languages with this same function, whose source
+ * grai/vite writes into the script (`locale-script.ts`), so it refers to nothing outside its body.
+ *
+ * @param {readonly string[]} locales
+ * @returns {(range: string) => string[]}
+ */
+function localeReach(locales) {
+	/** @param {string} tag a tag, lowercased, and each parent it is cut down to, longest first */
+	const parentsOf = (tag) => {
+		const subtags = tag.split("-");
+		return subtags.map((_, index) =>
+			subtags.slice(0, subtags.length - index).join("-"),
+		);
+	};
+	/** @param {string} tag its likely form, lowercased, or undefined for one Intl cannot read */
+	const likelyTag = (tag) => {
+		try {
+			return new Intl.Locale(tag).maximize().toString().toLowerCase();
+		} catch (error) {
+			if (!(error instanceof RangeError)) throw error;
+			return undefined;
+		}
+	};
+	const written = locales.map((locale) => locale.toLowerCase());
+	const likely = locales.map(likelyTag);
+	return (range) => {
+		const lowered = range.toLowerCase();
+		const forms = [
+			...parentsOf(lowered),
+			...parentsOf(likelyTag(lowered) ?? lowered),
+		];
+		return forms.flatMap((form) =>
+			locales.filter(
+				(_, index) => written[index] === form || likely[index] === form,
+			),
+		);
+	};
 }
