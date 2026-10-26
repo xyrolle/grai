@@ -1,4 +1,5 @@
 import type { Config } from "../config.ts";
+import { fallbackPositions, messageSource } from "../fallbacks.ts";
 import { type LocaleMessage, parseMessage } from "../message.ts";
 import { MessageProblem } from "../problem.ts";
 import type { KeyedMessage, MessagesByLocale } from "./convert.ts";
@@ -32,6 +33,9 @@ export type ImportedCatalogs = ImportReport & {
 	descriptions: Map<string, string>;
 };
 
+/** Whether a locale's source lacks a key one along its fallbacks has, which compiling takes from there. */
+type Inherits = (locale: string, key: string) => boolean;
+
 /** A locale's catalog value for a key, the message it compiles to, and how its source calls it. */
 type LocaleValue = {
 	value: CatalogValue;
@@ -42,9 +46,10 @@ type LocaleValue = {
 const schema = "https://inlang.com/schema/inlang-message-format";
 
 /**
- * A catalog for each configured locale, the base locale's keys in their order first. A key that
- * some locale lacks or cannot convert is left out of every locale, with the reasons, so the
- * catalogs compile.
+ * A catalog for each configured locale, the base locale's keys in their order first. A locale's
+ * catalog leaves out a key it takes from its fallbacks, as compiling does, so it keeps taking it. A
+ * key that some locale cannot convert, or lacks with no fallback that has it, is left out of every
+ * locale, with the reasons, so the catalogs compile.
  */
 export function catalogsOf(
 	messages: MessagesByLocale,
@@ -61,8 +66,9 @@ export function catalogsOf(
 		leftOut: [],
 		changed: [],
 	};
+	const inherits = inheritsIn(messages, config);
 	for (const key of keysInOrder(messages, config.baseLocale)) {
-		const values = valuesOf(key, messages, imported);
+		const values = valuesOf(key, messages, inherits, imported);
 		if (values === undefined) continue;
 		for (const { locale, catalog } of imported.files) {
 			const value = values.get(locale)?.value;
@@ -101,6 +107,24 @@ function descriptionOf(
 		.find((description) => description !== undefined);
 }
 
+/** The import's `Inherits`, from the sources and the configured fallbacks. */
+function inheritsIn(messages: MessagesByLocale, config: Config): Inherits {
+	const { locales, fallbacks } = config;
+	const sources = locales.map((locale) => ({
+		messages: messages.get(locale) ?? new Map<string, KeyedMessage>(),
+	}));
+	const fallbackOf = fallbackPositions(locales, fallbacks);
+	return (locale, key) => {
+		const index = locales.indexOf(locale);
+		const fallback = fallbackOf[index];
+		return (
+			!sources[index]?.messages.has(key) &&
+			fallback !== undefined &&
+			messageSource(key, fallback, sources, fallbackOf) !== undefined
+		);
+	};
+}
+
 /** Every key, the base locale's in its order first. */
 function keysInOrder(
 	messages: MessagesByLocale,
@@ -113,10 +137,14 @@ function keysInOrder(
 	return keys;
 }
 
-/** A key's value in each locale, or nothing, with the reasons in the report, when one locale has none. */
+/**
+ * A key's value in each locale but those that take it from their fallbacks, or nothing, with the
+ * reasons in the report, when one locale has none.
+ */
 function valuesOf(
 	key: string,
 	messages: MessagesByLocale,
+	inherits: Inherits,
 	report: ImportReport,
 ): Map<string, LocaleValue> | undefined {
 	const inLocales = [...messages].map(([locale, byKey]) => ({
@@ -128,6 +156,7 @@ function valuesOf(
 	const values = new Map<string, LocaleValue>();
 	const problems: LocaleDetail[] = [];
 	for (const { locale, message } of inLocales) {
+		if (inherits(locale, key)) continue;
 		try {
 			values.set(locale, valueIn(locale, message));
 		} catch (error) {
@@ -154,7 +183,7 @@ function valueIn(
 	if (message === undefined) {
 		throw new MessageProblem(
 			"key-missing",
-			"it has no message in this locale, and every key needs one in each locale.",
+			"it has no message in this locale or any it falls back to, and every key needs one in each locale.",
 		);
 	}
 	if (message.result instanceof MessageProblem) throw message.result;
