@@ -1,9 +1,9 @@
 /**
  * How the CLI resolves an import, as the project's bundler would: the project's own Vite aliases
  * first, as Vite applies them, then `oxc-resolver`, the resolver Rolldown is built on, with the
- * tsconfig `paths` of the file's nearest tsconfig (following `extends`, so SvelteKit's generated
- * one brings `$lib`), package.json `imports` and `exports`, and TypeScript's extensions. A build
- * resolves with the bundler itself.
+ * `paths` of the project's tsconfig (following `extends`, so SvelteKit's generated one brings
+ * `$lib`), package.json `imports` and `exports`, and TypeScript's extensions. A build resolves with
+ * the bundler itself.
  */
 
 import { existsSync } from "node:fs";
@@ -32,8 +32,13 @@ const extensions = [
 /** The project's resolution: its Vite aliases, if it has a Vite config, then `oxc-resolver`. */
 export async function projectResolve(root: string): Promise<Resolve> {
 	const aliases = await viteAliases(root);
+	const tsconfig = join(root, "tsconfig.json");
 	const resolver = new ResolverFactory({
-		tsconfig: "auto",
+		// The project's tsconfig for every module, as SvelteKit, Astro and Next apply its paths: to a
+		// component too, which the `include` of a tsconfig found by the file's own place may not list.
+		...(existsSync(tsconfig)
+			? { tsconfig: { configFile: tsconfig, references: "auto" } }
+			: {}),
 		conditionNames: ["import", "module", "browser", "default"],
 		mainFields: ["module", "main"],
 		extensions,
