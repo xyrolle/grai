@@ -49,11 +49,19 @@ async function child(command, config, ...args) {
 	const result = await exported(config, ...args);
 	const ms = performance.now() - start;
 	const errors = Array.isArray(result) ? result : result.errors;
+	// rename refuses a key a read by a computed name may reach, and that is its answer, not a failure.
+	if (command === "rename" && errors.length > 0) {
+		console.log(JSON.stringify({ ms, refused: true }));
+		return;
+	}
 	if (command !== "check" && errors.length > 0) throw errors[0];
 	console.log(JSON.stringify({ ms }));
 }
 
-/** The median of the runs, each after its own setup and then its check, in milliseconds. */
+/**
+ * The median of the runs, each after its own setup and then its check, in milliseconds, or
+ * `refused` when the command refused a run.
+ */
 function median(setup, args, after = () => {}) {
 	const runs = Array.from({ length: RUNS }, (_, run) => {
 		setup(run);
@@ -65,9 +73,11 @@ function median(setup, args, after = () => {}) {
 			},
 		);
 		after();
-		return JSON.parse(output.trim().split("\n").at(-1) ?? "").ms;
+		return JSON.parse(output.trim().split("\n").at(-1) ?? "");
 	});
-	return runs.toSorted((a, b) => a - b)[Math.floor(RUNS / 2)];
+	if (runs.some((run) => run.refused)) return "refused";
+	const ms = runs.map((run) => run.ms).toSorted((a, b) => a - b);
+	return `${ms[Math.floor(RUNS / 2)]?.toFixed(0)} ms`;
 }
 
 /** A copy of an app's sources and catalogs, with a grai config, from its checkout or made up. */
@@ -209,7 +219,7 @@ if (process.argv[2] === "--child") {
 				),
 			};
 			const times = Object.entries(ms).map(
-				([name, value]) => `${name} ${value.toFixed(0)} ms`,
+				([name, value]) => `${name} ${value}`,
 			);
 			console.log(`${app}: ${times.join(", ")}`);
 		} finally {
