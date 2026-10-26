@@ -12,8 +12,10 @@ import { dirname, join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { factsOf } from "../src/code/facts.ts";
 import { readerVersion } from "../src/code/facts-cache.ts";
-import { inWorkers, workerStart, workersFor } from "../src/code/facts-pool.ts";
+import { factsOfFiles, workerStart } from "../src/code/facts-pool.ts";
+import { Pool, workersFor } from "../src/code/pool.ts";
 import { type ProjectCode, readProjectCode } from "../src/code/project.ts";
+import { projectResolution, resolverFor } from "../src/code/resolution.ts";
 import { type Config, readConfig } from "../src/config.ts";
 import { GraiError } from "../src/error.ts";
 
@@ -45,6 +47,37 @@ async function codeOf(config: Config, dir: string): Promise<ProjectCode> {
 	const code = await readProjectCode(config, [join(dir, "src")]);
 	if (code instanceof GraiError) throw code;
 	return code;
+}
+
+/** The paths a facts cache holds, from its lines after the version's. */
+function cachedPaths(cache: string): string[] {
+	return entriesOf(cache).map(([path]) => path);
+}
+
+/** A facts cache's entries: each file's path, its text's hash and its facts' JSON. */
+function entriesOf(cache: string): [string, string, string][] {
+	return readFileSync(cache, "utf8")
+		.split("\n")
+		.slice(1)
+		.filter((line) => line !== "")
+		.map((line) => {
+			const [path = "", hash = "", json = ""] = line.split("\t");
+			return [JSON.parse(path), hash, json];
+		});
+}
+
+/** A facts cache with `facts` in place of each entry `planted` picks, written as a save writes it. */
+function planted(
+	cache: string,
+	picks: (path: string) => boolean,
+	facts: unknown,
+): string {
+	const [version] = readFileSync(cache, "utf8").split("\n");
+	const lines = entriesOf(cache).map(
+		([path, hash, json]) =>
+			`${JSON.stringify(path)}\t${hash}\t${picks(path) ? JSON.stringify(facts) : json}`,
+	);
+	return `${[version, ...lines].join("\n")}\n`;
 }
 
 describe("the module graph", () => {
@@ -203,17 +236,13 @@ describe("reading a project's facts", () => {
 		});
 		const cache = join(dir, "out/.grai/facts");
 		await codeOf(config, dir);
-		const saved: {
-			version: string;
-			entries: [string, { hash: string; facts: unknown }][];
-		} = JSON.parse(readFileSync(cache, "utf8"));
-		expect(saved.entries.map(([path]) => path).sort()).toEqual([
+		expect(cachedPaths(cache).sort()).toEqual([
 			join(dir, "src/a.ts"),
 			join(dir, "src/b.ts"),
 		]);
 
 		// A cached entry stands for its file while the file's text is the one it was read from.
-		const planted = {
+		const plantedFacts = {
 			modules: [
 				{
 					imports: [],
@@ -226,22 +255,13 @@ describe("reading a project's facts", () => {
 		};
 		writeFileSync(
 			cache,
-			JSON.stringify({
-				...saved,
-				entries: saved.entries.map(([path, entry]) => [
-					path,
-					path.endsWith("b.ts") ? { ...entry, facts: planted } : entry,
-				]),
-			}),
+			planted(cache, (path) => path.endsWith("b.ts"), plantedFacts),
 		);
 		rmSync(join(dir, "src/a.ts"));
 		const { sources } = await codeOf(config, dir);
 
-		expect(sources.get(join(dir, "src/b.ts"))?.facts).toEqual(planted);
-		const kept: { entries: [string, unknown][] } = JSON.parse(
-			readFileSync(cache, "utf8"),
-		);
-		expect(kept.entries.map(([path]) => path)).toEqual([join(dir, "src/b.ts")]);
+		expect(sources.get(join(dir, "src/b.ts"))?.facts).toEqual(plantedFacts);
+		expect(cachedPaths(cache)).toEqual([join(dir, "src/b.ts")]);
 	});
 
 	it("keys the facts on the reader's own code, so a change to it reads every file again, released or not", () => {
@@ -264,28 +284,20 @@ describe("reading a project's facts", () => {
 		});
 		const cache = join(dir, "out/.grai/facts");
 		await codeOf(config, dir);
-		const saved: {
-			version: string;
-			entries: [string, { hash: string; facts: unknown }][];
-		} = JSON.parse(readFileSync(cache, "utf8"));
 		// Facts no reading would give, so a file read again shows.
-		const planted = { modules: [] };
-		const bytes = JSON.stringify({
-			...saved,
-			entries: saved.entries.map(([path, entry]) => [
-				path,
-				{ ...entry, facts: planted },
-			]),
-		});
-		writeFileSync(cache, bytes);
+		const empty = { modules: [] };
+		writeFileSync(
+			cache,
+			planted(cache, () => true, empty),
+		);
 		// A save writes a new file in its place, so the same file is one never written again.
 		const file = statSync(cache).ino;
 
 		const { sources } = await codeOf(config, dir);
 
 		expect([...sources.values()].map(({ facts }) => facts)).toEqual([
-			planted,
-			planted,
+			empty,
+			empty,
 		]);
 		expect(statSync(cache).ino).toBe(file);
 	});
@@ -294,21 +306,24 @@ describe("reading a project's facts", () => {
 		// The reading has taken a worker's start, a millisecond for each file read.
 		const after = workerStart + 1;
 		const workers = (left: number, parallelism = 8) =>
-			workersFor(after, after, left, parallelism);
+			workersFor(workerStart, after, after, left, parallelism);
 
 		expect(
 			[400, 600, 1_000, 1_500, 100_000].map((left) => workers(left)),
 		).toEqual([0, 2, 4, 6, 7]);
 		expect(workers(100_000, 2)).toBe(0);
 		// Before a worker's start has passed, the reading goes on here whatever is left.
-		expect(workersFor(workerStart, workerStart, 100_000, 8)).toBe(0);
+		expect(workersFor(workerStart, workerStart, workerStart, 100_000, 8)).toBe(
+			0,
+		);
 	});
 
 	it("reads files in workers into the same facts as on one thread, each in its place", async () => {
+		// Files enough for tasks of their own, which the two workers share.
 		const files = [
-			...Array.from({ length: 5 }, (_, n) => ({
+			...Array.from({ length: 8 }, (_, n) => ({
 				path: `src/m${n}.ts`,
-				text: `import { m } from "./i18n";\n${"m.title();\n".repeat(n + 1)}export const v${n} = 1;\n`,
+				text: `import { m } from "./i18n";\n${"m.title();\n".repeat(4_000 + n)}export const v${n} = 1;\n`,
 			})),
 			{
 				path: "src/App.svelte",
@@ -318,6 +333,57 @@ describe("reading a project's facts", () => {
 		const inline = [];
 		for (const { path, text } of files) inline.push(await factsOf(path, text));
 
-		expect(await inWorkers(files, 2)).toEqual(inline);
+		const pool = new Pool();
+		onTestFinished(() => pool.close());
+		pool.start(2);
+		const read = await factsOfFiles(files, pool, false);
+
+		expect(read.map(({ facts }) => facts)).toEqual(inline);
+		expect(read.map(({ json }) => JSON.parse(json))).toEqual(inline);
+	});
+
+	it("resolves imports in a worker as this thread does, an empty path for one that names no file", async () => {
+		const { dir } = projectWith({
+			"package.json": JSON.stringify({ imports: { "#lib/*": "./src/lib/*" } }),
+			"tsconfig.json": JSON.stringify({
+				compilerOptions: { paths: { "$lib/*": ["./src/lib/*"] } },
+			}),
+			"src/lib/i18n.ts": 'export { m } from "../../out/messages.js";\n',
+			"src/a.ts": "export const a = 1;\n",
+		});
+		const resolution = await projectResolution(dir);
+		if (resolution instanceof GraiError) throw resolution;
+		const importer = join(dir, "src/a.ts");
+		const imports = [
+			"#lib/i18n.ts",
+			"$lib/i18n",
+			"./missing.js",
+			"../out/keys.js",
+		].map((source) => ({ source, importer }));
+		const pool = new Pool();
+		onTestFinished(() => pool.close());
+		pool.start(1);
+		const resolve = resolverFor(resolution);
+
+		const [paths] = await pool.run(
+			[{ kind: "resolve", resolution, imports }],
+			{
+				here: async () => [],
+				there: (answer) => answer,
+				size: (task) => task.imports.length,
+				start: 0,
+			},
+			false,
+		);
+
+		expect(paths).toEqual(
+			imports.map(({ source }) => resolve(source, importer) ?? ""),
+		);
+		expect(paths).toEqual([
+			join(dir, "src/lib/i18n.ts"),
+			join(dir, "src/lib/i18n.ts"),
+			"",
+			join(dir, "out/keys.js"),
+		]);
 	});
 });

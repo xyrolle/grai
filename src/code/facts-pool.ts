@@ -1,104 +1,61 @@
 /**
- * Files read into their facts, on this thread until the pool pays. A worker costs about
- * `workerStart` to start and load the parsers, so the reading starts here; once it has taken that
- * long and the rest would take more than twice it, the rest is shared among workers, each given at
- * least that much work, and no more of them than the machine's parallelism less one
- * (`workersFor`). Measured on app B the pool pays from about a thousand files, on the synthetic
- * project from about four thousand, whose scripts are simpler, so what decides is the work, not the
- * count.
+ * Files read into their facts in the pool (`pool.ts`), in tasks of about `taskSize` of text each.
+ * A worker costs about `workerStart` to start and load the parsers, so this thread reads alone until
+ * the reading has taken that long and the rest would take more than twice it. Measured on app B the
+ * pool pays from about a thousand files, on the synthetic project from about four thousand, whose
+ * scripts are simpler, so what decides is the work, not the count.
  */
 
-import { availableParallelism } from "node:os";
-import { extname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { Worker } from "node:worker_threads";
-import { type FileFacts, factsOf } from "./facts.ts";
+import { factsOf } from "./facts.ts";
+import type { FactsRead } from "./facts-cache.ts";
+import type { Pool } from "./pool.ts";
 
 /** What a worker costs to start and to load the parsers, measured: about a quarter of a second. */
 export const workerStart = 250;
 
+/** A task's text: few enough messages for the threads, small enough tasks to share out evenly. */
+const taskSize = 128 * 1024;
+
 /** A file to read. */
 type File = { path: string; text: string };
 
-/** Each file's facts, in the order given. */
+/**
+ * Each file's facts, with their JSON, in the order given, read in the pool. With `here` false, only
+ * the workers the pool has started read them.
+ */
 export async function factsOfFiles(
 	files: readonly File[],
-): Promise<FileFacts[]> {
-	const facts: FileFacts[] = [];
-	const start = performance.now();
+	pool: Pool,
+	here = true,
+): Promise<FactsRead[]> {
+	const tasks: { kind: "facts"; files: File[] }[] = [];
+	let size = taskSize;
 	for (const { path, text } of files) {
-		facts.push(await factsOf(path, text));
-		const workers = workersFor(
-			performance.now() - start,
-			facts.length,
-			files.length - facts.length,
-			availableParallelism(),
-		);
-		if (workers > 0) {
-			return [
-				...facts,
-				...(await inWorkers(files.slice(facts.length), workers)),
-			];
+		if (size >= taskSize) {
+			tasks.push({ kind: "facts", files: [] });
+			size = 0;
 		}
+		tasks.at(-1)?.files.push({ path, text });
+		size += text.length;
 	}
-	return facts;
-}
-
-/**
- * How many workers read the files left, from how long the files read so far took: none while the
- * reading has taken less than a worker's start or the rest would take less than two, then one for
- * each worker's start the rest would take, at most the parallelism less one, and none rather than
- * one, which would only add its start.
- */
-export function workersFor(
-	elapsed: number,
-	read: number,
-	left: number,
-	parallelism: number,
-): number {
-	const rest = (elapsed / read) * left;
-	if (elapsed <= workerStart || rest <= 2 * workerStart) return 0;
-	const workers = Math.min(parallelism - 1, Math.floor(rest / workerStart));
-	return workers > 1 ? workers : 0;
-}
-
-/** Files shared among workers in batches of about equal size, read in parallel. */
-export async function inWorkers(
-	files: readonly File[],
-	workers: number,
-): Promise<FileFacts[]> {
-	const batches = Array.from({ length: workers }, () => ({
-		files: [] as File[],
-		indexes: [] as number[],
-		bytes: 0,
-	}));
-	files.forEach((file, index) => {
-		const lightest = batches.reduce((a, b) => (b.bytes < a.bytes ? b : a));
-		lightest.files.push(file);
-		lightest.indexes.push(index);
-		lightest.bytes += file.text.length;
-	});
-	const script = new URL(
-		`./facts-worker${extname(fileURLToPath(import.meta.url))}`,
-		import.meta.url,
+	const read = await pool.run(
+		tasks,
+		{
+			here: async (task) => {
+				const each: FactsRead[] = [];
+				for (const { path, text } of task.files) {
+					const facts = await factsOf(path, text);
+					each.push({ facts, json: JSON.stringify(facts) });
+				}
+				return each;
+			},
+			there: (answer) =>
+				answer.map((json) => ({ facts: JSON.parse(json), json })),
+			size: (task) =>
+				task.files.reduce((sum, { text }) => sum + text.length, 0),
+			start: workerStart,
+		},
+		here,
 	);
-	const results = new Array<FileFacts>(files.length);
-	await Promise.all(
-		batches.map(async (batch) => {
-			const worker = new Worker(script);
-			try {
-				const facts = await new Promise<FileFacts[]>((resolve, reject) => {
-					worker.once("message", resolve);
-					worker.once("error", reject);
-					worker.postMessage(batch.files);
-				});
-				facts.forEach((each, at) => {
-					results[batch.indexes[at] ?? 0] = each;
-				});
-			} finally {
-				await worker.terminate();
-			}
-		}),
-	);
-	return results;
+	return read.flat();
 }

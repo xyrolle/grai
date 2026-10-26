@@ -11,7 +11,6 @@ import { join } from "node:path";
 import { ResolverFactory } from "oxc-resolver";
 import type { AliasOptions } from "vite";
 import { GraiError } from "../error.ts";
-import type { Resolve } from "./modules.ts";
 
 /** A Vite alias: a path or a pattern, and what it is replaced with. */
 export type Alias = { find: string | RegExp; replacement: string };
@@ -32,21 +31,64 @@ const extensions = [
 ];
 
 /**
- * The project's resolution: its Vite aliases, if it has a Vite config, then `oxc-resolver`; or the
- * error when either config cannot be read, as the bundler would fail on it too.
+ * What a project's imports resolve by, as data a worker can be sent: its tsconfig, and its Vite
+ * config's aliases.
  */
-export async function projectResolve(
+export type Resolution = {
+	tsconfig: string | undefined;
+	aliases: Alias[];
+};
+
+/**
+ * The project's resolution: its Vite aliases, if it has a Vite config, then its tsconfig; or the
+ * error when either cannot be read, as the bundler would fail on it too.
+ */
+export async function projectResolution(
 	root: string,
-): Promise<Resolve | GraiError> {
+): Promise<Resolution | GraiError> {
 	const aliases = await viteAliases(root);
 	if (aliases instanceof GraiError) return aliases;
-	const tsconfig = join(root, "tsconfig.json");
-	const resolver = new ResolverFactory({
+	const file = join(root, "tsconfig.json");
+	const resolution = {
+		tsconfig: existsSync(file) ? file : undefined,
+		aliases,
+	};
+	// A tsconfig the resolver cannot follow, such as one that extends or references what a framework
+	// generates before it is generated, fails every import, and a command would then read none.
+	const { error } =
+		resolution.tsconfig === undefined
+			? {}
+			: resolverOf(resolution).resolveFileSync(file, "./tsconfig.json");
+	if (error !== undefined) {
+		return new GraiError(
+			"resolution-invalid",
+			{ file: "tsconfig.json" },
+			`the project's tsconfig cannot be followed: ${error}. Generate what it extends or references, as SvelteKit's svelte-kit sync or Nuxt's nuxi prepare does, or fix it.`,
+		);
+	}
+	return resolution;
+}
+
+/**
+ * Where an import resolves from the importing file, by the project's resolution, or undefined when
+ * it names no file: the first Vite alias that matches, then `oxc-resolver`.
+ */
+export function resolverFor(
+	resolution: Resolution,
+): (source: string, importer: string) => string | undefined {
+	const resolver = resolverOf(resolution);
+	return (source, importer) =>
+		resolver.resolveFileSync(importer, aliased(resolution.aliases, source))
+			.path ?? undefined;
+}
+
+function resolverOf({ tsconfig }: Resolution): ResolverFactory {
+	return new ResolverFactory({
 		// The project's tsconfig for every module, as SvelteKit, Astro and Next apply its paths: to a
 		// component too, which the `include` of a tsconfig found by the file's own place may not list.
-		...(existsSync(tsconfig)
-			? { tsconfig: { configFile: tsconfig, references: "auto" } }
-			: {}),
+		...(tsconfig === undefined
+			? {}
+			: { tsconfig: { configFile: tsconfig, references: "auto" } }),
 		conditionNames: ["import", "module", "browser", "default"],
 		mainFields: ["module", "main"],
 		extensions,
@@ -57,25 +99,6 @@ export async function projectResolve(
 		},
 		builtinModules: true,
 	});
-	// A tsconfig the resolver cannot follow, such as one that extends or references what a framework
-	// generates before it is generated, fails every import, and a command would then read none.
-	const { error } = existsSync(tsconfig)
-		? resolver.resolveFileSync(tsconfig, "./tsconfig.json")
-		: {};
-	if (error !== undefined) {
-		return new GraiError(
-			"resolution-invalid",
-			{ file: "tsconfig.json" },
-			`the project's tsconfig cannot be followed: ${error}. Generate what it extends or references, as SvelteKit's svelte-kit sync or Nuxt's nuxi prepare does, or fix it.`,
-		);
-	}
-	return async (source, importer) => {
-		const { path } = resolver.resolveFileSync(
-			importer,
-			aliased(aliases, source),
-		);
-		return path ?? undefined;
-	};
 }
 
 /**

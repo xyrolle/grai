@@ -1,8 +1,8 @@
 /**
  * A project's code, read for a command: each source file under the roots, its facts from the cache
- * or read again, in the pool, and the module graph that follows their imports, resolved as the
- * project's bundler resolves them. A module the graph follows outside the sources, such as a
- * package's, is read when it is first followed.
+ * or read again, and the module graph that follows their imports, resolved as the project's bundler
+ * resolves them. The sources' imports are resolved up front, both in the pool. A module the graph
+ * follows outside the sources, such as a package's, is read and resolved when it is first followed.
  */
 
 import { readFileSync } from "node:fs";
@@ -15,10 +15,12 @@ import { moduleOf } from "../output-paths.ts";
 import { realPath } from "../real-path.ts";
 import { sourceExtensions, sourceFiles } from "../sources.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
-import { FactsCache } from "./facts-cache.ts";
+import { FactsCache, textHash } from "./facts-cache.ts";
 import { factsOfFiles } from "./facts-pool.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
-import { projectResolve } from "./resolution.ts";
+import { Pool } from "./pool.ts";
+import { projectResolution, resolverFor } from "./resolution.ts";
+import { importKey, resolvedImports } from "./resolved.ts";
 
 /** A source file: the path the project shows, its text, and its facts. */
 export type SourceCode = { file: string; text: string; facts: FileFacts };
@@ -50,32 +52,50 @@ export async function readProjectCode(
 				? path.slice(keyModulePrefix.length)
 				: undefined,
 	};
-	const resolveFile = await projectResolve(config.root);
-	if (resolveFile instanceof GraiError) return resolveFile;
+	const resolution = await projectResolution(config.root);
+	if (resolution instanceof GraiError) return resolution;
+	const resolveFile = resolverFor(resolution);
+	const cache = new FactsCache(join(config.outdir, stateDirectory));
+	const files = sourceFiles(roots.map(realPath), config.root, config.outdir);
+	// Each file's facts from the cache, or the file to read, by its text's hash.
+	const cached: (FileFacts | undefined)[] = [];
+	const unread: { path: string; text: string; hash: string }[] = [];
+	for (const { path, text } of files) {
+		const hash = textHash(text);
+		const facts = cache.get(path, hash);
+		cached.push(facts);
+		if (facts === undefined) unread.push({ path, text, hash });
+	}
+	const pool = new Pool();
+	const sources = new Map<string, SourceCode>();
+	let resolved: ReadonlyMap<string, string | undefined>;
+	try {
+		const read = await factsOfFiles(unread, pool);
+		unread.forEach(({ path, hash }, index) => {
+			const each = read[index];
+			if (each !== undefined) cache.set(path, hash, each);
+		});
+		saveQuietly(cache);
+		let next = 0;
+		files.forEach(({ path, file, text }, index) => {
+			const each = cached[index] ?? read[next++]?.facts;
+			if (each !== undefined) sources.set(path, { file, text, facts: each });
+		});
+		resolved = await resolvedImports(sources, resolution, resolveFile, pool);
+	} finally {
+		await pool.close();
+	}
 	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
 	const resolve: Resolve = async (source, importer) => {
-		const path = await resolveFile(source, importer);
+		const key = importKey(source, importer);
+		const path = resolved.has(key)
+			? resolved.get(key)
+			: resolveFile(source, importer);
 		const module = moduleOf(source);
 		return path === output.keys && module.type === "key"
 			? `${keyModulePrefix}${module.key}`
 			: path;
 	};
-	const cache = new FactsCache(join(config.outdir, stateDirectory));
-	const files = sourceFiles(roots.map(realPath), config.root, config.outdir);
-	const facts = files.map(({ path, text }) => cache.get(path, text));
-	const unread = files.filter((_, index) => facts[index] === undefined);
-	const read = await factsOfFiles(unread);
-	unread.forEach(({ path, text }, index) => {
-		const each = read[index];
-		if (each !== undefined) cache.set(path, text, each);
-	});
-	saveQuietly(cache);
-	const sources = new Map<string, SourceCode>();
-	let next = 0;
-	files.forEach(({ path, file, text }, index) => {
-		const each = facts[index] ?? read[next++];
-		if (each !== undefined) sources.set(path, { file, text, facts: each });
-	});
 	const followed = new Map<string, Promise<FileFacts | undefined>>();
 	const factsOfPath = (path: string) => {
 		const source = sources.get(path);
