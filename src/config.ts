@@ -7,6 +7,7 @@ import {
 	resolve,
 	sep,
 } from "node:path";
+import { type CatalogPaths, readCatalogPaths } from "./catalog-paths.ts";
 import { type Cookie, cookieFields, readCookie } from "./cookie.ts";
 import { GraiError } from "./error.ts";
 import { readFallbacks } from "./fallbacks.ts";
@@ -29,8 +30,8 @@ export type Config = {
 	root: string;
 	locales: readonly string[];
 	baseLocale: string;
-	/** Each locale's catalog file, in `locales` order. */
-	catalogs: ReadonlyMap<string, string>;
+	/** Each locale's catalog files, in `locales` order: the first is where a new key goes. */
+	catalogs: ReadonlyMap<string, CatalogPaths>;
 	outdir: string;
 	/** Where the server's middleware looks for a request's locale, in order, before the base locale. */
 	strategy: readonly Strategy[];
@@ -100,7 +101,6 @@ export const configFields: ReadonlySet<string> = new Set([
 	"pseudoLocale",
 	"descriptions",
 ]);
-const localePlaceholder = "{locale}";
 /**
  * Test files as Vitest and Jest name them, Jest's `__tests__` folders, and the project's own
  * `test` and `tests` folders. A test ships nothing. A folder named `tests` deeper down may ship,
@@ -161,11 +161,8 @@ export function readConfig(file: string): Config {
 			`"baseLocale" must be one of "locales": ${locales.join(", ")}`,
 		);
 	}
-	if (typeof catalogs !== "string" || !catalogs.includes(localePlaceholder)) {
-		throw invalid(
-			`"catalogs" must be a path with ${localePlaceholder} in it, such as "messages/${localePlaceholder}.json"`,
-		);
-	}
+	const root = dirname(resolve(file));
+	const catalogPaths = readCatalogPaths(catalogs, locales, root, invalid);
 	if (typeof outdir !== "string" || outdir === "") {
 		throw invalid('"outdir" must be the path of the output directory');
 	}
@@ -229,16 +226,9 @@ export function readConfig(file: string): Config {
 			'"descriptions" must be the path of a JSON file of each key\'s description for translators, such as "messages/descriptions.json"',
 		);
 	}
-	const root = dirname(resolve(file));
-	const catalogPaths = new Map(
-		locales.map((locale) => [
-			locale,
-			resolve(root, catalogs.replaceAll(localePlaceholder, locale)),
-		]),
-	);
 	const out = resolve(root, outdir);
-	const held = [resolve(file), ...catalogPaths.values()].find((path) =>
-		isWithin(path, out),
+	const held = [resolve(file), ...[...catalogPaths.values()].flat()].find(
+		(path) => isWithin(path, out),
 	);
 	if (held !== undefined) {
 		throw invalid(

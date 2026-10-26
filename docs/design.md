@@ -13,6 +13,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
 ## Catalogs and config
 
 - **Catalogs are the inlang message-format JSON, one file per locale,** so existing Paraglide catalogs compile unchanged. `$schema` is ignored.
+  - **A locale's messages can be split across files,** with `"catalogs": ["messages/{locale}.json", "messages/admin/{locale}.json"]`, so an area of an app, or the team that owns it, keeps a file of its own. A key is still one message per locale: a key in two files of one locale is a compile error naming both, as either could be the one that ships. `add`, `rename`, `seed` and `merge` write a key back to the file it is in; a key a locale lacks goes in its file at the place of the base locale's that has it, and a new key goes in the first file. One of the files may be empty, as long as the locale has messages. With one path, a locale's one file is its catalog, as before.
 - **An object of messages nests keys.** A message's key is the names of the objects it is in and its own, joined by `_`: `{ "cart": { "title": … } }` holds `cart_title`. That's how `grai import` names a nested source key, and how Paraglide exports one, so the call is `m.cart_title()` either way. As in the format, a message is a string or an array, and any other object holds messages.
   - Two paths that name one key (`cart.title` and `cart_title`) are an error in their catalog, and so is a message with variants written without its array.
   - The joined key must be a key name like any other, so `cart.item-count` is an error naming its path.
