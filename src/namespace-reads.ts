@@ -2,16 +2,12 @@
  * The keys a module reads through a namespace it imports, by scope: `m.key`, `m?.key`, `m["key"]`
  * and the keys a pattern takes apart, `const { key } = m`, where `m` is the import, not a parameter,
  * a variable, a function, a class or a caught error that a nearer scope declares by the same name.
- * Read from the module's ESTree program.
+ * Read from the module's ESTree program, its scopes by `code/scopes.ts`.
  */
 
-import {
-	child,
-	identifierName,
-	isTreeNode,
-	type TreeNode,
-	walk,
-} from "./svelte-tree.ts";
+import type { ESTree } from "./code/parse.ts";
+import { Scopes } from "./code/scopes.ts";
+import { childrenOf, type Node } from "./code/syntax.ts";
 
 /** A key a namespace's member names: the key, and where the member and the key's name are. */
 export type NamespaceRead = {
@@ -21,11 +17,8 @@ export type NamespaceRead = {
 	keyStart: number;
 };
 
-const functions: ReadonlySet<string> = new Set([
-	"FunctionDeclaration",
-	"FunctionExpression",
-	"ArrowFunctionExpression",
-]);
+/** An object pattern: a declaration's or a default's, or an assignment's target. */
+type ObjectPattern = ESTree.ObjectPattern | ESTree.ObjectAssignmentTarget;
 
 /** Fields that hold only types, which read no value. */
 const typeFields: ReadonlySet<string> = new Set([
@@ -42,29 +35,33 @@ const typeFields: ReadonlySet<string> = new Set([
  * it reads one by a computed name too, `m[name]`, which may be any key.
  */
 export function namespaceReads(
-	program: TreeNode,
+	program: ESTree.Program,
 	namespaces: ReadonlySet<string>,
 ): { reads: NamespaceRead[]; computed: boolean } {
+	const scopes = new Scopes(program);
+	const isNamespace = (node: Node | null) =>
+		node?.type === "Identifier" &&
+		namespaces.has(node.name) &&
+		isImported(scopes, node);
 	const reads: NamespaceRead[] = [];
 	let computed = false;
-	const visit = (node: TreeNode, shadowed: ReadonlySet<string>) => {
-		const inner = withDeclarations(node, shadowed, namespaces);
-		if (node.type === "MemberExpression") {
-			const read = memberRead(node, inner, namespaces);
+	const visit = (node: Node) => {
+		if (node.type === "MemberExpression" && isNamespace(node.object)) {
+			const read = memberRead(node);
 			if (read === "computed") computed = true;
 			else if (read !== undefined) reads.push(read);
 		}
-		const taken = patternReads(node, inner, namespaces);
-		if (taken === "computed") computed = true;
-		else reads.push(...taken);
-		for (const [field, value] of Object.entries(node)) {
-			if (typeFields.has(field)) continue;
-			for (const item of Array.isArray(value) ? value : [value]) {
-				if (isTreeNode(item)) visit(item, inner);
-			}
+		const taken = takenApart(node);
+		if (taken !== undefined && isNamespace(taken.value)) {
+			const read = patternReads(taken.pattern);
+			if (read === "computed") computed = true;
+			else reads.push(...read);
+		}
+		for (const [field, child] of childrenOf(node)) {
+			if (!typeFields.has(field)) visit(child);
 		}
 	};
-	visit(program, new Set());
+	visit(program);
 	return { reads, computed };
 }
 
@@ -72,225 +69,93 @@ export function namespaceReads(
  * The names a program reads members of, `name.member`, `name[member]` or `const { member } =
  * name`, in any scope.
  */
-export function memberObjects(program: TreeNode): Set<string> {
+export function memberObjects(program: ESTree.Program): Set<string> {
 	const names = new Set<string>();
-	for (const { node } of walk([program])) {
-		const sides = Object.hasOwn(patternSides, node.type)
-			? patternSides[node.type]
-			: undefined;
+	const visit = (node: Node) => {
 		const object =
-			node.type === "MemberExpression"
-				? child(node, "object")
-				: sides !== undefined && child(node, sides[0])?.type === "ObjectPattern"
-					? child(node, sides[1])
-					: undefined;
-		const name = identifierName(object);
-		if (name !== undefined) names.add(name);
-	}
+			node.type === "MemberExpression" ? node.object : takenApart(node)?.value;
+		if (object?.type === "Identifier") names.add(object.name);
+		for (const [, child] of childrenOf(node)) visit(child);
+	};
+	visit(program);
 	return names;
 }
 
-/** The two sides of an assignment of a value to a pattern: a declaration's, an assignment's or a default's. */
-const patternSides: Readonly<Record<string, readonly [string, string]>> = {
-	VariableDeclarator: ["id", "init"],
-	AssignmentExpression: ["left", "right"],
-	AssignmentPattern: ["left", "right"],
-};
+/** Whether a name is the module's import of it, not a nearer declaration of the same name. */
+function isImported(
+	scopes: Scopes,
+	node: { name: string; start: number },
+): boolean {
+	const binding = scopes.resolve(node.name, node.start);
+	const declaring =
+		binding === undefined ? undefined : scopes.parent(binding.node);
+	return (
+		declaring?.type === "ImportSpecifier" ||
+		declaring?.type === "ImportDefaultSpecifier" ||
+		declaring?.type === "ImportNamespaceSpecifier"
+	);
+}
 
 /**
- * The keys an object pattern takes apart from an unshadowed namespace, `const { key } = m` or
+ * The object pattern a node takes a value apart with, and the value: a declaration's, an
+ * assignment's or a default's.
+ */
+function takenApart(
+	node: Node,
+): { pattern: ObjectPattern; value: Node } | undefined {
+	if (node.type === "VariableDeclarator" && node.init !== null) {
+		return node.id.type === "ObjectPattern"
+			? { pattern: node.id, value: node.init }
+			: undefined;
+	}
+	if (
+		node.type === "AssignmentExpression" ||
+		node.type === "AssignmentPattern"
+	) {
+		return node.left.type === "ObjectPattern"
+			? { pattern: node.left, value: node.right }
+			: undefined;
+	}
+	return undefined;
+}
+
+/**
+ * The keys an object pattern takes apart from the namespace, `const { key } = m` or
  * `const { "key": name } = m`, or `"computed"` when it takes one by a computed name or takes the
  * rest, which may be any key.
  */
-function patternReads(
-	node: TreeNode,
-	shadowed: ReadonlySet<string>,
-	namespaces: ReadonlySet<string>,
-): NamespaceRead[] | "computed" {
-	const sides = Object.hasOwn(patternSides, node.type)
-		? patternSides[node.type]
-		: undefined;
-	if (sides === undefined) return [];
-	const pattern = child(node, sides[0]);
-	const name = identifierName(child(node, sides[1]));
-	if (pattern?.type !== "ObjectPattern" || name === undefined) return [];
-	if (!namespaces.has(name) || shadowed.has(name)) return [];
-	const properties = Array.isArray(pattern.properties)
-		? pattern.properties
-		: [];
+function patternReads(pattern: ObjectPattern): NamespaceRead[] | "computed" {
 	const reads: NamespaceRead[] = [];
-	for (const property of properties) {
-		if (!isTreeNode(property) || property.type !== "Property")
-			return "computed";
-		const key = child(property, "key");
-		const start = key === undefined ? undefined : numberOf(key, "start");
-		const end = key === undefined ? undefined : numberOf(key, "end");
-		if (key === undefined || start === undefined || end === undefined) continue;
+	for (const property of pattern.properties) {
+		if (property.type === "RestElement") return "computed";
+		const { key } = property;
 		if (key.type === "Literal" && typeof key.value === "string") {
+			const { start, end } = key;
 			reads.push({ key: key.value, start, end, keyStart: start + 1 });
-			continue;
+		} else if (!property.computed && key.type === "Identifier") {
+			const { start, end } = key;
+			reads.push({ key: key.name, start, end, keyStart: start });
+		} else {
+			return "computed";
 		}
-		const named = property.computed === true ? undefined : identifierName(key);
-		if (named === undefined) return "computed";
-		reads.push({ key: named, start, end, keyStart: start });
 	}
 	return reads;
 }
 
 /**
- * The key a member names through an unshadowed namespace, if it is one, or `"computed"` for a
- * member of one by any other computed name.
+ * The key a member of the namespace names, if it is one, or `"computed"` for a member by any other
+ * computed name.
  */
 function memberRead(
-	node: TreeNode,
-	shadowed: ReadonlySet<string>,
-	namespaces: ReadonlySet<string>,
+	node: ESTree.MemberExpression,
 ): NamespaceRead | "computed" | undefined {
-	const name = identifierName(child(node, "object"));
-	if (name === undefined || !namespaces.has(name) || shadowed.has(name))
-		return undefined;
-	const property = child(node, "property");
-	const start = numberOf(node, "start");
-	const end = numberOf(node, "end");
-	const at = property === undefined ? undefined : numberOf(property, "start");
-	if (start === undefined || end === undefined || at === undefined)
-		return undefined;
-	if (node.computed !== true) {
-		const key = identifierName(property);
-		return key === undefined ? undefined : { key, start, end, keyStart: at };
+	const { start, end, property } = node;
+	if (!node.computed) {
+		return property.type === "Identifier"
+			? { key: property.name, start, end, keyStart: property.start }
+			: undefined;
 	}
-	const literal = property?.type === "Literal" ? property.value : undefined;
-	return typeof literal === "string"
-		? { key: literal, start, end, keyStart: at + 1 }
+	return property.type === "Literal" && typeof property.value === "string"
+		? { key: property.value, start, end, keyStart: property.start + 1 }
 		: "computed";
-}
-
-/** The names shadowed inside a node: those it declares that are the namespaces' names. */
-function withDeclarations(
-	node: TreeNode,
-	shadowed: ReadonlySet<string>,
-	namespaces: ReadonlySet<string>,
-): ReadonlySet<string> {
-	const declared = declaredIn(node).filter((name) => namespaces.has(name));
-	return declared.length === 0 ? shadowed : new Set([...shadowed, ...declared]);
-}
-
-/** The names a node declares for its own scope. */
-function declaredIn(node: TreeNode): string[] {
-	if (functions.has(node.type)) {
-		const own = node.type === "FunctionExpression" ? [child(node, "id")] : [];
-		const parameters = Array.isArray(node.params) ? node.params : [];
-		return [
-			...[...own, ...parameters].flatMap(boundNames),
-			...hoisted([child(node, "body")]),
-		];
-	}
-	if (node.type === "ClassExpression") return boundNames(child(node, "id"));
-	if (node.type === "CatchClause") return boundNames(child(node, "param"));
-	if (node.type === "StaticBlock") {
-		const body = Array.isArray(node.body) ? node.body : [];
-		return [...lexical(body), ...hoisted(body)];
-	}
-	if (node.type === "BlockStatement" || node.type === "Program") {
-		return lexical(Array.isArray(node.body) ? node.body : []);
-	}
-	if (node.type === "SwitchStatement" && Array.isArray(node.cases)) {
-		return node.cases.flatMap((each) =>
-			isTreeNode(each) && Array.isArray(each.consequent)
-				? lexical(each.consequent)
-				: [],
-		);
-	}
-	if (/^For(?:In|Of)?Statement$/.test(node.type)) {
-		const head = child(node, node.type === "ForStatement" ? "init" : "left");
-		return head === undefined ? [] : lexical([head]);
-	}
-	return [];
-}
-
-/** The names a list of statements declares with let, const, class or a function declaration. */
-function lexical(statements: readonly unknown[]): string[] {
-	return statements.flatMap((statement) => {
-		const node = exported(statement);
-		if (node === undefined) return [];
-		if (node.type === "VariableDeclaration" && node.kind !== "var")
-			return declarators(node);
-		if (node.type === "ClassDeclaration" || node.type === "FunctionDeclaration")
-			return boundNames(child(node, "id"));
-		return [];
-	});
-}
-
-/**
- * The `var` names statements declare anywhere outside their nested functions and static blocks,
- * which hold their own: a function's body, or a static block's.
- */
-function hoisted(statements: readonly unknown[]): string[] {
-	const names: string[] = [];
-	const visit = (node: TreeNode) => {
-		if (functions.has(node.type) || node.type === "StaticBlock") return;
-		if (node.type === "VariableDeclaration" && node.kind === "var")
-			names.push(...declarators(node));
-		for (const value of Object.values(node)) {
-			for (const item of Array.isArray(value) ? value : [value]) {
-				if (isTreeNode(item)) visit(item);
-			}
-		}
-	};
-	for (const statement of statements) {
-		if (isTreeNode(statement)) visit(statement);
-	}
-	return names;
-}
-
-function declarators(declaration: TreeNode): string[] {
-	const list = Array.isArray(declaration.declarations)
-		? declaration.declarations
-		: [];
-	return list.flatMap((each) =>
-		isTreeNode(each) ? boundNames(child(each, "id")) : [],
-	);
-}
-
-/** The names a pattern binds: an identifier, or the names in a destructuring, default or rest. */
-function boundNames(pattern: unknown): string[] {
-	if (!isTreeNode(pattern)) return [];
-	const name = identifierName(pattern);
-	if (name !== undefined) return [name];
-	switch (pattern.type) {
-		case "AssignmentPattern":
-			return boundNames(pattern.left);
-		case "RestElement":
-			return boundNames(pattern.argument);
-		case "TSParameterProperty":
-			return boundNames(pattern.parameter);
-		case "ArrayPattern":
-			return (Array.isArray(pattern.elements) ? pattern.elements : []).flatMap(
-				boundNames,
-			);
-		case "ObjectPattern":
-			return (
-				Array.isArray(pattern.properties) ? pattern.properties : []
-			).flatMap((property) =>
-				isTreeNode(property) && property.type === "Property"
-					? boundNames(property.value)
-					: boundNames(property),
-			);
-		default:
-			return [];
-	}
-}
-
-/** A statement, or the declaration an `export` statement holds. */
-function exported(statement: unknown): TreeNode | undefined {
-	if (!isTreeNode(statement)) return undefined;
-	return statement.type === "ExportNamedDeclaration" ||
-		statement.type === "ExportDefaultDeclaration"
-		? child(statement, "declaration")
-		: statement;
-}
-
-function numberOf(node: TreeNode, field: string): number | undefined {
-	const value = node[field];
-	return typeof value === "number" ? value : undefined;
 }
