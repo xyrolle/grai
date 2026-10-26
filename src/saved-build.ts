@@ -10,12 +10,16 @@ import { GraiError } from "./error.ts";
 import { stateDirectory } from "./outdir-contents.ts";
 
 /**
- * A build as saved. A catalog's revision is a symbol of the process that parsed it, so the build
- * taken up gives each catalog a new one, and the edit it came from is the past's.
+ * A build as saved: every field of it but its key, which heads the file, and of each catalog every
+ * field but its revision and edit. A revision is a symbol of the process that parsed the catalog,
+ * so the build taken up gives each catalog a new one, and the edit it came from is the past's. No
+ * field is listed, so one a build gains is saved with the rest.
  */
 type Saved = Omit<Build, "key" | "catalogs" | "compilation"> & {
 	catalogs: readonly SavedCatalog[];
-	compilation: Omit<Compilation, "catalogs">;
+	compilation: Omit<Compilation, "catalogs"> & {
+		catalogs: readonly SavedCatalog[];
+	};
 };
 type SavedCatalog = Omit<Catalog, "revision" | "edit">;
 
@@ -49,29 +53,18 @@ function savedFile(build: Build): {
 	file: string;
 	bytes: Buffer;
 } {
-	const catalogs = build.catalogs.map(
-		({ locale, file, messages, paths }): SavedCatalog => ({
-			locale,
-			file,
-			messages,
-			paths,
-		}),
-	);
-	const { keys, changed, formatted, errors } = build.compilation;
+	const { key, catalogs: parsed, compilation, ...rest } = build;
+	const catalogs = parsed.map(withoutRevision);
 	const saved: Saved = {
-		config: build.config,
-		sources: build.sources,
-		hashes: build.hashes,
+		...rest,
 		catalogs,
-		compilation: { keys, changed, formatted, errors },
-		positions: build.positions,
-		rendered: build.rendered,
+		compilation: { ...compilation, catalogs },
 	};
 	const state = join(build.config.outdir, stateDirectory);
 	return {
 		temporary: join(state, `${savedName}.${process.pid}.tmp`),
 		file: join(state, savedName),
-		bytes: Buffer.concat([Buffer.from(`${build.key}\n`), serialize(saved)]),
+		bytes: Buffer.concat([Buffer.from(`${key}\n`), serialize(saved)]),
 	};
 }
 
@@ -126,4 +119,13 @@ async function readSaved(
 	} catch {
 		return undefined;
 	}
+}
+
+/** A catalog as saved: all of it but its revision and its edit, which are this process's. */
+function withoutRevision({
+	revision: _revision,
+	edit: _edit,
+	...catalog
+}: Catalog): SavedCatalog {
+	return catalog;
 }
