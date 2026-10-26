@@ -184,6 +184,7 @@
 		"wrangler": "4.152.0"
 	},
 	"dependencies": {
-		"oxc-parser": "^0.155.0"
+		"oxc-parser": "^0.155.0",
+		"oxc-resolver": "^11.24.2"
 	}
 }
