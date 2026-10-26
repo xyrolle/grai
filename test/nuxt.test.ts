@@ -32,6 +32,21 @@ describe("the module", { timeout: 30_000 }, () => {
 		);
 	});
 
+	it("refuses pathnames beside domains, which Nuxt cannot route by host", async () => {
+		await expect(
+			loaded(
+				{
+					strategy: ["url"],
+					domains: { en: "shop.test" },
+					pathnames: { "/about": { en: "/about-us" } },
+				},
+				{},
+			),
+		).rejects.toThrow(
+			`grai.config.json: Nuxt routes a page by its path alone, so on a locale's own host ("domains") it cannot route that locale's words ("pathnames"). Leave out one of them.`,
+		);
+	});
+
 	it("refuses a base URL that is not grai's basePath, under the url strategy, which reads the locale after it", async () => {
 		await expect(
 			loaded({ strategy: ["url"] }, { app: { baseURL: "/shop/" } }),
@@ -54,6 +69,7 @@ describe("the pages of the url strategy", () => {
 		unlocalizedPaths: [],
 		pathnames: [],
 		basePath: "",
+		domains: [],
 	} as const;
 	const index: NuxtPage = { name: "index", path: "/", file: "index.vue" };
 	const docs: NuxtPage = {

@@ -102,7 +102,7 @@ export declare function bindRequests(storage: {
 	getStore(): RequestLocale | undefined;
 }): void;
 /** A request's locale, by its position in \`locales\`. */
-export type RequestLocale = { index: number };
+export type RequestLocale = { index: number; origin?: string };
 /** A message's inputs as its compiled code reads them; the key's declaration types them. */
 type CompiledInputs = { readonly [input: string]: unknown };
 /** A compiled message without inputs: its text in each locale, in \`locales\` order. */
