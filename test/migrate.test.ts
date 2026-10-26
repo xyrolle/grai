@@ -469,6 +469,30 @@ export async function homeTitle() {
 		).toEqual(["Über uns", "Welcome"]);
 	});
 
+	it("imports the messages in a Next app as the namespace of keys.js, which next dev reads key by key", async () => {
+		const project = migrated("icu", icuCatalogs, {
+			"package.json": JSON.stringify({ dependencies: { next: "16.4.3" } }),
+			"src/home.ts": `import { useTranslations } from "next-intl";
+
+export function homeTitle() {
+	const t = useTranslations("Home");
+	return t("title");
+}
+`,
+		});
+		const home = await project.load("src/home.ts");
+
+		expect(
+			project.text("src/home.ts"),
+		).toBe(`import * as m from "../out/keys.js";
+
+export function homeTitle() {
+	return m.Home_title();
+}
+`);
+		expect(home.homeTitle?.()).toBe("Welcome");
+	});
+
 	it("reports t.rich, t.raw, a message with markup and a namespace that is an expression", () => {
 		const project = migrated("icu", icuCatalogs, {
 			"src/about.tsx": `import { useTranslations } from "next-intl";

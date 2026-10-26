@@ -1,10 +1,12 @@
+import { readFileSync } from "node:fs";
 import { dirname, extname, join, relative, sep } from "node:path";
-import { type Config, readConfig } from "./config.ts";
+import { type Config, isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import type { ImportFormat } from "./import/convert.ts";
 import { type Mapping, readMapping } from "./import/mapping.ts";
 import { formatjsModules } from "./migrate/formatjs.ts";
 import { i18nextModules } from "./migrate/i18next.ts";
+import type { MessagesImport } from "./migrate/imports.ts";
 import type { LibraryModule } from "./migrate/library.ts";
 import {
 	type LeftUse,
@@ -70,6 +72,7 @@ export function migrate(
 	}
 	const libraries = librariesOf[mapping.from];
 	const migration = { mapping, libraries, defaultNamespace };
+	const next = isNextApp(config.root);
 	const texts = new Map<string, string>();
 	const left: LeftCall[] = [];
 	let rewritten = 0;
@@ -79,7 +82,8 @@ export function migrate(
 			source.text.includes(name),
 		);
 		if (!named) continue;
-		const migrated = migrateSource(source, config.outdir, migration);
+		const messages = messagesOf(source.path, config.outdir, next);
+		const migrated = migrateSource(source, messages, migration);
 		if (migrated.text !== undefined) texts.set(source.path, migrated.text);
 		rewritten += migrated.rewritten;
 		left.push(...migrated.left.map((use) => leftCall(source, use)));
@@ -92,14 +96,13 @@ export function migrate(
 /** A module, rewritten; or a component, whose imports of the library are left for a person. */
 function migrateSource(
 	source: SourceFile,
-	outdir: string,
+	messages: MessagesImport,
 	migration: Migration,
 ): MigratedModule {
 	if (components.has(extname(source.path))) {
 		const left = componentImports(source, migration.libraries);
 		return { text: undefined, rewritten: 0, left };
 	}
-	const messages = messagesPath(source.path, outdir);
 	return migrateModule(source.path, source.text, messages, migration);
 }
 
@@ -117,12 +120,41 @@ function componentImports(
 		}));
 }
 
-/** The path a module imports grai's messages by: from its directory to the outdir's messages.js. */
-function messagesPath(file: string, outdir: string): string {
-	const path = relative(dirname(file), join(outdir, "messages.js"))
+/**
+ * How a module imports grai's messages, by the path from its directory: `m`, the namespace
+ * messages.js exports, or in a Next app the namespace of keys.js. `next dev` builds a namespace
+ * that a module re-exports whole, in each layer that imports it and again after each edit, and
+ * reads a namespace import of keys.js key by key (`docs/followups.md`).
+ */
+function messagesOf(
+	file: string,
+	outdir: string,
+	next: boolean,
+): MessagesImport {
+	const entry = next ? "keys.js" : "messages.js";
+	const path = relative(dirname(file), join(outdir, entry))
 		.split(sep)
 		.join("/");
-	return path.startsWith(".") ? path : `./${path}`;
+	return {
+		path: path.startsWith(".") ? path : `./${path}`,
+		namespace: next,
+	};
+}
+
+/** Whether the project is a Next app: its package.json depends on `next`. */
+function isNextApp(root: string): boolean {
+	let manifest: unknown;
+	try {
+		manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+	} catch (error) {
+		if (isMissing(error)) return false;
+		throw error;
+	}
+	if (typeof manifest !== "object" || manifest === null) return false;
+	return ["dependencies", "devDependencies"].some((field) => {
+		const listed: unknown = Reflect.get(manifest, field);
+		return typeof listed === "object" && listed !== null && "next" in listed;
+	});
 }
 
 function leftCall(source: SourceFile, { at, detail }: LeftUse): LeftCall {
