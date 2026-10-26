@@ -1,10 +1,6 @@
 import { join, resolve } from "node:path";
-import type { Logger, Plugin } from "vite";
-import {
-	type KeyReading,
-	keyReading,
-	missingKeyReads,
-} from "./build-key-reads.ts";
+import { type Logger, type Plugin, parseSync } from "vite";
+import { type KeyReading, keyReading, keyReads } from "./build-key-reads.ts";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
@@ -18,6 +14,7 @@ import {
 	textPrefix,
 } from "./locale-chunks.ts";
 import { moduleOf } from "./message-imports.ts";
+import { type ModuleLinks, moduleLinks, seenThrough } from "./module-links.ts";
 import { realPath } from "./real-path.ts";
 import {
 	type ChunkingGraph,
@@ -94,6 +91,17 @@ export function graiPlugin(
 	let reading: KeyReading | undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
+	/**
+	 * What the client build's last transforms read of its modules, for the keys' reach: the keys each
+	 * reads through the namespace, those that read it by a computed name, and each one's links.
+	 */
+	const read = {
+		reads: new Map<string, ReadonlySet<string>>(),
+		computed: new Set<string>(),
+		modules: new Map<string, ModuleLinks>(),
+	};
+	/** The client build's imports that change once re-export modules are seen through, at its end. */
+	let seen = new Map<string, string[]>();
 	/** The client build's chunk of each key it reaches exactly, by the pages that load it. */
 	let pageChunks: Map<string, string> | undefined;
 	const pageChunkOf = (id: string, graph: ChunkingGraph) => {
@@ -102,6 +110,7 @@ export function graiPlugin(
 			build,
 			files.keysFile,
 			(module) => graph.getModuleInfo(module),
+			{ reads: read.reads, computed: read.computed, imports: seen },
 			adapter.pageEntries === undefined
 				? undefined
 				: [...adapter.pageEntries()],
@@ -226,6 +235,12 @@ export function graiPlugin(
 		async buildStart() {
 			if (serving) return;
 			pageChunks = undefined;
+			if (building(this.environment)) {
+				read.reads.clear();
+				read.computed.clear();
+				read.modules.clear();
+				seen = new Map();
+			}
 			first ??= recompile(files.configFile, undefined, {
 				localeCopies: options.localeChunks === true,
 			}).then(({ result, build: next }) => {
@@ -237,7 +252,8 @@ export function graiPlugin(
 			const held = placeholderTexts(compiled);
 			if (held.length > 0) this.error(messagesOf(held));
 		},
-		// A module's code as the last plugins see it, a component's compiled, names the keys it ships.
+		// A module's code as the last plugins see it, a component's compiled, names the keys it ships, and
+		// tells the client build's chunking which keys it reads and what it links to.
 		transform: {
 			order: "post",
 			filter: { id: { exclude: [/\/node_modules\//, /^\0/] } },
@@ -250,7 +266,9 @@ export function graiPlugin(
 					return null;
 				if (reading?.build !== build)
 					reading = keyReading(build, files.keysFile);
-				const missing = await missingKeyReads(
+				const { program } = parseSync(id, code, { lang: "js" });
+				const { keys, computed, missing } = await keyReads(
+					program,
 					code,
 					id,
 					reading,
@@ -258,6 +276,11 @@ export function graiPlugin(
 						(await this.resolve(source, importer))?.id,
 				);
 				if (missing.length > 0) this.error(messagesOf(missing));
+				if (building(this.environment)) {
+					if (keys.size > 0) read.reads.set(id, keys);
+					if (computed) read.computed.add(id);
+					read.modules.set(id, moduleLinks(program));
+				}
 				return null;
 			},
 		},
@@ -284,6 +307,13 @@ export function graiPlugin(
 		// written into the project once the server has closed.
 		async buildEnd() {
 			await closeMessages();
+			if (!building(this.environment)) return;
+			seen = await seenThrough(
+				read.modules,
+				(id) => this.getModuleInfo(id),
+				async (source, importer) =>
+					(await this.resolve(source, importer)) ?? undefined,
+			);
 		},
 		resolveId: {
 			// Ahead of Vite's resolver, which keeps a lookup that found nothing until its watcher reports

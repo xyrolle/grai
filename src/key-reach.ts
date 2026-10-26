@@ -1,4 +1,5 @@
 import { add, type Bits, bits, has } from "./bits.ts";
+import { keyModulePrefix } from "./locale-chunks.ts";
 
 /** What the bundler tells of a module, as much as a key's reach needs. */
 export type GraphModule = {
@@ -24,23 +25,33 @@ export type KeyReach = {
 };
 
 /**
- * Which entries reach each of `keys`, read from the module graph, or nothing when the graph cannot
- * tell them all. It tells a key's when its own module is imported by the modules that use it, as a
- * per-key path is. A key imported through `barrel` (keys.js, which re-exports every key) is reached
- * from wherever any key is, and a key's chunk depends on the others', so one such key leaves them all
- * to the entries' own sets.
+ * How a build's modules link beyond its graph: the keys each module reads through grai's
+ * namespace, the modules that read it by a computed name, which may be any key, and the imports of
+ * the modules whose imports change once re-export modules are seen through (`module-links.ts`).
+ */
+export type KeyLinks = {
+	readonly reads: ReadonlyMap<string, ReadonlySet<string>>;
+	readonly computed: ReadonlySet<string>;
+	readonly imports: ReadonlyMap<string, readonly string[]>;
+};
+
+/**
+ * Which entries reach each of `keys`, read from the module graph as `links` amends it. A key is
+ * reached from the modules that import its own module, as a per-key path is, and from those that
+ * read it through the namespace. `barrel`, keys.js, re-exports every key, so it links to none: a
+ * module that only imports it reaches no key through it.
  */
 export function keyReach(
-	graph: ModuleGraph,
-	keys: Iterable<string>,
+	bundled: ModuleGraph,
+	keys: readonly string[],
 	barrel: string,
-): KeyReach | undefined {
-	const used = [...keys].flatMap((key) => {
+	links: KeyLinks,
+): KeyReach {
+	const graph = asRead(bundled, keys, barrel, links);
+	const used = keys.flatMap((key) => {
 		const module = graph(key);
 		return module === null ? [] : [{ key, module }];
 	});
-	if (used.some(({ module }) => module.importers.includes(barrel)))
-		return undefined;
 	const cone = upward(
 		graph,
 		used.map(({ key }) => key),
@@ -59,6 +70,58 @@ export function keyReach(
 		of: new Map(
 			used.map(({ key }) => [key, reach.get(key) ?? bits(entries.length)]),
 		),
+	};
+}
+
+/**
+ * The graph as `links` amends it: a module that reads keys through the namespace imports each of
+ * those keys' modules, one that reads it by a computed name imports every key's, a module whose
+ * imports change once re-export modules are seen through imports what it does then, and keys.js
+ * imports no key.
+ */
+function asRead(
+	graph: ModuleGraph,
+	keys: readonly string[],
+	barrel: string,
+	{ reads, computed, imports }: KeyLinks,
+): ModuleGraph {
+	const every = keys.filter((id) => id.startsWith(keyModulePrefix));
+	const importsOf = (id: string, module: GraphModule) => {
+		if (id === barrel) return [];
+		const read = computed.has(id)
+			? every
+			: [...(reads.get(id) ?? [])].map((key) => `${keyModulePrefix}${key}`);
+		const own = imports.get(id) ?? module.importedIds;
+		return read.length === 0 ? own : [...own, ...read];
+	};
+	const importers = new Map<string, Set<string>>();
+	const link = (from: string, to: string) => {
+		const found = importers.get(to);
+		if (found === undefined) importers.set(to, new Set([from]));
+		else found.add(from);
+	};
+	for (const [reader, read] of reads)
+		for (const key of read) link(reader, `${keyModulePrefix}${key}`);
+	for (const reader of computed) for (const key of every) link(reader, key);
+	for (const [importer, own] of imports)
+		for (const id of own) link(importer, id);
+	const changed = new Map(
+		[...imports].map(([importer, own]) => [importer, new Set(own)]),
+	);
+	return (id) => {
+		const module = graph(id);
+		if (module === null) return null;
+		const linked = importers.get(id) ?? new Set();
+		const kept = module.importers.filter(
+			(importer) =>
+				importer !== barrel && (changed.get(importer)?.has(id) ?? true),
+		);
+		return {
+			isEntry: module.isEntry,
+			dynamicImporters: module.dynamicImporters,
+			importers: [...new Set([...kept, ...linked])],
+			importedIds: importsOf(id, module),
+		};
 	};
 }
 

@@ -1,19 +1,21 @@
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { build, type Rolldown } from "vite";
 import { describe, expect, it } from "vitest";
-import { ownChunkBytes } from "../src/vite-build.ts";
+import { requestBytes } from "../src/key-sets.ts";
 import { type GraiAdapter, graiPlugin } from "../src/vite-plugin.ts";
 import { project } from "./project.ts";
 
-/** A word repeated into a message whose key's module alone reaches `ownChunkBytes`. */
+/** A word repeated into a message far larger than a request is worth, which no merge takes. */
 const sized = (word: string) =>
-	`${word} `.repeat(Math.ceil(ownChunkBytes / word.length));
+	`${word} `.repeat(Math.ceil((8 * requestBytes) / word.length));
 
 /**
  * A client build of `entries`: each module (`entries`, then `modules`) calls the keys it lists,
- * imported by their per-key paths, and imports later a module it lists as `./name.js`. It gives the
- * keys each message chunk holds, and the code each entry loads with its imports.
+ * imported by their per-key paths, or with `namespace` read through `m`, and imports later a
+ * module it lists as `./name.js`; `files` are written as they are, after the modules, so that one
+ * can stand for a module's code. It gives the keys each message chunk holds, and the code each entry
+ * loads with its imports.
  */
 async function built(
 	catalog: Record<string, string>,
@@ -21,9 +23,13 @@ async function built(
 	{
 		modules = {},
 		adapter = () => ({}),
+		namespace = false,
+		files = {},
 	}: {
 		modules?: Record<string, readonly string[]>;
 		adapter?: (dir: string) => GraiAdapter;
+		namespace?: boolean;
+		files?: Record<string, string>;
 	} = {},
 ) {
 	const { dir } = project({ en: catalog, de: catalog });
@@ -34,16 +40,21 @@ async function built(
 	for (const [name, uses] of Object.entries({ ...entries, ...modules })) {
 		const keys = uses.filter((use) => !use.startsWith("./"));
 		const later = uses.filter((use) => use.startsWith("./"));
+		const imports = namespace
+			? [`import { m } from "./out/messages.js";`]
+			: keys.map((key) => `import { ${key} } from "#i18n/messages/${key}.js";`);
 		writeFileSync(
 			join(dir, `${name}.js`),
 			[
-				...keys.map(
-					(key) => `import { ${key} } from "#i18n/messages/${key}.js";`,
-				),
-				`console.log(${keys.map((key) => `${key}()`).join(", ")});`,
+				...imports,
+				`console.log(${keys.map((key) => `${namespace ? "m." : ""}${key}()`).join(", ")});`,
 				...later.map((module) => `import("${module}");`),
 			].join("\n"),
 		);
+	}
+	for (const [file, code] of Object.entries(files)) {
+		mkdirSync(dirname(join(dir, file)), { recursive: true });
+		writeFileSync(join(dir, file), code);
 	}
 	const output = await build({
 		root: dir,
@@ -117,9 +128,9 @@ describe("the Vite plugin's chunks by page", () => {
 	});
 
 	it("merges two sets of keys when the request it saves outweighs the bytes it loads in vain", async () => {
-		// A set nearer by its entries than the shared one, but whose words two pages would load for
-		// nothing: under ownChunkBytes, which Rolldown's merge alone would take.
-		const intro = sized("Intro").slice(0, ownChunkBytes / 2);
+		// A set nearer by its entries than the shared one, but whose words nine pages would load for
+		// nothing.
+		const intro = sized("Intro");
 		const pages = Array.from({ length: 10 }, (_, index) => `page${index}`);
 		const { keysOf, code } = await built(
 			{ nav: "Nav", tab: "Tab", intro },
@@ -147,5 +158,70 @@ describe("the Vite plugin's chunks by page", () => {
 		);
 
 		expect(keysOf).toEqual([["later"], ["now"]]);
+	});
+
+	it("chunks the keys a module reads through the namespace by the pages that load it, as it chunks a per-key import", async () => {
+		const catalog = {
+			menu: sized("Menu"),
+			save: sized("Save"),
+			article: sized("Article"),
+			title: sized("Title"),
+		};
+		const entries = {
+			layout: ["menu", "save"],
+			article: ["save", "article"],
+			about: ["title"],
+		};
+		const pages = (dir: string) => ({
+			pageEntries: () => [
+				[join(dir, "layout.js"), join(dir, "article.js")],
+				[join(dir, "layout.js"), join(dir, "about.js")],
+			],
+		});
+
+		expect(
+			(await built(catalog, entries, { adapter: pages, namespace: true }))
+				.keysOf,
+		).toEqual([["article"], ["menu", "save"], ["title"]]);
+	});
+
+	it("chunks the keys a module may read by a computed name with the keys of the pages that module is on", async () => {
+		const { keysOf } = await built(
+			{ shown: "Shown", picked: "Picked", other: "Other" },
+			{ list: ["shown"], detail: [] },
+			{
+				namespace: true,
+				files: {
+					"detail.js": `import { m } from "./out/messages.js";\nconst name = document.title;\nconsole.log(m[name]());\n`,
+				},
+			},
+		);
+
+		expect(keysOf).toEqual([["other", "picked", "shown"]]);
+	});
+
+	it("sees through a module that only re-exports, to the modules that hold what each page takes from it", async () => {
+		const group = (name: string, key: string) =>
+			`import { m } from "../out/messages.js";\nexport const ${name} = { one: m.${key} };\n`;
+		const page = (name: string) =>
+			`import { ${name} } from "./groups/index.js";\nconsole.log(${name}.one());\n`;
+		const { keysOf, code } = await built(
+			{ alpha: sized("Alpha"), beta: sized("Beta") },
+			{ first: [], second: [] },
+			{
+				files: {
+					"groups/package.json": JSON.stringify({ sideEffects: false }),
+					"groups/alpha.js": group("alphaGroup", "alpha"),
+					"groups/beta.js": group("betaGroup", "beta"),
+					"groups/index.js": `export { alphaGroup } from "./alpha.js";\nexport * from "./beta.js";\n`,
+					"first.js": page("alphaGroup"),
+					"second.js": page("betaGroup"),
+				},
+			},
+		);
+
+		expect(keysOf).toEqual([["alpha"], ["beta"]]);
+		expect(code.first?.includes("Beta")).toBe(false);
+		expect(code.second?.includes("Alpha")).toBe(false);
 	});
 });
