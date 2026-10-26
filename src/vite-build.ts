@@ -45,11 +45,52 @@ export function keyModule(
 	const key = build.compilation.keys.get(name);
 	if (key === undefined) return undefined;
 	const shape = process.env.GRAI_SERVER_SHAPE;
+	if (consumer === "server" && shape === "e")
+		return serverSwitch(build, name, key);
 	if (consumer === "server" && key.kind !== "text" && shape)
 		return serverDispatch(build, name, key, shape);
 	const names = calledNames([key]);
 	const value = consumer === "server" ? key.serverValue : key.value;
 	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
+}
+
+/**
+ * PROTOTYPE, shape e: shape c for every key of a server build, a text's strings too. Each key is a
+ * function of its own that switches on the locale's index, each locale's code inlined in it.
+ */
+function serverSwitch(build: Build, name: string, key: CompiledKey): string {
+	const markup = key.kind === "markup";
+	const names = calledNames(
+		[key],
+		markup ? ["localeIndex", "withParts"] : ["localeIndex"],
+	);
+	const bound = new Set([...everyName(names), name]);
+	const o = freshName("o", bound);
+	bound.add(o);
+	const dispatch = (bodies: readonly string[]) => {
+		const cases = bodies.map(
+			(body, index) =>
+				`${index === bodies.length - 1 ? "default" : `case ${index}`}: ${body}`,
+		);
+		return `function (i, ${o}) { switch (localeIndex(${o})) { ${cases.join(" ")} } }`;
+	};
+	const inlined = (
+		functions: readonly { declarations: string; body: string }[],
+	) =>
+		dispatch(
+			functions.map(
+				({ declarations, body }) => `{ ${declarations}return ${body}; }`,
+			),
+		);
+	const value =
+		key.kind === "text"
+			? dispatch(key.variants.map((text) => `return ${text};`))
+			: markup
+				? `/*#__PURE__*/ withParts(${inlined(key.functions.strings)}, ${inlined(key.functions.parts)})`
+				: inlined(key.functions.strings);
+	const taken = new Set(bound);
+	taken.delete(name);
+	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], taken)}`;
 }
 
 /** The runtime functions each prototype shape of a server build's dispatch calls. */
