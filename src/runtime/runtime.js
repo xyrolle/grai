@@ -83,8 +83,9 @@ export class GraiError extends Error {
 const page = typeof document !== "undefined";
 
 /**
- * The locale where no server binds requests, by its position in `locales`: in a browser, the
- * page's `<html lang>`, the locale the server drew it in; in a script or a test, the base locale.
+ * The locale outside a request, by its position in `locales`: in a browser, the page's
+ * `<html lang>`, the locale the server drew it in; in a script or a test, the base locale, or the
+ * one the test binds. A server reads it only once a test binds it.
  */
 let current = locales.indexOf(
 	page && locales.includes(document.documentElement.lang)
@@ -116,22 +117,24 @@ export function bindRequests(storage) {
 	requests = storage;
 }
 
-/** The position in `locales` of the bound locale: on a server, the request's; else the process's. */
+/** Whether a test bound the locale outside a request, which then holds on a server too. */
+let boundByTest = false;
+
+/** The position in `locales` of the bound locale: the request's, else the one outside a request. */
 function bound() {
-	return requests === undefined ? current : serving().index;
+	const request = requests?.getStore();
+	if (request !== undefined) return request.index;
+	if (requests !== undefined && !boundByTest) throw unbound();
+	return current;
 }
 
 /**
- * The request a server is serving. Outside every request it binds there is none, and the
- * process's locale would render some readers' pages in another language, so a call fails: a
- * stream's pull runs there once the middleware has returned, as its reader starts it.
- *
- * @returns {RequestLocale}
+ * Why a server's call outside every request it binds fails: there is no reader's locale there,
+ * and the process's would render some readers' pages in another language. A stream's pull runs
+ * there once the middleware has returned, as its reader starts it.
  */
-function serving() {
-	const request = requests?.getStore();
-	if (request !== undefined) return request;
-	throw new GraiError(
+function unbound() {
+	return new GraiError(
 		"locale-unbound",
 		"A message was rendered outside every request the middleware binds. Render it while the handler runs, or in a task the handler starts: a stream renders in its start() or in a task writing to it, not in its pull(), which runs once the middleware has returned. Outside a request, pass { locale } to the message.",
 	);
@@ -139,12 +142,13 @@ function serving() {
 
 /**
  * Binds a locale outside a request, by its position in `locales`: for the process, or the page.
- * testing.js binds a test's locale with it.
+ * testing.js binds a test's locale with it, which holds on a server too.
  *
  * @param {number} index
  */
 export function bindLocale(index) {
 	current = index;
+	boundByTest = true;
 }
 
 /** @returns {string} */
@@ -154,22 +158,25 @@ export function getLocale() {
 
 /**
  * Sets the locale. In a request, for the rest of the request; on a server outside every request,
- * it throws `locale-unbound`; in a script or a test, for the process. A page renders in its locale for as long as it lives, so in a page it keeps the choice
- * where the strategy reads it: its cookie, its key in localStorage, its URL's prefix or query
- * parameter. Then it loads the page again in it, at the URL that names it, unless
- * `{ reload: false }`, which only keeps the choice, for the page's next load. A page whose
- * strategy keeps the choice nowhere would load in its old locale again, so there it throws. The
- * page's own locale is kept too, but loads nothing again.
+ * it throws `locale-unbound`, unless a test bound one; in a script or a test, for the process. A
+ * page renders in its locale for as long as it lives, so in a page it keeps the choice where the
+ * strategy reads it: its cookie, its key in localStorage, its URL's prefix or query parameter.
+ * Then it loads the page again in it, at the URL that names it, unless `{ reload: false }`, which
+ * only keeps the choice, for the page's next load. A page whose strategy keeps the choice nowhere
+ * would load in its old locale again, so there it throws. The page's own locale is kept too, but
+ * loads nothing again.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
  */
 export function setLocale(locale, options) {
 	const index = locales.indexOf(assertIsLocale(locale));
-	if (requests !== undefined) {
-		serving().index = index;
+	const request = requests?.getStore();
+	if (request !== undefined) {
+		request.index = index;
 		return;
 	}
+	if (requests !== undefined && !boundByTest) throw unbound();
 	if (!page) {
 		current = index;
 		return;

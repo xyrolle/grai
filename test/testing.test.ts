@@ -48,3 +48,19 @@ it("renders a component in a locale other than the page's in jsdom, once the tes
 	expect(m.title?.()).toBe("Ihr Warenkorb");
 	expect(page.documentElement.lang).toBe("de");
 });
+
+it("binds a test's locale in a process that serves requests too, outside every request", async () => {
+	const { dir, load } = project({
+		en: { title: "Your cart" },
+		de: { title: "Ihr Warenkorb" },
+	});
+	const { m } = await load();
+	const output = (file: string) =>
+		import(pathToFileURL(join(dir, "out", file)).href);
+	await output("server.js");
+	const { useLocale } = await output("testing.js");
+
+	useLocale("de");
+
+	expect(m.title?.()).toBe("Ihr Warenkorb");
+});
