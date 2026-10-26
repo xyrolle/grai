@@ -57,6 +57,15 @@ describe("outside a request", () => {
 		expect([m.title?.(), runtime.getLocale()]).toEqual(["Ihr Warenkorb", "de"]);
 	});
 
+	it("throws locale-unknown for a locale a project of one locale does not have, though each message holds one variant", async () => {
+		const { m } = await project({ en: { title: "Your cart" } }).load();
+
+		expect(m.title?.({}, { locale: "en" })).toBe("Your cart");
+		expect(thrown(() => m.title?.({}, { locale: "de" }))).toMatchObject({
+			code: "locale-unknown",
+		});
+	});
+
 	it("throws locale-unbound in a server whose middleware binds each request, unless the call names its locale", async () => {
 		const { m, runtime } = await served();
 
