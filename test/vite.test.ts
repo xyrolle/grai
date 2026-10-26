@@ -1009,6 +1009,97 @@ export const render = () => \`\${m.title()} \${globalThis.evaluations}\`;
 		expect(await rendered()).toBe("Title 1");
 	});
 
+	it("takes the messages again, not a patch, for an edit that turns a text into markup and back", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";
+globalThis.markupEvaluations = (globalThis.markupEvaluations ?? 0) + 1;
+export const render = () => \`\${typeof m.title.parts === "function" ? "markup" : "text"} \${m.title()} \${globalThis.markupEvaluations}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		expect(await rendered()).toBe("text Title 1");
+		const catalog = join(dir, "messages", "en.json");
+		const titled = (title: string) =>
+			writeFileSync(
+				catalog,
+				JSON.stringify({ ...catalogs.en, title }, null, "\t"),
+			);
+
+		// How the key is called changes, so its module's export must be made again.
+		titled("{#b}Title{/b}");
+		await expect.poll(rendered, devWait).toBe("markup Title 2");
+		titled("Heading");
+		await expect.poll(rendered, devWait).toBe("text Heading 3");
+	});
+
+	it("patches an edit that renames formats.js, whose new name the patch imports", async () => {
+		const priced = (currency: string) => ({
+			en: {
+				...catalogs.en,
+				price: `{amount :number style=currency currency=${currency}}`,
+			},
+			de: {
+				...catalogs.de,
+				price: `{amount :number style=currency currency=${currency}}`,
+			},
+		});
+		const { dir } = project(priced("EUR"));
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages.js";
+globalThis.priceEvaluations = (globalThis.priceEvaluations ?? 0) + 1;
+export const render = () => \`\${m.price({ amount: 5 })} \${globalThis.priceEvaluations}\`;
+`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		const euros = new Intl.NumberFormat("en", {
+			style: "currency",
+			currency: "EUR",
+		}).format(5);
+		const dollars = new Intl.NumberFormat("en", {
+			style: "currency",
+			currency: "USD",
+		}).format(5);
+		expect(await rendered()).toBe(`${euros} 1`);
+		const formats = (await outputFile(dir, "formats.js")).split("/").at(-1);
+
+		for (const [locale, catalog] of Object.entries(priced("USD")))
+			writeFileSync(
+				join(dir, "messages", `${locale}.json`),
+				JSON.stringify(catalog, null, "\t"),
+			);
+
+		// Patched in place: the program is not evaluated again.
+		await expect.poll(rendered, devWait).toBe(`${dollars} 1`);
+		expect((await outputFile(dir, "formats.js")).split("/").at(-1)).not.toBe(
+			formats,
+		);
+	});
+
 	it("patches a server render's messages in place, and a later evaluation keeps the edit", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
