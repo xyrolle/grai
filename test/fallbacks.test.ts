@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
@@ -6,6 +6,9 @@ import { add } from "../src/add.ts";
 import { check } from "../src/check.ts";
 import { recompile } from "../src/compile.ts";
 import { removeUnusedKeys } from "../src/fix.ts";
+import { importCatalogs } from "../src/import.ts";
+import { seed } from "../src/seed.ts";
+import { exportLocale, mergeDocument } from "../src/translations.ts";
 
 import { errorsOf, type Messages, outputFile, project } from "./project.ts";
 
@@ -157,4 +160,68 @@ it("leaves check --fix nothing to refuse in a locale whose empty catalog takes i
 	const fixed = await removeUnusedKeys(config);
 
 	expect([fixed.removed, fixed.errors]).toEqual([[], []]);
+});
+
+it("exports a key a locale takes from its fallback as translated, in its fallback's words", async () => {
+	const { config, dir } = project(catalogs, { fallbacks });
+	const exported = async (untranslated: boolean) => {
+		const result = await exportLocale(config, "en-GB", {
+			json: true,
+			untranslated,
+		});
+		if ("errors" in result) throw new Error(result.errors[0]?.message);
+		return result.document;
+	};
+	const targets = (document: string) =>
+		JSON.parse(document).units.map(
+			(unit: { key: string; target?: string }) => `${unit.key}: ${unit.target}`,
+		);
+	const all = await exported(false);
+
+	expect(targets(await exported(true))).toEqual([]);
+	expect(targets(all)).toEqual([
+		"color: Colour",
+		"cart: Cart",
+		"greeting: Hello {name}",
+	]);
+	const file = join(dir, "en-GB.json");
+	writeFileSync(file, all);
+	expect(await mergeDocument(config, file)).toMatchObject({ messages: 0 });
+	expect(
+		JSON.parse(readFileSync(join(dir, "messages", "en-GB.json"), "utf8")),
+	).toEqual(catalogs["en-GB"]);
+});
+
+it("seeds a locale with no key its fallback has, so it keeps taking them from there", async () => {
+	const { config, dir } = project(catalogs, { fallbacks });
+
+	expect(await seed(config, "en-GB")).toMatchObject({ keys: 0 });
+	expect(
+		JSON.parse(readFileSync(join(dir, "messages", "en-GB.json"), "utf8")),
+	).toEqual(catalogs["en-GB"]);
+});
+
+it("imports a key a locale's source lacks from its fallback's, keeping the locale's catalog sparse", () => {
+	const { config, dir } = project(catalogs, { fallbacks });
+	const sources = join(dir, "source");
+	mkdirSync(sources);
+	writeFileSync(
+		join(sources, "en.json"),
+		JSON.stringify({ color: "Color", cart: "Cart" }),
+	);
+	writeFileSync(
+		join(sources, "en-GB.json"),
+		JSON.stringify({ color: "Colour" }),
+	);
+	rmSync(join(dir, "messages"), { recursive: true });
+
+	const result = importCatalogs(config, "i18next", [sources]);
+
+	expect(result.leftOut).toEqual([]);
+	expect(
+		JSON.parse(readFileSync(join(dir, "messages", "en-GB.json"), "utf8")),
+	).toEqual({
+		$schema: "https://inlang.com/schema/inlang-message-format",
+		color: "Colour",
+	});
 });
