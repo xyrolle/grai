@@ -20,6 +20,8 @@ export type GraiErrorCode =
 	| "description-stale"
 	| "call-site-ambiguous"
 	| "resolution-invalid"
+	| "source-invalid"
+	| "import-unresolved"
 	| "message-invalid"
 	| "unsupported"
 	| "plural-category-unknown"
