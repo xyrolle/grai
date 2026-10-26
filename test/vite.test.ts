@@ -414,6 +414,51 @@ describe("the Vite plugin's build", () => {
 			built(dir, { a: `${code.split("\n").slice(0, -1).join("\n")}\n` }),
 		).resolves.toBeDefined();
 	});
+
+	it("reads a TypeScript module as the bundler runs it, where a type of the namespace's name leaves the star export's", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(join(dir, "types.ts"), "export type m = number;\n");
+		const modules = (exports: Record<string, string>) => {
+			for (const [name, code] of Object.entries(exports))
+				writeFileSync(
+					join(dir, `${name}.ts`),
+					`${code}\nexport * from "./out/messages.js";\n`,
+				);
+			const names = Object.keys(exports);
+			return [
+				...names.map((name) => `import { m as ${name} } from "./${name}.ts";`),
+				...names.map((name) => `console.log(${name}.size());`),
+			].join("\n");
+		};
+		const typesOnly = {
+			alias: "export type m = number;",
+			shape: "export interface m { size(): string }",
+			ambient: "export declare const m: { size(): string };",
+			listed: 'export type { m } from "./types.ts";',
+			marked: 'export { type m } from "./types.ts";',
+			imported: 'import type { m } from "./types.ts";\nexport { m };',
+			local: "type m = number;\nexport { m };",
+			space: "export namespace m { export type size = number; }",
+		};
+
+		await expect(built(dir, { a: `${modules(typesOnly)}\n` })).rejects.toThrow(
+			Object.keys(typesOnly)
+				.map(
+					(name, index, names) =>
+						`a.js:${names.length + index + 1}:${name.length + 14}: "size": ${name}.size names a key no catalog has. Add it with grai add size --en "…" --de "…", or fix the name.`,
+				)
+				.join("\n"),
+		);
+		await expect(
+			built(dir, {
+				a: `${modules({
+					merged:
+						'export type m = number;\nexport const m = { size: () => "Own size" };',
+					space: 'export namespace m { export const size = () => "Own size"; }',
+				})}\n`,
+			}),
+		).resolves.toBeDefined();
+	});
 });
 
 describe("the Vite plugin's message chunks", () => {
