@@ -125,10 +125,12 @@ export function isPathAfter(passed: Passed): boolean {
 	);
 }
 
-/** Whether a string after the code passed is in brackets, as the index of `m["key"]` is. */
+/** Whether a string after the code passed names a member, as the index of `m["key"]` or `m?.["key"]`. */
 export function isIndexAfter(passed: Passed): boolean {
 	const [previous] = lastTokens(passed, 1);
-	return previous?.text === "[";
+	if (previous?.text !== "[") return false;
+	const [, object, beforeObject] = lastTokens(passed, 3);
+	return object?.text === "." || endsOperand(object, beforeObject);
 }
 
 /**
