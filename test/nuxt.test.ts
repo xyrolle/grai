@@ -3,7 +3,7 @@ import { loadNuxt } from "nuxt/kit";
 import type { NuxtPage } from "nuxt/schema";
 import { describe, expect, it } from "vitest";
 import module from "../src/nuxt/module.ts";
-import { localizedPages } from "../src/nuxt/pages.ts";
+import { localizedPages, sharedPath } from "../src/nuxt/pages.ts";
 import {
 	type HeadTag,
 	pointAtLocaleChunks,
@@ -32,18 +32,46 @@ describe("the module", { timeout: 30_000 }, () => {
 		);
 	});
 
-	it("refuses pathnames beside domains, which Nuxt cannot route by host", async () => {
-		await expect(
-			loaded(
-				{
-					strategy: ["url"],
-					domains: { en: "shop.test" },
-					pathnames: { "/about": { en: "/about-us" } },
+	it("routes pathnames beside domains, and refuses a path that two locales' words give two pages", async () => {
+		/** The pages Nuxt routes, after the module adds its own to a project's. */
+		const routed = async (pathnames: Record<string, unknown>) => {
+			const nuxt = await loadNuxt({
+				cwd: fileURLToPath(new URL("..", import.meta.url)),
+				overrides: {
+					rootDir: project(
+						{ en: { title: "Your cart" }, ro: { title: "Coșul tău" } },
+						{
+							strategy: ["url"],
+							domains: { en: "shop.test", ro: "shop.ro.test" },
+							pathnames,
+						},
+					).dir,
+					modules: [module],
+					telemetry: false,
 				},
-				{},
-			),
+			});
+			const pages: NuxtPage[] = [
+				{ name: "about", path: "/about", file: "about.vue" },
+				{ name: "contact", path: "/contact", file: "contact.vue" },
+			];
+			try {
+				await nuxt.callHook("pages:resolved", pages);
+				return pages;
+			} finally {
+				await nuxt.close();
+			}
+		};
+
+		expect(await routed({ "/about": { ro: "/despre" } })).toContainEqual({
+			name: "about___ro",
+			path: "/ro/despre",
+			alias: ["/despre"],
+			file: "about.vue",
+		});
+		await expect(
+			routed({ "/about": { ro: "/despre" }, "/contact": { ro: "/about" } }),
 		).rejects.toThrow(
-			`grai.config.json: Nuxt routes a page by its path alone, so on a locale's own host ("domains") it cannot route that locale's words ("pathnames"). Leave out one of them.`,
+			`grai.config.json: Nuxt routes a page by its path alone, the same on every host, and "pathnames" gives /about to contact.vue in ro, where it is about.vue's path too. Give one of them other words.`,
 		);
 	});
 
@@ -170,6 +198,106 @@ describe("the pages of the url strategy", () => {
 				routing,
 			),
 		).toEqual([{ name: "about___ro", path: "/ro/știri", file: "about.vue" }]);
+	});
+
+	it("routes a page in a locale's words without its prefix too where domains give the locale a host, on which its paths have none", () => {
+		const about: NuxtPage = {
+			name: "about",
+			path: "/about",
+			file: "about.vue",
+			children: [{ name: "about-team", path: "/team", file: "team.vue" }],
+		};
+		const routing = {
+			...asNeeded,
+			domains: ["shop.test", "shop.ro.test"],
+			pathnames: [
+				{ route: "/about", paths: ["/about-us", "/despre"] },
+				{ route: "/team", paths: ["/team", "/echipa"] },
+			],
+		};
+
+		expect(localizedPages([index, about], ["en", "ro"], "en", routing)).toEqual(
+			[
+				{
+					name: "about___en",
+					path: "/about-us",
+					file: "about.vue",
+					children: [
+						{ name: "about-team___en", path: "/team", file: "team.vue" },
+					],
+				},
+				{ name: "index___ro", path: "/ro", file: "index.vue" },
+				{
+					name: "about___ro",
+					path: "/ro/despre",
+					alias: ["/despre"],
+					file: "about.vue",
+					children: [
+						{
+							name: "about-team___ro",
+							path: "/ro/echipa",
+							alias: ["/echipa"],
+							file: "team.vue",
+						},
+					],
+				},
+			],
+		);
+		expect(
+			localizedPages([about], ["en", "ro"], "en", {
+				...routing,
+				localePrefix: "always",
+			})[0],
+		).toEqual({
+			name: "about___en",
+			path: "/en/about-us",
+			alias: ["/about-us"],
+			file: "about.vue",
+			children: [
+				{ name: "about-team___en", path: "/en/team", file: "team.vue" },
+			],
+		});
+	});
+
+	it("finds a path without a prefix that two locales' words give two pages, of a shape Nuxt routes to one", () => {
+		const products: NuxtPage = {
+			name: "products-id",
+			path: "/products/:id()",
+			file: "products/[id].vue",
+		};
+		const posts: NuxtPage = {
+			name: "posts-slug",
+			path: "/posts/:slug()",
+			file: "posts/[slug].vue",
+		};
+		const routing = {
+			...asNeeded,
+			domains: ["shop.test", "shop.ro.test"],
+			pathnames: [
+				{ route: "/products/[id]", paths: ["/products/[id]", "/p/[id]"] },
+				{ route: "/posts/[slug]", paths: ["/p/[slug]", "/posts/[slug]"] },
+			],
+		};
+
+		expect(sharedPath([products, posts], ["en", "ro"], "en", routing)).toEqual({
+			path: "/p/:id()",
+			locale: "ro",
+			pages: ["posts/[slug].vue", "products/[id].vue"],
+		});
+		// Without domains, ro's words have its prefix wherever they are read.
+		expect(
+			sharedPath([products, posts], ["en", "ro"], "en", {
+				...routing,
+				domains: [],
+			}),
+		).toBeUndefined();
+		// Two locales' words for one page lead to that page alone.
+		expect(
+			sharedPath([products], ["en", "ro"], "en", {
+				...routing,
+				pathnames: [{ route: "/products/[id]", paths: ["/p/[id]", "/p/[id]"] }],
+			}),
+		).toBeUndefined();
 	});
 
 	it("leaves a page at a path the strategy leaves alone without copies", () => {
