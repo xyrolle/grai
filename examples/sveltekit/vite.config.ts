@@ -25,9 +25,7 @@ export default defineConfig(({ mode }) => ({
 				mode === "cookie"
 					? { mode: "nonce", directives: { "script-src": ["self"] } }
 					: {},
-			// Absolute paths, so that resolve() gives a link the base path it starts with, which
-			// localizeHref puts the locale after: a relative one it leaves as it is.
-			paths: { base: mode === "base" ? "/shop" : "", relative: false },
+			paths: { base: mode === "base" ? "/shop" : "" },
 		}),
 	],
 }));
