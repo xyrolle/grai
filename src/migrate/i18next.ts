@@ -13,8 +13,10 @@ import {
 	type LibraryModule,
 	type ModuleView,
 	memberAt,
+	movedLocale,
 	ownApi,
 	passedOn,
+	readsTheSame,
 	type Translator,
 	writtenProperties,
 } from "./library.ts";
@@ -137,7 +139,10 @@ function hookLookup(
 		};
 	}
 	const namespaces = mode === "fallback" ? loaded : loaded.slice(0, 1);
+	// The hook reads its lng once, and each call it becomes reads it again.
 	const lng = written.properties.get("lng")?.value;
+	if (lng !== undefined && !readsTheSame(lng, module.scopes))
+		return movedLocale;
 	const locale = lng && module.text.slice(lng.start, lng.end);
 	return { loaded, namespaces, keyPrefix: prefix, locale };
 }

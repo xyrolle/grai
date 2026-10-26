@@ -37,6 +37,8 @@ export class Scopes {
 	private readonly declared = new Map<string, Binding[]>();
 	private readonly bindings = new Map<Node, Binding>();
 	private readonly uses = new Map<string, Use[]>();
+	/** The uses that assign their name a value: `x = …`, `x++`, `[x] = …`, `for (x of …)`. */
+	private readonly writes = new Set<Node>();
 
 	constructor(program: ESTree.Program) {
 		const module = { start: program.start, end: program.end };
@@ -69,6 +71,11 @@ export class Scopes {
 		return innermost;
 	}
 
+	/** Whether anything assigns a binding again after it is declared. */
+	isAssignedAgain(binding: Binding): boolean {
+		return this.usesOf(binding).some((use) => this.writes.has(use));
+	}
+
 	/** Every use that reads a binding, in source order. */
 	usesOf(binding: Binding): Use[] {
 		return (this.uses.get(binding.name) ?? []).filter(
@@ -77,6 +84,8 @@ export class Scopes {
 	}
 
 	private visit(node: Node, at: Enclosing): void {
+		const target = assignedIn(node);
+		if (target !== undefined) this.markWritten(target);
 		if (node.type === "Identifier") {
 			this.addUse(node);
 		} else if (node.type === "ImportDeclaration") {
@@ -210,6 +219,34 @@ export class Scopes {
 		}
 	}
 
+	/** Marks each name an assignment's target writes. */
+	private markWritten(target: Node): void {
+		if (target.type === "Identifier") {
+			this.writes.add(target);
+		} else if (target.type === "ObjectPattern") {
+			for (const property of target.properties) {
+				this.markWritten(
+					property.type === "RestElement" ? property.argument : property.value,
+				);
+			}
+		} else if (target.type === "ArrayPattern") {
+			for (const element of target.elements) {
+				if (element !== null) this.markWritten(element);
+			}
+		} else if (target.type === "AssignmentPattern") {
+			this.markWritten(target.left);
+		} else if (target.type === "RestElement") {
+			this.markWritten(target.argument);
+		} else if (
+			target.type === "TSAsExpression" ||
+			target.type === "TSSatisfiesExpression" ||
+			target.type === "TSNonNullExpression" ||
+			target.type === "TSTypeAssertion"
+		) {
+			this.markWritten(target.expression);
+		}
+	}
+
 	private addBinding(node: Node & { name: string }, scope: Span): void {
 		const binding = { name: node.name, node, scope };
 		this.bindings.set(node, binding);
@@ -234,6 +271,16 @@ function appendTo<T>(map: Map<string, T[]>, key: string, value: T): void {
 	const values = map.get(key);
 	if (values === undefined) map.set(key, [value]);
 	else values.push(value);
+}
+
+/** What an assignment, an update or a `for … in`/`of` without a declaration writes to. */
+function assignedIn(node: Node): Node | undefined {
+	if (node.type === "AssignmentExpression") return node.left;
+	if (node.type === "UpdateExpression") return node.argument;
+	const loop = node.type === "ForInStatement" || node.type === "ForOfStatement";
+	return loop && node.left.type !== "VariableDeclaration"
+		? node.left
+		: undefined;
 }
 
 function size({ scope }: Binding): number {

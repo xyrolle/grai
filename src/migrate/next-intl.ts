@@ -6,8 +6,10 @@ import {
 	type LibraryModule,
 	type ModuleView,
 	memberAt,
+	movedLocale,
 	type Outcome,
 	passedOn,
+	readsTheSame,
 	type Translator,
 	writtenProperties,
 } from "./library.ts";
@@ -121,6 +123,8 @@ function serverScope(
 	const scope = namespaceScope(properties.get("namespace")?.value);
 	const locale = properties.get("locale")?.value;
 	if ("left" in scope || locale === undefined) return scope;
+	// getTranslations reads its locale once, and each call it becomes reads it again.
+	if (!readsTheSame(locale, module.scopes)) return movedLocale;
 	return { ...scope, locale: module.text.slice(locale.start, locale.end) };
 }
 

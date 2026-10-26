@@ -1,9 +1,12 @@
 import type { ESTree } from "vite";
 import type { MappedKey, Mapping } from "../import/mapping.ts";
 import {
+	droppedValue,
 	type Left,
 	type ModuleView,
+	movedLocale,
 	type Outcome,
+	readsTheSame,
 	writtenProperties,
 } from "./library.ts";
 import { messageCall } from "./message-call.ts";
@@ -71,7 +74,7 @@ export function i18nextCall(
 		"options",
 	);
 	if ("left" in passed) return passed;
-	const options = optionsOf(passed.properties, lookup, module.text);
+	const options = optionsOf(passed.properties, lookup, module);
 	if ("left" in options) return options;
 	const separator = written.indexOf(":");
 	if (separator !== -1 && lookup.keyPrefix !== "") {
@@ -101,12 +104,13 @@ export function i18nextCall(
 
 /**
  * A call's options: `ns` sets where it looks, `context` and `ordinal` add to its key, `lng` sets
- * its locale, a default value is never shown, as the key exists; the others are its inputs.
+ * its locale, a default value is never shown, as the key exists; the others are its inputs. The
+ * locale moves after the inputs and a default value is dropped, so each must read the same.
  */
 function optionsOf(
 	properties: ReadonlyMap<string, ESTree.ObjectProperty>,
 	lookup: Lookup,
-	text: string,
+	{ text, scopes }: ModuleView,
 ): CallOptions | Left {
 	let named: readonly string[] | undefined;
 	let { locale } = lookup;
@@ -134,12 +138,15 @@ function optionsOf(
 			}
 			ordinal = value.value ? "_ordinal" : "";
 		} else if (name === "lng") {
+			if (!readsTheSame(value, scopes)) return movedLocale;
 			locale = text.slice(value.start, value.end);
 		} else if (unmigratedOptions.has(name)) {
 			return {
 				left: `it passes i18next's ${name}, which grai has no counterpart for.`,
 			};
-		} else if (name !== "defaultValue" && !name.startsWith("defaultValue_")) {
+		} else if (name === "defaultValue" || name.startsWith("defaultValue_")) {
+			if (!readsTheSame(value, scopes)) return droppedValue(name);
+		} else {
 			inputs.set(name, property);
 		}
 	}
