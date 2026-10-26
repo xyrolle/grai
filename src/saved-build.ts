@@ -1,13 +1,14 @@
 import { renameSync, writeFileSync } from "node:fs";
-import { readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { deserialize, serialize } from "node:v8";
 import type { Catalog } from "./catalog.ts";
 import type { Compilation } from "./compilation.ts";
 import { type Build, buildKey, type CompileOptions } from "./compile.ts";
-import { type Config, readConfig } from "./config.ts";
+import { type Config, isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { stateDirectory } from "./outdir-contents.ts";
+import { isAlive } from "./output-lock.ts";
 
 /**
  * A build as saved: every field of it but its key, which heads the file, and of each catalog every
@@ -27,24 +28,54 @@ type SavedCatalog = Omit<Catalog, "revision" | "edit">;
 const savedName = "build";
 
 /**
+ * The file a process writes its save to before it renames it into place. Not a `.tmp` file: a
+ * compile under the output's lock removes those as left by a compile that stopped halfway, and a
+ * save does not take the lock, which would hold up an edit's compile while 22 MB are written. A
+ * process's own name, so saves never write into each other's; one that a crash left is removed by
+ * the next save, once its process is gone (`removeStaleSaves`).
+ */
+export function savingFile(state: string, pid: number): string {
+	return join(state, `${savedName}.${pid}.saving`);
+}
+const savingName = new RegExp(`^${savedName}\\.(\\d+)\\.saving$`);
+
+/**
  * Saves a build for the next process's first compile, as V8 serializes it, in a file beside the
- * manifest. The file is written whole and then renamed into place, so a reader sees one build or
- * another, never part of one, whichever process saved it last.
+ * manifest. The file is written whole to the process's `savingFile` and then renamed into place,
+ * so a reader sees one build or another, never part of one, whichever process saved it last.
  */
 export async function saveBuild(build: Build): Promise<void> {
 	const { temporary, file, bytes } = savedFile(build);
+	await removeStaleSaves(dirname(file));
 	await writeFile(temporary, bytes);
 	await rename(temporary, file);
 }
 
 /**
  * Saves a build as `saveBuild` does, synchronously, as the process exits and nothing waits for a
- * promise.
+ * promise. It leaves any stale save to the next `saveBuild`.
  */
 export function saveBuildNow(build: Build): void {
 	const { temporary, file, bytes } = savedFile(build);
 	writeFileSync(temporary, bytes);
 	renameSync(temporary, file);
+}
+
+/** Removes the saves that processes no longer running left halfway, as when one crashed. */
+async function removeStaleSaves(state: string): Promise<void> {
+	const names = await readdir(state).catch((error: unknown) => {
+		if (isMissing(error)) return [];
+		throw error;
+	});
+	await Promise.all(
+		names.map(async (name) => {
+			const pid = Number(savingName.exec(name)?.[1]);
+			if (!Number.isInteger(pid) || pid === process.pid || isAlive(pid)) return;
+			await unlink(join(state, name)).catch((error: unknown) => {
+				if (!isMissing(error)) throw error;
+			});
+		}),
+	);
 }
 
 /** A build's saved file: its bytes, its path, and the path it is written to first. */
@@ -62,7 +93,7 @@ function savedFile(build: Build): {
 	};
 	const state = join(build.config.outdir, stateDirectory);
 	return {
-		temporary: join(state, `${savedName}.${process.pid}.tmp`),
+		temporary: savingFile(state, process.pid),
 		file: join(state, savedName),
 		bytes: Buffer.concat([Buffer.from(`${key}\n`), serialize(saved)]),
 	};
