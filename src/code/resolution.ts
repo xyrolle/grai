@@ -9,6 +9,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { ResolverFactory } from "oxc-resolver";
+import type { AliasOptions } from "vite";
+import { GraiError } from "../error.ts";
 import type { Resolve } from "./modules.ts";
 
 /** A Vite alias: a path or a pattern, and what it is replaced with. */
@@ -29,9 +31,15 @@ const extensions = [
 	".mdx",
 ];
 
-/** The project's resolution: its Vite aliases, if it has a Vite config, then `oxc-resolver`. */
-export async function projectResolve(root: string): Promise<Resolve> {
+/**
+ * The project's resolution: its Vite aliases, if it has a Vite config, then `oxc-resolver`; or the
+ * error when either config cannot be read, as the bundler would fail on it too.
+ */
+export async function projectResolve(
+	root: string,
+): Promise<Resolve | GraiError> {
 	const aliases = await viteAliases(root);
+	if (aliases instanceof GraiError) return aliases;
 	const tsconfig = join(root, "tsconfig.json");
 	const resolver = new ResolverFactory({
 		// The project's tsconfig for every module, as SvelteKit, Astro and Next apply its paths: to a
@@ -49,6 +57,18 @@ export async function projectResolve(root: string): Promise<Resolve> {
 		},
 		builtinModules: true,
 	});
+	// A tsconfig the resolver cannot follow, such as one that extends a file a framework generates
+	// before it is generated, fails every import, and a command would then read none.
+	const { error } = existsSync(tsconfig)
+		? resolver.resolveFileSync(tsconfig, "./tsconfig.json")
+		: {};
+	if (error !== undefined) {
+		return new GraiError(
+			"resolution-invalid",
+			{ file: "tsconfig.json" },
+			`the project's tsconfig cannot be followed: ${error}. Generate what it extends, as SvelteKit's svelte-kit sync or Nuxt's nuxi prepare does, or fix it.`,
+		);
+	}
 	return async (source, importer) => {
 		const { path } = resolver.resolveFileSync(
 			importer,
@@ -86,17 +106,27 @@ const configFiles = [
  * The aliases the project's Vite config declares, read through Vite's own config loader, which
  * runs none of its plugins; a plugin's aliases are in its generated tsconfig, as SvelteKit's are.
  */
-async function viteAliases(root: string): Promise<Alias[]> {
+async function viteAliases(root: string): Promise<Alias[] | GraiError> {
 	const file = configFiles.find((name) => existsSync(join(root, name)));
 	if (file === undefined) return [];
-	const { loadConfigFromFile } = await import("vite");
-	const loaded = await loadConfigFromFile(
-		{ command: "build", mode: "production" },
-		join(root, file),
-		root,
-		"silent",
-	);
-	const alias = loaded?.config.resolve?.alias;
+	let alias: AliasOptions | undefined;
+	try {
+		const { loadConfigFromFile } = await import("vite");
+		const loaded = await loadConfigFromFile(
+			{ command: "build", mode: "production" },
+			join(root, file),
+			root,
+			"silent",
+		);
+		alias = loaded?.config.resolve?.alias;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		return new GraiError(
+			"resolution-invalid",
+			{ file },
+			`the project's Vite config cannot be loaded, so its aliases are unknown: ${message.split("\n")[0]}. Fix it, as the build fails on it too.`,
+		);
+	}
 	if (alias === undefined) return [];
 	return Array.isArray(alias)
 		? alias.map(({ find, replacement }) => ({ find, replacement }))
