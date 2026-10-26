@@ -228,3 +228,9 @@ Done when: the plugin merges the page's own import map into the one the locale s
 A Vite build refuses a text with `!~{…}~` in it (`placeholderTexts` in `src/vite-build.ts`). Rolldown writes each chunk's hash over its placeholder wherever that is in a chunk's code, a string's value included, and grai does the same in each locale's copy. Every other way of writing the text, such as `\x7e` for the `~`, an escaped template, a concatenation or a join, comes out of Rolldown's printer and minifier as the one string again before the hashes go in.
 
 Done when: Rolldown leaves the placeholder's shape in a string's value alone, and the build takes the text as it is.
+
+## check --fix scans the sources once
+
+`check --fix` reads every source file and collects the names they write twice: once to find the unused keys, and again in the check it runs after, though a fix changes only catalogs. On app B the second pass is about 0.7 s of its 2.7 s, 0.2 s of reading and 0.5 s of names; 25 Oct's build paid it too.
+
+Done when: the check after a fix takes the sources and names the fix read, and still reads the catalogs the fix wrote.
