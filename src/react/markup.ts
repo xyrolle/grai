@@ -1,4 +1,5 @@
 import { createElement, Fragment, type ReactNode } from "react";
+import { ownEntry } from "../own-entry.ts";
 
 /**
  * A message's part, as its `.parts()` gives it: the runtime's `MessagePart`, a run of text or a
@@ -23,7 +24,8 @@ type Open<Tag extends string> = { name: Tag; children: ReactNode[] };
  * Renders a markup message's parts, each element drawn by its function in `markup`: translators
  * place the markup, and the app decides how it looks. An end closes the innermost element of its
  * name, an end with none open draws nothing, and an element left open closes at the end. An
- * element `markup` does not draw throws, naming it.
+ * element `markup` does not draw throws, naming it: `markup`'s own functions draw, so an element
+ * the catalog names `constructor` is none of them.
  */
 export function Markup<Tag extends string>({
 	parts,
@@ -36,7 +38,7 @@ export function Markup<Tag extends string>({
 	const open: Open<Tag>[] = [];
 	const current = () => open.at(-1)?.children ?? root;
 	const draw = (name: Tag, children?: ReactNode[]) => {
-		const element = markup[name];
+		const element = ownEntry(markup, name);
 		if (element === undefined) {
 			throw new Error(
 				`Markup has no function for the message's element "${name}". Add ${name} to its markup.`,
