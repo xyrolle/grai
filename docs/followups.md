@@ -175,6 +175,12 @@ react-intl apps often write their descriptors once, `const messages = defineMess
 
 Done when: `grai migrate` rewrites both calls of such a `const` in the module that declares it, and removes the `const` once nothing reads it.
 
+## The messages a `<Trans>` renders, as grai markup
+
+A `<Trans>`'s message reads its tags as elements: `Hello <1>{{name}}</1>` numbers one by the `<Trans>`'s children, and `<bold>` names one of its `components`, each taking the attributes the translation gives it, while `<strong>` or `<br/>` may be a basic HTML node it keeps. `grai import` keeps every tag as text, which is right for a `t()` call, and `grai migrate` lists the `<Trans>` for a person to write its message's tags as grai markup in each catalog. Only the call sites tell which keys are rich text: reading every string with angle brackets as markup would break a `t()` message that shows them.
+
+Done when: `grai migrate` writes the messages of each key a `<Trans>` renders, in every locale and variant, as grai markup, with its numbered, named, basic and self-closing tags and their attributes, under names the markup component of the next entry can render; it leaves every other key's text as it is and lists a tag it cannot name, with why; and a test covers each kind of tag.
+
 ## Calls that render markup, in `grai migrate`
 
 `<Trans>`, next-intl's `t.rich` and `t.markup`, and a react-intl message with markup are listed for a person, who renders the message's `.parts()`. A framework's markup component, such as `grai/react`'s `Markup`, would take the tags' renderers the call passes.
