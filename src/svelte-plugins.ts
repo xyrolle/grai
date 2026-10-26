@@ -12,5 +12,5 @@ export function sveltePlugins(
 	adapter: GraiAdapter,
 ): Plugin[] {
 	const core = graiPlugin(options, adapter);
-	return [core.plugin, svelteTexts(core)];
+	return [...core.plugins, svelteTexts(core)];
 }

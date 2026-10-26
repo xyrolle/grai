@@ -10,7 +10,7 @@ import { dirname, extname, join } from "node:path";
 import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { keyModulePrefix } from "../locale-chunks.ts";
-import { moduleOf } from "../output-paths.ts";
+import { keyOfModule, moduleOf } from "../output-paths.ts";
 import { realPath } from "../real-path.ts";
 import { type Seen, sourceExtensions } from "../sources.ts";
 import { stateDirectory } from "../state-directory.ts";
@@ -61,10 +61,7 @@ export async function readProjectCode(
 	const output: Output = {
 		messages: join(config.outdir, "messages.js"),
 		keys: join(config.outdir, "keys.js"),
-		keyOf: (path) =>
-			path.startsWith(keyModulePrefix)
-				? path.slice(keyModulePrefix.length)
-				: undefined,
+		keyOf: keyOfModule,
 	};
 	const resolution = await projectResolution(config.root);
 	if (resolution instanceof GraiError) return resolution;
