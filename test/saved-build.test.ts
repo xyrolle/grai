@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
-import { savedBuild } from "../src/saved-build.ts";
+import { savedBuild, savingFile } from "../src/saved-build.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -240,4 +240,40 @@ it("starts from nothing when the saved build was cut short", async () => {
 
 	expect(await savedBuild(file, { pseudoLocale: true })).toBeUndefined();
 	expect((await started(file)).build?.compilation.changed.size).toBe(2);
+});
+
+it("leaves a save under way alone when a compile under the output's lock clears what compiles left halfway", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	const { build } = await started(file);
+	const state = join(dir, "out", ".grai");
+	// A save another process is writing, and a temporary file a compile that stopped halfway left.
+	const saving = savingFile(state, process.ppid);
+	const leftover = join(state, "keys-0.js.tmp");
+	writeFileSync(saving, "part of a build");
+	writeFileSync(leftover, "");
+
+	await recompile(file, build, { pseudoLocale: true });
+
+	expect([existsSync(saving), existsSync(leftover)]).toEqual([true, false]);
+});
+
+it("removes a save a process left as it crashed, and none whose process still runs", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	const state = join(dir, "out", ".grai");
+	// A process that has ended, whose pid no process has yet.
+	const { pid: ended } = spawnSync(process.execPath, ["--eval", ""]);
+	const stale = savingFile(state, ended);
+	const running = savingFile(state, process.ppid);
+	writeFileSync(stale, "part of a build");
+	writeFileSync(running, "part of a build");
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, title: "Überschrift" }, null, "\t"),
+	);
+
+	await started(file);
+
+	expect([existsSync(stale), existsSync(running)]).toEqual([false, true]);
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
 });

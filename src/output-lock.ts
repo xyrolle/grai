@@ -136,7 +136,8 @@ async function holderOf(path: string): Promise<number | undefined> {
 	}
 }
 
-function isAlive(pid: number): boolean {
+/** Whether a process is running, as one whose signal the system refuses to send is. */
+export function isAlive(pid: number): boolean {
 	if (!Number.isInteger(pid) || pid <= 0) return false;
 	try {
 		process.kill(pid, 0);

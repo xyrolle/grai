@@ -9,8 +9,9 @@ export const stateDirectory = ".grai";
 /**
  * What an outdir holds: its files, by their paths from it with `/`, the directories they are in,
  * and apart from them the temporary files in grai's state directory. Only a writer under the lock
- * makes a temporary file, so one that a writer under the lock finds was left by a compile that
- * stopped halfway.
+ * makes a temporary file, one ending `.tmp`, so one that a writer under the lock finds was left by
+ * a compile that stopped halfway. A watcher's save of its build is written outside the lock under
+ * another name, `build.<pid>.saving` (`savingFile` in saved-build.ts), which is no temporary here.
  */
 export async function outdirContents(outdir: string): Promise<{
 	files: Set<string>;
