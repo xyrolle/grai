@@ -27,6 +27,7 @@ export function configModule(config: Config, localeCopies: boolean): string {
 		"/** @type {readonly RegExp[]} */",
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
 		...pathnamesTable(config.urlRouting.pathnames),
+		`export const basePath = ${JSON.stringify(config.urlRouting.basePath)};`,
 		"/** @type {boolean} */",
 		`export const localeCopies = ${localeCopies};`,
 		"",
@@ -58,7 +59,7 @@ export function directionOf(locale: string): "ltr" | "rtl" {
  * bundler folds, so a page carries the code of only what its config uses.
  */
 function strategyConstants(config: Config): string[] {
-	const { localePrefix, prefixes, unlocalizedPaths, pathnames } =
+	const { localePrefix, prefixes, unlocalizedPaths, pathnames, basePath } =
 		config.urlRouting;
 	const constants = {
 		readsUrl: config.strategy.includes("url"),
@@ -72,6 +73,7 @@ function strategyConstants(config: Config): string[] {
 		),
 		leavesPathsAlone: unlocalizedPaths.length > 0,
 		translatesPaths: pathnames.length > 0,
+		servedUnderBase: basePath !== "",
 	};
 	return Object.entries(constants).map(
 		([name, value]) => `export const ${name} = ${value};`,

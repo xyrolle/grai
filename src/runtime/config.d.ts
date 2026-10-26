@@ -54,3 +54,7 @@ export declare const pathnames: readonly {
 		path: string;
 	}[];
 }[];
+/** Whether the config names a base path the app is served under: `basePath`. */
+export declare const servedUnderBase: boolean;
+/** The path the app is served under, such as `/shop`, or `""` for none. */
+export declare const basePath: string;

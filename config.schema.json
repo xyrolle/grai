@@ -148,6 +148,12 @@
 				}
 			]
 		},
+		"basePath": {
+			"description": "With the \"url\" strategy: the path the app is served under, which the locale's prefix follows, such as \"/shop\". It starts with / and does not end with one. The framework's base path must be the same: Vite's base, SvelteKit's paths.base, Next's basePath or Astro's base.",
+			"type": "string",
+			"pattern": "^(?:/[^/?#\\s]+)+$",
+			"examples": ["/shop"]
+		},
 		"tests": {
 			"description": "Globs, of *, **, ? and {a,b}, of the source files that are tests, by path from the root, which grai check does not count as using a key. [] makes no file a test.",
 			"type": "array",
