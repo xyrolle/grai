@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { check } from "../src/check.ts";
 import { fixLines, removeUnusedKeys } from "../src/fix.ts";
@@ -60,6 +61,50 @@ describe("grai check --fix", () => {
 			JSON.stringify(kept, null, "\t"),
 		);
 		expect((await check(config)).problems).toEqual([]);
+	});
+
+	it("hands the check after it the sources it read, beside the catalogs as it wrote them", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.tsx": "export const Promo = () => <p>{promo_spring()}</p>;\n",
+		});
+
+		const fixed = await removeUnusedKeys(config);
+		// Written after the fix read the sources, so in none it hands on.
+		writeSources(dir, {
+			"src/late.js":
+				'import { m } from "../out/messages.js";\nm.cart_titel();\n',
+		});
+
+		expect(fixed.removed).toEqual(["banner_old"]);
+		expect((await check(config, undefined, fixed.scanned)).problems).toEqual(
+			[],
+		);
+		expect((await check(config)).problems.map(({ code }) => code)).toEqual([
+			"key-missing",
+		]);
+	});
+
+	it("hands the check no sources when it wrote one of them, as a config named like a module is", async () => {
+		const { dir } = project(catalogs, { tests: ["grai.config.mjs"] });
+		const config = join(dir, "grai.config.mjs");
+		writeFileSync(
+			config,
+			JSON.stringify({
+				...JSON.parse(readText(dir, "grai.config.json")),
+				identicalToBase: { de: ["banner_old"] },
+			}),
+		);
+		writeSources(dir, {
+			"src/Cart.svelte": cartSvelte,
+			"src/promo.tsx": "export const Promo = () => <p>{promo_spring()}</p>;\n",
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.changed).toContain("grai.config.mjs");
+		expect(fixed.scanned).toBeUndefined();
 	});
 
 	it("takes each unused entry out with the separator before it, leaving every other byte as it is written", async () => {

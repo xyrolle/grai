@@ -10,13 +10,8 @@ import { missingKeyCalls, type Unchecked } from "./missing-key-calls.ts";
 import { MessageProblem } from "./problem.ts";
 import { isSeed, untranslatedKeys } from "./seed.ts";
 import { shownInputs } from "./shown-inputs.ts";
-import {
-	namesIn,
-	sourceFiles,
-	splitTests,
-	type TestNames,
-	testsNaming,
-} from "./sources.ts";
+import { type ScannedSources, scanSources } from "./source-scan.ts";
+import { type TestNames, testsNaming } from "./sources.ts";
 
 /** What a check found: the problems, and each locale's keys that are still untranslated. */
 export type Checked = {
@@ -34,10 +29,13 @@ export type Checked = {
  * project's root, or under `sources` when given, outside the outdir, dependencies, build output and
  * dot-directories; those the config's `tests` match ship nothing. Beside them, the keys each locale
  * has not translated yet, which are not problems: a message can rightly read as the base locale's.
+ * The check after a fix takes the sources the fix read as `scanned`, which a fix hands on only
+ * when it wrote none of them; the catalogs, the config and the descriptions it reads again.
  */
 export async function check(
 	configFile: string,
 	sources?: readonly string[],
+	scanned?: ScannedSources,
 ): Promise<Checked> {
 	const read = await readProject(configFile);
 	if ("errors" in read)
@@ -48,9 +46,7 @@ export async function check(
 	const { config } = read;
 	const compilation = compileCatalogs(config, catalogs);
 	const roots = sources ?? [config.root];
-	const files = sourceFiles(roots, config.root, config.outdir);
-	const { shipped, tests } = splitTests(files, config.tests);
-	const names = namesIn(shipped);
+	const { files, tests, names } = scanned ?? scanSources(roots, config);
 	const keys = new Set(
 		catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);

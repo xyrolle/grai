@@ -2,6 +2,7 @@ import { check } from "../check.ts";
 import type { GraiError } from "../error.ts";
 import { fixLines, removeUnusedKeys } from "../fix.ts";
 import type { Unchecked } from "../missing-key-calls.ts";
+import type { ScannedSources } from "../source-scan.ts";
 import {
 	type Command,
 	failed,
@@ -29,12 +30,20 @@ export const checkCommand: Command = {
 		if (values.fix === true && values.json === true) {
 			throw new UsageError("check takes --fix or --json, not both");
 		}
+		// A fix writes catalogs, the config and the descriptions, so the check after it takes the
+		// sources the fix read, which it hands on unless it wrote one.
+		let scanned: ScannedSources | undefined;
 		if (values.fix === true) {
 			const fixed = await removeUnusedKeys(config, sources);
 			for (const line of fixLines(fixed)) console.log(line);
 			if (fixed.errors.length > 0) return failed(fixed.errors);
+			scanned = fixed.scanned;
 		}
-		const { problems, untranslated, unchecked } = await check(config, sources);
+		const { problems, untranslated, unchecked } = await check(
+			config,
+			sources,
+			scanned,
+		);
 		if (values.json === true) {
 			console.log(
 				JSON.stringify(
