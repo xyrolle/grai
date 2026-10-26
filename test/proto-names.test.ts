@@ -44,7 +44,7 @@ describe("a name that an object literal would take for its prototype", () => {
 		if (build === undefined) throw new Error("the compile failed");
 		const outdir = join(dir, "out");
 		const dev = join(outdir, "dev.js");
-		writeFileSync(dev, devModule(outdir, build));
+		writeFileSync(dev, devModule(outdir, build, 0));
 		const patch = join(outdir, "patch.js");
 		writeFileSync(patch, patchModule(outdir, build, ["__proto__"]));
 		// Node itself imports them: Vitest's transform writes a module's exports into an object, where

@@ -362,8 +362,8 @@ async function measure(browser, app, design) {
 	};
 	const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
 	const original = catalog[key];
-	// The server's program evaluated before the first edit, as a dev server has it: evaluated while
-	// a patch came in, it could keep the words it was loaded with and miss the patch.
+	// The server's program evaluated before the first edit, as a dev server has it, so the first edit
+	// times a patch, not the program's first evaluation.
 	if (design === "grai's plugin") await rendered(original);
 	const latencies = [];
 	for (let edit = 0; edit < EDITS + 3; edit++) {

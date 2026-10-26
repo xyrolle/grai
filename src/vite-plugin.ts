@@ -100,6 +100,8 @@ export function graiPlugin(
 		_key: string,
 		_importer: string,
 	): string | undefined => undefined;
+	/** How many patches the dev server has made: the version of the dev module it serves now. */
+	let patchesMade = () => 0;
 	/** How the build's modules are followed to keys.js, to check the keys they name. */
 	let reading: KeyReading | undefined;
 	let closeMessages = async () => {};
@@ -152,7 +154,9 @@ export function graiPlugin(
 		if (id.startsWith(textModulePrefix))
 			return textModule(compiled, id, consumer);
 		if (id === devKeysId || id === files.keysFile)
-			return serving ? devModule(files.outdir, compiled) : keysModule(compiled);
+			return serving
+				? devModule(files.outdir, compiled, patchesMade())
+				: keysModule(compiled);
 		return serving
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
 			: keyModule(compiled, id, consumer);
@@ -326,6 +330,7 @@ export function graiPlugin(
 			({
 				module: devModuleOf,
 				missingKeyImport,
+				version: patchesMade,
 				close: closeMessages,
 			} = serveMessages(
 				server,
