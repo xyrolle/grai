@@ -9,6 +9,7 @@ import {
 import type { RuntimeFunction } from "./modules.ts";
 import {
 	type OutputModules,
+	type RenderedFormats,
 	type RuntimeSources,
 	renderModules,
 } from "./output-modules.ts";
@@ -44,6 +45,8 @@ type ShardFiles = {
 export type Rendered = {
 	files: ReadonlyMap<string, string>;
 	modules: OutputModules;
+	/** formats.js, which the next render keeps if the messages call the same formatters. */
+	formats: RenderedFormats;
 	/** Each shard's keys, sorted. */
 	shards: readonly (readonly string[])[];
 	/** The files of each shard that holds keys, by its index. */
@@ -73,11 +76,12 @@ export function renderOutput(
 	{ localeCopies }: { localeCopies: boolean },
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
-	const { modules, immutable, entries } = renderModules(
+	const { modules, immutable, entries, formats } = renderModules(
 		config,
 		runtime,
 		compilation,
 		localeCopies,
+		previous?.formats,
 	);
 	const count = shardCount(compilation.keys.size);
 	const before =
@@ -150,6 +154,7 @@ export function renderOutput(
 		rendered: {
 			files: new Map([...output.immutable, ...output.mutable]),
 			modules,
+			formats,
 			shards,
 			shardFiles,
 		},
