@@ -1,5 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
 import { savedBuild } from "../src/saved-build.ts";
@@ -58,7 +60,7 @@ it("starts a watcher from the build the last one saved, compiling and saving not
 	expect(statSync(savedFile(dir)).mtimeMs).toBe(saved);
 });
 
-it("saves a watcher's first build a second after it, while the watcher runs on", async () => {
+it("saves a watcher's first build once the process is quiet, while the watcher runs on", async () => {
 	const { dir, config: file } = project(catalogs, config);
 	const watcher = watch(
 		file,
@@ -73,6 +75,58 @@ it("saves a watcher's first build a second after it, while the watcher runs on",
 		.poll(() => existsSync(savedFile(dir)), { timeout: 5000 })
 		.toBe(true);
 	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
+});
+
+it("saves a watcher's first build as the process exits, before it is quiet", async () => {
+	const { config: file } = project(catalogs, config);
+	// A process that exits as soon as its watcher reports, as one whose SIGTERM handler exits at once.
+	const watching = pathToFileURL(
+		fileURLToPath(new URL("../src/watch.ts", import.meta.url)),
+	).href;
+	const { status, stderr } = spawnSync(
+		process.execPath,
+		[
+			"--input-type=module",
+			"--eval",
+			`import { watch } from ${JSON.stringify(watching)};
+watch(${JSON.stringify(file)}, () => process.exit(0), (error) => {
+	console.error(error);
+	process.exit(1);
+});`,
+		],
+		{ encoding: "utf8" },
+	);
+
+	expect({ status, stderr }).toEqual({ status: 0, stderr: "" });
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
+});
+
+it("saves no build while the process works, as a dev server does as it starts", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	// The process works 45 ms of every 50, for 30 rounds: three of the saver's windows, and more.
+	let rounds = 0;
+	const worked = Promise.withResolvers<void>();
+	const working = setInterval(() => {
+		const until = performance.now() + 45;
+		while (performance.now() < until);
+		if (++rounds === 30) worked.resolve();
+	}, 50);
+	onTestFinished(() => clearInterval(working));
+	const watcher = watch(
+		file,
+		() => {},
+		(error) => {
+			throw error;
+		},
+	);
+	onTestFinished(() => watcher.close());
+
+	await worked.promise;
+	expect(existsSync(savedFile(dir))).toBe(false);
+	clearInterval(working);
+	await expect
+		.poll(() => existsSync(savedFile(dir)), { timeout: 5000 })
+		.toBe(true);
 });
 
 it.each([
