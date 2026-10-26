@@ -5,8 +5,15 @@
  * count of files, as app B's scripts take longer than the synthetic project's.
  */
 
+import type { FileFacts } from "./facts.ts";
 import { factsOf } from "./facts.ts";
-import { type FactsRead, keptFacts, keptText } from "./facts-cache.ts";
+import {
+	type FactsCache,
+	type FactsRead,
+	keptFacts,
+	keptText,
+	textHash,
+} from "./facts-cache.ts";
 import type { Pool } from "./pool.ts";
 
 /** What a worker costs to start and to load the parsers, measured: about a quarter of a second. */
@@ -57,4 +64,27 @@ export async function factsOfFiles(
 		here,
 	);
 	return read.flat();
+}
+
+/** Each file's facts, from the cache or read in the pool, which the cache keeps then. */
+export async function factsOfSources(
+	files: readonly { path: string; text: string }[],
+	cache: FactsCache,
+	pool: Pool,
+): Promise<(FileFacts | undefined)[]> {
+	const cached: (FileFacts | undefined)[] = [];
+	const unread: { path: string; text: string; hash: string }[] = [];
+	for (const { path, text } of files) {
+		const hash = textHash(text);
+		const facts = cache.get(path, hash);
+		cached.push(facts);
+		if (facts === undefined) unread.push({ path, text, hash });
+	}
+	const read = await factsOfFiles(unread, pool);
+	unread.forEach(({ path, hash }, index) => {
+		const each = read[index];
+		if (each !== undefined) cache.set(path, hash, each);
+	});
+	let next = 0;
+	return cached.map((facts) => facts ?? read[next++]?.facts);
 }
