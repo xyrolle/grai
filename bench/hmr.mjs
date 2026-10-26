@@ -21,7 +21,6 @@ import {
 import { join } from "node:path";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { chromium } from "playwright-core";
-import { createServer } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { graiSource } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
@@ -30,6 +29,12 @@ import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
 
 const { grai } = await import(join(graiSource, "vite.ts"));
+// The dev server comes from the Vite grai's source imports, as an app has one Vite: grai's plugin
+// tells a server environment it can patch in place by Vite's own class, and the bench's copy of
+// Vite is another, so a server made by it would have its messages taken again on every edit.
+const { createServer } = await import(
+	join(graiSource, "../node_modules/vite/dist/node/index.js")
+);
 
 const EDITS = 20;
 const SHOWN = 500;

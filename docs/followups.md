@@ -8,6 +8,12 @@ grai/vite chunks keys by the pages that load them when an adapter passes `pageEn
 
 Done when: grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
 
+## Patch a server render whose Vite is another copy
+
+The dev plugin patches a server environment's runner in place only when `isRunnableDevEnvironment` says it is one, which checks Vite's own class. A dev server made by another copy of Vite than the one grai imports, as in a workspace whose packages resolve Vite with different peers, fails that check: every edit then has the server take the messages again, about 110 ms on the synthetic catalog against 9 ms patched (`bench/hmr.mjs`, which now makes its server with grai's Vite for that reason). An app has one Vite, so this only shows in such setups.
+
+Done when: a server environment that runs its modules in a runner is patched whichever copy of Vite made it, with a test that makes the server with another copy.
+
 ## A page's later imports at its first paint
 
 The merge rule may put a key a page needs only through a later import in a chunk that page's first paint loads, when another page's first paint needs the key: on app B four pages load one such key at first paint. Keeping a set that later imports load off the first paints it is not on, without knowing which pages make which later imports, cost the rule most of its merges: 46 chunks a page against 13. Telling it exactly needs each later import's pages, from its dynamic importers' reach.
