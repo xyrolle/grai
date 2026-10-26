@@ -12,7 +12,7 @@ import { GraiError } from "../error.ts";
 import { keyModulePrefix } from "../locale-chunks.ts";
 import { stateDirectory } from "../outdir-contents.ts";
 import { moduleOf } from "../output-paths.ts";
-import { sourceFiles } from "../sources.ts";
+import { sourceExtensions, sourceFiles } from "../sources.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfFiles } from "./facts-pool.ts";
@@ -27,22 +27,6 @@ export type ProjectCode = {
 	sources: ReadonlyMap<string, SourceCode>;
 	graph: ModuleGraph;
 };
-
-/** The extensions of the modules grai reads. */
-const readable = new Set([
-	".js",
-	".mjs",
-	".cjs",
-	".jsx",
-	".ts",
-	".mts",
-	".cts",
-	".tsx",
-	".svelte",
-	".vue",
-	".astro",
-	".mdx",
-]);
 
 /** A project's code under the roots, or the error that keeps its imports from resolving. */
 export async function readProjectCode(
@@ -89,7 +73,7 @@ export async function readProjectCode(
 		if (source !== undefined) return Promise.resolve(source.facts);
 		const known = followed.get(path);
 		if (known !== undefined) return known;
-		const facts = readable.has(extname(path))
+		const facts = sourceExtensions.has(extname(path))
 			? factsOf(path, readFileSync(path, "utf8"))
 			: Promise.resolve(undefined);
 		followed.set(path, facts);
