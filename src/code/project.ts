@@ -14,7 +14,7 @@ import { stateDirectory } from "../outdir-contents.ts";
 import { moduleOf } from "../output-paths.ts";
 import { realPath } from "../real-path.ts";
 import { type Seen, sourceExtensions, sourceFiles } from "../sources.ts";
-import { namesOf, textTest } from "./candidates.ts";
+import { namesOf, textTest, written } from "./candidates.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
@@ -112,7 +112,7 @@ export async function readProjectCode(
 				mappings &&
 				namesOf({ outdir: config.outdir, barrels }, mappings, links, packages);
 			if (names !== undefined) {
-				for (const name of outside.passing(names)) names.add(name);
+				for (const name of outside.passing(names)) names.add(written(name));
 			}
 			const test = names && textTest(names);
 			const taken = files.filter(
