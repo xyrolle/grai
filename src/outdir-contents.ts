@@ -11,7 +11,8 @@ export const stateDirectory = ".grai";
  * and apart from them the temporary files in grai's state directory. Only a writer under the lock
  * makes a temporary file, one ending `.tmp`, so one that a writer under the lock finds was left by
  * a compile that stopped halfway. A watcher's save of its build is written outside the lock under
- * another name, `build.<pid>.saving` (`savingFile` in saved-build.ts), which is no temporary here.
+ * another name, `build.<pid>.<uuid>.saving` (`savingFile` in saved-build.ts), which is no temporary
+ * here.
  */
 export async function outdirContents(outdir: string): Promise<{
 	files: Set<string>;
