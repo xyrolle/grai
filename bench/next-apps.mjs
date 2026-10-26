@@ -1,13 +1,16 @@
 // The same Next.js App Router page three times, written from a catalog: on grai, on next-intl and
 // with its words written in (no library), the floor for bytes. The page is a server component
 // rendering SERVER_KEYS messages and a client component rendering CLIENT_KEYS, chosen evenly
-// across the catalog, so it has the catalog's share of plurals and inputs. Each app sits under
-// bench/.cache/next/, inside bench's own install of next, react, next-intl and grai.
+// across the keys both libraries can hold, so it has the catalog's share of plurals, inputs and
+// markup. next-intl reads the ICU catalog libraries.mjs writes, its markup dropped as grai's string
+// call drops it. Each app sits under bench/.cache/next/, inside bench's own install of next, react,
+// next-intl and grai.
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { compile } from "grai";
 import { cacheDir } from "./apps.mjs";
+import { libraryCatalogs, portable } from "./libraries.mjs";
 
 export const SERVER_KEYS = 400;
 export const CLIENT_KEYS = 100;
@@ -20,7 +23,7 @@ export const nextDir = join(cacheDir, "next");
  */
 export function pageKeys(app) {
 	const base = app.messages[app.baseLocale];
-	const keys = Object.keys(base);
+	const keys = Object.keys(base).filter((key) => portable(app, key));
 	const total = SERVER_KEYS + CLIENT_KEYS;
 	const chosen = Array.from(
 		{ length: total },
@@ -44,20 +47,6 @@ function inputsOf(message) {
 	for (const [, name] of source.matchAll(/\{(\w+)\}/g)) inputs[name] = "Ana";
 	for (const [, name] of source.matchAll(/input (\w+)/g)) inputs[name] = 3;
 	return inputs;
-}
-
-/** An inlang message as ICU MessageFormat, which next-intl reads. */
-function icu(message) {
-	if (typeof message === "string") return message;
-	const [{ declarations, match }] = message;
-	const counted = declarations
-		.find((line) => line.startsWith("input "))
-		.slice("input ".length);
-	const branches = Object.entries(match).map(
-		([selector, pattern]) =>
-			`${selector.split("=")[1].replace("*", "other")} {${pattern}}`,
-	);
-	return `{${counted}, plural, ${branches.join(" ")}}`;
 }
 
 const call = (target, key, inputs) =>
@@ -185,12 +174,7 @@ function writeNextIntl(app, keys, { picked }) {
 	const messages = {};
 	for (const locale of app.locales) {
 		messages[`messages/${locale}.json`] = JSON.stringify(
-			Object.fromEntries(
-				Object.entries(app.messages[locale]).map(([key, message]) => [
-					key,
-					icu(message),
-				]),
-			),
+			libraryCatalogs(app, locale).icu,
 			null,
 			"\t",
 		);
