@@ -25,6 +25,7 @@ import {
 	messageChunkCopies,
 	messageChunking,
 	placeholderTexts,
+	serverMessageChunking,
 	textModule,
 } from "./vite-build.ts";
 import {
@@ -159,7 +160,8 @@ export function graiPlugin(
 			testing = environment.mode === "test";
 		},
 		configEnvironment(name, environment) {
-			if (serving || name !== "client") return undefined;
+			if (serving) return undefined;
+			if (name !== "client") return serverMessageChunking();
 			const chunking = messageChunking(files.outdir, pageChunkOf);
 			// With copies, a page's own preloads leave the shared message chunks out, for its locale
 			// script to preload the locale's copies.
