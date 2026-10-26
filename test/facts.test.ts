@@ -145,6 +145,54 @@ describe("a file's facts", () => {
 		]);
 	});
 
+	it("records how a use written in shorthand is written out in full around another name", async () => {
+		const written = async (path: string, text: string) => {
+			const module = await moduleOf(path, text);
+			return module.uses.map(({ at, shorthand }) =>
+				shorthand === undefined
+					? text.slice(at.start, at.end)
+					: `${text.slice(shorthand.replaces.start, shorthand.replaces.end)} => ${shorthand.before}x${shorthand.after}`,
+			);
+		};
+		const imported = 'import { title, tooltip } from "./i18n";';
+
+		expect(
+			await written(
+				"src/A.svelte",
+				`<script>${imported}</script>\n<C {title} /><C bind:title /><p class:title style:title use:tooltip>{title}</p>\n`,
+			),
+		).toEqual([
+			"{title} => title={x}",
+			"bind:title => bind:title={x}",
+			"class:title => class:title={x}",
+			"style:title => style:title={x}",
+			"title",
+			"tooltip",
+		]);
+		expect(
+			await written(
+				"src/A.vue",
+				`<script setup>${imported}</script>\n<template><C :title v-bind:tooltip :label="title" /></template>\n`,
+			),
+		).toEqual([
+			':title => :title="x"',
+			"title",
+			'v-bind:tooltip => v-bind:tooltip="x"',
+		]);
+		expect(
+			await written(
+				"src/a.astro",
+				`---\n${imported}\n---\n<C {title} label={tooltip} />\n`,
+			),
+		).toEqual(["{title} => title={x}", "tooltip"]);
+		expect(
+			await written(
+				"src/a.ts",
+				`${imported}\nexport const o = { title, tooltip: tooltip };\n`,
+			),
+		).toEqual(["title => title: x", "tooltip"]);
+	});
+
 	it("is a file's error where it does not parse", async () => {
 		expect(await factsOf("src/a.ts", "const = 1;")).toEqual({
 			error: { at: 6, message: "Unexpected token" },

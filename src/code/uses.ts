@@ -5,8 +5,8 @@
  */
 
 import {
-	type Binding,
 	originOf,
+	type Reference,
 	type Span,
 	type UseEnd,
 	type UseFact,
@@ -15,6 +15,13 @@ import {
 import type { ESTree } from "./parse.ts";
 import type { Scopes } from "./scopes.ts";
 import { literalText, type Node } from "./syntax.ts";
+import { computed, pattern } from "./use-ends.ts";
+
+/** Where a module's nodes are in its file, and how the file writes each use of a name. */
+export type FileOf = {
+	span: (node: Span) => Span;
+	reference: (use: Node) => Reference;
+};
 
 /** Nodes that hold a value as it is: parentheses, TypeScript's assertions, `?.`'s chain. */
 const transparent: ReadonlySet<string> = new Set([
@@ -31,7 +38,7 @@ export function usesOf(
 	program: ESTree.Program,
 	scopes: Scopes,
 	loads: readonly Node[],
-	span: (node: Span) => Span,
+	file: FileOf,
 ): { uses: Uses; aliases: Record<string, string> } {
 	const uses: Uses = {};
 	const aliases: Record<string, string> = {};
@@ -47,9 +54,9 @@ export function usesOf(
 		chain: UseFact["chain"],
 		type: boolean,
 	) => {
-		const { end, alias, read } = endOf(node, chain, scopes, span);
+		const { end, alias, read } = endOf(node, chain, scopes, file);
 		if (alias === undefined) {
-			add({ from, at: span(node), type, chain: read, end });
+			add({ from, ...file.reference(node), type, chain: read, end });
 			return;
 		}
 		const binding = scopes.bindingOf(alias);
@@ -87,8 +94,9 @@ function endOf(
 	start: Node,
 	chain: UseFact["chain"],
 	scopes: Scopes,
-	span: (node: Span) => Span,
+	file: FileOf,
 ): { end: UseEnd; read: UseFact["chain"]; alias?: ESTree.BindingIdentifier } {
+	const { span } = file;
 	const read = [...chain];
 	let node = start;
 	for (
@@ -124,7 +132,7 @@ function endOf(
 		} else if (parent.type === "VariableDeclarator" && parent.init === node) {
 			const { id } = parent;
 			if (id.type === "ObjectPattern") {
-				return { end: pattern(id, scopes, span), read };
+				return { end: pattern(id, scopes, file), read };
 			}
 			const declaration = scopes.parent(parent);
 			const constant =
@@ -139,7 +147,7 @@ function endOf(
 			parent.right === node &&
 			parent.left.type === "ObjectPattern"
 		) {
-			return { end: pattern(parent.left, scopes, span), read };
+			return { end: pattern(parent.left, scopes, file), read };
 		} else if (
 			parent.type === "ExportSpecifier" ||
 			(parent.type === "ExportDefaultDeclaration" &&
@@ -164,83 +172,8 @@ function memberName(member: ESTree.MemberExpression): string | undefined {
 }
 
 /** Where a member's name is: an identifier's, or a string's text inside its quotes. */
-function keySpan(node: Node): Span {
+export function keySpan(node: Node): Span {
 	return node.type === "Identifier"
 		? node
 		: { start: node.start + 1, end: node.end - 1 };
-}
-
-/**
- * A read by a computed name: the names it may be, those that start with its literal start (a
- * template's text before its first value, or text joined to one), or the literals of a choice.
- */
-function computed(property: Node): {
-	prefix: string;
-	choices: string[] | undefined;
-} {
-	if (property.type === "TemplateLiteral") {
-		return {
-			prefix: property.quasis[0]?.value.cooked ?? "",
-			choices: undefined,
-		};
-	}
-	if (property.type === "BinaryExpression" && property.operator === "+") {
-		return { prefix: literalText(property.left) ?? "", choices: undefined };
-	}
-	if (property.type === "ConditionalExpression") {
-		const choices = [property.consequent, property.alternate].map(literalText);
-		if (choices.every((choice) => choice !== undefined)) {
-			return { prefix: "", choices: choices.flatMap((c) => c ?? []) };
-		}
-	}
-	return { prefix: "", choices: undefined };
-}
-
-/** The names a pattern takes apart, each with what it binds; a rest, or a computed name, may be any. */
-function pattern(
-	node: ESTree.ObjectPattern | ESTree.ObjectAssignmentTarget,
-	scopes: Scopes,
-	span: (node: Span) => Span,
-): UseEnd {
-	const names: Extract<UseEnd, { kind: "pattern" }>["names"] = [];
-	let rest: Span | undefined;
-	for (const property of node.properties) {
-		if (property.type === "RestElement") {
-			rest ??= span(property);
-			continue;
-		}
-		const { key } = property;
-		const name = property.computed
-			? literalText(key)
-			: key.type === "Identifier"
-				? key.name
-				: literalText(key);
-		if (name === undefined) {
-			rest ??= span(property);
-			continue;
-		}
-		names.push({
-			name,
-			at: span(keySpan(key)),
-			binds: boundBy(property.value, scopes, span),
-		});
-	}
-	return { kind: "pattern", names, rest };
-}
-
-/** The name a pattern's value binds, with every reference to it. */
-function boundBy(
-	value: Node,
-	scopes: Scopes,
-	span: (node: Span) => Span,
-): Binding | undefined {
-	const target = value.type === "AssignmentPattern" ? value.left : value;
-	if (target.type !== "Identifier") return undefined;
-	const binding = scopes.bindingOf(target);
-	if (binding === undefined) return undefined;
-	return {
-		name: binding.name,
-		at: span(target),
-		references: scopes.usesOf(binding).map((use) => span(use)),
-	};
 }

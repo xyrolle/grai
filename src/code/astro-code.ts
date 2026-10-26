@@ -40,6 +40,7 @@ export function astroCode(
 	if (program !== undefined) piece(writer, program).write("\n;\n");
 	const scripts: SourceCode[] = [];
 	const visit = (node: TreeNode) => {
+		if (node.type === "JSXAttribute" && shorthand(writer, node)) return;
 		if (node.type === "JSXExpressionContainer") {
 			const expression = child(node, "expression");
 			if (
@@ -77,6 +78,32 @@ export function astroCode(
 		}
 	}
 	return [writer.code("tsx"), ...scripts];
+}
+
+/**
+ * Writes an attribute that is `{name}`, Astro's shorthand for the name and the value of the same
+ * name, as that name, and how to write it out in full; whether it is one.
+ */
+function shorthand(writer: CodeWriter, attribute: TreeNode): boolean {
+	const value = child(attribute, "value");
+	const name = child(value, "expression");
+	const start = number(attribute, "start");
+	const end = number(attribute, "end");
+	if (
+		value?.type !== "JSXExpressionContainer" ||
+		name?.type !== "Identifier" ||
+		start === undefined ||
+		end === undefined ||
+		number(value, "start") !== start
+	) {
+		return false;
+	}
+	writer.shorthand(number(name, "start") ?? 0, number(name, "end") ?? 0, {
+		replaces: { start, end },
+		before: `${text(name, "name") ?? ""}={`,
+		after: "}",
+	});
+	return true;
 }
 
 /** Whether an element's name names a binding, as a component's does, not an HTML tag. */
