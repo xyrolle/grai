@@ -5,9 +5,10 @@
  * and the versions of the parsers it loads, so any change to them reads every file again. The cache
  * is written whole and atomically after a command that read a file again or found one gone, with the
  * files that command read, so an entry for a file gone or changed is dropped. Each file's facts are
- * kept as JSON, which V8 reads back in about half the time its own serializer takes for the same
- * facts (75 MB of them, for 9,000 files). A file's JSON is parsed only when a command takes its
- * facts, and a save writes each entry it kept as it was read, so it makes no file's JSON again.
+ * kept as text (`keptText`): JSON, which V8 reads back in about half the time its own serializer
+ * takes for the same facts (75 MB of them, for 9,000 files), its modules' uses apart, so that a
+ * reading parses only the uses it needs (`usesFrom`). A save writes each entry it kept as it was
+ * read, so it makes no file's text again.
  */
 
 import { createHash, hash } from "node:crypto";
@@ -21,13 +22,20 @@ import {
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { FileFacts } from "./facts.ts";
+import type { FileFacts, ModuleFacts } from "./facts.ts";
 
-/** What the cache holds for a file: its text's hash, and its facts as JSON. */
-type Entry = { hash: string; json: string };
+/** What the cache holds for a file: its text's hash, and its facts' text (`keptText`). */
+type Entry = { hash: string; kept: string };
 
-/** A file's facts, read, and their JSON, which the cache keeps as it is. */
-export type FactsRead = { facts: FileFacts; json: string };
+/** A file's facts, read, and their text, which the cache keeps as it is. */
+export type FactsRead = { facts: FileFacts; kept: string };
+
+/**
+ * What parts a kept file's uses (`keptText`): `unit` a module's index, an origin and the JSON of its
+ * uses, and `record` one origin's from the next.
+ */
+const unit = "\u0001";
+const record = "\u0002";
 
 /** The packages whose versions decide what a file's facts are: grai's parser and the frameworks'. */
 const readers = ["oxc-parser", "svelte", "vue", "astro", "@mdx-js/mdx"];
@@ -54,11 +62,11 @@ export class FactsCache {
 		const entry = this.read.get(path);
 		if (entry === undefined || entry.hash !== hash) return undefined;
 		this.kept.set(path, entry);
-		return JSON.parse(entry.json);
+		return keptFacts(entry.kept);
 	}
 
-	set(path: string, hash: string, { json }: FactsRead): void {
-		this.kept.set(path, { hash, json });
+	set(path: string, hash: string, { kept }: FactsRead): void {
+		this.kept.set(path, { hash, kept });
 		this.added = true;
 	}
 
@@ -72,12 +80,46 @@ export class FactsCache {
 		mkdirSync(dirname(this.file), { recursive: true });
 		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
 		const lines = [JSON.stringify(this.version)];
-		for (const [path, { hash, json }] of this.kept) {
-			lines.push(`${JSON.stringify(path)}\t${hash}\t${json}`);
+		for (const [path, { hash, kept }] of this.kept) {
+			lines.push(`${JSON.stringify(path)}\t${hash}\t${kept}`);
 		}
 		writeFileSync(temporary, `${lines.join("\n")}\n`);
 		renameSync(temporary, this.file);
 	}
+}
+
+/**
+ * A file's facts as the cache keeps them: their JSON without the modules' uses, a tab, then each
+ * module's uses of each origin as JSON, apart by control characters that JSON never writes as they
+ * are. A reading parses the uses of an origin only once it needs them.
+ */
+export function keptText(facts: FileFacts): string {
+	if ("error" in facts) return JSON.stringify(facts);
+	const groups: string[] = [];
+	const modules = facts.modules.map(({ uses, ...rest }, index): ModuleFacts => {
+		for (const [origin, list] of Object.entries(uses)) {
+			const json = typeof list === "string" ? list : JSON.stringify(list);
+			groups.push([index, origin, json].join(unit));
+		}
+		return { ...rest, uses: {} };
+	});
+	return `${JSON.stringify({ modules })}\t${groups.join(record)}`;
+}
+
+/** A file's facts from the text the cache keeps them as (`keptText`), their uses left as JSON. */
+export function keptFacts(kept: string): FileFacts {
+	const tab = kept.indexOf("\t");
+	if (tab === -1) return JSON.parse(kept);
+	const facts: FileFacts = JSON.parse(kept.slice(0, tab));
+	if ("error" in facts || tab === kept.length - 1) return facts;
+	for (const group of kept.slice(tab + 1).split(record)) {
+		const [index, origin, json] = group.split(unit);
+		const module = facts.modules[Number(index)];
+		if (module !== undefined && origin !== undefined && json !== undefined) {
+			module.uses[origin] = json;
+		}
+	}
+	return facts;
 }
 
 /** The hash a file's text is kept by. */
@@ -110,7 +152,7 @@ export function readerVersion(directory: string): string {
 
 /**
  * The entries of the cache's file: its first line the reader's version, then a line for each file,
- * its path as JSON, its text's hash and its facts' JSON, apart by tabs, which JSON writes escaped.
+ * its path as JSON, its text's hash and its facts' text, apart by tabs, which JSON writes escaped.
  * A cache of another version, or one no reading can use, holds nothing.
  */
 function load(file: string, version: string): ReadonlyMap<string, Entry> {
@@ -132,7 +174,7 @@ function load(file: string, version: string): ReadonlyMap<string, Entry> {
 			if (typeof path !== "string" || hashEnd === -1) return new Map();
 			entries.set(path, {
 				hash: line.slice(pathEnd + 1, hashEnd),
-				json: line.slice(hashEnd + 1),
+				kept: line.slice(hashEnd + 1),
 			});
 		}
 	} catch {

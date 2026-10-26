@@ -7,7 +7,7 @@
  */
 
 import { factsOf } from "./facts.ts";
-import type { FactsRead } from "./facts-cache.ts";
+import { type FactsRead, keptFacts, keptText } from "./facts-cache.ts";
 import type { Pool } from "./pool.ts";
 
 /** What a worker costs to start and to load the parsers, measured: about a quarter of a second. */
@@ -20,8 +20,8 @@ const taskSize = 128 * 1024;
 type File = { path: string; text: string };
 
 /**
- * Each file's facts, with their JSON, in the order given, read in the pool. With `here` false, only
- * the workers the pool has started read them.
+ * Each file's facts, with the text the cache keeps them as, in the order given, read in the pool.
+ * With `here` false, only the workers the pool has started read them.
  */
 export async function factsOfFiles(
 	files: readonly File[],
@@ -45,12 +45,12 @@ export async function factsOfFiles(
 				const each: FactsRead[] = [];
 				for (const { path, text } of task.files) {
 					const facts = await factsOf(path, text);
-					each.push({ facts, json: JSON.stringify(facts) });
+					each.push({ facts, kept: keptText(facts) });
 				}
 				return each;
 			},
 			there: (answer) =>
-				answer.map((json) => ({ facts: JSON.parse(json), json })),
+				answer.map((kept) => ({ facts: keptFacts(kept), kept })),
 			size: (task) =>
 				task.files.reduce((sum, { text }) => sum + text.length, 0),
 			start: workerStart,

@@ -10,8 +10,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { factsOf } from "../src/code/facts.ts";
-import { readerVersion } from "../src/code/facts-cache.ts";
+import { type FileFacts, factsOf, usesFrom } from "../src/code/facts.ts";
+import { keptFacts, readerVersion } from "../src/code/facts-cache.ts";
 import { factsOfFiles, workerStart } from "../src/code/facts-pool.ts";
 import { Pool, workersFor } from "../src/code/pool.ts";
 import { type ProjectCode, readProjectCode } from "../src/code/project.ts";
@@ -54,15 +54,15 @@ function cachedPaths(cache: string): string[] {
 	return entriesOf(cache).map(([path]) => path);
 }
 
-/** A facts cache's entries: each file's path, its text's hash and its facts' JSON. */
+/** A facts cache's entries: each file's path, its text's hash and its facts' text. */
 function entriesOf(cache: string): [string, string, string][] {
 	return readFileSync(cache, "utf8")
 		.split("\n")
 		.slice(1)
 		.filter((line) => line !== "")
 		.map((line) => {
-			const [path = "", hash = "", json = ""] = line.split("\t");
-			return [JSON.parse(path), hash, json];
+			const [path = "", hash = "", ...kept] = line.split("\t");
+			return [JSON.parse(path), hash, kept.join("\t")];
 		});
 }
 
@@ -74,10 +74,19 @@ function planted(
 ): string {
 	const [version] = readFileSync(cache, "utf8").split("\n");
 	const lines = entriesOf(cache).map(
-		([path, hash, json]) =>
-			`${JSON.stringify(path)}\t${hash}\t${picks(path) ? JSON.stringify(facts) : json}`,
+		([path, hash, kept]) =>
+			`${JSON.stringify(path)}\t${hash}\t${picks(path) ? JSON.stringify(facts) : kept}`,
 	);
 	return `${[version, ...lines].join("\n")}\n`;
+}
+
+/** Facts with each module's uses parsed from what the cache kept, as a reading parses them. */
+function parsed(facts: FileFacts): FileFacts {
+	if ("error" in facts) return facts;
+	for (const { uses } of facts.modules) {
+		for (const origin of Object.keys(uses)) usesFrom(uses, origin);
+	}
+	return facts;
 }
 
 describe("the module graph", () => {
@@ -248,7 +257,7 @@ describe("reading a project's facts", () => {
 					imports: [],
 					exports: [{ exported: "planted", local: "planted" }],
 					loads: [],
-					uses: [],
+					uses: {},
 					aliases: {},
 				},
 			],
@@ -338,8 +347,8 @@ describe("reading a project's facts", () => {
 		pool.start(2);
 		const read = await factsOfFiles(files, pool, false);
 
-		expect(read.map(({ facts }) => facts)).toEqual(inline);
-		expect(read.map(({ json }) => JSON.parse(json))).toEqual(inline);
+		expect(read.map(({ facts }) => parsed(facts))).toEqual(inline);
+		expect(read.map(({ kept }) => parsed(keptFacts(kept)))).toEqual(inline);
 	});
 
 	it("resolves imports in a worker as this thread does, an empty path for one that names no file", async () => {

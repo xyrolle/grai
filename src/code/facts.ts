@@ -88,12 +88,37 @@ export type LoadFact =
 	| { at: Span; source: string }
 	| { at: Span; pattern: string };
 
+/**
+ * A module's uses, by what each starts from (`originOf`). A list is facts, or the JSON the facts
+ * cache kept it as, which `usesFrom` parses the first time a reading needs it: uses are most of a
+ * module's facts, and most start from what holds none of grai's.
+ */
+export type Uses = Record<string, UseFact[] | string>;
+
+/**
+ * What a use starts from, as a module keeps its uses: an import's local name, or `#` and a load's
+ * index.
+ */
+export function originOf(from: UseFact["from"]): string {
+	return "local" in from ? from.local : `#${from.load}`;
+}
+
+/** The uses that start from an origin, parsed from what the cache kept the first time. */
+export function usesFrom(uses: Uses, origin: string): readonly UseFact[] {
+	const kept = uses[origin];
+	if (kept === undefined) return [];
+	if (typeof kept !== "string") return kept;
+	const parsed: UseFact[] = JSON.parse(kept);
+	uses[origin] = parsed;
+	return parsed;
+}
+
 /** A module's facts. */
 export type ModuleFacts = {
 	imports: ImportFact[];
 	exports: ExportFact[];
 	loads: LoadFact[];
-	uses: UseFact[];
+	uses: Uses;
 	/** Each top-level `const` that holds an import (`const t = m`), by its name: the import's. */
 	aliases: Record<string, string>;
 };
