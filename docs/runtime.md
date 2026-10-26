@@ -194,7 +194,7 @@ The server component's messages cost grai nothing beyond their HTML. The 7.3 KB 
 | grai | 212 | 1,547 | 247 | 1,550 | 214 | 122 |
 | next-intl | 222 | 1,238 | 221 | 1,178 | 154 | 154 |
 
-- **grai's share of the start** is `withGrai`'s work when `next dev` asks for its config, its import included: 30 ms with the output current, as on every start after the first, and 138 ms from an empty outdir, which compiles and writes it. The watch's first compile, which later edits start from, runs while Next starts.
+- **grai's share of the start** is `withGrai`'s work when `next dev` asks for its config, its import included. It holds Next back 32 ms with the output current, as on every start after the first, while the watch's first compile, which later edits start from, runs beside Next; and 113 ms from an empty outdir, which that same compile writes, so a start compiles once.
 - **An edit** reaches the shard grai rewrites in 4.5–4.6 ms, as the watcher compiles a save on its first event (`watch.ts`). The rest is Next noticing the shard and refreshing the page, as it notices and refreshes next-intl's catalog.
 - **The page's first response** from an empty `.next` is slower on grai, here by 309 ms, and by 372 ms with `.next` kept: Turbopack compiles the output's 1.8 MB of message functions in each layer that imports them, where next-intl's catalog is JSON (`docs/followups.md`).
 
