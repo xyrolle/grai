@@ -98,7 +98,7 @@ describe("grai migrate, from i18next", () => {
 			"src/cart.tsx": `import { useTranslation } from "react-i18next";
 
 export function Cart({ count }: { count: number }) {
-	const { t } = useTranslation("cart");
+	const { t } = useTranslation(["cart", "common"]);
 	return (
 		<p title={t("title")}>
 			{t("items", { count })} {t("common:friend", { context: "male" })}
@@ -254,6 +254,68 @@ export function Greeting({ name }: { name: string }) {
 		const again = migrate(join(project.dir, "grai.config.json"));
 		expect([again.changed, again.left]).toEqual([[], []]);
 		expect(project.text("src/cards.tsx")).toBe(migratedText);
+	});
+
+	it("looks a key up in the first namespace a hook loads, as react-i18next does, unless its nsMode is fallback", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/namespaces.tsx": `import { useTranslation } from "react-i18next";
+
+export function Loaded({ name }: { name: string }) {
+	const { t } = useTranslation(["cart", "common"]);
+	return (
+		<>
+			{t("title")}
+			{t("greeting", { name, defaultValue: "Hello" })}
+			{t("common:greeting", { name })}
+			{t("greeting", { ns: "common", name })}
+			{t("greeting", { ns: ["cart", "common"], name })}
+		</>
+	);
+}
+
+export function Fallback({ name }: { name: string }) {
+	const { t } = useTranslation(["cart", "common"], { nsMode: "fallback" });
+	return <p>{t("greeting", { name })}</p>;
+}
+
+export function Single({ name }: { name: string }) {
+	const { t } = useTranslation("cart");
+	return <p>{t("common:greeting", { name })}</p>;
+}
+`,
+		});
+
+		expect(
+			project.text("src/namespaces.tsx"),
+		).toBe(`import { m } from "../out/messages.js";
+import { useTranslation } from "react-i18next";
+
+export function Loaded({ name }: { name: string }) {
+	const { t } = useTranslation(["cart", "common"]);
+	return (
+		<>
+			{m.cart_title()}
+			{t("greeting", { name, defaultValue: "Hello" })}
+			{m.common_greeting({ name })}
+			{m.common_greeting({ name })}
+			{m.common_greeting({ name })}
+		</>
+	);
+}
+
+export function Fallback({ name }: { name: string }) {
+	return <p>{m.common_greeting({ name })}</p>;
+}
+
+export function Single({ name }: { name: string }) {
+	const { t } = useTranslation("cart");
+	return <p>{t("common:greeting", { name })}</p>;
+}
+`);
+		expect(project.left()).toEqual([
+			'src/namespaces.tsx:8:5: grai.import.json has no key cart:greeting. common:greeting is in it, which i18next reaches only through its fallbackNS or the hook\'s nsMode: "fallback": call m.common_greeting() if the app sets one.',
+			"src/namespaces.tsx:23:13: it names common, which its useTranslation does not load: i18next finds the key only if another hook or the app's i18next init loads common. Call m.common_greeting() if one does.",
+		]);
 	});
 
 	it("reports each call it cannot rewrite with its line, and keeps what those calls need", () => {
