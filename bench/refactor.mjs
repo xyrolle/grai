@@ -167,8 +167,12 @@ function writeSynthetic(dir) {
 			JSON.stringify(catalog, null, "\t"),
 		);
 	}
-	const code =
-		"\tconst total = items.reduce((sum, item) => sum + item.price, 0);\n";
+	// Each line declares a name of its own, as code that compiles does.
+	const code = Array.from(
+		{ length: 110 },
+		(_, n) =>
+			`\tconst total${n} = items.reduce((sum, item) => sum + item.price, 0);\n`,
+	).join("");
 	for (let n = 0; n < 9_000; n++) {
 		const [a, b, c, d] = [0, 1, 2, 3].map(
 			(i) => keys[(n * 7 + i * 1931) % keys.length],
@@ -177,7 +181,7 @@ function writeSynthetic(dir) {
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(
 			file,
-			`<script lang="ts">\n\timport { m } from "#lib/i18n";\n\timport { ${a} } from "#i18n/messages/${a}.js";\n${code.repeat(110)}</script>\n\n<h1>{${a}()}</h1>\n<p>{m.${b}()} {m.${c}()} {m["${d}"]()}</p>\n`,
+			`<script lang="ts">\n\timport { m } from "#lib/i18n";\n\timport { ${a} } from "#i18n/messages/${a}.js";\n${code}</script>\n\n<h1>{${a}()}</h1>\n<p>{m.${b}()} {m.${c}()} {m["${d}"]()}</p>\n`,
 		);
 	}
 	return {
