@@ -180,23 +180,23 @@ What the page downloads, brotli:
 
 | | document | scripts | total | more than the words written in |
 |---|---|---|---|---|
-| grai | 9.2 KB | 120.6 KB | 129.8 KB | 6.7 KB |
-| next-intl, its default provider | 106.3 KB | 124.0 KB | 230.3 KB | 107.3 KB |
-| next-intl, the client's keys picked | 10.5 KB | 124.0 KB | 134.4 KB | 11.4 KB |
-| words written in | 9.2 KB | 113.8 KB | 123.1 KB | |
+| grai | 9.3 KB | 121.1 KB | 130.4 KB | 7.3 KB |
+| next-intl, its default provider | 106.7 KB | 124.0 KB | 230.7 KB | 107.5 KB |
+| next-intl, the client's keys picked | 10.5 KB | 124.0 KB | 134.6 KB | 11.4 KB |
+| words written in | 9.2 KB | 113.9 KB | 123.2 KB | |
 
-The server component's messages cost grai nothing beyond their HTML. The 6.7 KB is the runtime and the client component's 100 messages, each with all three locales' variants: Turbopack left out every other key of the catalog.
+The server component's messages cost grai nothing beyond their HTML. The 7.3 KB is the runtime and the client component's 100 messages, each with all three locales' variants: Turbopack left out every other key of the catalog.
 
-`next dev`, until ready and until the page's first response, from an empty `.next` and from the last run's; then one message edited in its catalog until the page shows it, the median of 7 edits, ms. One run, under a load of 13–20 from other work, which moves the first responses and the edits by hundreds of milliseconds for both:
+`next dev`, until ready and until the page's first response, from an empty `.next` and from the last run's; then one message edited in its catalog until the page shows it, the median of 7 edits, ms. One run, under a load of 3–6 from other work:
 
 | | ready, empty `.next` | page | ready, `.next` kept | page | edit, server component | edit, client component |
 |---|---|---|---|---|---|---|
-| grai | 317 | 2,468 | 302 | 1,261 | 428 | 2,033 |
-| next-intl | 249 | 2,383 | 314 | 1,063 | 1,577 | 654 |
+| grai | 212 | 1,547 | 247 | 1,550 | 214 | 122 |
+| next-intl | 222 | 1,238 | 221 | 1,178 | 154 | 154 |
 
 - **grai's share of the start** is `withGrai`'s work when `next dev` asks for its config, its import included: 30 ms with the output current, as on every start after the first, and 138 ms from an empty outdir, which compiles and writes it. The watch's first compile, which later edits start from, runs while Next starts.
-- **An edit** reaches the shard grai rewrites in 27–28 ms, 20 of them waiting for the save to settle (`watch.ts`). The rest is Next noticing the shard and refreshing the page, as it notices and refreshes next-intl's catalog.
-- **The page's first response** from an empty `.next` is slower on grai, here by 85 ms, and by 198 ms with `.next` kept: Turbopack compiles the output's 1.8 MB of message functions in each layer that imports them, where next-intl's catalog is JSON (`docs/followups.md`).
+- **An edit** reaches the shard grai rewrites in 4.5–4.6 ms, as the watcher compiles a save on its first event (`watch.ts`). The rest is Next noticing the shard and refreshing the page, as it notices and refreshes next-intl's catalog.
+- **The page's first response** from an empty `.next` is slower on grai, here by 309 ms, and by 372 ms with `.next` kept: Turbopack compiles the output's 1.8 MB of message functions in each layer that imports them, where next-intl's catalog is JSON (`docs/followups.md`).
 
 ## Astro
 
