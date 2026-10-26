@@ -2,6 +2,7 @@
 
 import { relative } from "node:path";
 import { type Catalog, readCatalogSources } from "./catalog.ts";
+import type { CatalogPaths } from "./catalog-paths.ts";
 import { parseCatalogs } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
@@ -10,8 +11,8 @@ import { fallbackPositions, messageSource } from "./fallbacks.ts";
 /** A project's config, its base catalog, and the locale's own, which may not exist yet. */
 export type LocaleCatalogs = {
 	config: Config;
-	/** Where the locale's catalog is, or goes. */
-	path: string;
+	/** Where the locale's catalog files are, or go. */
+	paths: CatalogPaths;
 	base: Catalog;
 	target: Catalog | undefined;
 	/** The locale's keys whose message is the base text on purpose. */
@@ -40,8 +41,8 @@ export async function readLocaleCatalogs(
 		if (error instanceof GraiError) return { errors: [error] };
 		throw error;
 	}
-	const path = config.catalogs.get(locale);
-	if (path === undefined || locale === config.baseLocale) {
+	const paths = config.catalogs.get(locale);
+	if (paths === undefined || locale === config.baseLocale) {
 		const others = config.locales.filter(
 			(other) => other !== config.baseLocale,
 		);
@@ -74,5 +75,5 @@ export async function readLocaleCatalogs(
 		fallback === undefined
 			? undefined
 			: messageSource(key, fallback, byLocale, fallbackOf)?.messages.get(key);
-	return { config, path, base, target, identical, inherited };
+	return { config, paths, base, target, identical, inherited };
 }

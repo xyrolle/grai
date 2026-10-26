@@ -3,7 +3,7 @@
  * differs from every other key by more than case, and every locale has it.
  */
 
-import type { Catalog } from "./catalog.ts";
+import { type Catalog, fileOfKey } from "./catalog.ts";
 import { written } from "./catalog-keys.ts";
 import { GraiError } from "./error.ts";
 
@@ -57,7 +57,7 @@ export function keyProblems(
 	collisions: ReadonlyMap<string, string>,
 ): GraiError[] {
 	const catalog = catalogs.find((each) => each.messages.has(key));
-	const file = catalog?.file ?? "";
+	const file = catalog === undefined ? "" : fileOfKey(catalog, key);
 	if (!isKeyName(key)) {
 		const path = catalog?.paths.get(key) ?? [key];
 		const nested =

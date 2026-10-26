@@ -7,18 +7,21 @@ import { join, relative } from "node:path";
 import { messageEntries } from "./catalog-entries.ts";
 import { keyOf } from "./catalog-keys.ts";
 
-/** Where something starts in a text: its line and its column, both from 0. */
-export type Position = readonly [line: number, column: number];
+/**
+ * Where something starts in a text: its line and its column, both from 0, and, in a catalog split
+ * across files, which of them, from 0 too.
+ */
+export type Position = readonly [line: number, column: number, file?: number];
 
 /** A key, and the line of its shard's declarations its declaration is on. */
 export type DeclarationLine = readonly [key: string, line: number];
 
 /**
- * The base locale's catalog, for the declaration maps: its path, where each key is in it, and
- * whether that can differ from where the previous render had them.
+ * The base locale's catalog, for the declaration maps: its files' paths, where each key is in
+ * them, and whether that can differ from where the previous render had them.
  */
 export type BaseCatalog = {
-	path: string;
+	paths: readonly string[];
 	positions: ReadonlyMap<string, Position>;
 	moved: boolean;
 };
@@ -52,8 +55,14 @@ export function shardMap(
 	) {
 		return previous.map;
 	}
-	const catalog = relative(join(outdir, "keys"), base.path);
-	return declarationMap(file, catalog, lines, base.positions, nameColumn);
+	const keys = join(outdir, "keys");
+	return declarationMap(
+		file,
+		base.paths.map((path) => relative(keys, path)),
+		lines,
+		base.positions,
+		nameColumn,
+	);
 }
 
 /** Whether a shard's declarations are on the lines they were on in the previous render. */
@@ -160,30 +169,31 @@ const lineFeed = 10;
 
 /**
  * The declaration map of a shard's `.d.ts`: each declaration's name, at `column` of its line, to
- * its key's position in the catalog. `declarations` are each key with the line its declaration is
- * on, in order.
+ * its key's position in the catalog's files. `declarations` are each key with the line its
+ * declaration is on, in order.
  */
 export function declarationMap(
 	file: string,
-	catalog: string,
+	sources: readonly string[],
 	declarations: readonly DeclarationLine[],
 	positions: ReadonlyMap<string, Position>,
 	column: number,
 ): string {
-	// Each segment starts at the name's column, in the one source; then come the deltas of the line
-	// and the column in the catalog. A line without a declaration has no segment.
-	const start = `${vlq(column)}A`;
+	// Each segment starts at the name's column; then come the deltas of the source, the line and
+	// the column in the catalog. A line without a declaration has no segment.
+	const start = vlq(column);
 	let mappings = "";
 	let line = 0;
-	let previous: Position = [0, 0];
+	let previous: Position = [0, 0, 0];
 	for (const [key, declared] of declarations) {
 		const position = positions.get(key);
 		if (position === undefined) continue;
-		mappings += `${";".repeat(declared - line)}${start}${vlq(position[0] - previous[0])}${vlq(position[1] - previous[1])}`;
+		const source = (position[2] ?? 0) - (previous[2] ?? 0);
+		mappings += `${";".repeat(declared - line)}${start}${source === 0 ? "A" : vlq(source)}${vlq(position[0] - previous[0])}${vlq(position[1] - previous[1])}`;
 		line = declared;
 		previous = position;
 	}
-	return `${JSON.stringify({ version: 3, file, sources: [catalog], names: [], mappings })}\n`;
+	return `${JSON.stringify({ version: 3, file, sources, names: [], mappings })}\n`;
 }
 
 /** The lines a text takes, counting the line its last line break ends. */
