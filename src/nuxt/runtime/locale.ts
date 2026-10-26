@@ -1,4 +1,8 @@
-import { locales, type RequestLocale } from "grai/nuxt/output/internal.js";
+import {
+	hostsLocales,
+	locales,
+	type RequestLocale,
+} from "grai/nuxt/output/internal.js";
 import { localeOf, redirectOf, vary } from "grai/nuxt/output/server.js";
 import { defineEventHandler, type EventHandler } from "nuxt/server";
 import { requestLocaleKey } from "./request-locale.ts";
@@ -13,9 +17,12 @@ const handler: EventHandler<Response | undefined> = defineEventHandler(
 	(event) => {
 		const redirect = redirectOf(event.req);
 		if (redirect !== undefined) return redirect;
-		const kept: RequestLocale = {
-			index: locales.indexOf(localeOf(event.req)),
-		};
+		// Where a locale has a host of its own, the origin goes with the locale, so that a link to
+		// another locale's host is a whole URL.
+		const index = locales.indexOf(localeOf(event.req));
+		const kept: RequestLocale = hostsLocales
+			? { index, origin: new URL(event.req.url).origin }
+			: { index };
 		event.context[requestLocaleKey] = kept;
 		if (vary !== "") event.res.headers.append("vary", vary);
 		return undefined;

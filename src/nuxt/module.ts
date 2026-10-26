@@ -53,6 +53,14 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 				base,
 			);
 		}
+		const { pathnames, domains } = config.urlRouting;
+		if (pathnames.length > 0 && domains.length > 0) {
+			throw new GraiError(
+				"config-invalid",
+				{ file: basename(configFile) },
+				`Nuxt routes a page by its path alone, so on a locale's own host ("domains") it cannot route that locale's words ("pathnames"). Leave out one of them.`,
+			);
+		}
 		// As grai/vite's compile, so that the output it finds is already the one it would write.
 		const { result } = await recompile(configFile, undefined, {
 			localeCopies: true,
