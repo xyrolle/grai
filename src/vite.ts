@@ -3,7 +3,7 @@ import type { Plugin } from "vite";
 import { readConfig } from "./config.ts";
 import { realPath } from "./real-path.ts";
 import { type GraiModuleKind, moduleKindIn } from "./vite-build.ts";
-import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
+import { type GraiOptions, graiPlugin, viteBase } from "./vite-plugin.ts";
 
 export type { GraiModuleKind };
 
@@ -22,7 +22,7 @@ export type { GraiModuleKind };
  * (`server-chunks.ts`).
  */
 export function grai(options: GraiOptions = {}): Plugin {
-	return graiPlugin(options).plugin;
+	return graiPlugin(options, { frameworkBase: viteBase }).plugin;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { AstroConfig } from "astro";
+import { baseDisagreement } from "../base-agreement.ts";
 import type { Config } from "../config.ts";
 import { globMatcher } from "../globs.ts";
 
@@ -27,25 +28,21 @@ const linkedPrefix = (tag: string) => tag.replaceAll("_", "-").toLowerCase();
  *   so grai reads the URL first, for the same locales under the same prefixes, with the same
  *   default, prefixed in both or in neither. A path outside Astro's routing is one of grai's
  *   `unlocalizedPaths`, whose locale the strategies after `url` find.
- * - grai's `url` strategy finds the locale in the path's first segment, so the site has no base,
- *   and no locale has a domain of its own.
+ * - grai's `url` strategy finds the locale in the path's first segment after the base path, so
+ *   Astro's base is grai's `basePath`, and no locale has a domain of its own.
  * - With every locale's paths prefixed, grai sends a request without a prefix to its locale's path,
  *   so Astro's own routes, which have none, are `unlocalizedPaths`.
  */
 export function disagreements(grai: Config, astro: AstroRouting): string[] {
+	const base = baseDisagreement(grai, {
+		option: "Astro's base",
+		base: astro.base,
+	});
 	return [
-		...(grai.strategy.includes("url") ? baseDisagreements(astro.base) : []),
+		...(base === undefined ? [] : [base]),
 		...ownRouteDisagreements(grai, astro),
 		...(astro.i18n === undefined ? [] : routingDisagreements(grai, astro.i18n)),
 	];
-}
-
-function baseDisagreements(base: string): string[] {
-	return base.replaceAll("/", "") === ""
-		? []
-		: [
-				`The "url" strategy reads the locale from the path's first segment, which Astro's base ${JSON.stringify(base)} takes. Serve the site from Astro's base "/" ("The framework's base path" in grai's docs/followups.md).`,
-			];
 }
 
 /**
