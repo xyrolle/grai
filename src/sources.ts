@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
-import { type CodeText, codeText, type Uncertain } from "./code-text.ts";
 
 /**
  * Files that can name a message: JavaScript, TypeScript, the components of Svelte, Vue and Astro,
@@ -22,52 +21,12 @@ export const sourceExtensions: ReadonlySet<string> = new Set([
 ]);
 /** Directories of dependencies and of build output, which name no message of the project's own. */
 const skippedDirectories = new Set(["node_modules", "dist", "build"]);
-/**
- * An identifier: a name that starts with a letter, `_` or `$`, and is not the end of a longer one,
- * any of its characters maybe written as an escape, `\u0069`.
- */
-const identifier =
-	/(?<![\w$\\])(?:[A-Za-z_$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})(?:[\w$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})*/g;
-const unicodeEscape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
-
-/**
- * A source file: its path, the path the project shows (relative to its root), its text, and its
- * code: the text with comments and literals blanked at the same offsets (`code-text.ts`), which a
- * scan for what the code reads goes through, with the ranges the scan cannot read with certainty.
- * The code is worked out the first time a scan reads it, as most commands read only the files
- * that write a name they look for.
- */
+/** A source file: its path, the path the project shows (relative to its root), and its text. */
 export type SourceFile = {
 	readonly path: string;
 	readonly file: string;
 	readonly text: string;
-	readonly code: string;
-	readonly uncertain: readonly Uncertain[];
 };
-
-/** A source file of a text, its code blanked when first read. */
-export function sourceFile(
-	path: string,
-	file: string,
-	text: string,
-): SourceFile {
-	let scanned: CodeText | undefined;
-	const scan = () => {
-		scanned ??= codeText(text, path);
-		return scanned;
-	};
-	return {
-		path,
-		file,
-		text,
-		get code() {
-			return scan().code;
-		},
-		get uncertain() {
-			return scan().uncertain;
-		},
-	};
-}
 
 /**
  * What a listing of the sources saw beside them: the symlinks, the package.json files, and the
@@ -100,35 +59,12 @@ export function sourceFiles(
 				else if (path !== outdir) seen?.skipped.push(path);
 			} else if (sourceExtensions.has(extname(entry.name))) {
 				const text = readFileSync(path, "utf8");
-				files.push(sourceFile(path, relative(projectRoot, path), text));
+				files.push({ path, file: relative(projectRoot, path), text });
 			}
 		}
 	};
 	for (const root of roots) visit(root);
 	return files;
-}
-
-/** Each offset at which a text writes a name as a whole identifier, in strings and comments too. */
-export function occurrencesOf(text: string, name: string): number[] {
-	const pattern = new RegExp(
-		`(?<![\\w$])${name.replaceAll("$", "\\$")}(?![\\w$])`,
-		"g",
-	);
-	return [...text.matchAll(pattern)].map((match) => match.index);
-}
-
-/** Each identifier code writes with an escape, as the name it spells, and where it is. */
-export function escapedNames(code: string): { name: string; at: number }[] {
-	return [...code.matchAll(identifier)]
-		.filter(([written]) => written.includes("\\"))
-		.map((match) => ({ name: unescaped(match[0]), at: match.index }));
-}
-
-/** An identifier as the name it spells, its escapes read. */
-export function unescaped(written: string): string {
-	return written.replace(unicodeEscape, (_, braced, four) =>
-		String.fromCodePoint(Number.parseInt(braced ?? four, 16)),
-	);
 }
 
 /** A test file, by the path the project shows, and the keys it reads. */
@@ -168,25 +104,4 @@ export function lineAt(text: string, at: number): string {
 	const start = text.lastIndexOf("\n", at - 1) + 1;
 	const end = text.indexOf("\n", at);
 	return text.slice(start, end === -1 ? text.length : end).replace(/\r$/, "");
-}
-
-/** The offset of the last character before `at` that is not whitespace, or -1. */
-export function before(text: string, at: number): number {
-	let index = at - 1;
-	while (index >= 0 && /\s/.test(text[index] ?? "")) index--;
-	return index;
-}
-
-/** The offset of the first character from `at` that is not whitespace. */
-export function after(text: string, at: number): number {
-	let index = at;
-	while (index < text.length && /\s/.test(text[index] ?? "")) index++;
-	return index;
-}
-
-/** The identifier that ends at `end`, inclusive, or "" when none does. */
-export function nameEndingAt(text: string, end: number): string {
-	let start = end;
-	while (start >= 0 && /[\w$]/.test(text[start] ?? "")) start--;
-	return text.slice(start + 1, end + 1);
 }

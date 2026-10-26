@@ -79,6 +79,11 @@ export class Scopes {
 		return this.usesOf(binding).some((use) => this.writes.has(use));
 	}
 
+	/** Every use of a name, whatever it reads, in source order. */
+	usesNamed(name: string): readonly Use[] {
+		return this.uses.get(name) ?? [];
+	}
+
 	/** Every use that reads a binding, in source order. */
 	usesOf(binding: Binding): Use[] {
 		return (this.uses.get(binding.name) ?? []).filter(
