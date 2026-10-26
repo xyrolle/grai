@@ -463,8 +463,10 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - `check` reports each key read that no catalog has, at its place. A key is unused when no read of shipped code reaches it.
   - A computed read or a whole use that keeps keys no read names is listed with its place, as `check --fix` lists it. A key only tests read is unused, and the report names those tests.
   - `check --fix` removes the unused keys and lists each one it removes, so nothing is deleted silently. The check after it takes the reading the fix made.
-  - `find` lists every read of the key: by name, and the computed reads, whole uses and loads that may reach it.
-  - `rename` edits exactly the spans of the key's reads by name. That covers a member, a string or template, a path's last segment, an import's name, and the name a per-key import or a shorthand pattern binds, with every reference to it. An escaped name is written plainly.
+  - `find` lists every read of the key: by name, with each use of a name such a read binds, and the computed reads, whole uses and loads that may reach it.
+  - `rename` edits exactly the spans of the key's reads by name. That covers a member, a string or template, a path's last segment, an import's or a re-export's name, and a binding named after the key (a per-key import's, a shorthand pattern's), with every reference to it. An escaped name, in an identifier, a string or a path, is written plainly.
+    - A reference written in shorthand is written out in full: `{ title }` becomes `title: heading`, Svelte's `{title}` and `bind:title` become `title={heading}` and `bind:title={heading}`, Vue's `:title` becomes `:title="heading"`. The template readers record each shorthand with its place, as only they see that a name stands for an attribute too.
+    - A name the key keeps through modules is renamed in each of them: a re-export by the key's own name, and every import of it by that name, as the key's name is the module's export then. A name a module gives the key (`export { title as heading }`) is that module's, so it and its importers stay.
   - `rename` refuses only for these reasons, each named with its place:
     - a computed read, whole use or pattern load that may reach the key;
     - a binding it would rename that would collide with, or capture, another name in its scope;
