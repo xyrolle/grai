@@ -487,6 +487,26 @@ describe("the middleware", () => {
 			page(m),
 		).catch((thrown: unknown) => thrown);
 
+	it("fails a prerendered page whose URL names its locale as a file, as Astro's file builds write it", async () => {
+		for (const localePrefix of ["as-needed", "always"]) {
+			const { m, middleware } = await compiledProject({
+				strategy: ["url"],
+				localePrefix,
+				unlocalizedPaths: ["/404"],
+			});
+			const onRequest = middleware();
+
+			expect(await prerendering(onRequest, m, "/ro.html")).toMatchObject({
+				name: "GraiError",
+				code: "config-invalid",
+				message: `grai.config.json: the page /ro.html is prerendered at /ro.html, which names its locale as a file, ro.html, where the "url" strategy reads a path's first segment. Build each page into a folder: set Astro's build.format to "directory", and name a locale's page [locale]/index.astro rather than [locale].astro.`,
+			});
+			expect(await prerendering(onRequest, m, "/ro/about.html")).toBeInstanceOf(
+				Response,
+			);
+		}
+	});
+
 	it("fails a prerendered page whose locale a strategy ahead of the URL would find in the request", async () => {
 		const { m, middleware } = await compiledProject({
 			strategy: ["cookie", "url"],
