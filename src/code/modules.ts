@@ -31,9 +31,12 @@ export type Resolve = (
 /** A module's facts, by its path, or undefined for one that is not code grai reads. */
 export type FactsOf = (path: string) => Promise<FileFacts | undefined>;
 
+/** The keys a value holds: every key, or these. */
+export type KeysHeld = "every" | ReadonlySet<string>;
+
 export class ModuleGraph {
-	private readonly output: Output;
-	private readonly resolve: Resolve;
+	readonly output: Output;
+	readonly resolve: Resolve;
 	private readonly facts: FactsOf;
 	private readonly exportsMemo = new Map<string, Promise<Value | undefined>>();
 
@@ -60,6 +63,57 @@ export class ModuleGraph {
 		if (value.kind === "module")
 			return this.exported(value.path, name, new Set());
 		return value.kind === "namespace" ? { kind: "key", key: name } : undefined;
+	}
+
+	/**
+	 * The keys a value holds, as code that has it whole may read any of them: every key for grai's
+	 * namespace, the key for a key's function, and for a module's namespace object, the keys each of
+	 * its exports holds.
+	 */
+	async keysHeld(
+		value: Value,
+		seen: ReadonlySet<string> = new Set(),
+	): Promise<KeysHeld> {
+		if (value.kind === "namespace") return "every";
+		if (value.kind === "key") return new Set([value.key]);
+		const { path } = value;
+		if (path === this.output.messages || path === this.output.keys) {
+			return "every";
+		}
+		const own = this.output.keyOf(path);
+		if (own !== undefined) return new Set([own]);
+		const facts = await this.facts(path);
+		if (facts === undefined || "error" in facts || seen.has(path)) {
+			return new Set();
+		}
+		const within = new Set([...seen, path]);
+		const keys = new Set<string>();
+		for (const module of facts.modules) {
+			for (const fact of module.exports) {
+				const exported =
+					fact.exported !== undefined
+						? await this.exported(path, fact.exported, new Set())
+						: "source" in fact
+							? await this.starred(path, fact.source)
+							: undefined;
+				const held =
+					exported === undefined
+						? new Set<string>()
+						: await this.keysHeld(exported, within);
+				if (held === "every") return held;
+				for (const key of held) keys.add(key);
+			}
+		}
+		return keys;
+	}
+
+	/** The module object an `export *` of a module takes its names from. */
+	private async starred(
+		path: string,
+		source: string,
+	): Promise<Value | undefined> {
+		const target = await this.resolve(source, path);
+		return target === undefined ? undefined : { kind: "module", path: target };
 	}
 
 	/** What a module exports by `name`, followed to where it is declared. */
