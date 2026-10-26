@@ -133,6 +133,19 @@ describe("grai rename", () => {
 		);
 	});
 
+	it("renames a per-key module a test loads late, its path and the name it destructures", async () => {
+		const { dir, config } = app();
+		const late = `const { cart_title } = await import("#i18n/messages/cart_title.js");\nexpect(cart_title()).toBe("Your cart");\n`;
+		writeSources(dir, { "src/title.test.ts": late });
+
+		expect((await rename(config, "cart_title", "basket_title")).errors).toEqual(
+			[],
+		);
+		expect(readText(dir, "src/title.test.ts")).toBe(
+			late.replaceAll("cart_title", "basket_title"),
+		);
+	});
+
 	it("changes nothing when a source names the key where it may mean something else", async () => {
 		const { dir, config } = app();
 		writeSources(dir, {
@@ -160,6 +173,20 @@ describe("grai rename", () => {
 
 		expect(result.errors.map(({ message }) => message)).toEqual([
 			'src/render.ts:2:41: m[name] may read "cart_title", so the rename cannot change every read of it. Read it as m.cart_title, or rename it by hand.',
+		]);
+		expect(result.changed).toEqual([]);
+	});
+
+	it("refuses while a per-key module is loaded by a built path, and names the load", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/load.ts": `export const load = (name: string) => import(\`#i18n/messages/\${name}.js\`);\n`,
+		});
+
+		const result = await rename(config, "cart_title", "basket_title");
+
+		expect(result.errors.map(({ message }) => message)).toEqual([
+			'src/load.ts:1:39: import(`#i18n/messages/${ may read "cart_title", so the rename cannot change every read of it. Read it as m.cart_title, or rename it by hand.',
 		]);
 		expect(result.changed).toEqual([]);
 	});

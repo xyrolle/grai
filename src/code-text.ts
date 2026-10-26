@@ -1,10 +1,11 @@
 /**
  * A source's code with what it does not run blanked to spaces, at the same offsets: comments, and
  * the text of string, template and regular-expression literals. A scan of it then finds no name a
- * literal or a comment only mentions. Two kinds of string stay, as the scans read them: a module's
- * path after `from` or `import`, and a string in brackets, which reads a member by name
- * (`m["key"]`). A component's markup is left as it is, and only its scripts are blanked: a
- * Svelte, Vue or Astro `<script>`, and Astro's frontmatter.
+ * literal or a comment only mentions. Two kinds of literal stay, as the scans read them: a module's
+ * path, after `from` or `import` or as what a dynamic import or a Vite glob loads (`import("…")`,
+ * `` import(`…${key}`) ``, `import.meta.glob("…")`), and a string in brackets, which reads a member
+ * by name (`m["key"]`). A component's markup is left as it is, and only its scripts are blanked:
+ * a Svelte, Vue or Astro `<script>`, and Astro's frontmatter.
  */
 
 /** Words after which a `/` starts a regular expression, not a division. */
@@ -30,6 +31,8 @@ const frontmatter = /^(---\r?\n)([\s\S]*?)(\r?\n---)/;
 /** What can start a comment or a literal, and inside a template's `${}`, a brace too. */
 const significantInCode = /[/"'`]/g;
 const significantInTemplate = /[/"'`{}]/g;
+/** The end of code that opens a dynamic import or a Vite glob, whose argument is a module's path. */
+const opensLoad = /(?<![\w$.])import\s*(?:\.\s*meta\s*\.\s*glob\s*)?\(\s*$/;
 
 /** A file's code, blanked as above. */
 export function codeText(text: string, file: string): string {
@@ -81,7 +84,12 @@ function blankedCode(source: string): string {
 			templates.length > 0 ? significantInTemplate : significantInCode;
 		significant.lastIndex = index;
 		const at = significant.exec(source)?.index ?? source.length;
-		previous = lastWritten(source.slice(index, at)) ?? previous;
+		const passed = source.slice(index, at);
+		previous = lastWritten(passed) ?? previous;
+		const path =
+			previous === "from" ||
+			previous === "import" ||
+			(previous === "(" && opensLoad.test(passed));
 		keep(at);
 		if (index === source.length) break;
 		const char = source.charAt(index);
@@ -99,10 +107,8 @@ function blankedCode(source: string): string {
 				previous = char;
 				continue;
 			}
-			const kept =
-				previous === "[" || previous === "from" || previous === "import";
 			keep(index + 1);
-			if (kept) keep(end - 1);
+			if (path || previous === "[") keep(end - 1);
 			else blank(index, end - 1);
 			keep(end);
 			previous = "literal";
@@ -110,7 +116,8 @@ function blankedCode(source: string): string {
 			if (char === "}") templates.pop();
 			keep(index + 1);
 			const end = templateTextEnd(source, index);
-			blank(index, end);
+			if (char === "`" && path) keep(end);
+			else blank(index, end);
 			if (source.startsWith("${", end)) {
 				keep(end + 2);
 				templates.push(0);
