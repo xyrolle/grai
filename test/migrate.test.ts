@@ -12,7 +12,7 @@ import { readText, writeSources } from "./sources.ts";
  * A project for `locales`, the first its base, whose source catalogs, by path under `source/`, are
  * imported, and whose files, by path from its root, are then migrated under `src/`.
  */
-function migrated(
+async function migrated(
 	format: ImportFormat,
 	catalogs: Record<string, unknown>,
 	files: Record<string, string>,
@@ -39,7 +39,7 @@ function migrated(
 	mkdirSync(join(dir, "src"), { recursive: true });
 	const imported = importCatalogs(config, format, [join(dir, "source")]);
 	expect(imported.errors.map((error) => error.message)).toEqual([]);
-	const result = migrate(config, [join(dir, "src")]);
+	const result = await migrate(config, [join(dir, "src")]);
 	return {
 		dir,
 		result,
@@ -93,8 +93,8 @@ const i18nextCatalogs = {
 };
 
 describe("grai migrate, from i18next", () => {
-	it("rewrites useTranslation's t with its namespace and keyPrefix, and removes what it leaves unused", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("rewrites useTranslation's t with its namespace and keyPrefix, and removes what it leaves unused", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/cart.tsx": `import { useTranslation } from "react-i18next";
 
 export function Cart({ count }: { count: number }) {
@@ -133,8 +133,8 @@ export function Total({ sum }: { sum: string }) {
 `);
 	});
 
-	it("drops a t it rewrote every call of from React's hook dependencies, and keeps one it did not", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("drops a t it rewrote every call of from React's hook dependencies, and keeps one it did not", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/title.tsx": `import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -175,7 +175,7 @@ export function Note({ keyName }: { keyName: string }) {
 	});
 
 	it("rewrites i18next's own t, with ns, ordinal and lng, into calls that render as i18next did", async () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/server.ts": `import i18next, { t } from "i18next";
 
 export const greet = (name: string) => t("common:greeting", { name });
@@ -217,8 +217,8 @@ export const language = () => i18next.language;
 		expect(server.place?.(2, "de")).toBe("2.");
 	});
 
-	it("follows each t to the hook that declares it, past a name that shadows it, and changes nothing the next time", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("follows each t to the hook that declares it, past a name that shadows it, and changes nothing the next time", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/cards.tsx": `import { useTranslation } from "react-i18next";
 
 const label = "Корзина 🛒";
@@ -251,13 +251,13 @@ export function Greeting({ name }: { name: string }) {
 
 		expect(project.text("src/cards.tsx")).toBe(migratedText);
 		expect(project.left()).toEqual([]);
-		const again = migrate(join(project.dir, "grai.config.json"));
+		const again = await migrate(join(project.dir, "grai.config.json"));
 		expect([again.changed, again.left]).toEqual([[], []]);
 		expect(project.text("src/cards.tsx")).toBe(migratedText);
 	});
 
-	it("looks a key up in the first namespace a hook loads, as react-i18next does, unless its nsMode is fallback", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("looks a key up in the first namespace a hook loads, as react-i18next does, unless its nsMode is fallback", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/namespaces.tsx": `import { useTranslation } from "react-i18next";
 
 export function Loaded({ name }: { name: string }) {
@@ -318,8 +318,8 @@ export function Single({ name }: { name: string }) {
 		]);
 	});
 
-	it("reports each call it cannot rewrite with its line, and keeps what those calls need", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("reports each call it cannot rewrite with its line, and keeps what those calls need", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/left.tsx": `import { Trans, useTranslation } from "react-i18next";
 
 export function Left({ name, gender, keyName, options }) {
@@ -408,7 +408,7 @@ const icuCatalogs = {
 
 describe("grai migrate, from next-intl", () => {
 	it("rewrites the t of useTranslations and getTranslations under their namespace, with getTranslations' locale", async () => {
-		const project = migrated("icu", icuCatalogs, {
+		const project = await migrated("icu", icuCatalogs, {
 			"src/home.tsx": `import { useTranslations } from "next-intl";
 
 export function Home({ name, count }: { name: string; count: number }) {
@@ -470,7 +470,7 @@ export async function homeTitle() {
 	});
 
 	it("imports the messages in a Next app as the namespace of keys.js, which next dev reads key by key", async () => {
-		const project = migrated("icu", icuCatalogs, {
+		const project = await migrated("icu", icuCatalogs, {
 			"package.json": JSON.stringify({ dependencies: { next: "16.4.3" } }),
 			"src/home.ts": `import { useTranslations } from "next-intl";
 
@@ -493,8 +493,8 @@ export function homeTitle() {
 		expect(home.homeTitle?.()).toBe("Welcome");
 	});
 
-	it("reports t.rich, t.raw, a message with markup and a namespace that is an expression", () => {
-		const project = migrated("icu", icuCatalogs, {
+	it("reports t.rich, t.raw, a message with markup and a namespace that is an expression", async () => {
+		const project = await migrated("icu", icuCatalogs, {
 			"src/about.tsx": `import { useTranslations } from "next-intl";
 
 export function About({ section }: { section: string }) {
@@ -538,8 +538,8 @@ const formatjsCatalogs = {
 };
 
 describe("grai migrate, from FormatJS", () => {
-	it("rewrites formatMessage of useIntl, its object's or destructured, and <FormattedMessage> as an expression", () => {
-		const project = migrated("icu", formatjsCatalogs, {
+	it("rewrites formatMessage of useIntl, its object's or destructured, and <FormattedMessage> as an expression", async () => {
+		const project = await migrated("icu", formatjsCatalogs, {
 			"src/shop.tsx": `import { FormattedMessage, useIntl } from "react-intl";
 
 export function Shop({ name, count }: { name: string; count: number }) {
@@ -573,8 +573,8 @@ export function Shop({ name, count }: { name: string; count: number }) {
 `);
 	});
 
-	it("reports descriptors not written in the call, rich values, and the rest of the library", () => {
-		const project = migrated("icu", formatjsCatalogs, {
+	it("reports descriptors not written in the call, rich values, and the rest of the library", async () => {
+		const project = await migrated("icu", formatjsCatalogs, {
 			"src/left.tsx": `import { FormattedMessage, useIntl } from "react-intl";
 import { messages } from "./messages";
 
@@ -605,13 +605,19 @@ export function Left({ id }: { id: string }) {
 });
 
 describe("grai migrate", () => {
-	it("reports a component it does not parse and a module whose m is another name, and changes neither", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("reports each import of the library a component's own parser reads, and a module whose m is another name, and changes neither", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/Cart.svelte": `<script>
 	import { t } from "i18next";
 </script>
 
 <h1>{t("cart:title")}</h1>
+`,
+			"src/Note.vue": `<script setup>
+// import { t } from "i18next" was how this read its words.
+const note = 'import { t } from "i18next"';
+</script>
+<template><p>{{ note }}</p></template>
 `,
 			"src/math.ts": `import { t } from "i18next";
 
@@ -621,13 +627,13 @@ export const title = () => t("cart:title") + m;
 		});
 
 		expect(project.left()).toEqual([
-			"src/Cart.svelte:2:2: grai migrate rewrites JavaScript and TypeScript modules: migrate this component's calls by hand.",
+			"src/Cart.svelte:2:20: grai migrate rewrites JavaScript and TypeScript modules: migrate this component's calls by hand.",
 			"src/math.ts:4:28: m names something else here: rename it, then run grai migrate again.",
 		]);
 		expect(project.result.changed).toEqual([]);
 	});
 
-	it("is an error without the import's mapping, and changes nothing", () => {
+	it("is an error without the import's mapping, and changes nothing", async () => {
 		const dir = realpathSync(mkdtempSync(join(tmpdir(), "grai-migrate-")));
 		onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
 		writeSources(dir, {
@@ -640,7 +646,7 @@ export const title = () => t("cart:title") + m;
 			"src/a.ts": 'import { t } from "i18next";\nt("a");\n',
 		});
 
-		const result = migrate(join(dir, "grai.config.json"));
+		const result = await migrate(join(dir, "grai.config.json"));
 
 		expect(result.errors.map((error) => error.message)).toEqual([
 			"grai.import.json: there is no mapping of the import's keys. Run grai import first: it writes this file.",
@@ -652,8 +658,8 @@ export const title = () => t("cart:title") + m;
 });
 
 describe("grai migrate leaves a call it cannot prove safe", () => {
-	it("calls grai's m only through its own import, and React's hooks only through React's", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("calls grai's m only through its own import, and React's hooks only through React's", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/math.ts": `import { m } from "./numbers.js";
 import { t } from "i18next";
 
@@ -694,7 +700,7 @@ export const title = () => useMemo(() => m.cart_title(), [t]);
 	});
 
 	it("reads a name in a parameter's default where JavaScript does, outside the body's own var", async () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/render.ts": `import { t } from "i18next";
 
 export function render(value = t("cart:title")) {
@@ -717,8 +723,8 @@ export function render(value = m.cart_title()) {
 		expect((await project.load("src/render.ts")).render?.()).toBe("Cartlocal");
 	});
 
-	it("moves no locale that may read otherwise where the call is, and drops no default it would no longer evaluate", () => {
-		const project = migrated("i18next", i18nextCatalogs, {
+	it("moves no locale that may read otherwise where the call is, and drops no default it would no longer evaluate", async () => {
+		const project = await migrated("i18next", i18nextCatalogs, {
 			"src/order.ts": `import { t } from "i18next";
 
 export const greet = (choose: () => string, name: () => string) =>
@@ -728,7 +734,7 @@ export const tracked = (track: () => string) =>
 export const fixed = (lng: string) => t("cart:title", { lng });
 `,
 		});
-		const server = migrated("icu", icuCatalogs, {
+		const server = await migrated("icu", icuCatalogs, {
 			"src/about.ts": `import { getTranslations } from "next-intl/server";
 
 export async function later() {
@@ -758,7 +764,7 @@ export async function fixed(locale: string) {
 		expect(server.text("src/about.ts")).toContain(
 			"export async function fixed(locale: string) {\n\treturn m.About_title({}, { locale });\n}",
 		);
-		const shop = migrated("icu", formatjsCatalogs, {
+		const shop = await migrated("icu", formatjsCatalogs, {
 			"src/shop.tsx": `import { FormattedMessage } from "react-intl";
 
 export const Title = ({ label }: { label: () => string }) => (
@@ -771,8 +777,8 @@ export const Title = ({ label }: { label: () => string }) => (
 		]);
 	});
 
-	it("copies a hook's locale to no call where its name means something else", () => {
-		const server = migrated("icu", icuCatalogs, {
+	it("copies a hook's locale to no call where its name means something else", async () => {
+		const server = await migrated("icu", icuCatalogs, {
 			"src/about.ts": `import { getTranslations } from "next-intl/server";
 
 export async function titled() {
@@ -785,7 +791,7 @@ export async function titled() {
 }
 `,
 		});
-		const client = migrated("i18next", i18nextCatalogs, {
+		const client = await migrated("i18next", i18nextCatalogs, {
 			"src/cart.ts": `import { useTranslation } from "react-i18next";
 
 const lng = "en";
