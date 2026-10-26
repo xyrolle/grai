@@ -1,6 +1,7 @@
 import type { Config } from "./config.ts";
 import { cookieAttributes } from "./cookie.ts";
 import { globPattern } from "./globs.ts";
+import { pathnamesTable } from "./pathnames.ts";
 
 /** config.js: the project's config, as the runtime reads it, and whether its build has copies. */
 export function configModule(config: Config, localeCopies: boolean): string {
@@ -25,6 +26,7 @@ export function configModule(config: Config, localeCopies: boolean): string {
 		`export const prefixes = ${JSON.stringify(config.urlRouting.prefixes)};`,
 		"/** @type {readonly RegExp[]} */",
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
+		...pathnamesTable(config.urlRouting.pathnames),
 		"/** @type {boolean} */",
 		`export const localeCopies = ${localeCopies};`,
 		"",
@@ -56,7 +58,8 @@ export function directionOf(locale: string): "ltr" | "rtl" {
  * bundler folds, so a page carries the code of only what its config uses.
  */
 function strategyConstants(config: Config): string[] {
-	const { localePrefix, prefixes, unlocalizedPaths } = config.urlRouting;
+	const { localePrefix, prefixes, unlocalizedPaths, pathnames } =
+		config.urlRouting;
 	const constants = {
 		readsUrl: config.strategy.includes("url"),
 		// Every place but the browser's languages keeps a visitor's choice.
@@ -68,6 +71,7 @@ function strategyConstants(config: Config): string[] {
 			(prefix, index) => prefix !== config.locales[index],
 		),
 		leavesPathsAlone: unlocalizedPaths.length > 0,
+		translatesPaths: pathnames.length > 0,
 	};
 	return Object.entries(constants).map(
 		([name, value]) => `export const ${name} = ${value};`,

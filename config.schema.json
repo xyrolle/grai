@@ -108,6 +108,30 @@
 			},
 			"examples": [["/api/**"]]
 		},
+		"pathnames": {
+			"description": "With the \"url\" strategy: a route's path in each locale's words, which localizeHref writes and deLocalizeUrl reads back as the route. A path starts with /, a segment written [name] is carried across, and each locale's path names the route's segments.",
+			"type": "object",
+			"propertyNames": {
+				"pattern": "^/"
+			},
+			"additionalProperties": {
+				"type": "object",
+				"additionalProperties": {
+					"type": "string",
+					"pattern": "^/"
+				}
+			},
+			"examples": [
+				{
+					"/about": {
+						"de": "/ueber-uns"
+					},
+					"/products/[id]": {
+						"de": "/produkte/[id]"
+					}
+				}
+			]
+		},
 		"tests": {
 			"description": "Globs, of *, **, ? and {a,b}, of the source files that are tests, by path from the root, which grai check does not count as using a key. [] makes no file a test.",
 			"type": "array",

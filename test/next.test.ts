@@ -223,6 +223,19 @@ describe("the proxy", () => {
 		expect(await rewritten("/en/cart")).toBe("/en/en/cart");
 	});
 
+	it("rewrites a path in its locale's words to the app's route", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["url"],
+			pathnames: { "/products/[id]": { ro: "/produse/[id]" } },
+		});
+		await load();
+		const proxied = await proxyFor(dir);
+
+		expect(rewrittenPath(await proxied("/ro/produse/7?view=all"))).toBe(
+			"/ro/products/7?view=all",
+		);
+	});
+
 	it("rewrites by the cookie, then Accept-Language, leaves the path as it is, and varies by both", async () => {
 		const { dir, load } = project(catalogs, {
 			strategy: ["cookie", "preferredLanguage"],
