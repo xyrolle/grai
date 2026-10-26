@@ -254,9 +254,11 @@ if (process.argv[2] === "--child") {
 				join(dir, catalogs.replace("{locale}", locales[0])),
 			);
 			const none = () => {};
-			// The runs rename the key and back, so each renames the same call sites.
-			const names = (run) =>
-				run % 2 === 0 ? [key, `${key}_x`] : [`${key}_x`, key];
+			// The runs rename the key and back, so each renames the same call sites: counted across the
+			// cold runs and the warm ones, as an odd number of runs leaves the key renamed.
+			let renames = 0;
+			const names = () =>
+				renames++ % 2 === 0 ? [key, `${key}_x`] : [`${key}_x`, key];
 			const timed = (setup, args, after) => {
 				const coldly = median(
 					(run) => {
@@ -271,7 +273,7 @@ if (process.argv[2] === "--child") {
 			const ms = {
 				check: timed(none, () => ["check", config]),
 				find: timed(none, () => ["find", config, key]),
-				rename: timed(none, (run) => ["rename", config, ...names(run)]),
+				rename: timed(none, () => ["rename", config, ...names()]),
 				"check --fix": timed(
 					() => addUnusedKeys(dir, catalogs, locales),
 					() => ["fix", config],
