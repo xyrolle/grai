@@ -7,7 +7,7 @@ import {
 	unlink,
 	writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { isMissing } from "./config.ts";
 import { GraiError } from "./error.ts";
@@ -24,9 +24,10 @@ const lines = new Map<string, Promise<void>>();
 /**
  * Takes an outdir's lock, in its state directory: a file holding the writer's pid and the id of its
  * claim, linked into place from the claim, so that the lock exists only with them in it. A process
- * makes its claim once and its compiles take the lock in turn; a live writer's lock is waited for,
- * and a lock whose writer is gone, as one killed while it wrote, is removed (`removeDead`) and
- * taken. Returns the lock's release.
+ * makes its claim once and its compiles take the lock in turn. A lock whose writer is gone, as one
+ * killed while it wrote, is removed (`removeDead`) and taken. A live writer's lock is waited for, as
+ * is a live writer's takeover of a dead one's, each `lockPatience` at most: the compile then fails
+ * and names the file to delete. Returns the lock's release.
  */
 export async function lockOutput(state: string): Promise<() => Promise<void>> {
 	const before = lines.get(state);
@@ -58,7 +59,6 @@ export async function lockOutput(state: string): Promise<() => Promise<void>> {
 
 async function takeLock(state: string): Promise<void> {
 	const path = join(state, "lock");
-	const where = { file: join(".grai", "lock") };
 	const started = Date.now();
 	for (;;) {
 		const claim = await claimIn(state);
@@ -70,20 +70,27 @@ async function takeLock(state: string): Promise<void> {
 		}
 		const holder = await holderOf(path);
 		if (holder === undefined) continue;
-		if (!isAlive(holder.pid)) {
-			await removeDead(path, holder, claim);
-			continue;
-		}
+		const waiting = isAlive(holder.pid)
+			? { file: path, pid: holder.pid }
+			: await removeDead(path, holder, claim);
+		if (waiting === undefined) continue;
 		if (Date.now() - started > lockPatience) {
+			const waited =
+				waiting.file === path
+					? "has held the output's lock"
+					: "has been taking over the output's lock, left by a process no longer running,";
 			throw new GraiError(
 				"output-locked",
-				where,
-				`process ${holder.pid} has held the output's lock for ${lockPatience / 1000} s. If no grai is running, delete ${path}.`,
+				{ file: join(".grai", basename(waiting.file)) },
+				`process ${waiting.pid} ${waited} for ${lockPatience / 1000} s. If no grai is running, delete ${waiting.file}.`,
 			);
 		}
 		await delay(lockRetry);
 	}
 }
+
+/** A live writer a compile waits for, and the file it holds: the lock, or a takeover of it. */
+type Waiting = { file: string; pid: number };
 
 /**
  * This process's claim in a state directory, made the first time: `lock.<pid>.<uuid>`, created
@@ -130,26 +137,25 @@ async function linked(
  * which one writer can and the others then find taken, and removes the file only while it still
  * holds that holder's id. No other writer removes the file meanwhile, as each would need the same
  * takeover, so the remover never removes a lock another writer took after the dead one. A takeover
- * whose remover is gone in turn is removed the same way first; one whose remover is alive is waited
- * for.
+ * whose remover is gone in turn is removed the same way first. Returns the live writer whose
+ * takeover there is to wait for, as a live writer's lock is waited for, or undefined once the file
+ * is removed.
  */
 async function removeDead(
 	file: string,
 	holder: Holder,
 	claim: string,
-): Promise<void> {
+): Promise<Waiting | undefined> {
 	const takeover = `${file}.taking.${holder.id}`;
 	for (;;) {
 		const taken = await linked(claim, takeover);
 		if (taken === "taken") break;
-		if (taken === "claim gone") return;
+		if (taken === "claim gone") return undefined;
 		const remover = await holderOf(takeover);
 		if (remover === undefined) continue;
-		if (isAlive(remover.pid)) {
-			await delay(lockRetry);
-			return;
-		}
-		await removeDead(takeover, remover, claim);
+		if (isAlive(remover.pid)) return { file: takeover, pid: remover.pid };
+		const waiting = await removeDead(takeover, remover, claim);
+		if (waiting !== undefined) return waiting;
 	}
 	try {
 		if ((await holderOf(file))?.id === holder.id)
@@ -157,6 +163,7 @@ async function removeDead(
 	} finally {
 		await unlink(takeover).catch(ignoreMissing);
 	}
+	return undefined;
 }
 
 /** Who holds a lock: the pid of its writer and the id of the writer's claim. */

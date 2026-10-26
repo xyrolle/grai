@@ -1,6 +1,12 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -138,5 +144,43 @@ it(
 		expect(writtenBefore).toBe(false);
 		expect((await compiling).errors).toEqual([]);
 		expect((await messagesOf(dir)).title?.()).toBe("Title");
+	},
+);
+
+it(
+	"gives up on a takeover whose writer stays alive without ending it, after the wait a live lock gets, naming the takeover",
+	processTest,
+	async () => {
+		const { dir, compile } = project(catalogs);
+		const state = join(dir, "out", ".grai");
+		mkdirSync(state, { recursive: true });
+		const gone = spawnSync(process.execPath, ["-e", ""]).pid;
+		writeFileSync(join(state, "lock"), `${gone} gone-writer`);
+		// A writer that took over the dead one's lock and stopped there, alive, as one paused by
+		// SIGSTOP or at a debugger's breakpoint would.
+		const remover = processRunning("setInterval(() => {}, 60_000);");
+		const takeover = join(state, "lock.taking.gone-writer");
+		writeFileSync(takeover, `${remover.pid} remover`);
+		// The wait is 30 s: the clock moves past it once the compile waits, with no test-only setting.
+		vi.useFakeTimers({ toFake: ["Date"] });
+		onTestFinished(() => {
+			vi.useRealTimers();
+		});
+
+		const compiling = compile();
+		await vi.waitFor(() =>
+			expect(
+				readdirSync(state).some((name) =>
+					name.startsWith(`lock.${process.pid}.`),
+				),
+			).toBe(true),
+		);
+		vi.setSystemTime(Date.now() + 31_000);
+		const { errors } = await compiling;
+
+		expect(errors.map(({ code }) => code)).toEqual(["output-locked"]);
+		expect(errors[0]?.message).toContain(`process ${remover.pid}`);
+		expect(errors[0]?.message).toContain(`delete ${takeover}`);
+		expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
 	},
 );
