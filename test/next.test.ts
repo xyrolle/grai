@@ -1,5 +1,11 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -151,6 +157,41 @@ await withGrai()(${JSON.stringify(PHASE_DEVELOPMENT_SERVER)});`,
 		await expect.poll(() => shards(dir)).toContain("Your basket");
 	});
 
+	it("refuses a Next basePath that is not grai's, under the url strategy, which reads the locale after it", async () => {
+		const { dir } = project(
+			{ en: { title: "Your cart" } },
+			{ strategy: ["url"], basePath: "/shop" },
+		);
+		inProject(dir);
+
+		await expect(
+			withGrai({ basePath: "/store" })(PHASE_PRODUCTION_BUILD),
+		).rejects.toThrow(
+			'grai.config.json: Next\'s basePath "/store" and grai\'s "basePath" "/shop" must name the same path: the "url" strategy reads the locale after it.',
+		);
+		await expect(withGrai()(PHASE_PRODUCTION_BUILD)).rejects.toThrow(
+			'grai.config.json: Next\'s basePath (none) and grai\'s "basePath" "/shop" must name the same path',
+		);
+		expect(
+			(await withGrai({ basePath: "/shop" })(PHASE_PRODUCTION_BUILD)).basePath,
+		).toBe("/shop");
+	});
+
+	it("reads the grai config its options name", async () => {
+		const { dir } = project({ en: { title: "Your cart" } }, { outdir: "out" });
+		inProject(dir);
+		renameSync(join(dir, "grai.config.json"), join(dir, "grai.base.json"));
+
+		const config = await withGrai(
+			{},
+			{ config: "grai.base.json" },
+		)(PHASE_PRODUCTION_BUILD);
+
+		expect(config.turbopack?.resolveAlias).toEqual({
+			"grai/next/output/*": "./out/*",
+		});
+	});
+
 	it("gives a command that bundles nothing, such as next start, the config as it is, without reading grai's", async () => {
 		const { dir } = project({ en: { title: "Your cart" } });
 		inProject(join(dir, "messages"));
@@ -193,8 +234,17 @@ async function proxyFor(dir: string) {
 	const proxy: (request: NextRequest) => Promise<Response> = (
 		await import(pathToFileURL(join(outDir, "proxy.js")).href)
 	).proxy;
-	return (path: string, headers: Record<string, string> = {}) =>
-		proxy(new NextRequest(`https://shop.test${path}`, { headers }));
+	return (
+		path: string,
+		headers: Record<string, string> = {},
+		basePath?: string,
+	) =>
+		proxy(
+			new NextRequest(`https://shop.test${path}`, {
+				headers,
+				...(basePath === undefined ? {} : { nextConfig: { basePath } }),
+			}),
+		);
 }
 
 /** The path a proxy's response rewrites the request to. */
@@ -221,6 +271,33 @@ describe("the proxy", () => {
 		expect(await rewritten("/cart?step=2")).toBe("/en/cart?step=2");
 		expect(await rewritten("/ro/cart")).toBe("/ro/cart");
 		expect(await rewritten("/en/cart")).toBe("/en/en/cart");
+	});
+
+	it("reads the locale after Next's basePath, and rewrites under it", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["url"],
+			basePath: "/shop",
+		});
+		await load();
+		const proxied = await proxyFor(dir);
+
+		expect([
+			rewrittenPath(await proxied("/shop/ro/cart", {}, "/shop")),
+			rewrittenPath(await proxied("/shop/cart", {}, "/shop")),
+		]).toEqual(["/shop/ro/cart", "/shop/en/cart"]);
+	});
+
+	it("rewrites a path in its locale's words to the app's route", async () => {
+		const { dir, load } = project(catalogs, {
+			strategy: ["url"],
+			pathnames: { "/products/[id]": { ro: "/produse/[id]" } },
+		});
+		await load();
+		const proxied = await proxyFor(dir);
+
+		expect(rewrittenPath(await proxied("/ro/produse/7?view=all"))).toBe(
+			"/ro/products/7?view=all",
+		);
 	});
 
 	it("rewrites by the cookie, then Accept-Language, leaves the path as it is, and varies by both", async () => {
@@ -258,13 +335,16 @@ const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
  * Builds the example with the given bundler flags and serves it until the suite ends, on a port the
  * system picks, so that runs of this file side by side never meet. The origin is set once it serves.
  */
-function servedWith(flags: string[]): { origin: string } {
+function servedWith(
+	flags: string[],
+	variables: Record<string, string> = {},
+): { origin: string } {
 	const served = { origin: "" };
 	let server: ChildProcess | undefined;
 	beforeAll(async () => {
 		const build = spawnSync(next, ["build", ...flags], {
 			cwd: example,
-			env,
+			env: { ...env, ...variables },
 			encoding: "utf8",
 		});
 		if (build.status !== 0) {
@@ -273,7 +353,7 @@ function servedWith(flags: string[]): { origin: string } {
 		// The leader of a process group of its own, so that stopping it stops what it forks.
 		server = spawn(next, ["start", "--port", "0"], {
 			cwd: example,
-			env,
+			env: { ...env, ...variables },
 			detached: true,
 		});
 		served.origin = await servedAt(server);
@@ -410,6 +490,23 @@ describe("the Next example, built with Turbopack", () => {
 
 		expect(await text("h1")).toBe("A shop that speaks your language");
 		expect(await text("#cart")).toBe("1 item in your cart");
+	});
+});
+
+describe("the Next example, under a base path", () => {
+	const served = servedWith([], { EXAMPLE_BASE_PATH: "/shop" });
+
+	it("renders the locale named after the base path, and links within it under the base path", async () => {
+		await page.goto(`${served.origin}/shop/ro`);
+
+		expect(await page.locator("html").getAttribute("lang")).toBe("ro");
+		expect(await page.locator("#about").getAttribute("href")).toBe(
+			"/shop/ro/about",
+		);
+		await page.click("#about");
+		await page.waitForURL(`${served.origin}/shop/ro/about`);
+		expect(await text("h1")).toBe("Despre magazin");
+		expect(errors).toEqual([]);
 	});
 });
 

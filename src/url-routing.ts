@@ -1,10 +1,13 @@
 /**
  * The config's fields the `url` strategy reads: which locales' paths have a prefix, each locale's
- * prefix, and the paths it leaves alone. Without the strategy none of them is read, so none is taken.
+ * prefix, the paths it leaves alone, each route's path in each locale's words, the base path the
+ * app is served under, and each locale's host. Without the strategy none of them is read, so none
+ * is taken.
  */
 
 import type { GraiError } from "./error.ts";
 import { isGlob } from "./globs.ts";
+import { type Pathname, readPathnames } from "./pathnames.ts";
 
 /** Which locales' paths the `url` strategy prefixes: all but the base locale's, or every one. */
 export type LocalePrefix = "as-needed" | "always";
@@ -15,13 +18,25 @@ export type UrlRouting = {
 	prefixes: readonly string[];
 	/** Globs of the paths the `url` strategy leaves alone, which the strategies after it localize. */
 	unlocalizedPaths: readonly string[];
+	/** Each route's path in each locale's words, where the config gives one. */
+	pathnames: readonly Pathname[];
+	/** The path the app is served under, such as `/shop`, or `""` for none. */
+	basePath: string;
+	/** Each locale's host, in `locales` order, where the config gives every locale one; else none. */
+	domains: readonly string[];
 };
 
 export const urlRoutingFields = [
 	"localePrefix",
 	"localePrefixes",
 	"unlocalizedPaths",
+	"pathnames",
+	"basePath",
+	"domains",
 ] as const;
+
+/** A base path: one or more path segments, without a trailing slash. */
+const basePathForm = /^(?:\/[^/?#\s]+)+$/;
 
 /** A prefix of the config's own: one path segment, as a URL writes it without escapes. */
 const segment = /^[a-z\d-]+$/;
@@ -47,10 +62,21 @@ export function readUrlRouting(
 		localePrefix = "as-needed",
 		localePrefixes = {},
 		unlocalizedPaths = [],
+		pathnames = {},
+		basePath,
+		domains,
 	} = raw;
 	if (localePrefix !== "as-needed" && localePrefix !== "always") {
 		throw invalid(
 			'"localePrefix" must be "as-needed", where the base locale\'s paths have no prefix, or "always", where every locale\'s have one',
+		);
+	}
+	if (
+		basePath !== undefined &&
+		(typeof basePath !== "string" || !basePathForm.test(basePath))
+	) {
+		throw invalid(
+			'"basePath" must be the path the app is served under, as its framework has it, such as "/shop": it starts with / and does not end with one',
 		);
 	}
 	if (!isPathGlobList(unlocalizedPaths)) {
@@ -73,7 +99,61 @@ export function readUrlRouting(
 		localePrefix,
 		prefixes: readPrefixes(localePrefixes, locales, invalid),
 		unlocalizedPaths,
+		pathnames: readPathnames(pathnames, locales, invalid),
+		basePath: basePath ?? "",
+		domains:
+			domains === undefined ? [] : readDomains(domains, locales, invalid),
 	};
+}
+
+/** A host as a request names it: a lowercase name, and its port if it has one. */
+const hostForm = /^[a-z\d-]+(?:\.[a-z\d-]+)*(?::\d{1,5})?$/;
+
+/**
+ * Each locale's host, which `domains` must give every locale, each its own: a locale without one
+ * would have no address that a link from another's host could name.
+ */
+function readDomains(
+	value: unknown,
+	locales: readonly string[],
+	invalid: (detail: string) => GraiError,
+): readonly string[] {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		throw invalid(
+			'"domains" must map each locale to its host, such as { "en": "example.com", "de": "example.de" }',
+		);
+	}
+	const given = new Map(Object.entries(value));
+	const stranger = [...given.keys()].find(
+		(locale) => !locales.includes(locale),
+	);
+	if (stranger !== undefined) {
+		throw invalid(
+			`"domains" names ${JSON.stringify(stranger)}, which is not one of "locales": ${locales.join(", ")}`,
+		);
+	}
+	const hosts = new Map<string, string>();
+	return locales.map((locale) => {
+		const host = given.get(locale);
+		if (host === undefined) {
+			throw invalid(
+				`"domains" must give every locale its host, and gives none to ${locale}`,
+			);
+		}
+		if (typeof host !== "string" || !hostForm.test(host)) {
+			throw invalid(
+				`"domains" gives ${locale} ${JSON.stringify(host)}, but a host is a lowercase name, such as "example.de", with a port if it has one`,
+			);
+		}
+		const other = hosts.get(host);
+		if (other !== undefined) {
+			throw invalid(
+				`"domains" gives ${locale} "${host}", which is ${other}'s host too. Give each locale a host of its own`,
+			);
+		}
+		hosts.set(host, locale);
+		return host;
+	});
 }
 
 /** Each locale's prefix, its tag unless `localePrefixes` gives it a segment of its own. */

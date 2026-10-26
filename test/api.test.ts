@@ -50,13 +50,14 @@ it("exports from the output's runtime.js only the API apps call", async () => {
 	]);
 });
 
-it("exports the middleware, its lookup, redirect and Vary, and localeCopies from server.js, useLocale from testing.js, m from messages.js and each key from keys.js", async () => {
+it("exports the middleware, its lookup, redirect and Vary, defineServerStrategy and localeCopies from server.js, useLocale from testing.js, m from messages.js and each key from keys.js", async () => {
 	const { dir, compile } = project(catalogs);
 	await compile();
 	const output = (file: string) =>
 		import(pathToFileURL(join(dir, "out", file)).href);
 
 	expect(Object.keys(await output("server.js")).sort()).toEqual([
+		"defineServerStrategy",
 		"localeCopies",
 		"localeOf",
 		"middleware",
@@ -70,6 +71,7 @@ it("exports the middleware, its lookup, redirect and Vary, and localeCopies from
 		"cart_title",
 	]);
 	expect(await importableNames(dir, "./out/server.js")).toEqual([
+		"defineServerStrategy",
 		"localeCopies",
 		"localeOf",
 		"middleware",
@@ -141,7 +143,10 @@ it("exports from grai/sveltekit, grai/sveltekit/vite, grai/sveltekit/navigation,
 		"LocaleProvider",
 		"bindLocale",
 	]);
-	expect(await importableNames(dir, "grai/next/config")).toEqual(["withGrai"]);
+	expect(await importableNames(dir, "grai/next/config")).toEqual([
+		"WithGraiOptions",
+		"withGrai",
+	]);
 	expect(await importableNames(dir, "grai/next/proxy")).toEqual(["proxy"]);
 	expect(await importableNames(dir, "grai/react")).toEqual(["Markup"]);
 });
