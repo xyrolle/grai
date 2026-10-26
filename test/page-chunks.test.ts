@@ -240,4 +240,53 @@ describe("the Vite plugin's chunks by page", () => {
 		expect(code.first?.includes("Beta")).toBe(false);
 		expect(code.second?.includes("Alpha")).toBe(false);
 	});
+
+	it("follows a name through each `export *` it passes, to the module that holds it", async () => {
+		const reader = (name: string, key: string) =>
+			`import { m } from "../out/messages.js";\nexport function ${name}() { return m.${key}(); }\n`;
+		const page = (name: string) =>
+			`import { ${name} } from "./groups/index.js";\nconsole.log(${name}());\n`;
+		const { keysOf, code } = await built(
+			{ alpha: sized("Alpha"), beta: sized("Beta") },
+			{ first: [], second: [] },
+			{
+				files: {
+					"groups/package.json": JSON.stringify({ sideEffects: false }),
+					"groups/alpha.js": reader("alphaText", "alpha"),
+					"groups/beta.js": reader("betaText", "beta"),
+					"groups/both.js": `export * from "./alpha.js";\nexport * from "./beta.js";\n`,
+					"groups/index.js": `export * from "./both.js";\n`,
+					"first.js": page("alphaText"),
+					"second.js": page("betaText"),
+				},
+			},
+		);
+
+		expect(keysOf).toEqual([["alpha"], ["beta"]]);
+		expect(code.first?.includes("Beta")).toBe(false);
+		expect(code.second?.includes("Alpha")).toBe(false);
+	});
+
+	it("takes a name a module re-exports by name from that module, not from an `export *` beside it", async () => {
+		// Small keys, which a page reading both would merge: the first page reads only alpha.
+		const reader = (name: string, key: string) =>
+			`import { m } from "../out/messages.js";\nexport function ${name}() { return m.${key}(); }\n`;
+		const { keysOf } = await built(
+			{ alpha: "Alpha", beta: "Beta" },
+			{ first: [], second: [] },
+			{
+				files: {
+					"groups/package.json": JSON.stringify({ sideEffects: false }),
+					"groups/alpha.js": reader("text", "alpha"),
+					"groups/beta.js": `${reader("text", "beta")}export const other = 1;\n`,
+					"groups/index.js": `export { text } from "./alpha.js";\nexport * from "./beta.js";\n`,
+					"first.js": `import { text } from "./groups/index.js";\nconsole.log(text());\n`,
+					"second.js": `import { m } from "./out/messages.js";\nconsole.log(m.beta());\n`,
+				},
+				namespace: true,
+			},
+		);
+
+		expect(keysOf).toEqual([["alpha"], ["beta"]]);
+	});
 });
