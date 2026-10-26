@@ -27,6 +27,9 @@ const beforeExpression = new Set([
 const components = /\.(?:svelte|vue|astro)$/;
 const scriptBlock = /(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi;
 const frontmatter = /^(---\r?\n)([\s\S]*?)(\r?\n---)/;
+/** What can start a comment or a literal, and inside a template's `${}`, a brace too. */
+const significantInCode = /[/"'`]/g;
+const significantInTemplate = /[/"'`{}]/g;
 
 /** A file's code, blanked as above. */
 export function codeText(text: string, file: string): string {
@@ -50,7 +53,11 @@ export function escapesNames(code: string): boolean {
 	return /\\u(?:[0-9a-fA-F]{4}|\{[0-9a-fA-F]+\})/.test(code);
 }
 
-/** JavaScript or TypeScript with its comments and literals' text blanked. */
+/**
+ * JavaScript or TypeScript with its comments and literals' text blanked. The scan goes from one
+ * character that can start a comment or a literal to the next, and reads a `/` or a quote by the
+ * word or character the code it went past ends with.
+ */
 function blankedCode(source: string): string {
 	let out = "";
 	let index = 0;
@@ -59,7 +66,10 @@ function blankedCode(source: string): string {
 	/** For each template the code is inside: the depth of `{` in its `${}`. */
 	const templates: number[] = [];
 	const blank = (from: number, to: number) => {
-		out += source.slice(from, to).replace(/[^\n]/g, " ");
+		const text = source.slice(from, to);
+		out += text.includes("\n")
+			? text.replace(/[^\n]/g, " ")
+			: " ".repeat(text.length);
 		index = to;
 	};
 	const keep = (to: number) => {
@@ -67,6 +77,13 @@ function blankedCode(source: string): string {
 		index = to;
 	};
 	while (index < source.length) {
+		const significant =
+			templates.length > 0 ? significantInTemplate : significantInCode;
+		significant.lastIndex = index;
+		const at = significant.exec(source)?.index ?? source.length;
+		previous = lastWritten(source.slice(index, at)) ?? previous;
+		keep(at);
+		if (index === source.length) break;
 		const char = source.charAt(index);
 		const next = source.charAt(index + 1);
 		if (char === "/" && next === "/") {
@@ -109,21 +126,24 @@ function blankedCode(source: string): string {
 			keep(end);
 			previous = "literal";
 		} else {
-			if (templates.length > 0 && (char === "{" || char === "}")) {
+			// A `/` that divides, or a brace inside a template's `${}`.
+			if (char !== "/") {
 				const depth = templates.pop() ?? 0;
 				templates.push(depth + (char === "{" ? 1 : -1));
 			}
-			const word = /^[\w$]+/.exec(source.slice(index, index + 64))?.[0];
-			if (word !== undefined) {
-				keep(index + word.length);
-				previous = word;
-			} else {
-				keep(index + 1);
-				if (!/\s/.test(char)) previous = char;
-			}
+			keep(index + 1);
+			previous = char;
 		}
 	}
 	return out;
+}
+
+/** The last word, or character other than space, that code writes, if it writes any. */
+function lastWritten(code: string): string | undefined {
+	const written = code.trimEnd();
+	let start = written.length;
+	while (start > 0 && /[\w$]/.test(written.charAt(start - 1))) start--;
+	return start < written.length ? written.slice(start) : written.at(-1);
 }
 
 /** The offset after a string's closing quote, or nothing when the line ends first, as in JSX text. */
