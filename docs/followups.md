@@ -8,6 +8,12 @@ grai/vite chunks keys by the pages that load them when an adapter passes `pageEn
 
 Done when: grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
 
+## A patch that comes while a server first evaluates the messages
+
+A server's runner that evaluates the dev module while an edit's patch is sent can miss the patch: the module registers its handler as it is evaluated, and a patch sent before then reaches no handler, so the server renders the words the module was fetched with until the next edit. `bench/hmr.mjs` met it when its first server render came after its first edit, and now evaluates the server's program before it edits.
+
+Done when: a module fetched before an edit and evaluated after its patch was sent shows the edit, with a test that holds its evaluation across the patch.
+
 ## Patch a server render whose Vite is another copy
 
 The dev plugin patches a server environment's runner in place only when `isRunnableDevEnvironment` says it is one, which checks Vite's own class. A dev server made by another copy of Vite than the one grai imports, as in a workspace whose packages resolve Vite with different peers, fails that check: every edit then has the server take the messages again, about 110 ms on the synthetic catalog against 9 ms patched (`bench/hmr.mjs`, which now makes its server with grai's Vite for that reason). An app has one Vite, so this only shows in such setups.

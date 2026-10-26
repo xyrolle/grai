@@ -344,18 +344,27 @@ async function measure(browser, app, design) {
 
 	const catalogFile = join(root, "messages", `${locale}.json`);
 	const catalogBytes = readFileSync(catalogFile).length;
-	// grai's: when a server render through Vite's runner shows the edit, polled each millisecond.
+	// grai's: when a server render through Vite's runner shows the edit, polled each millisecond,
+	// for as long as the page is waited for.
 	const ssr = server.environments.ssr;
 	const rendered = async (text) => {
+		const until = performance.now() + 120_000;
 		for (;;) {
 			const { render } = await ssr.runner.import("/render.js");
-			if (render(key, locale) === text)
-				return performance.timeOrigin + performance.now();
+			const shown = render(key, locale);
+			if (shown === text) return performance.timeOrigin + performance.now();
+			if (performance.now() > until)
+				throw new Error(
+					`a server render still showed ${JSON.stringify(shown)} 120 s after the edit to ${JSON.stringify(text)}`,
+				);
 			await new Promise((resolve) => setTimeout(resolve, 1));
 		}
 	};
 	const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
 	const original = catalog[key];
+	// The server's program evaluated before the first edit, as a dev server has it: evaluated while
+	// a patch came in, it could keep the words it was loaded with and miss the patch.
+	if (design === "grai's plugin") await rendered(original);
 	const latencies = [];
 	for (let edit = 0; edit < EDITS + 3; edit++) {
 		// Saves come seconds apart; back-to-back writes would measure the file watcher's coalescing.
