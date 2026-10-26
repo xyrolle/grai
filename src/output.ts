@@ -11,6 +11,7 @@ import {
 import {
 	assertOutdirIsGrais,
 	outdirContents,
+	presentIn,
 	stateDirectory,
 } from "./outdir-contents.ts";
 import { lockOutput } from "./output-lock.ts";
@@ -25,7 +26,7 @@ const retention = 10_000;
 
 /**
  * Whether the outdir holds the output of these inputs, every file of it in place. The files are
- * looked for in one listing of the outdir, not one by one, so the check costs the same however
+ * looked for by listing their few directories, not one by one, so the check costs the same however
  * many files there are.
  */
 export async function isUpToDate(
@@ -35,7 +36,7 @@ export async function isUpToDate(
 	const manifest = await readManifest(join(outdir, stateDirectory));
 	if (manifest?.inputs !== inputs) return false;
 	const files = [...manifest.immutable, ...Object.keys(manifest.mutable)];
-	const { files: present } = await outdirContents(outdir);
+	const present = await presentIn(outdir, files);
 	return files.every((file) => present.has(file));
 }
 

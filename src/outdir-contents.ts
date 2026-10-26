@@ -27,10 +27,14 @@ export async function outdirContents(outdir: string): Promise<{
 	const files = new Set<string>();
 	const directories = new Set<string>(["."]);
 	const temporaries: string[] = [];
+	const directoryOf = new Map<string, string>();
 	for (const entry of entries) {
-		const path = relative(outdir, join(entry.parentPath, entry.name))
-			.split(sep)
-			.join(posix.sep);
+		let directory = directoryOf.get(entry.parentPath);
+		if (directory === undefined) {
+			directory = relative(outdir, entry.parentPath).split(sep).join(posix.sep);
+			directoryOf.set(entry.parentPath, directory);
+		}
+		const path = directory === "" ? entry.name : `${directory}/${entry.name}`;
 		const inState = path.startsWith(`${stateDirectory}/`);
 		if (entry.isDirectory()) {
 			if (path !== stateDirectory && !inState) directories.add(path);
@@ -59,4 +63,24 @@ export async function assertOutdirIsGrais(outdir: string): Promise<void> {
 		{ file: outdir },
 		`the outdir holds ${names.slice(0, 3).join(", ")}${names.length > 3 ? ", …" : ""}, which no compile wrote: grai owns its outdir and removes what it does not name, so it writes only into a directory that is empty or of its own. Move those files out, or name another outdir.`,
 	);
+}
+
+/** Which of these files are there, by listing each of their directories once. */
+export async function presentIn(
+	outdir: string,
+	files: readonly string[],
+): Promise<Set<string>> {
+	const directories = new Set(files.map((file) => posix.dirname(file)));
+	const listings = await Promise.all(
+		[...directories].map(async (directory) => {
+			const names = await readdir(join(outdir, directory)).catch(
+				(error: unknown): string[] => {
+					if (!isMissing(error)) throw error;
+					return [];
+				},
+			);
+			return names.map((name) => posix.join(directory, name));
+		}),
+	);
+	return new Set(listings.flat());
 }
