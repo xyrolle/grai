@@ -121,10 +121,15 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 		importFact(statement, span, imports);
 		exportFacts(statement, exports);
 	}
+	// A use of a load names it by its index among the loads with facts: a load by a name loads
+	// nothing the bundler follows, so it has none, and nor have its uses.
+	const followed: Node[] = [];
 	for (const node of loadNodes) {
 		const fact = loadFact(node, span);
-		if (fact !== undefined) loads.push(fact);
-		if (fact !== undefined && "source" in fact) {
+		if (fact === undefined) continue;
+		loads.push(fact);
+		followed.push(node);
+		if ("source" in fact) {
 			imports.push({
 				source: fact.source,
 				path: fact.at,
@@ -133,7 +138,7 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 			});
 		}
 	}
-	const { uses, aliases } = usesOf(program, scopes, loadNodes, span);
+	const { uses, aliases } = usesOf(program, scopes, followed, span);
 	return { imports, exports, loads, uses, aliases };
 }
 
