@@ -1,31 +1,18 @@
 /**
  * The installed packages a source may import, which a reading follows as it follows any module, and
  * which may pass grai's on unseen, as their code is no source and its text is never tested. A
- * source imports one only by a specifier that starts with its name, in one string (`candidates.ts`
- * reads every file that may spell a specifier otherwise). So the specifiers a source left out may
- * import a package by are the strings in its text that start with the name of a package installed
- * in a `node_modules` it may resolve from; each is resolved from it and followed, as reading the
- * source would, and a source that writes one that passes grai's on is read.
+ * source imports one only by a specifier that starts with its name (`candidates.ts` reads every
+ * file that may spell a specifier otherwise). So the specifiers a source left out may import a
+ * package by are those that start with the name of a package installed in a `node_modules` it may
+ * resolve from; each is resolved from it and followed, as reading the source would, and a source
+ * that writes one that passes grai's on is read.
  */
 
 import { readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { SourceFile } from "../sources.ts";
-import { written } from "./candidates.ts";
+import { specifiersIn, written } from "./candidates.ts";
 import type { Mapping } from "./mappings.ts";
-
-/** A string in single or double quotes on one line, its escapes kept. */
-const quoted = [/'((?:[^'\n\\]|\\.)*)'/g, /"((?:[^"\n\\]|\\.)*)"/g];
-
-/** What a simple escape in a string stands for; any other escaped character stands for itself. */
-const escapes: Record<string, string> = {
-	b: "\b",
-	f: "\f",
-	n: "\n",
-	r: "\r",
-	t: "\t",
-	v: "\v",
-};
 
 /** The packages installed for a project, and the specifiers of them that the sources write. */
 export class Installed {
@@ -124,24 +111,16 @@ export class Installed {
 		return this.resolved.get(memo);
 	}
 
-	/** The strings in a text that may name an installed package's module, each as it is read. */
+	/** The specifiers in a text that may name an installed package's module. */
 	private specifiers(text: string): Set<string> {
 		const found = new Set<string>();
 		if (this.names.size === 0) return found;
-		for (const pattern of quoted) {
-			for (const [, written = ""] of text.matchAll(pattern)) {
-				const value = written.includes("\\")
-					? written.replace(
-							/\\(.)/g,
-							(_, character: string) => escapes[character] ?? character,
-						)
-					: written;
-				const segments = value.split("/");
-				const name = value.startsWith("@")
-					? segments.slice(0, 2).join("/")
-					: segments[0];
-				if (name !== undefined && this.names.has(name)) found.add(value);
-			}
+		for (const specifier of specifiersIn(text)) {
+			const segments = specifier.split("/");
+			const name = specifier.startsWith("@")
+				? segments.slice(0, 2).join("/")
+				: segments[0];
+			if (name !== undefined && this.names.has(name)) found.add(specifier);
 		}
 		return found;
 	}
