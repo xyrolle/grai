@@ -135,6 +135,62 @@ describe("a recompile after an edit", () => {
 		expect(output).toEqual(await outputOf(fresh.dir));
 	});
 
+	it("writes after edits that rename formats.js or the plural rules, across shards, what a compile from nothing writes", async () => {
+		// Enough keys for several shards, and in each, likely, keys no edit touches that call a
+		// formatter or the plural rules: their shards import the module the edits rename.
+		const plural = [
+			{
+				declarations: ["input count", "local n = count: number"],
+				selectors: ["n"],
+				match: { "n=one": "{n} item", "n=*": "{n} items" },
+			},
+		];
+		const texts = (locale: string) =>
+			Object.fromEntries(
+				Array.from({ length: 1200 }, (_, index) => [
+					`text_${index}`,
+					index % 100 === 0
+						? `${locale} {amount :number style=currency currency=EUR}`
+						: index % 100 === 50
+							? plural
+							: `${locale} ${index}`,
+				]),
+			);
+		const rounded = [
+			{
+				declarations: [
+					"input count",
+					"local n = count: number minimumFractionDigits=1",
+				],
+				selectors: ["n"],
+				match: { "n=one": "{n} one", "n=*": "{n}" },
+			},
+		];
+		const versions = [
+			{ price: "{amount :number minimumFractionDigits=2}" },
+			{ price: "{amount :number minimumFractionDigits=3}" },
+			{ price: "{amount :number minimumFractionDigits=3}", rounded },
+			{ price: "{amount :number style=percent}" },
+		];
+		const catalogsAt = (version: Record<string, unknown>) => ({
+			en: { ...texts("en"), ...version },
+			de: { ...texts("de"), ...version },
+		});
+		const { dir, config } = project(catalogsAt(versions[0] ?? {}));
+		let { build } = await recompile(config, undefined);
+		for (const version of versions.slice(1)) {
+			const next = catalogsAt(version);
+			writeFileSync(join(dir, "messages", "en.json"), laidOut(next.en));
+			writeFileSync(join(dir, "messages", "de.json"), laidOut(next.de));
+			({ build } = await recompile(config, build));
+			const fresh = project(next);
+			await recompile(fresh.config, undefined);
+
+			expect(build?.rendered.shards.length).toBeGreaterThan(1);
+			expect(await outputOf(dir)).toEqual(await outputOf(fresh.dir));
+		}
+	});
+
 	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
 		const { dir, config } = project(catalogs);
 		const built = async (previous?: Build) => {
