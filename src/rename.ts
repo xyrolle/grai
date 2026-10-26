@@ -19,6 +19,7 @@ import { descriptionsRenamed } from "./descriptions.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
 import { compileOutputIfMissing } from "./output-present.ts";
+import { realPath } from "./real-path.ts";
 import { codeEdits, edited } from "./rename-edits.ts";
 import { writeAll } from "./write-all.ts";
 
@@ -90,7 +91,12 @@ export async function rename(
 	const described = descriptionsRenamed(config, from, to);
 	if (described !== undefined) texts.set(described.file, described.text);
 	writeAll(texts);
-	const changed = [...texts.keys()].map((path) => relative(config.root, path));
+	// The code's files are named by their real paths, as the bundler names them, so each file and the
+	// root are taken by theirs to name a file as the project does.
+	const root = realPath(config.root);
+	const changed = [...texts.keys()].map((path) =>
+		relative(root, realPath(path)),
+	);
 	return { ...(await compile(configFile)), changed };
 }
 
