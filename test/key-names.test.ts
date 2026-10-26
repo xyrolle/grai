@@ -2,15 +2,15 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { build, type InlineConfig, parseSync } from "vite";
+import { build, type InlineConfig } from "vite";
 import { describe, expect, it } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { devModule } from "../src/dev-module.ts";
 import { outputPrefix, textModulePrefix } from "../src/locale-chunks.ts";
-import { calledNames, everyName } from "../src/output-imports.ts";
 import { grai } from "../src/vite.ts";
 import { textModule } from "../src/vite-build.ts";
 import { project } from "./project.ts";
+import { unrecordedCalls } from "./recorded-names.ts";
 
 /**
  * Keys named as what a module of keys calls: the runtime's functions, plurals.js's, a formatter
@@ -61,6 +61,7 @@ const catalog = {
 			match: { "n=1": "one", "n=*": "more" },
 		},
 	],
+	shifted: "{n :offset subtract=1}",
 	Intl: "Intl",
 	Object: "Object",
 	T: "T",
@@ -82,6 +83,7 @@ const calls: Record<string, [inputs: object | undefined, says: unknown]> = {
 	integer: [{ count: 2.2 }, "two"],
 	String: [{ kind: 1 }, "first"],
 	Number: [{ count: 1 }, "one"],
+	shifted: [{ n: 3 }, "2"],
 	Intl: [undefined, "Intl"],
 	Object: [undefined, "Object"],
 	T: [undefined, "T"],
@@ -230,57 +232,12 @@ const shapes = {
 	guests: "With {names :list}, {days :relativetime unit=day}",
 };
 
-/**
- * The names an expression refers to and does not bind itself: each identifier but a property's
- * name, less the names its functions bind.
- */
-function freeNames(code: string): Set<string> {
-	const { program, errors } = parseSync("value.js", `(${code});`);
-	if (errors.length > 0) throw new Error(errors[0]?.message);
-	const bound = new Set<string>();
-	const named = new Set<string>();
-	const visit = (node: unknown, role: "reference" | "binding" | "name") => {
-		if (Array.isArray(node)) {
-			for (const each of node) visit(each, role);
-			return;
-		}
-		if (typeof node !== "object" || node === null || !("type" in node)) return;
-		if (node.type === "Identifier" && "name" in node) {
-			const into = { reference: named, binding: bound, name: undefined }[role];
-			into?.add(String(node.name));
-			return;
-		}
-		const computed = "computed" in node && node.computed === true;
-		for (const [field, child] of Object.entries(node)) {
-			if (node.type === "MemberExpression" && field === "property" && !computed)
-				visit(child, "name");
-			else if (node.type === "Property" && field === "key" && !computed)
-				visit(child, "name");
-			else if (
-				field === "params" ||
-				(node.type === "VariableDeclarator" && field === "id")
-			)
-				visit(child, "binding");
-			else visit(child, "reference");
-		}
-	};
-	visit(program, "reference");
-	return new Set([...named].filter((name) => !bound.has(name)));
-}
-
 describe("a key's code", () => {
 	it("calls nothing but the names its module records, so the module knows each name a key could take", async () => {
 		const { config } = project({ en: shapes });
 		const { build: compiled } = await recompile(config, undefined);
 		if (compiled === undefined) throw new Error("the compile failed");
-		for (const [key, value] of compiled.compilation.keys) {
-			const recorded = everyName(calledNames([value], value.uses));
-			for (const code of [value.value, value.serverValue])
-				expect({
-					key,
-					calls: [...freeNames(code)].filter((name) => !recorded.has(name)),
-				}).toEqual({ key, calls: [] });
-		}
+		expect(unrecordedCalls(compiled.compilation.keys)).toEqual([]);
 	});
 
 	it("binds a key that takes no name under its own name, and one that does under a name of its own", async () => {
