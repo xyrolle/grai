@@ -35,10 +35,14 @@ export type ProjectCode = {
 	graph: ModuleGraph;
 };
 
-/** A project's code under the roots, or the error that keeps its imports from resolving. */
+/**
+ * A project's code under the roots, or the error that keeps its imports from resolving. With a key,
+ * only what may read or reach that key is read (`keyNamesOf`), for a command about it alone.
+ */
 export async function readProjectCode(
 	given: Config,
 	roots: readonly string[],
+	key?: string,
 ): Promise<ProjectCode | GraiError> {
 	// Each module named by its real path, as the bundler names it and the resolver resolves it, so a
 	// project reached through a symlink, as macOS reaches its temporary directory, finds its sources
@@ -105,6 +109,8 @@ export async function readProjectCode(
 		// more.
 		const test = new TextTest({
 			root: config.root,
+			output,
+			key,
 			listing: {
 				roots: listedRoots,
 				skipped: seen.skipped,
@@ -136,7 +142,7 @@ export async function readProjectCode(
 			for (const [path, source] of added) sources.set(path, source);
 			const paths = await resolvedImports(added, resolution, resolveFile, pool);
 			for (const [key, path] of paths) resolved.set(key, path);
-			const holds = holding(new ModuleGraph(output, resolve, factsOfPath));
+			const holds = holding(new ModuleGraph(output, resolve, factsOfPath), key);
 			barrels = await barrelsOf(sources.keys(), holds);
 			// The installed packages the sources left out may import, and that pass grai's on.
 			if (mappings !== undefined) {
@@ -155,11 +161,15 @@ export async function readProjectCode(
 /** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */
 const holdsNothing: FileFacts = { modules: [] };
 
-/** Whether a module passes grai's on: whether it holds a key or more. */
-function holding(graph: ModuleGraph): (path: string) => Promise<boolean> {
+/** Whether a module passes grai's on: whether it holds a key or more, or this key. */
+function holding(
+	graph: ModuleGraph,
+	key: string | undefined,
+): (path: string) => Promise<boolean> {
 	return async (path) => {
 		const held = await graph.keysHeld({ kind: "module", path });
-		return held === "every" || held.size > 0;
+		if (held === "every") return true;
+		return key === undefined ? held.size > 0 : held.has(key);
 	};
 }
 
