@@ -277,3 +277,38 @@ it("removes a save a process left as it crashed, and none whose process still ru
 	expect([existsSync(stale), existsSync(running)]).toEqual([false, true]);
 	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
 });
+
+it("saves one whole build when two watchers of an outdir close at once, so no start takes up a mix of them", async () => {
+	// Long enough catalogs that a save takes several writes, which two saves at once would interleave.
+	const valued = (value: string) =>
+		Object.fromEntries(
+			Array.from({ length: 5000 }, (_, index) => [
+				`key_${index}`,
+				`${value} ${index} ${"x".repeat(400)}`,
+			]),
+		);
+	const { dir, config: file } = project(
+		{ en: valued("old"), de: valued("alt") },
+		config,
+	);
+	const watching = async () => {
+		const first = Promise.withResolvers<void>();
+		const watcher = watch(file, () => first.resolve(), first.reject);
+		await first.promise;
+		return watcher;
+	};
+	const before = await watching();
+	writeFileSync(
+		join(dir, "messages", "en.json"),
+		JSON.stringify(valued("new"), null, "\t"),
+	);
+	const after = await watching();
+
+	await Promise.all([before.close(), after.close()]);
+	const start = await started(file);
+
+	expect(await fresh(file)).toEqual({
+		written: [],
+		files: start.build?.rendered.files,
+	});
+});

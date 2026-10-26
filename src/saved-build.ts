@@ -1,4 +1,5 @@
-import { renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { deserialize, serialize } from "node:v8";
@@ -28,27 +29,37 @@ type SavedCatalog = Omit<Catalog, "revision" | "edit">;
 const savedName = "build";
 
 /**
- * The file a process writes its save to before it renames it into place. Not a `.tmp` file: a
- * compile under the output's lock removes those as left by a compile that stopped halfway, and a
- * save does not take the lock, which would hold up an edit's compile while 22 MB are written. A
- * process's own name, so saves never write into each other's; one that a crash left is removed by
- * the next save, once its process is gone (`removeStaleSaves`).
+ * The file one save writes to before it renames it into place, created for that save alone. Not a
+ * `.tmp` file: a compile under the output's lock removes those as left by a compile that stopped
+ * halfway, and a save does not take the lock, which would hold up an edit's compile while 22 MB are
+ * written. Its own file for each save, not for each process: two watchers of an outdir in one
+ * process saved through one file at once, and the build renamed into place could be part of each,
+ * whole enough to read and to render the old words. The pid in its name lets the next save remove
+ * one that a crash left, once its process is gone (`removeStaleSaves`).
  */
-export function savingFile(state: string, pid: number): string {
-	return join(state, `${savedName}.${pid}.saving`);
+export function savingFile(state: string, pid: number = process.pid): string {
+	return join(state, `${savedName}.${pid}.${randomUUID()}.saving`);
 }
-const savingName = new RegExp(`^${savedName}\\.(\\d+)\\.saving$`);
+const savingName = new RegExp(
+	`^${savedName}\\.(\\d+)\\.[0-9a-f-]{36}\\.saving$`,
+);
 
 /**
  * Saves a build for the next process's first compile, as V8 serializes it, in a file beside the
- * manifest. The file is written whole to the process's `savingFile` and then renamed into place,
- * so a reader sees one build or another, never part of one, whichever process saved it last.
+ * manifest. The file is written whole to a `savingFile` of this save's own, which it creates and
+ * no other save opens, and then renamed into place, so a reader sees one build or another, never
+ * part of one, whichever save renamed last.
  */
 export async function saveBuild(build: Build): Promise<void> {
 	const { temporary, file, bytes } = savedFile(build);
 	await removeStaleSaves(dirname(file));
-	await writeFile(temporary, bytes);
-	await rename(temporary, file);
+	try {
+		await writeFile(temporary, bytes, { flag: "wx" });
+		await rename(temporary, file);
+	} catch (error) {
+		await unlink(temporary).catch(ignoreMissing);
+		throw error;
+	}
 }
 
 /**
@@ -57,8 +68,17 @@ export async function saveBuild(build: Build): Promise<void> {
  */
 export function saveBuildNow(build: Build): void {
 	const { temporary, file, bytes } = savedFile(build);
-	writeFileSync(temporary, bytes);
-	renameSync(temporary, file);
+	try {
+		writeFileSync(temporary, bytes, { flag: "wx" });
+		renameSync(temporary, file);
+	} catch (error) {
+		try {
+			unlinkSync(temporary);
+		} catch (removing) {
+			ignoreMissing(removing);
+		}
+		throw error;
+	}
 }
 
 /** Removes the saves that processes no longer running left halfway, as when one crashed. */
@@ -71,9 +91,7 @@ async function removeStaleSaves(state: string): Promise<void> {
 		names.map(async (name) => {
 			const pid = Number(savingName.exec(name)?.[1]);
 			if (!Number.isInteger(pid) || pid === process.pid || isAlive(pid)) return;
-			await unlink(join(state, name)).catch((error: unknown) => {
-				if (!isMissing(error)) throw error;
-			});
+			await unlink(join(state, name)).catch(ignoreMissing);
 		}),
 	);
 }
@@ -93,7 +111,7 @@ function savedFile(build: Build): {
 	};
 	const state = join(build.config.outdir, stateDirectory);
 	return {
-		temporary: savingFile(state, process.pid),
+		temporary: savingFile(state),
 		file: join(state, savedName),
 		bytes: Buffer.concat([Buffer.from(`${key}\n`), serialize(saved)]),
 	};
@@ -159,4 +177,8 @@ function withoutRevision({
 	...catalog
 }: Catalog): SavedCatalog {
 	return catalog;
+}
+
+function ignoreMissing(error: unknown): void {
+	if (!isMissing(error)) throw error;
 }
