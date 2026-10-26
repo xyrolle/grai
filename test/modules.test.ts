@@ -13,7 +13,7 @@ import { deserialize, serialize } from "node:v8";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { factsOf } from "../src/code/facts.ts";
 import { readerVersion } from "../src/code/facts-cache.ts";
-import { factsOfFiles } from "../src/code/facts-pool.ts";
+import { inWorkers, workerStart, workersFor } from "../src/code/facts-pool.ts";
 import { type ProjectCode, readProjectCode } from "../src/code/project.ts";
 import { type Config, readConfig } from "../src/config.ts";
 import { GraiError } from "../src/error.ts";
@@ -291,21 +291,34 @@ describe("reading a project's facts", () => {
 		expect(statSync(cache).ino).toBe(file);
 	});
 
-	// Enough work for the pool to start, read twice, which takes seconds on a loaded machine.
-	it("reads files in a pool of workers into the same facts as on one thread", {
-		timeout: 30_000,
-	}, async () => {
-		// Each file reads many keys.
-		const reads = Array.from({ length: 400 }, (_, n) => `m.key_${n}();`).join(
-			"\n",
-		);
-		const files = Array.from({ length: 1500 }, (_, n) => ({
-			path: `src/m${n}.ts`,
-			text: `import { m } from "./i18n";\n${reads}\nexport const v${n} = 1;\n`,
-		}));
+	it("sizes the pool by the work left: no worker for a little, one for each worker's start of it, at most the parallelism less one", () => {
+		// The reading has taken a worker's start, a millisecond for each file read.
+		const after = workerStart + 1;
+		const workers = (left: number, parallelism = 8) =>
+			workersFor(after, after, left, parallelism);
+
+		expect(
+			[400, 600, 1_000, 1_500, 100_000].map((left) => workers(left)),
+		).toEqual([0, 2, 4, 6, 7]);
+		expect(workers(100_000, 2)).toBe(0);
+		// Before a worker's start has passed, the reading goes on here whatever is left.
+		expect(workersFor(workerStart, workerStart, 100_000, 8)).toBe(0);
+	});
+
+	it("reads files in workers into the same facts as on one thread, each in its place", async () => {
+		const files = [
+			...Array.from({ length: 5 }, (_, n) => ({
+				path: `src/m${n}.ts`,
+				text: `import { m } from "./i18n";\n${"m.title();\n".repeat(n + 1)}export const v${n} = 1;\n`,
+			})),
+			{
+				path: "src/App.svelte",
+				text: '<script>\n\timport { m } from "./i18n";\n</script>\n<h1>{m.title()}</h1>\n',
+			},
+		];
 		const inline = [];
 		for (const { path, text } of files) inline.push(await factsOf(path, text));
 
-		expect(await factsOfFiles(files)).toEqual(inline);
+		expect(await inWorkers(files, 2)).toEqual(inline);
 	});
 });
