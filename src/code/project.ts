@@ -8,6 +8,7 @@
 import { readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { Config } from "../config.ts";
+import { GraiError } from "../error.ts";
 import { stateDirectory } from "../outdir-contents.ts";
 import { sourceFiles } from "../sources.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
@@ -41,11 +42,13 @@ const readable = new Set([
 	".mdx",
 ]);
 
-/** A project's code under the roots. */
+/** A project's code under the roots, or the error that keeps its imports from resolving. */
 export async function readProjectCode(
 	config: Config,
 	roots: readonly string[],
-): Promise<ProjectCode> {
+): Promise<ProjectCode | GraiError> {
+	const resolve = await projectResolve(config.root);
+	if (resolve instanceof GraiError) return resolve;
 	const cache = new FactsCache(join(config.outdir, stateDirectory));
 	const files = sourceFiles(roots, config.root, config.outdir);
 	const facts = files.map(({ path, text }) => cache.get(path, text));
@@ -79,7 +82,6 @@ export async function readProjectCode(
 		keys: join(config.outdir, "keys.js"),
 		keyOf: () => undefined,
 	};
-	const resolve = await projectResolve(config.root);
 	return { sources, graph: new ModuleGraph(output, resolve, factsOfPath) };
 }
 
