@@ -15,11 +15,27 @@ export type Piece = { at: number; from: number; length: number };
 /** Why a file's code cannot be read, and where in the file. */
 export type CodeError = { at: number; message: string };
 
-/** A module's code: the text, its language, and the pieces of it that are the file's. */
+/**
+ * A name a template writes in shorthand, which stands for a name and the value of the same name:
+ * Svelte's `{title}` and `bind:title`, Vue's `:title`, Astro's `{title}`. To use another binding in
+ * its place, the file's text at `replaces` becomes `before`, the binding's name, then `after`:
+ * `title={heading}`.
+ */
+export type Shorthand = {
+	replaces: { start: number; end: number };
+	before: string;
+	after: string;
+};
+
+/**
+ * A module's code: the text, its language, the pieces of it that are the file's, and the names its
+ * template writes in shorthand, by the offset in the file where the name is.
+ */
 export type SourceCode = {
 	readonly text: string;
 	readonly lang: Lang;
 	readonly pieces: readonly Piece[];
+	readonly shorthands: ReadonlyMap<number, Shorthand>;
 };
 
 /** A script file's code: its text as it is, in the language its extension names. */
@@ -28,6 +44,7 @@ export function scriptCode(path: string, text: string): SourceCode {
 		text,
 		lang: langOf(path),
 		pieces: [{ at: 0, from: 0, length: text.length }],
+		shorthands: new Map(),
 	};
 }
 
@@ -44,6 +61,7 @@ export function langOf(path: string): Lang {
 export class CodeWriter {
 	private text = "";
 	private readonly pieces: Piece[] = [];
+	private readonly shorthands = new Map<number, Shorthand>();
 	/** The file's text, which the pieces are of. */
 	readonly source: string;
 
@@ -69,8 +87,18 @@ export class CodeWriter {
 		return this.write("(\n").piece(from, to).write("\n);\n");
 	}
 
+	/**
+	 * A name the file writes in shorthand, from `from` to `to`, as an expression of its own, and how
+	 * the shorthand is written out in full around another name.
+	 */
+	shorthand(from: number, to: number, written: Shorthand): this {
+		this.shorthands.set(from, written);
+		return this.expression(from, to);
+	}
+
 	code(lang: Lang): SourceCode {
-		return { text: this.text, lang, pieces: this.pieces };
+		const { text, pieces, shorthands } = this;
+		return { text, lang, pieces, shorthands };
 	}
 }
 

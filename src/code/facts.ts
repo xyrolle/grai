@@ -7,26 +7,37 @@
  */
 
 import { isLoad, loadFact } from "./loads.ts";
-import type { ESTree } from "./parse.ts";
+import { exportFacts, importFact } from "./module-record.ts";
 import { type CodeError, type ModuleCode, readCode } from "./read.ts";
 import { Scopes } from "./scopes.ts";
-import { fileOffset, type SourceCode } from "./source.ts";
+import { fileOffset, type Shorthand, type SourceCode } from "./source.ts";
 import type { Node } from "./syntax.ts";
-import { usesOf } from "./uses.ts";
+import { propertyShorthand } from "./use-ends.ts";
+import { type FileOf, usesOf } from "./uses.ts";
 
 /** A stretch of the file. */
 export type Span = { start: number; end: number };
 
 /**
  * Where a module gets a value: a static import's or a re-export's path, a dynamic import's or a
- * `require()`'s literal path, each with the names it takes. A namespace import takes `*`.
+ * `require()`'s literal path, each with the names it takes, where the name it imports is and where
+ * the binding it makes is, and the names a re-export passes on. A namespace import takes `*`.
  */
 export type ImportFact = {
 	source: string;
 	/** Where the path's text is, for a rename of a key's path. */
 	path: Span;
-	names: { imported: string; local: string; at: Span }[];
+	names: { imported: string; importedAt: Span; local: string; at: Span }[];
+	reexports: Reexport[];
 	typeOnly: boolean;
+};
+
+/** A name a re-export passes on, `export { imported as exported } from`, and where each is. */
+export type Reexport = {
+	imported: string;
+	importedAt: Span;
+	exported: string;
+	exportedAt: Span;
 };
 
 /**
@@ -39,14 +50,13 @@ export type ExportFact =
 	| { exported: string | undefined; source: string; imported: string };
 
 /**
- * A use of a value a module imports or loads: the import's local name, or the load's index; the
- * static names read from it in turn (`m.title` reads `title`, `i18n.m.title` reads `m` then
- * `title`), each where its name is and where the expression that reads it is; and what then
- * happens to what they read.
+ * A use of a value a module imports or loads: the import's local name, or the load's index; where
+ * the use is, and how the file writes it when in shorthand; the static names read from it in turn
+ * (`m.title` reads `title`, `i18n.m.title` reads `m` then `title`), each where its name is and
+ * where the expression that reads it is; and what then happens to what they read.
  */
-export type UseFact = {
+export type UseFact = Reference & {
 	from: { local: string } | { load: number };
-	at: Span;
 	type: boolean;
 	chain: { name: string; at: Span; expression: Span }[];
 	end: UseEnd;
@@ -76,8 +86,14 @@ export type UseEnd =
 	  }
 	| { kind: "export" };
 
-/** A name a pattern binds, with every reference to it, for a rename of a key's binding. */
-export type Binding = { name: string; at: Span; references: Span[] };
+/** A name an import or a pattern binds, with every reference to it, for a rename of the binding. */
+export type Binding = { name: string; at: Span; references: Reference[] };
+
+/**
+ * A use of a name: where it is, and, when it is written in shorthand (`{ title }`, Svelte's
+ * `{title}`), how to write it out in full around another name.
+ */
+export type Reference = { at: Span; shorthand: Shorthand | undefined };
 
 /**
  * A dynamic import or `require()`, by a literal path (an `ImportFact` too) or by a template or a
@@ -114,6 +130,15 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 		if (isLoad(node)) loadNodes.push(node);
 	});
 	const span = (node: Span): Span => fileSpan(source, node);
+	const file: FileOf = {
+		span,
+		reference: (use) => {
+			const at = span(use);
+			const shorthand =
+				source.shorthands.get(at.start) ?? propertyShorthand(use, scopes, at);
+			return { at, shorthand };
+		},
+	};
 	const imports: ImportFact[] = [];
 	const exports: ExportFact[] = [];
 	const loads: LoadFact[] = [];
@@ -129,11 +154,12 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 				source: fact.source,
 				path: fact.at,
 				names: [],
+				reexports: [],
 				typeOnly: false,
 			});
 		}
 	}
-	const { uses, aliases } = usesOf(program, scopes, loadNodes, span);
+	const { uses, aliases } = usesOf(program, scopes, loadNodes, file);
 	return { imports, exports, loads, uses, aliases };
 }
 
@@ -142,84 +168,4 @@ export function fileSpan(source: SourceCode, node: Span): Span {
 	const start = fileOffset(source, node.start) ?? -1;
 	const end = fileOffset(source, node.end) ?? start;
 	return { start, end };
-}
-
-function importFact(
-	statement: ESTree.Statement | ESTree.Directive | ESTree.ModuleDeclaration,
-	span: (node: Span) => Span,
-	imports: ImportFact[],
-): void {
-	if (statement.type === "ImportDeclaration") {
-		imports.push({
-			source: statement.source.value,
-			path: span(statement.source),
-			names: statement.specifiers.map((specifier) => ({
-				imported:
-					specifier.type === "ImportNamespaceSpecifier"
-						? "*"
-						: specifier.type === "ImportDefaultSpecifier"
-							? "default"
-							: nameOf(specifier.imported),
-				local: specifier.local.name,
-				at: span(specifier.local),
-			})),
-			typeOnly: statement.importKind === "type",
-		});
-	} else if (
-		(statement.type === "ExportNamedDeclaration" &&
-			statement.source !== null) ||
-		statement.type === "ExportAllDeclaration"
-	) {
-		const source = statement.source;
-		if (source === null) return;
-		imports.push({
-			source: source.value,
-			path: span(source),
-			names: [],
-			typeOnly: statement.exportKind === "type",
-		});
-	}
-}
-
-function exportFacts(
-	statement: ESTree.Statement | ESTree.Directive | ESTree.ModuleDeclaration,
-	exports: ExportFact[],
-): void {
-	if (statement.type === "ExportAllDeclaration") {
-		if (statement.exportKind === "type") return;
-		exports.push({
-			exported:
-				statement.exported === null ? undefined : nameOf(statement.exported),
-			source: statement.source.value,
-			imported: "*",
-		});
-	} else if (statement.type === "ExportNamedDeclaration") {
-		if (statement.exportKind === "type") return;
-		for (const specifier of statement.specifiers) {
-			if (specifier.exportKind === "type") continue;
-			const exported = nameOf(specifier.exported);
-			const local = nameOf(specifier.local);
-			exports.push(
-				statement.source === null
-					? { exported, local }
-					: { exported, source: statement.source.value, imported: local },
-			);
-		}
-		const declaration = statement.declaration;
-		if (declaration?.type === "VariableDeclaration") {
-			for (const { id } of declaration.declarations) {
-				if (id.type === "Identifier")
-					exports.push({ exported: id.name, local: id.name });
-			}
-		}
-	} else if (statement.type === "ExportDefaultDeclaration") {
-		const declaration = statement.declaration;
-		if (declaration.type === "Identifier") {
-			exports.push({ exported: "default", local: declaration.name });
-		}
-	}
-}
-
-function nameOf(name: ESTree.ModuleExportName): string {
-	return name.type === "Literal" ? name.value : name.name;
 }
