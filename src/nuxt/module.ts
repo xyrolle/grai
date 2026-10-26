@@ -12,7 +12,7 @@ import { type CompileResult, recompile } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { graiPlugin } from "../vite-plugin.ts";
-import { localizedPages } from "./pages.ts";
+import { localizedPages, sharedPath } from "./pages.ts";
 
 /** The module's options. `config` is the path of the project's grai.config.json, from its root. */
 export type GraiNuxtOptions = { config: string };
@@ -53,14 +53,6 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 				base,
 			);
 		}
-		const { pathnames, domains } = config.urlRouting;
-		if (pathnames.length > 0 && domains.length > 0) {
-			throw new GraiError(
-				"config-invalid",
-				{ file: basename(configFile) },
-				`Nuxt routes a page by its path alone, so on a locale's own host ("domains") it cannot route that locale's words ("pathnames"). Leave out one of them.`,
-			);
-		}
 		// As grai/vite's compile, so that the output it finds is already the one it would write.
 		const { result } = await recompile(configFile, undefined, {
 			localeCopies: true,
@@ -84,14 +76,17 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		addPlugin(runtime("./runtime/plugin"));
 		if (config.strategy.includes("url")) {
 			nuxt.hook("pages:resolved", (pages) => {
-				pages.push(
-					...localizedPages(
-						pages,
-						config.locales,
-						config.baseLocale,
-						config.urlRouting,
-					),
-				);
+				const { locales, baseLocale, urlRouting } = config;
+				const shared = sharedPath(pages, locales, baseLocale, urlRouting);
+				if (shared !== undefined) {
+					const [owner, page] = shared.pages;
+					throw new GraiError(
+						"config-invalid",
+						{ file: basename(configFile) },
+						`Nuxt routes a page by its path alone, the same on every host, and "pathnames" gives ${shared.path} to ${page} in ${shared.locale}, where it is ${owner}'s path too. Give one of them other words.`,
+					);
+				}
+				pages.push(...localizedPages(pages, locales, baseLocale, urlRouting));
 			});
 		}
 	},
