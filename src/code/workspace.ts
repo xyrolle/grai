@@ -7,7 +7,7 @@
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { sourceFiles } from "../sources.ts";
-import { type Package, textTest } from "./candidates.ts";
+import { type Package, textTest, written } from "./candidates.ts";
 
 export function workspacePackages(root: string): Package[] {
 	const packages: Package[] = [];
@@ -95,7 +95,7 @@ export class OutsidePackages {
 		const passing = new Set<string>();
 		for (let grown = true; grown; ) {
 			grown = false;
-			const test = textTest(new Set([...names, ...passing]));
+			const test = textTest(new Set([...names, ...[...passing].map(written)]));
 			for (const { name, texts } of this.packages) {
 				if (passing.has(name) || !texts().some((text) => test.test(text))) {
 					continue;

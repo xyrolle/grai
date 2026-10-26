@@ -34,10 +34,12 @@ const unwritten =
 
 /** The test a file's text must pass to be read, from the names that may name a destination. */
 export function textTest(names: ReadonlySet<string>): RegExp {
-	const written = [...names].map((name) =>
-		name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-	);
-	return new RegExp([unwritten.source, ...written].join("|"));
+	return new RegExp([unwritten.source, ...names].join("|"));
+}
+
+/** A name as a text writes it, as the source of a pattern. */
+export function written(name: string): string {
+	return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -50,35 +52,44 @@ export function namesOf(
 	links: readonly Link[],
 	packages: readonly Package[],
 ): Set<string> | undefined {
-	const names = new Set([basename(destinations.outdir)]);
-	for (const barrel of destinations.barrels) {
-		// A path to an index names its folder, which a path to it goes through.
-		const stem = basename(barrel, extname(barrel));
-		names.add(stem === "index" ? basename(dirname(barrel)) : stem);
-	}
+	const names = new Set([written(basename(destinations.outdir))]);
+	for (const barrel of destinations.barrels) names.add(written(nameOf(barrel)));
 	const lands = (path: string) => landsOn(path, destinations);
 	for (const { key, targets } of mappings) {
 		const star = key.indexOf("*");
-		const written = star === -1 ? key : key.slice(0, star);
+		const fixed = star === -1 ? key : key.slice(0, star);
 		const named = targets.some((target) =>
 			star === -1
 				? namesExactly(target, lands)
 				: namesBelow(target, destinations),
 		);
 		if (!named) continue;
-		if (written === "") return undefined;
-		names.add(written);
+		if (fixed === "") return undefined;
+		names.add(written(fixed));
 	}
 	for (const { path, real } of links) {
-		if (lands(real)) names.add(basename(path, extname(path)));
+		if (lands(real)) names.add(written(basename(path, extname(path))));
 	}
 	for (const { name, directory } of packages) {
 		const inside = [destinations.outdir, ...destinations.barrels].some(
 			(destination) => destination.startsWith(`${directory}/`),
 		);
-		if (inside) names.add(name);
+		if (inside) names.add(written(name));
 	}
 	return names;
+}
+
+/** The name a path to a module goes through: its file's, or for an index, its folder's. */
+function nameOf(file: string): string {
+	const stem = basename(file, extname(file));
+	return stem === "index" ? basename(dirname(file)) : stem;
+}
+
+/** Whether a path names a module file: the file, its path without an extension, or an index's folder. */
+function pathNames(path: string, file: string): boolean {
+	const stem = file.slice(0, file.length - extname(file).length);
+	if (path === file || path === stem) return true;
+	return basename(stem) === "index" && path === dirname(file);
 }
 
 /** Whether a mapping without `*` may name a destination: its target lands on one, or is a specifier. */
@@ -110,13 +121,8 @@ function namesBelow(target: string, destinations: Destinations): boolean {
 	);
 }
 
-/** Whether a path names a destination: in the output directory, a barrel, or an index barrel's folder. */
+/** Whether a path names a destination: in the output directory, or a barrel's module. */
 function landsOn(path: string, { outdir, barrels }: Destinations): boolean {
 	if (path === outdir || path.startsWith(`${outdir}/`)) return true;
-	for (const barrel of barrels) {
-		const stem = barrel.slice(0, barrel.length - extname(barrel).length);
-		if (path === barrel || path === stem) return true;
-		if (basename(stem) === "index" && path === dirname(barrel)) return true;
-	}
-	return false;
+	return [...barrels].some((barrel) => pathNames(path, barrel));
 }
