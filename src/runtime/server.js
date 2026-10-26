@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import {
 	baseLocale,
 	cookieName,
+	hostsLocales,
 	locales,
 	prefixesEveryLocale,
 	queryParameter,
@@ -16,6 +17,7 @@ import {
 	bindRequests,
 	isLocale,
 	lacksPrefix,
+	localeOfHost,
 	localeOfPath,
 	localizeUrl,
 } from "./runtime.js";
@@ -45,12 +47,16 @@ export const vary = headersRead().join(", ");
  * @returns {Promise<Response>}
  */
 export async function middleware(request, handler) {
-	const { pathname } = new URL(request.url);
-	const locale = assertIsLocale(findLocale(request, pathname));
-	const response = unprefixedPage(request, pathname)
-		? Response.redirect(localizeUrl(request.url, { locale }), 307)
-		: await requests.run({ index: locales.indexOf(locale) }, () =>
-				handler({ request, locale }),
+	const url = new URL(request.url);
+	const locale = assertIsLocale(findLocale(request, url));
+	const response = unprefixedPage(request, url)
+		? Response.redirect(localizeUrl(url, { locale }), 307)
+		: await requests.run(
+				// The origin only where links may cross to another locale's host.
+				hostsLocales
+					? { index: locales.indexOf(locale), origin: url.origin }
+					: { index: locales.indexOf(locale) },
+				() => handler({ request, locale }),
 			);
 	return vary === "" ? response : withVary(response);
 }
@@ -63,7 +69,7 @@ export async function middleware(request, handler) {
  * @returns {string}
  */
 export function localeOf(request) {
-	return assertIsLocale(findLocale(request, new URL(request.url).pathname));
+	return assertIsLocale(findLocale(request, new URL(request.url)));
 }
 
 /**
@@ -75,10 +81,10 @@ export function localeOf(request) {
  * @returns {Response | undefined}
  */
 export function redirectOf(request) {
-	const { pathname } = new URL(request.url);
-	if (!unprefixedPage(request, pathname)) return undefined;
-	const locale = assertIsLocale(findLocale(request, pathname));
-	const redirect = Response.redirect(localizeUrl(request.url, { locale }), 307);
+	const url = new URL(request.url);
+	if (!unprefixedPage(request, url)) return undefined;
+	const locale = assertIsLocale(findLocale(request, url));
+	const redirect = Response.redirect(localizeUrl(url, { locale }), 307);
 	return vary === "" ? redirect : withVary(redirect);
 }
 
@@ -88,14 +94,15 @@ export function redirectOf(request) {
  * answered with another address, at a path the `url` strategy does not leave alone.
  *
  * @param {Request} request
- * @param {string} pathname
+ * @param {URL} url
  */
-function unprefixedPage(request, pathname) {
+function unprefixedPage(request, url) {
 	return (
 		prefixesEveryLocale &&
 		readsUrl &&
 		(request.method === "GET" || request.method === "HEAD") &&
-		lacksPrefix(pathname)
+		localeOfHost(url.host) === undefined &&
+		lacksPrefix(url.pathname)
 	);
 }
 
@@ -103,11 +110,11 @@ function unprefixedPage(request, pathname) {
  * The first locale the strategy finds in the request, else the base locale.
  *
  * @param {Request} request
- * @param {string} pathname
+ * @param {URL} url
  */
-function findLocale(request, pathname) {
+function findLocale(request, url) {
 	for (const source of strategy) {
-		const locale = fromSource(source, request, pathname);
+		const locale = fromSource(source, request, url);
 		if (locale !== undefined) return locale;
 	}
 	return baseLocale;
@@ -119,19 +126,19 @@ function findLocale(request, pathname) {
  *
  * @param {(typeof strategy)[number]} source
  * @param {Request} request
- * @param {string} pathname
+ * @param {URL} url
  * @returns {string | undefined}
  */
-function fromSource(source, request, pathname) {
+function fromSource(source, request, url) {
 	switch (source) {
 		case "cookie":
 			return fromCookie(request.headers.get("cookie") ?? "");
 		case "preferredLanguage":
 			return fromAcceptLanguage(request.headers.get("accept-language") ?? "");
 		case "query":
-			return fromQuery(request.url);
+			return fromQuery(url);
 		case "url":
-			return localeOfPath(pathname);
+			return localeOfHost(url.host) ?? localeOfPath(url.pathname);
 		case "localStorage":
 			return undefined;
 	}
@@ -141,13 +148,11 @@ function fromSource(source, request, pathname) {
  * The locale the URL's query parameter names, matched as a preferred language is, since a link may
  * name `de-AT` where the project has `de`.
  *
- * @param {string} url
+ * @param {URL} url
  */
 function fromQuery(url) {
 	const tag =
-		queryParameter === undefined
-			? null
-			: new URL(url).searchParams.get(queryParameter);
+		queryParameter === undefined ? null : url.searchParams.get(queryParameter);
 	return tag === null ? undefined : reachedBy(tag)[0];
 }
 

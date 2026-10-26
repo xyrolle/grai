@@ -28,6 +28,8 @@ export function configModule(config: Config, localeCopies: boolean): string {
 		`export const unlocalizedPaths = [${config.urlRouting.unlocalizedPaths.map((glob) => String(globPattern(glob))).join(", ")}];`,
 		...pathnamesTable(config.urlRouting.pathnames),
 		`export const basePath = ${JSON.stringify(config.urlRouting.basePath)};`,
+		"/** @type {readonly string[]} */",
+		`export const domains = ${JSON.stringify(config.urlRouting.domains)};`,
 		"/** @type {boolean} */",
 		`export const localeCopies = ${localeCopies};`,
 		"",
@@ -59,8 +61,14 @@ export function directionOf(locale: string): "ltr" | "rtl" {
  * bundler folds, so a page carries the code of only what its config uses.
  */
 function strategyConstants(config: Config): string[] {
-	const { localePrefix, prefixes, unlocalizedPaths, pathnames, basePath } =
-		config.urlRouting;
+	const {
+		localePrefix,
+		prefixes,
+		unlocalizedPaths,
+		pathnames,
+		basePath,
+		domains,
+	} = config.urlRouting;
 	const constants = {
 		readsUrl: config.strategy.includes("url"),
 		// Every place but the browser's languages keeps a visitor's choice.
@@ -74,6 +82,7 @@ function strategyConstants(config: Config): string[] {
 		leavesPathsAlone: unlocalizedPaths.length > 0,
 		translatesPaths: pathnames.length > 0,
 		servedUnderBase: basePath !== "",
+		hostsLocales: domains.length > 0,
 	};
 	return Object.entries(constants).map(
 		([name, value]) => `export const ${name} = ${value};`,

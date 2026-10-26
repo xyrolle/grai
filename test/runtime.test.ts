@@ -721,6 +721,60 @@ it("sends an unprefixed page under the base path to its locale's path there", as
 	]).toEqual(["https://example.test/shop/de/cart", "de"]);
 });
 
+describe("with a domain per locale", () => {
+	const config = {
+		strategy: ["url"],
+		domains: { en: "shop.test", de: "shop.de.test", ar: "shop.ar.test" },
+		pathnames: { "/about": { de: "/ueber-uns" } },
+	};
+
+	it("takes the locale a request's host is the domain of, and links across hosts with whole URLs", async () => {
+		const { runtime, middleware } = await served(config);
+		const answer = async (url: string, href: string, locale: string) =>
+			(
+				await middleware(
+					new Request(url),
+					({ locale: found }) =>
+						new Response(`${found} ${runtime.localizeHref(href, { locale })}`),
+				)
+			).text();
+
+		expect([
+			await answer("https://shop.de.test/cart", "/about", "de"),
+			await answer("https://shop.de.test/cart", "/about", "ar"),
+			await answer("https://shop.test/cart", "/about", "de"),
+		]).toEqual([
+			"de /ueber-uns",
+			"de https://shop.ar.test/about",
+			"en https://shop.de.test/ueber-uns",
+		]);
+		expect([
+			String(runtime.localizeUrl("https://shop.test/cart", { locale: "de" })),
+			runtime.deLocalizeUrl("https://shop.de.test/ueber-uns").pathname,
+			runtime.extractLocaleFromUrl("https://shop.ar.test/x"),
+		]).toEqual(["https://shop.de.test/cart", "/about", "ar"]);
+	});
+
+	it("routes by prefix on a host that is no locale's, as in development", async () => {
+		const { runtime, middleware } = await served(config);
+		const answer = async (url: string) =>
+			(
+				await middleware(
+					new Request(url),
+					({ locale }) =>
+						new Response(
+							`${locale} ${runtime.localizeHref("/about", { locale: "de" })}`,
+						),
+				)
+			).text();
+
+		expect([
+			await answer("http://localhost:5173/de/cart"),
+			await answer("http://localhost:5173/cart"),
+		]).toEqual(["de /de/ueber-uns", "en /de/ueber-uns"]);
+	});
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies, its storage and its reloads. */
 	function page(lang: string) {
