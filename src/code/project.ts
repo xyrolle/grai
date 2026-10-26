@@ -12,6 +12,7 @@ import { GraiError } from "../error.ts";
 import { keyModulePrefix } from "../locale-chunks.ts";
 import { stateDirectory } from "../outdir-contents.ts";
 import { moduleOf } from "../output-paths.ts";
+import { realPath } from "../real-path.ts";
 import { sourceExtensions, sourceFiles } from "../sources.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
@@ -30,9 +31,17 @@ export type ProjectCode = {
 
 /** A project's code under the roots, or the error that keeps its imports from resolving. */
 export async function readProjectCode(
-	config: Config,
+	given: Config,
 	roots: readonly string[],
 ): Promise<ProjectCode | GraiError> {
+	// Each module named by its real path, as the bundler names it and the resolver resolves it, so a
+	// project reached through a symlink, as macOS reaches its temporary directory, finds its sources
+	// and its output at the paths its imports resolve to.
+	const config = {
+		...given,
+		root: realPath(given.root),
+		outdir: realPath(given.outdir),
+	};
 	const output: Output = {
 		messages: join(config.outdir, "messages.js"),
 		keys: join(config.outdir, "keys.js"),
@@ -52,7 +61,7 @@ export async function readProjectCode(
 			: path;
 	};
 	const cache = new FactsCache(join(config.outdir, stateDirectory));
-	const files = sourceFiles(roots, config.root, config.outdir);
+	const files = sourceFiles(roots.map(realPath), config.root, config.outdir);
 	const facts = files.map(({ path, text }) => cache.get(path, text));
 	const unread = files.filter((_, index) => facts[index] === undefined);
 	const read = await factsOfFiles(unread);
