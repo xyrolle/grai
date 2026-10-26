@@ -74,7 +74,7 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		// build writes each message chunk's copy per locale, which a page then loads alone.
 		// Nuxt's own base is checked against grai's above: Vite's is where Nuxt puts its assets.
 		addVitePlugin(
-			() => graiPlugin({ config: configFile, localeChunks: true }).plugin,
+			() => graiPlugin({ config: configFile, localeChunks: true }).plugins,
 			{ server: false },
 		);
 		addServerHandler({

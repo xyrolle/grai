@@ -11,7 +11,7 @@ import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { keyModulePrefix } from "../locale-chunks.ts";
 import { stateDirectory } from "../outdir-contents.ts";
-import { moduleOf } from "../output-paths.ts";
+import { keyOfModule, moduleOf } from "../output-paths.ts";
 import { sourceExtensions, sourceFiles } from "../sources.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
@@ -36,10 +36,7 @@ export async function readProjectCode(
 	const output: Output = {
 		messages: join(config.outdir, "messages.js"),
 		keys: join(config.outdir, "keys.js"),
-		keyOf: (path) =>
-			path.startsWith(keyModulePrefix)
-				? path.slice(keyModulePrefix.length)
-				: undefined,
+		keyOf: keyOfModule,
 	};
 	const resolveFile = await projectResolve(config.root);
 	if (resolveFile instanceof GraiError) return resolveFile;

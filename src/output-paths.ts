@@ -5,6 +5,8 @@
  * so it follows the path as the build does.
  */
 
+import { keyModulePrefix } from "./locale-chunks.ts";
+
 /** A module of the output, by its import path: `messages.js` (`m`), `keys.js`, one key's path, or another. */
 export type MessageModule =
 	| { type: "messages" | "keys" | "other" }
@@ -27,4 +29,11 @@ export function moduleOf(specifier: string): MessageModule {
 	}
 	if (last === "messages" || last === "keys") return { type: last };
 	return otherModule;
+}
+
+/** The key whose own module an id is, as a build and a command resolve a key's path, or none. */
+export function keyOfModule(id: string): string | undefined {
+	return id.startsWith(keyModulePrefix)
+		? id.slice(keyModulePrefix.length)
+		: undefined;
 }

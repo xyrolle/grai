@@ -60,7 +60,7 @@ async function built(
 		root: dir,
 		configFile: false,
 		logLevel: "silent",
-		plugins: [graiPlugin({}, adapter(dir)).plugin],
+		plugins: graiPlugin({}, adapter(dir)).plugins,
 		build: {
 			write: false,
 			rolldownOptions: {
