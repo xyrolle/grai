@@ -13,7 +13,7 @@ import { runtimeNames } from "./runtime-names.ts";
 import { Scopes } from "./scopes.ts";
 import { fileOffset, type Shorthand, type SourceCode } from "./source.ts";
 import type { Node } from "./syntax.ts";
-import { propertyShorthand } from "./use-ends.ts";
+import { callWithout, propertyShorthand } from "./use-ends.ts";
 import { type FileOf, usesOf } from "./uses.ts";
 
 /** A stretch of the file. */
@@ -65,7 +65,8 @@ export type UseFact = Reference & {
 
 /**
  * What a use ends in:
- * - `value`, a use of what it read as a value: called, passed, returned or shown;
+ * - `value`, a use of what it read as a value: called, passed, returned or shown; `call` is the
+ *   call of a name or a plain member read with no arguments (`m.title()`), which a text can replace;
  * - `computed`, a read by a name the code computes (the expression at `at`), which may be any of
  *   the names that start with `prefix`, or one of `choices` when it is a choice between literals;
  * - `pattern`, names taken apart from it (`const { a, "b": c } = m`), each with what it binds, and
@@ -73,7 +74,7 @@ export type UseFact = Reference & {
  * - `export`, an export of it, which `ExportFact` follows.
  */
 export type UseEnd =
-	| { kind: "value" }
+	| { kind: "value"; call: Span | undefined }
 	| {
 			kind: "computed";
 			at: Span;
@@ -82,7 +83,12 @@ export type UseEnd =
 	  }
 	| {
 			kind: "pattern";
-			names: { name: string; at: Span; binds: Binding | undefined }[];
+			names: {
+				name: string;
+				at: Span;
+				written: Span;
+				binds: Binding | undefined;
+			}[];
 			rest: Span | undefined;
 	  }
 	| { kind: "export" };
@@ -91,10 +97,14 @@ export type UseEnd =
 export type Binding = { name: string; at: Span; references: Reference[] };
 
 /**
- * A use of a name: where it is, and, when it is written in shorthand (`{ title }`, Svelte's
- * `{title}`), how to write it out in full around another name.
+ * A use of a name: where it is; when it is written in shorthand (`{ title }`, Svelte's `{title}`),
+ * how to write it out in full around another name; and its call with no arguments, `title()`.
  */
-export type Reference = { at: Span; shorthand: Shorthand | undefined };
+export type Reference = {
+	at: Span;
+	shorthand: Shorthand | undefined;
+	call: Span | undefined;
+};
 
 /**
  * A dynamic import or `require()`, by a literal path (an `ImportFact` too) or by a template or a
@@ -113,6 +123,8 @@ export type ModuleFacts = {
 	uses: UseFact[];
 	/** Each top-level `const` that holds an import (`const t = m`), by its name: the import's. */
 	aliases: Record<string, string>;
+	/** Where in the file an import of the module's own may go, if it may take one. */
+	importsAt: number | undefined;
 };
 
 /** A file's facts: its modules', or its error. */
@@ -137,7 +149,8 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 			const at = span(use);
 			const shorthand =
 				source.shorthands.get(at.start) ?? propertyShorthand(use, scopes, at);
-			return { at, shorthand };
+			const call = callWithout(use, scopes);
+			return { at, shorthand, call: call && span(call) };
 		},
 	};
 	const imports: ImportFact[] = [];
@@ -162,7 +175,14 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 		}
 	}
 	const { uses, aliases } = usesOf(program, scopes, loadNodes, file);
-	return { imports, exports, loads, uses, aliases };
+	return {
+		imports,
+		exports,
+		loads,
+		uses,
+		aliases,
+		importsAt: source.importsAt,
+	};
 }
 
 /** The file's span of a node of the module's code. */

@@ -134,6 +134,6 @@ function isOutputPath(specifier: string, graph: ModuleGraph): boolean {
 function bindingOf(module: ModuleFacts, local: string, at: Span): Binding {
 	const references = module.uses
 		.filter((use) => "local" in use.from && use.from.local === local)
-		.map(({ at, shorthand }) => ({ at, shorthand }));
+		.map(({ at, shorthand, call }) => ({ at, shorthand, call }));
 	return { name: local, at, references };
 }
