@@ -88,6 +88,14 @@ describe("the module graph", () => {
 			kind: "key",
 			key: "title",
 		});
+		// A key's path is that key's module alone, as a build resolves it: through keys.js, its
+		// namespace object would hold every key.
+		const own = await of("#i18n/messages/title.js", "*");
+		expect(own).toEqual({ kind: "module", path: "\0grai:key/title" });
+		expect(await of("#i18n/messages/title.js", "subtitle")).toBeUndefined();
+		expect(
+			own === undefined ? undefined : await graph.member(own, "subtitle"),
+		).toBeUndefined();
 		expect(await of("./lib/star.ts", "m")).toEqual({ kind: "namespace" });
 		expect(await of("./lib/explicit.ts", "m")).toBeUndefined();
 		expect(await of("./lib/alias.ts", "t")).toEqual({ kind: "namespace" });
