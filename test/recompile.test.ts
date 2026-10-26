@@ -224,6 +224,44 @@ describe("a recompile after an edit", () => {
 		expect(new Set([first, otherCurrency, oneMore]).size).toBe(3);
 	});
 
+	it("renders again, when an edit renames formats.js, only the shards whose keys call a formatter", async () => {
+		// Many shards of text, and one key that formats a price.
+		const texts = (locale: string) =>
+			Object.fromEntries(
+				Array.from({ length: 1200 }, (_, index) => [
+					`text_${index}`,
+					`${locale} ${index}`,
+				]),
+			);
+		const priced = (currency: string) => ({
+			en: {
+				...texts("en"),
+				price: `{amount :number style=currency currency=${currency}}`,
+			},
+			de: {
+				...texts("de"),
+				price: `{amount :number style=currency currency=${currency}}`,
+			},
+		});
+		const { dir, config } = project(priced("EUR"));
+		const { build: before } = await recompile(config, undefined);
+		const next = priced("USD");
+		writeFileSync(join(dir, "messages", "en.json"), laidOut(next.en));
+		writeFileSync(join(dir, "messages", "de.json"), laidOut(next.de));
+		const { build: after } = await recompile(config, before);
+
+		expect(after?.rendered.modules.formats).not.toBe(
+			before?.rendered.modules.formats,
+		);
+		const kept = [...(after?.rendered.shardFiles ?? [])].map(
+			([index, files]) =>
+				files.lines === before?.rendered.shardFiles.get(index)?.lines,
+		);
+		// Every shard but the price's keeps what it was rendered as.
+		expect(kept.length).toBeGreaterThan(2);
+		expect(kept.filter((same) => !same)).toHaveLength(1);
+	});
+
 	it("holds on to no catalog an edit replaced, so a long run of edits does not add up", async () => {
 		const { dir, config } = project(catalogs);
 		const built = async (previous?: Build) => {
