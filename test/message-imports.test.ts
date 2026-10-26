@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { messageBindings, moduleOf } from "../src/message-imports.ts";
 
 it("names the output's modules by their paths, and any other import other", () => {
@@ -40,4 +40,28 @@ it("lists a destructured dynamic import once, as the one import it is", () => {
 		{ binds: true, specifier: "#i18n/messages/cart_title.js" },
 		{ binds: false, specifier: "#i18n/messages/cart_total.js" },
 	]);
+});
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
+
+it("tells an import that names none of the output's modules by its words, without splitting its path", () => {
+	const split = vi.spyOn(String.prototype, "split");
+	const imports = [
+		"./components/Header.svelte",
+		"$lib/stores/cart.ts",
+		"svelte/store",
+		"@scope/ui/button.js",
+	];
+
+	const modules = imports.map(moduleOf);
+
+	expect(modules.map((module) => module.type)).toEqual([
+		"other",
+		"other",
+		"other",
+		"other",
+	]);
+	expect(split).not.toHaveBeenCalled();
 });
