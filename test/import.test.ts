@@ -337,7 +337,7 @@ describe("grai import --from i18next", () => {
 		]);
 	});
 
-	it("reports each message whose values i18next escapes for HTML, which grai gives as they are", () => {
+	it("reports each message whose values i18next escapes for HTML or reads again, which grai gives as they are", () => {
 		const catalog = {
 			greeting: "Hi {{name}}",
 			raw: "Hi {{- name}}",
@@ -350,7 +350,11 @@ describe("grai import --from i18next", () => {
 
 		expect(
 			result.changed.map(({ key, detail }) => `${key}: ${detail}`),
-		).toEqual(["greeting", "guests"].map((key) => `${key}: ${escapingDetail}`));
+		).toEqual([
+			`greeting: ${escapingDetail}`,
+			"raw: i18next reads the value of {{- name}} again, so a {{…}} the value holds is filled in too, and grai gives the value as it is. Where a value can hold {{…}}, fill it in before the call.",
+			`guests: ${escapingDetail}`,
+		]);
 	});
 
 	it("leaves out a key that is both a message and a plural's forms, which i18next calls with and without count", () => {

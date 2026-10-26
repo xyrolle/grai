@@ -130,8 +130,9 @@ function convertText(
 		);
 	}
 	try {
-		const { pattern, escaped } = patternOf(value, texts);
+		const { pattern, escaped, reread } = patternOf(value, texts);
 		if (escaped.size > 0) notes.push(escapedValues);
+		if (reread.size > 0) notes.push(rereadValues);
 		return { path, result: plainMessage(pattern), notes };
 	} catch (error) {
 		if (!(error instanceof MessageProblem)) throw error;
@@ -176,10 +177,14 @@ function convertPlural(
 		const escapes = [...patterns.values()].some(({ escaped }) =>
 			[...escaped].some((name) => name !== "count"),
 		);
+		const rereads = [...patterns.values()].some(({ reread }) =>
+			[...reread].some((name) => name !== "count"),
+		);
 		const notes = [
 			...(kind === "cardinal" ? [] : [ordinalKey]),
 			...missing,
 			...(escapes ? [escapedValues] : []),
+			...(rereads ? [rereadValues] : []),
 		];
 		return { path, result: countChoice(patterns, kind), notes };
 	} catch (error) {
@@ -195,6 +200,14 @@ function convertPlural(
  */
 const escapedValues =
 	"i18next escapes the values of {{name}} for HTML by default, and grai gives them as they are, for the page to escape as React, Vue and Svelte do when they show text. Where this text is set as HTML, escape the values first.";
+
+/**
+ * What a message with a `{{- name}}` renders differently: i18next fills `{{name}}` in the text its
+ * pass for `{{- name}}` left, so it fills a `{{…}}` in that value too, which a message compiled
+ * ahead of time cannot.
+ */
+const rereadValues =
+	"i18next reads the value of {{- name}} again, so a {{…}} the value holds is filled in too, and grai gives the value as it is. Where a value can hold {{…}}, fill it in before the call.";
 
 /** How an ordinal is called once imported: by a key of its own, as i18next calls it by the plural's. */
 const ordinalKey =
