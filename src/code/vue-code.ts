@@ -96,7 +96,10 @@ class Template {
 	private directive(node: Directive): void {
 		if (node.arg !== undefined && !isStatic(node.arg))
 			this.expression(node.arg);
-		if (node.exp === undefined) return;
+		if (node.exp === undefined) {
+			if (node.name === "bind" && node.arg !== undefined) this.sameName(node);
+			return;
+		}
 		// A handler that is a function is called with the event; any other runs as statements.
 		const { start, end } = spanOf(node.exp);
 		const handler = this.writer.source.slice(start, end).trimStart();
@@ -105,6 +108,21 @@ class Template {
 		} else {
 			this.writer.write("(($event) => {\n").piece(start, end).write("\n});\n");
 		}
+	}
+
+	/** `:name` without a value, which binds the value of the same name, if it is a name. */
+	private sameName(node: Directive): void {
+		if (node.arg === undefined) return;
+		const name = spanOf(node.arg);
+		const written = this.writer.source.slice(name.start, name.end);
+		if (!/^[A-Za-z_$][\w$]*$/.test(written)) return;
+		const replaces = spanOf(node);
+		const full = this.writer.source.slice(replaces.start, replaces.end);
+		this.writer.shorthand(name.start, name.end, {
+			replaces,
+			before: `${full}="`,
+			after: '"',
+		});
 	}
 
 	/** A function of the names the patterns bind, around what follows until it is closed. */
