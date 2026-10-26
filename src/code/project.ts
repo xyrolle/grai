@@ -16,8 +16,8 @@ import { realPath } from "../real-path.ts";
 import { type Seen, sourceExtensions, sourceFiles } from "../sources.ts";
 import { namesOf, textTest } from "./candidates.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
-import { FactsCache, textHash } from "./facts-cache.ts";
-import { factsOfFiles } from "./facts-pool.ts";
+import { FactsCache } from "./facts-cache.ts";
+import { factsOfSources } from "./facts-pool.ts";
 import { projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Pool } from "./pool.ts";
@@ -142,29 +142,6 @@ export async function readProjectCode(
 
 /** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */
 const holdsNothing: FileFacts = { modules: [] };
-
-/** Each file's facts, from the cache or read in the pool, which the cache keeps then. */
-async function factsOfSources(
-	files: readonly { path: string; text: string }[],
-	cache: FactsCache,
-	pool: Pool,
-): Promise<(FileFacts | undefined)[]> {
-	const cached: (FileFacts | undefined)[] = [];
-	const unread: { path: string; text: string; hash: string }[] = [];
-	for (const { path, text } of files) {
-		const hash = textHash(text);
-		const facts = cache.get(path, hash);
-		cached.push(facts);
-		if (facts === undefined) unread.push({ path, text, hash });
-	}
-	const read = await factsOfFiles(unread, pool);
-	unread.forEach(({ path, hash }, index) => {
-		const each = read[index];
-		if (each !== undefined) cache.set(path, hash, each);
-	});
-	let next = 0;
-	return cached.map((facts) => facts ?? read[next++]?.facts);
-}
 
 /** The sources that pass grai's on: each whose module holds a key or more. */
 async function barrelsOf(
