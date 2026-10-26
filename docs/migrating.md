@@ -36,7 +36,7 @@ Each library has a small app in `bench/migrate/`. `node bench/migrate-equivalenc
   - options that are not an object written in the call;
   - i18next's own options, such as `returnObjects` and `postProcess`;
   - a `t` passed to another component or function;
-  - `<Trans>`, whose markup renders through the message's `.parts()`.
+  - `<Trans>`. grai import keeps an i18next message's tags as text, so a message `<Trans>` renders needs its tags written as grai markup, `{#b}…{/b}`, in each catalog; its `.parts()` then render with `grai/react`'s `Markup`.
 - **A call that misses an input** the message reads, or passes one it does not read, is listed too. i18next renders `{{name}}` or ignores the input; grai's types reject both.
 
 ## From next-intl

@@ -353,7 +353,7 @@ export function Prefixed() {
 			"src/left.tsx:10:5: the message reads name, which the call does not pass.",
 			"src/left.tsx:11:5: its options are not an object written in the call, so what they pass is unknown.",
 			"src/left.tsx:12:5: grai.import.json has no key common:missing: the import left it out, or no catalog has it.",
-			"src/left.tsx:14:4: <Trans> renders markup and components: render the message's .parts() instead.",
+			"src/left.tsx:14:4: <Trans> renders markup and components, which grai import keeps as text: write the message's tags as grai markup, {#b}…{/b}, in each catalog, then render its .parts() with grai/react's Markup.",
 			"src/left.tsx:15:14: t is passed on, so where it is called cannot be followed: call the messages by name there.",
 			"src/left.tsx:22:13: its key names a namespace under a keyPrefix, where i18next does not find it: call the message by name, as m.<key>().",
 		]);
