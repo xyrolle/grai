@@ -4,7 +4,9 @@
  * its tree, by the hash of its text, under the code that read it: grai's reader, by its contents,
  * and the versions of the parsers it loads, so any change to them reads every file again. The cache
  * is written whole and atomically after a command that read a file again or found one gone, with the
- * files that command read, so an entry for a file gone or changed is dropped.
+ * files that command read, so an entry for a file gone or changed is dropped. It is JSON, which V8
+ * reads back in about half the time its own serializer takes for the same facts (75 MB of them, for
+ * 9,000 files).
  */
 
 import { createHash, hash } from "node:crypto";
@@ -18,7 +20,6 @@ import {
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deserialize, serialize } from "node:v8";
 import type { FileFacts } from "./facts.ts";
 
 /** What the cache holds for a file: its text's hash, and its facts. */
@@ -67,7 +68,7 @@ export class FactsCache {
 		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
 		writeFileSync(
 			temporary,
-			serialize({ version: this.version, entries: [...this.kept] }),
+			JSON.stringify({ version: this.version, entries: [...this.kept] }),
 		);
 		renameSync(temporary, this.file);
 	}
@@ -101,13 +102,13 @@ export function readerVersion(directory: string): string {
 }
 
 function load(file: string, version: string): ReadonlyMap<string, Entry> {
-	let bytes: Buffer;
+	let saved: unknown;
 	try {
-		bytes = readFileSync(file);
+		saved = JSON.parse(readFileSync(file, "utf8"));
 	} catch {
+		// No cache yet, or none a reading can use: every file is read again.
 		return new Map();
 	}
-	const saved: unknown = deserialize(bytes);
 	if (
 		typeof saved !== "object" ||
 		saved === null ||

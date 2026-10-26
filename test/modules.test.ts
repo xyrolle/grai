@@ -9,7 +9,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { deserialize, serialize } from "node:v8";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { factsOf } from "../src/code/facts.ts";
 import { readerVersion } from "../src/code/facts-cache.ts";
@@ -207,7 +206,7 @@ describe("reading a project's facts", () => {
 		const saved: {
 			version: string;
 			entries: [string, { hash: string; facts: unknown }][];
-		} = deserialize(readFileSync(cache));
+		} = JSON.parse(readFileSync(cache, "utf8"));
 		expect(saved.entries.map(([path]) => path).sort()).toEqual([
 			join(dir, "src/a.ts"),
 			join(dir, "src/b.ts"),
@@ -227,7 +226,7 @@ describe("reading a project's facts", () => {
 		};
 		writeFileSync(
 			cache,
-			serialize({
+			JSON.stringify({
 				...saved,
 				entries: saved.entries.map(([path, entry]) => [
 					path,
@@ -239,8 +238,8 @@ describe("reading a project's facts", () => {
 		const { sources } = await codeOf(config, dir);
 
 		expect(sources.get(join(dir, "src/b.ts"))?.facts).toEqual(planted);
-		const kept: { entries: [string, unknown][] } = deserialize(
-			readFileSync(cache),
+		const kept: { entries: [string, unknown][] } = JSON.parse(
+			readFileSync(cache, "utf8"),
 		);
 		expect(kept.entries.map(([path]) => path)).toEqual([join(dir, "src/b.ts")]);
 	});
@@ -268,10 +267,10 @@ describe("reading a project's facts", () => {
 		const saved: {
 			version: string;
 			entries: [string, { hash: string; facts: unknown }][];
-		} = deserialize(readFileSync(cache));
+		} = JSON.parse(readFileSync(cache, "utf8"));
 		// Facts no reading would give, so a file read again shows.
 		const planted = { modules: [] };
-		const bytes = serialize({
+		const bytes = JSON.stringify({
 			...saved,
 			entries: saved.entries.map(([path, entry]) => [
 				path,
