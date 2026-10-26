@@ -7,6 +7,7 @@ import {
 	readHook,
 	updateEvent,
 } from "./dev-events.ts";
+import { identifierKey } from "./literal-key.ts";
 import { outputImports } from "./output-imports.ts";
 
 /**
@@ -30,16 +31,17 @@ export function devModule(outdir: string, build: Build): string {
 		)
 		.join(",");
 	return `${outputImports((file) => join(outdir, file), build.rendered.modules, build.compilation.keys.values(), ["markup", "message"])}
-const T = Object.assign(JSON.parse(${JSON.stringify(`{${textRows}}`)}), {
-${calls.map(([key, compiled]) => `\t${key}: ${row(compiled)},`).join("\n")}
-});
+const T = {
+	...JSON.parse(${JSON.stringify(`{${textRows}}`)}),
+${calls.map(([key, compiled]) => `\t${identifierKey(key)}: ${row(compiled)},`).join("\n")}
+};
 const read = Symbol.for(${JSON.stringify(readHook)});
 const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
 	globalThis[read]?.(key);
 	const variant = T[key][field][n];
 	return typeof variant === "function" ? variant(inputs) : variant;
 }), key];
-const made = {};
+const made = Object.create(null);
 for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
 export const { ${keys.map(([key]) => key).join(", ")} } = made;
 if (import.meta.hot) {
@@ -78,7 +80,8 @@ export function patchModule(
 ): string {
 	const keys = changed.flatMap((key) => build.compilation.keys.get(key) ?? []);
 	const rows = changed.map(
-		(key) => `\t${key}: ${row(build.compilation.keys.get(key))},`,
+		(key) =>
+			`\t${identifierKey(key)}: ${row(build.compilation.keys.get(key))},`,
 	);
 	return `${outputImports((file) => join(outdir, file), build.rendered.modules, keys, [])}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }

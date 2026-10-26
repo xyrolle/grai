@@ -1,5 +1,6 @@
 import type { Format } from "./format-options.ts";
 import { type Formatter, formatterOf } from "./formatters.ts";
+import { literalKey } from "./literal-key.ts";
 import { localeReads, shiftedCode } from "./locale-reads.ts";
 import type { MarkupPart } from "./markup.ts";
 import type { LocaleMessage } from "./message.ts";
@@ -165,7 +166,7 @@ function partCode(part: Part, placeholder: Placeholder): string {
 		case "literal":
 			return `{ type: "text", value: ${placeholder(part)} }`;
 		default:
-			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${JSON.stringify(Object.fromEntries(part.attributes))} }`;
+			return `{ type: "${part.type}", name: ${JSON.stringify(part.name)}, options: ${optionsCode(part, placeholder)}, attributes: ${attributesCode(part)} }`;
 	}
 }
 
@@ -173,9 +174,17 @@ function partCode(part: Part, placeholder: Placeholder): string {
 function optionsCode(part: MarkupPart, placeholder: Placeholder): string {
 	const entries = [...part.options].map(
 		([name, value]) =>
-			`${JSON.stringify(name)}: ${"variable" in value ? placeholder({ type: "variable", name: value.variable }) : JSON.stringify(value.literal)}`,
+			`${literalKey(name)}: ${"variable" in value ? placeholder({ type: "variable", name: value.variable }) : JSON.stringify(value.literal)}`,
 	);
 	return entries.length === 0 ? "{}" : `{ ${entries.join(", ")} }`;
+}
+
+/** A markup's attributes as an object: each literal as text, an attribute without one as `true`. */
+function attributesCode(part: MarkupPart): string {
+	const entries = [...part.attributes].map(
+		([name, value]) => `${literalKey(name)}:${JSON.stringify(value)}`,
+	);
+	return `{${entries.join(",")}}`;
 }
 
 /** Text as it reads inside a template literal: JSON's escapes, plus the backtick and `${`. */
