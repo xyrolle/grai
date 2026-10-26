@@ -487,7 +487,8 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
       - Measured, the pool pays from about a thousand of app B's files and about four thousand of the synthetic project's, whose scripts are simpler, so a count of files would be wrong for one of them.
   - **Each file's facts are kept on disk, in the outdir's `.grai/` state, which Git ignores already, so a one-shot command reads again only the files that changed.** The facts are cached, never an AST.
     - They are keyed by the content's hash, the hash of grai's reader code and the parsers' versions, so a change to any of them reads the file again. Hashing the reader's code, not grai's version, also covers an unreleased change to it.
-    - They are written atomically after a command reads, and an entry for a file that is gone or changed is dropped then.
+    - They are written atomically, after a command that read a file again or found one gone, and an entry for such a file is dropped then. A warm run writes nothing: on app B, writing the cache took 0.6 s of a warm `check`.
+    - They are JSON, which V8 reads back in 0.35 s for app B's facts, against 0.63 s for its own serializer's 75 MB.
     - A warm run reads each file and hashes it, and parses nothing that is unchanged. The target is a warm `find` and `rename` at or under main's times. A cold run costs what reading every file exactly costs, and the pool keeps that as low as it can.
     - In memory, the facts are also kept across a watch, between `check --fix`'s fix and its check, and across a build's rebuilds.
   - The bench's projects have to resolve as real ones do. The synthetic project gets a package.json `imports` and an `i18n` module that re-exports `m`, and app B's copy keeps its package.json and tsconfig, since a guessed import is no longer read.
