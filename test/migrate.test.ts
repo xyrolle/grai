@@ -746,4 +746,66 @@ export const Title = ({ label }: { label: () => string }) => (
 			"src/shop.tsx:4:2: its defaultMessage is an expression the rewrite would no longer evaluate: write it as a string, or remove it.",
 		]);
 	});
+
+	it("copies a hook's locale to no call where its name means something else", () => {
+		const server = migrated("icu", icuCatalogs, {
+			"src/about.ts": `import { getTranslations } from "next-intl/server";
+
+export async function titled() {
+	const locale = "en";
+	const t = await getTranslations({ locale, namespace: "About" });
+	const heading = t("title");
+	return function inner(locale: string) {
+		return heading + t("title") + locale;
+	};
+}
+`,
+		});
+		const client = migrated("i18next", i18nextCatalogs, {
+			"src/cart.ts": `import { useTranslation } from "react-i18next";
+
+const lng = "en";
+
+export function useTitles() {
+	const { t } = useTranslation("cart", { lng });
+	const title = t("title");
+	return ["de"].map((lng) => title + t("title") + lng);
+}
+`,
+		});
+
+		expect(server.left()).toEqual([
+			"src/about.ts:8:20: its locale, the name locale, means something else here: rename one of the two, then run grai migrate again.",
+		]);
+		expect(
+			server.text("src/about.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+import { getTranslations } from "next-intl/server";
+
+export async function titled() {
+	const locale = "en";
+	const t = await getTranslations({ locale, namespace: "About" });
+	const heading = m.About_title({}, { locale });
+	return function inner(locale: string) {
+		return heading + t("title") + locale;
+	};
+}
+`);
+		expect(client.left()).toEqual([
+			"src/cart.ts:8:37: its locale, the name lng, means something else here: rename one of the two, then run grai migrate again.",
+		]);
+		expect(
+			client.text("src/cart.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+import { useTranslation } from "react-i18next";
+
+const lng = "en";
+
+export function useTitles() {
+	const { t } = useTranslation("cart", { lng });
+	const title = m.cart_title({}, { locale: lng });
+	return ["de"].map((lng) => title + t("title") + lng);
+}
+`);
+	});
 });
