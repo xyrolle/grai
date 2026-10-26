@@ -32,6 +32,8 @@ export class TextTest {
 	private readonly beyond: Outside;
 	private readonly leaving: Set<string>;
 	private readonly passers: OutsidePackages;
+	/** The names the files were tested by, once they were: as they only grow, a file left out failed them. */
+	private tested: ReadonlySet<string> | undefined;
 
 	constructor(naming: Naming) {
 		this.naming = naming;
@@ -44,7 +46,8 @@ export class TextTest {
 	/**
 	 * The files among these whose text may read grai's, by the barrels found and the specifiers of
 	 * installed packages that pass it on (`reached`); every one when a mapping may name the output
-	 * from any specifier.
+	 * from any specifier. A call after the first takes the files the calls before left out, which
+	 * failed the names then, so it tests them by the names found since alone.
 	 */
 	taken(
 		files: readonly SourceFile[],
@@ -58,9 +61,17 @@ export class TextTest {
 		if (names === undefined) return [...files];
 		for (const name of [...this.leaving, ...reached]) names.add(name);
 		for (const name of this.passers.passing(names)) names.add(written(name));
-		const test = textTest(names);
-		return files.filter(
-			({ path, text }) => test.test(text) || this.beyond.test(path, text),
-		);
+		const tested = this.tested;
+		this.tested = names;
+		if (tested === undefined) {
+			const test = textTest(names);
+			return files.filter(
+				({ path, text }) => test.test(text) || this.beyond.test(path, text),
+			);
+		}
+		const found = [...names].filter((name) => !tested.has(name));
+		if (found.length === 0) return [];
+		const test = new RegExp(found.join("|"));
+		return files.filter(({ text }) => test.test(text));
 	}
 }
