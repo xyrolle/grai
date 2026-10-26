@@ -141,7 +141,10 @@ it("exports from grai/sveltekit, grai/sveltekit/vite, grai/sveltekit/navigation,
 		"LocaleProvider",
 		"bindLocale",
 	]);
-	expect(await importableNames(dir, "grai/next/config")).toEqual(["withGrai"]);
+	expect(await importableNames(dir, "grai/next/config")).toEqual([
+		"WithGraiOptions",
+		"withGrai",
+	]);
 	expect(await importableNames(dir, "grai/next/proxy")).toEqual(["proxy"]);
 	expect(await importableNames(dir, "grai/react")).toEqual(["Markup"]);
 });
