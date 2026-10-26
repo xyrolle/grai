@@ -29,6 +29,8 @@ const skippedDirectories = new Set(["node_modules", "dist", "build"]);
  */
 const identifier =
 	/(?<![\w$\\])(?:[A-Za-z_$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})(?:[\w$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})*/g;
+/** An identifier without escapes, as most files write every one: matched far faster. */
+const plainIdentifier = /(?<![\w$])[A-Za-z_$][\w$]*/g;
 const unicodeEscape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
 
 /**
@@ -107,6 +109,11 @@ export function occurrencesOf(text: string, name: string): number[] {
 export function namesIn(files: readonly SourceFile[]): Set<string> {
 	const names = new Set<string>();
 	for (const { text } of files) {
+		if (!text.includes("\\u")) {
+			for (const written of text.match(plainIdentifier) ?? [])
+				names.add(written);
+			continue;
+		}
 		for (const written of text.match(identifier) ?? []) {
 			names.add(unescaped(written));
 		}
