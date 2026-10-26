@@ -117,6 +117,13 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		await page.context().close();
 	});
 
+	it("renders a page at its path in the locale's words, routed by reroute as the route", async () => {
+		const page = await open(origin, "/ro/despre");
+		expect(await html(page, "lang")).toBe("ro");
+		expect(await page.locator("h1").textContent()).toBe("Despre acest exemplu");
+		await page.context().close();
+	});
+
 	it("renders the base locale without a prefix", async () => {
 		const page = await open(origin, "/about");
 		expect(await html(page, "lang")).toBe("en");
@@ -137,7 +144,7 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		expect(await page.locator("h1").textContent()).toBe("Bună ziua");
 		expect(
 			await page.getByRole("link", { name: "Despre" }).getAttribute("href"),
-		).toBe("/ro/about");
+		).toBe("/ro/despre");
 		await page.context().close();
 	});
 
