@@ -1,6 +1,6 @@
-// Builds the Astro example in its directory, as `astro build` does, with one more integration,
-// which keeps the pages Astro tells integrations it built, as a sitemap reads them, and prints
-// their paths as JSON.
+// Builds the Astro example in its directory, as `astro build` does and logging what it logs, with
+// one more integration, which keeps the pages Astro tells integrations it built, as a sitemap
+// reads them, and prints their paths as JSON, last.
 //   node test/astro-build-pages.js   (in examples/astro)
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
@@ -11,7 +11,7 @@ const { build } = await import(pathToFileURL(astro).href);
 let pages = [];
 await build({
 	root: process.cwd(),
-	logLevel: "error",
+	logLevel: "info",
 	integrations: [
 		{
 			name: "pages",
