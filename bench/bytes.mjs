@@ -1,78 +1,57 @@
-// Client bytes per page, an experiment on the schemes grai chose between: the messages each page of
-// a real build downloads with every locale, against only the reader's locale, as Paraglide's
-// per-locale build and as the per-locale functions of the design's prototype (prototype.mjs), not
-// grai's build: what a page of grai's build loads, its locale's copies of the message chunks, is
-// measured from the build itself (variants.mjs, library-bytes.mjs). The pages and their keys come
-// from a build record (record-build.mjs). Each scheme is bundled and minified by Rolldown from the
-// same keys, so compression is held equal; "page JS" is the brotli size of everything the page
-// loads in the build itself, for scale.
-//   node bytes.mjs <app> <grai-build.json>
-import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { brotliCompressSync, constants } from "node:zlib";
+// Client bytes per page of a real app, built twice from one commit: on Paraglide and on grai. Each
+// build's record (record-build.mjs, run in a copy of each, read by build-record.mjs) gives its
+// pages, and the two builds are matched by route. grai's columns are its build's files as written:
+// its message chunks, with every locale in each, and the reader's copies of them, which a page
+// loads when an import map points it at them. Paraglide's build mixes its messages into other
+// chunks, so its columns bundle the page's keys alone, minified by Rolldown into one file, which
+// compresses better than the several chunks a build splits them into. The last two columns are a
+// prototype, labelled so: its per-locale module, and its messages without inputs inlined.
+//   node bytes.mjs <app> <Paraglide build's record> <grai build's record>
+import { readFileSync } from "node:fs";
+import { join, posix } from "node:path";
 import { rolldown } from "rolldown";
 import { selectedApps } from "./apps.mjs";
+import { NOTHING, readBuild, sizes, sum } from "./build-record.mjs";
+import { graiSource } from "./grai.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { template, writePrototype } from "./prototype.mjs";
 
-const [appName, recordPath] = process.argv.slice(2);
+const { localeDirectory, messageDirectory } = await import(
+	join(graiSource, "message-directories.ts")
+);
+
+const [appName, paraglideRecord, graiRecord] = process.argv.slice(2);
 const [app] = selectedApps([appName]);
-const record = JSON.parse(readFileSync(recordPath, "utf8"));
-const client = join(record.root, ".svelte-kit/output/client");
+const reader = app.locales.includes("ru") ? "ru" : app.baseLocale;
 
-function sizes(code) {
-	const bytes = Buffer.from(code);
-	return {
-		raw: bytes.length,
-		brotli: brotliCompressSync(bytes, {
-			params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
-		}).length,
-	};
-}
-
-/** The key a compiled message module exports, or undefined for any other module. */
-const keyOfModule = new Map();
-function keyOf(id) {
-	if (!/\/paraglide\/messages\/(?!_index)[^/]+\.js$/.test(id)) return undefined;
-	if (!keyOfModule.has(id)) {
-		const code = readFileSync(id, "utf8");
-		keyOfModule.set(
-			id,
-			code.match(/export \{ \w+ as "([^"]+)" \}/)?.[1] ??
-				code.match(/export const (\w+) =/)?.[1],
-		);
-	}
-	return keyOfModule.get(id);
-}
-
-const chunks = new Map(record.chunks.map((chunk) => [chunk.file, chunk]));
-const nodeChunk = new Map();
-for (const chunk of record.chunks) {
-	if (chunk.facade && basename(dirname(chunk.facade)) === "nodes")
-		nodeChunk.set(Number(basename(chunk.facade, ".js")), chunk.file);
-}
-
-/** Chunks and every chunk they import statically, as SvelteKit preloads them. */
-function closure(files, into = new Set()) {
+/**
+ * A grai build's page: all it loads with the reader's copies, its message chunks, and what it
+ * loads of them in its locale: a chunk's copy, or the chunk itself, which has none when it holds
+ * something besides messages.
+ */
+function graiPage(build, files) {
+	const others = [];
+	const chunks = [];
+	const copies = [];
 	for (const file of files) {
-		if (into.has(file)) continue;
-		into.add(file);
-		closure(chunks.get(file)?.imports ?? [], into);
-	}
-	return into;
-}
-
-/** A file's brotli size as built; Vite drops a chunk that held only CSS after generating it. */
-const builtBrotli = new Map();
-function brotliOf(file) {
-	if (!builtBrotli.has(file))
-		builtBrotli.set(
-			file,
-			existsSync(join(client, file))
-				? sizes(readFileSync(join(client, file))).brotli
-				: 0,
+		const size = build.sizeOf(file) ?? NOTHING;
+		if (posix.basename(posix.dirname(file)) !== messageDirectory) {
+			others.push(size);
+			continue;
+		}
+		const copy = posix.join(
+			posix.dirname(posix.dirname(file)),
+			localeDirectory(reader),
+			posix.basename(file),
 		);
-	return builtBrotli.get(file);
+		chunks.push(size);
+		copies.push(build.sizeOf(copy) ?? size);
+	}
+	return {
+		js: sum([...others, ...copies]),
+		chunks: sum(chunks),
+		copies: sum(copies),
+	};
 }
 
 // Paraglide's per-locale build compiles this expression and has Vite define it per locale, so the
@@ -112,97 +91,89 @@ async function bundled(from, keys, locale, literals = []) {
 	return sizes(output[0].code);
 }
 
-/** The keys the code a page loads names: what it uses, whatever its chunks hold. */
-function usedKeys(files) {
-	const keys = new Set();
-	for (const file of files) {
-		for (const [id, length] of Object.entries(
-			chunks.get(file)?.modules ?? {},
-		)) {
-			if (length === 0 || keyOf(id)) continue;
-			for (const key of record.references[id] ?? [])
-				if (key in app.messages[app.baseLocale]) keys.add(key);
-		}
-	}
-	return keys;
-}
-
-const pages = record.routes.map((route) => {
-	const files = closure([
-		...record.entry,
-		...route.nodes.map((node) => nodeChunk.get(node)).filter(Boolean),
-	]);
-	const keys = new Set();
-	let js = 0;
-	for (const file of files) {
-		for (const id of Object.keys(chunks.get(file)?.modules ?? {}))
-			if (keyOf(id)) keys.add(keyOf(id));
-		js += brotliOf(file);
-	}
-	return { keys: [...keys], used: usedKeys(files).size, js };
-});
-
+const paraglide = readBuild(paraglideRecord, app.messages[app.baseLocale]);
+const grai = readBuild(graiRecord, app.messages[app.baseLocale]);
 const everyLocale = join(await paraglideOutput(app), "messages/_index.js");
 const perLocaleBuild = join(
 	await paraglideOutput(app, { experimentalStaticLocale: STATIC_LOCALE }),
 	"messages/_index.js",
 );
-const prototype = writePrototype(app);
-
-const kb = (bytes) => (bytes / 1024).toFixed(1);
-const reader = app.locales.includes("ru") ? "ru" : app.baseLocale;
-console.log(
-	`\n### ${app.name}: message bytes per page, KB brotli (raw), Paraglide ${paraglideVersion}, one locale = ${reader}\n`,
-);
-console.log(
-	"| page, by keys | keys loaded | keys used | page JS as built | messages, every locale | one locale, Paraglide per-locale build | one locale, prototype | prototype, no-input messages as strings | prototype, no-input messages inlined | prototype saves |",
-);
-console.log("|---|---|---|---|---|---|---|---|---|---|");
-// A message without inputs inlined at its call site: its text once, as a literal, and no function.
+const prototype = join(writePrototype(app), `${reader}.js`);
+// The prototype's experiment: a message without inputs inlined at its call site, its text once.
 const withoutInputs = (key) =>
 	typeof app.messages[reader][key] === "string" &&
 	!/\{[^#/]/.test(app.messages[reader][key]);
-const ranked = pages
-	.filter((page) => page.keys.length > 0)
-	.sort((a, b) => b.keys.length - a.keys.length);
-const totals = {
-	every: 0,
-	perLocale: 0,
-	grai: 0,
-	strings: 0,
-	inlined: 0,
-	js: 0,
+
+const columns = {
+	paraglideJs: "page JS, Paraglide build",
+	graiJs: "page JS, grai build, the locale's copies",
+	every: "Paraglide, every locale",
+	perLocale: "Paraglide per-locale build",
+	chunks: "grai's chunks as written, every locale",
+	copies: "grai, the locale's copies",
+	prototype: "prototype, one locale",
+	inlined: "prototype, no-input messages inlined",
 };
-for (const [index, page] of ranked.entries()) {
-	const every = await bundled(everyLocale, page.keys);
-	const perLocale = await bundled(perLocaleBuild, page.keys, reader);
-	const grai = await bundled(join(prototype, `${reader}.js`), page.keys);
-	const strings = await bundled(
-		join(prototype, `${reader}.strings.js`),
-		page.keys,
-	);
-	totals.strings += strings.brotli;
-	const inlinedKeys = page.keys.filter(withoutInputs);
-	const inlined = await bundled(
-		join(prototype, `${reader}.js`),
-		page.keys.filter((key) => !withoutInputs(key)),
-		undefined,
-		inlinedKeys.map((key) => template(app.messages[reader][key])),
-	);
-	totals.inlined += inlined.brotli;
-	totals.every += every.brotli;
-	totals.perLocale += perLocale.brotli;
-	totals.grai += grai.brotli;
-	totals.js += page.js;
-	if (index < 10 || index === ranked.length - 1) {
-		const cell = (size) => `${kb(size.brotli)} (${kb(size.raw)})`;
-		console.log(
-			`| ${index + 1} | ${page.keys.length} | ${page.used} | ${kb(page.js)} | ${cell(every)} | ${cell(perLocale)} | ${cell(grai)} | ${cell(strings)} | ${cell(inlined)} | ${(100 * (1 - grai.brotli / every.brotli)).toFixed(0)}% |`,
-		);
-	}
-}
-const less = (value) =>
-	`${(100 * (1 - value / totals.every)).toFixed(0)}% less`;
+const { version: builtWith } = JSON.parse(
+	readFileSync(
+		join(paraglide.root, "node_modules/@inlang/paraglide-js/package.json"),
+		"utf8",
+	),
+);
+const kb = (bytes) => (bytes / 1024).toFixed(1);
+const cells = (row) =>
+	Object.keys(columns)
+		.map((column) => `${kb(row[column].brotli)} (${kb(row[column].raw)})`)
+		.join(" | ");
 console.log(
-	`\n${ranked.length} pages, summed brotli: page JS ${kb(totals.js)} KB; messages every locale ${kb(totals.every)} KB; Paraglide per-locale build ${kb(totals.perLocale)} KB (${less(totals.perLocale)}); the prototype ${kb(totals.grai)} KB (${less(totals.grai)}); with no-input messages as strings ${kb(totals.strings)} KB (${less(totals.strings)}); with no-input messages inlined ${kb(totals.inlined)} KB (${less(totals.inlined)}).`,
+	`\n### ${app.name}: bytes per page, KB brotli (raw), one locale = ${reader}; the app built with Paraglide ${builtWith}, its keys bundled with ${paraglideVersion}\n`,
+);
+console.log(
+	`| page, by keys | keys loaded, Paraglide / grai | keys used | ${Object.values(columns).join(" | ")} |`,
+);
+console.log(`|---|---|---|${"---|".repeat(Object.keys(columns).length)}`);
+const ranked = [...paraglide.pages]
+	.filter(([, page]) => page.keys.length > 0)
+	.sort(([, a], [, b]) => b.keys.length - a.keys.length);
+const rows = [];
+for (const [index, [route, page]] of ranked.entries()) {
+	const graiBuilt = grai.pages.get(route);
+	if (graiBuilt === undefined)
+		throw new Error(`The grai build has no page ${route}`);
+	const inlinedKeys = page.keys.filter(withoutInputs);
+	const { js, chunks, copies } = graiPage(grai, graiBuilt.files);
+	const row = {
+		paraglideJs: sum(
+			page.files.map((file) => paraglide.sizeOf(file) ?? NOTHING),
+		),
+		graiJs: js,
+		every: await bundled(everyLocale, page.keys),
+		perLocale: await bundled(perLocaleBuild, page.keys, reader),
+		chunks,
+		copies,
+		prototype: await bundled(prototype, page.keys),
+		inlined: await bundled(
+			prototype,
+			page.keys.filter((key) => !withoutInputs(key)),
+			undefined,
+			inlinedKeys.map((key) => template(app.messages[reader][key])),
+		),
+	};
+	rows.push(row);
+	if (index < 10 || index === ranked.length - 1)
+		console.log(
+			`| ${index + 1} | ${page.keys.length} / ${graiBuilt.keys.length} | ${page.used.size} | ${cells(row)} |`,
+		);
+}
+const totals = Object.fromEntries(
+	Object.keys(columns).map((column) => [
+		column,
+		sum(rows.map((row) => row[column])),
+	]),
+);
+console.log(`| all ${ranked.length}, summed | | | ${cells(totals)} |`);
+const less = (column, than) =>
+	`${(100 * (1 - totals[column].brotli / totals[than].brotli)).toFixed(0)}%`;
+console.log(
+	`\nSummed brotli: grai's locale copies are ${less("copies", "chunks")} smaller than its chunks as written, and ${less("copies", "every")} smaller than Paraglide's keys in every locale, whose per-locale build is ${less("perLocale", "every")} smaller. A page's JS on grai, with the locale's copies, is ${less("graiJs", "paraglideJs")} smaller than on Paraglide.`,
 );
