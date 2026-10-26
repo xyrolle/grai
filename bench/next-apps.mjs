@@ -133,7 +133,7 @@ export default async function Layout({ children, params }) {
 }
 `,
 		"src/app/[locale]/page.jsx": `import { bindLocale } from "grai/next";
-import { m } from "../../i18n/messages.js";
+import * as m from "../../i18n/keys.js";
 import { Client } from "./client.jsx";
 import { Observer } from "../observer.jsx";
 
@@ -151,7 +151,7 @@ ${items(keys.server, app, (key, inputs) => `m.${key}(${Object.keys(inputs).lengt
 }
 `,
 		"src/app/[locale]/client.jsx": `"use client";
-import { m } from "../../i18n/messages.js";
+import * as m from "../../i18n/keys.js";
 
 export function Client() {
 	return (
