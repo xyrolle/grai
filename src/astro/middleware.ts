@@ -58,8 +58,14 @@ export function localeMiddleware(
 	context: LocaleContext,
 	next: () => Promise<Response>,
 ) => Promise<Response> {
-	return (context, next) =>
-		project.middleware(context.request, async ({ locale }) => {
+	return async (context, next) => {
+		if (context.isPrerendered) {
+			const pathname = new URL(context.request.url).pathname;
+			const file = localeAsFile(project, pathname);
+			if (file !== undefined)
+				throw namedAsFile(project, context.routePattern, pathname, file);
+		}
+		return project.middleware(context.request, async ({ locale }) => {
 			const importMap = project.importMaps?.[locale];
 			if (importMap !== undefined)
 				context.csp?.insertScriptHash(importMap.hash);
@@ -77,6 +83,7 @@ export function localeMiddleware(
 				head: importMap?.script ?? "",
 			});
 		});
+	};
 }
 
 /** The body of a page's response, or undefined for anything else. */
@@ -102,6 +109,33 @@ function withBody(
 		statusText: response.statusText,
 		headers,
 	});
+}
+
+/**
+ * A path's first segment when it is a locale's prefix written as a file, such as `ro.html`, which
+ * Astro's file builds give a locale's page: read as a folder, `/ro`, the path names another locale.
+ */
+function localeAsFile(
+	{ localeOfPath }: LocaleProject,
+	pathname: string,
+): string | undefined {
+	const first = pathname.split("/")[1] ?? "";
+	if (!first.endsWith(".html")) return undefined;
+	const asFolder = `/${first.slice(0, -".html".length)}`;
+	return localeOfPath(asFolder) === localeOfPath(pathname) ? undefined : first;
+}
+
+function namedAsFile(
+	project: LocaleProject,
+	page: string,
+	pathname: string,
+	file: string,
+): GraiError {
+	return new GraiError(
+		"config-invalid",
+		{ file: project.configName },
+		`the page ${page} is prerendered at ${pathname}, which names its locale as a file, ${file}, where the "url" strategy reads a path's first segment. Build each page into a folder: set Astro's build.format to "directory", and name a locale's page [locale]/index.astro rather than [locale].astro.`,
+	);
 }
 
 /** The strategies a request's locale would be read from beyond its URL, for its path. */
