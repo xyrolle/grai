@@ -1,15 +1,23 @@
 /**
  * Each file's facts kept on disk, in the outdir's `.grai/` state, which Git ignores already, so a
  * command reads again only the files that changed since the last. An entry is a file's facts, never
- * its tree, by the hash of its text, under the versions of grai and of the parsers that read it, so
- * any change to them reads every file again. The cache is written whole and atomically after a
- * command reads, with the files that command read, so an entry for a file gone or changed is dropped.
+ * its tree, by the hash of its text, under the code that read it: grai's reader, by its contents,
+ * and the versions of the parsers it loads, so any change to them reads every file again. The cache
+ * is written whole and atomically after a command reads, with the files that command read, so an
+ * entry for a file gone or changed is dropped.
  */
 
-import { hash } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { createHash, hash } from "node:crypto";
+import {
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { deserialize, serialize } from "node:v8";
 import type { FileFacts } from "./facts.ts";
 
@@ -23,13 +31,16 @@ const require = createRequire(import.meta.url);
 
 export class FactsCache {
 	private readonly file: string;
+	private readonly version = readerVersion(
+		dirname(fileURLToPath(import.meta.url)),
+	);
 	private readonly read: ReadonlyMap<string, Entry>;
 	private readonly kept = new Map<string, Entry>();
 
 	/** The cache of a project's facts, in its outdir's state, or an empty one. */
 	constructor(stateDirectory: string) {
 		this.file = join(stateDirectory, "facts");
-		this.read = load(this.file);
+		this.read = load(this.file, this.version);
 	}
 
 	/** A file's facts, if the cache has them for this text. */
@@ -48,7 +59,10 @@ export class FactsCache {
 	save(): void {
 		mkdirSync(dirname(this.file), { recursive: true });
 		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
-		writeFileSync(temporary, serialize({ version, entries: [...this.kept] }));
+		writeFileSync(
+			temporary,
+			serialize({ version: this.version, entries: [...this.kept] }),
+		);
 		renameSync(temporary, this.file);
 	}
 }
@@ -57,19 +71,30 @@ function textHash(text: string): string {
 	return hash("sha1", text);
 }
 
-/** The versions the facts were read with, grai's and its readers'. */
-const version = [
-	require("../../package.json").version,
-	...readers.map((name) => {
+/**
+ * What facts are read with: the hash of the reader's modules, every file in its directory, so an
+ * unreleased change to it counts as much as a release; and the version of each parser it loads.
+ */
+export function readerVersion(directory: string): string {
+	const code = createHash("sha1");
+	const files = readdirSync(directory, { withFileTypes: true })
+		.filter((entry) => entry.isFile())
+		.map(({ name }) => name)
+		.sort();
+	for (const name of files) {
+		code.update(name).update(readFileSync(join(directory, name)));
+	}
+	const parsers = readers.map((name) => {
 		try {
 			return `${name}@${require(`${name}/package.json`).version}`;
 		} catch {
 			return `${name}@-`;
 		}
-	}),
-].join(" ");
+	});
+	return [code.digest("hex"), ...parsers].join(" ");
+}
 
-function load(file: string): ReadonlyMap<string, Entry> {
+function load(file: string, version: string): ReadonlyMap<string, Entry> {
 	let bytes: Buffer;
 	try {
 		bytes = readFileSync(file);
