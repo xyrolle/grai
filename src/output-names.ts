@@ -8,7 +8,7 @@ export type OutputName = { kind: "namespace" } | { kind: "key"; key: string };
 export type Modules = {
 	/** The id `source` resolves to from `importer`, or nothing when it does not resolve. */
 	resolve(source: string, importer: string): Promise<string | undefined>;
-	/** A module's code, or nothing for a module that is not followed. */
+	/** A module's code as the bundler runs it, or nothing for a module that is not followed. */
 	code(id: string): Promise<string | undefined>;
 };
 

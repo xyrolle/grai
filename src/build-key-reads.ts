@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
-import type { ESTree } from "vite";
+import { type ESTree, transformWithOxc } from "vite";
 import type { Build } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { memberObjects, namespaceReads } from "./namespace-reads.ts";
@@ -63,7 +63,7 @@ export async function keyReads(
 		// longer follow is taken for none of grai's, as one the check cannot tell never fails a build.
 		resolve: (source, importer) =>
 			resolve(source, importer).catch(() => undefined),
-		code: async (file) => sourceOf(file),
+		code: codeAsRun,
 	};
 	const namespaces = new Set<string>();
 	for (const statement of importsOf(program)) {
@@ -116,6 +116,22 @@ function importsOf(program: ESTree.Program): ImportStatement[] {
 function exportName(name: ESTree.ModuleExportName): string {
 	return name.type === "Literal" ? name.value : name.name;
 }
+
+/**
+ * A module's code as the bundler runs it, read from its file: a TypeScript module's without its
+ * types, which bind no value, so a type never stands for a name the module exports. Nothing for a
+ * module that is not a file, or one that does not compile, which the bundler reports itself.
+ */
+async function codeAsRun(id: string): Promise<string | undefined> {
+	const source = sourceOf(id);
+	if (source === undefined || !typescript.test(id)) return source;
+	return transformWithOxc(source, id, { sourcemap: false }).then(
+		({ code }) => code,
+		() => undefined,
+	);
+}
+
+const typescript = /\.[cm]?tsx?$/;
 
 /** A module's own source, read from its file, or nothing for one that is not a file. */
 function sourceOf(id: string): string | undefined {
