@@ -66,8 +66,10 @@ type Spanned = { start: number; end: number };
  * A message-only chunk's code, as rendered before minification, once per locale. Each key is a
  * call of the runtime with one variant per locale (`text(…)`, `message(…)`, or `markup([…], […])`);
  * each copy keeps only its locale's variant, at its locale's position, so the runtime picks it
- * for the page's locale. Imports, exports, every name, and any other code, such as a namespace
- * object the bundler makes, stay as rendered.
+ * for the page's locale. A call's arguments before it are a variable the copy declares and never
+ * sets, which the minifier keeps as a one-letter name, where `void 0` cost 7 bytes a locale; a
+ * markup array's are holes, which a list of variants reads as undefined. Imports, exports, every
+ * name, and any other code, such as a namespace object the bundler makes, stay as rendered.
  */
 export function localeCopies(
 	fileName: string,
@@ -91,11 +93,16 @@ export function localeCopies(
 			: [],
 	);
 	const source = (node: Spanned) => code.slice(node.start, node.end);
-	const only = (variants: readonly Spanned[], index: number) =>
-		[
-			...Array.from({ length: index }, () => "void 0"),
-			...variants.slice(index, index + 1).map(source),
-		].join(", ");
+	// A name no binding of the chunk has, nor any text in it.
+	let none = "$none";
+	while (code.includes(none)) none += "$";
+	/** A locale's variant at its position: after `before` for each locale before it. */
+	const only = (variants: readonly Spanned[], index: number, before: string) =>
+		before.repeat(index) +
+		variants
+			.slice(index, index + 1)
+			.map(source)
+			.join("");
 	// One pass over the calls in order, joined once. Rebuilding the code at each call took 8.4 s for a
 	// chunk of 13,000 keys, against 0.14 s.
 	const copyIn = (index: number) => {
@@ -103,15 +110,18 @@ export function localeCopies(
 		let from = 0;
 		for (const { call, variants } of calls) {
 			const start = call.arguments[0]?.start ?? call.end - 1;
-			const kept = variants.map((group) => only(group, index));
+			const [first, second] = variants;
 			pieces.push(
 				code.slice(from, start),
-				variants.length === 2 ? `[${kept[0]}], [${kept[1]}]` : (kept[0] ?? ""),
+				first !== undefined && second !== undefined
+					? `[${only(first, index, ",")}], [${only(second, index, ",")}]`
+					: only(first ?? [], index, `${none}, `),
 			);
 			from = call.arguments.at(-1)?.end ?? call.end - 1;
 		}
 		pieces.push(code.slice(from));
-		return pieces.join("");
+		const copy = pieces.join("");
+		return index === 0 || !copy.includes(none) ? copy : `let ${none};\n${copy}`;
 	};
 	return new Map(locales.map((locale, index) => [locale, copyIn(index)]));
 }
