@@ -41,12 +41,42 @@ export function convertI18next(
 	const texts = new Map(
 		entries.map((entry) => [entry.path.join("."), entry.value]),
 	);
-	return messagesOf(entries).map((message) => ({
-		...(message.kind === "text"
-			? convertText(message.path, message.value, texts)
-			: convertPlural(message, locale, texts)),
-		description: message.description,
-	}));
+	const messages = messagesOf(entries);
+	const byPath = Map.groupBy(messages, ({ path }) => JSON.stringify(path));
+	return messages.flatMap((message) => {
+		const sharing = byPath.get(JSON.stringify(message.path)) ?? [message];
+		// The first of messages that become one key reports them all.
+		if (sharing[0] !== message) return [];
+		const converted =
+			sharing.length > 1
+				? oneKeyOf(sharing)
+				: message.kind === "text"
+					? convertText(message.path, message.value, texts)
+					: convertPlural(message, locale, texts);
+		return [{ ...converted, description: message.description }];
+	});
+}
+
+/**
+ * A message and a plural's forms that become one key, which grai leaves out: i18next calls the
+ * message without `count` and the forms with it, so neither may take the other's place.
+ */
+function oneKeyOf(messages: readonly Message[]): Conversion {
+	const text = messages.find((message) => message.kind === "text");
+	const plural = messages.find((message) => message.kind !== "text");
+	const name = (message: Message | undefined) => message?.path.at(-1) ?? "";
+	const forms = [...(plural?.forms.keys() ?? [])].map(
+		(form) => `${name(plural)}_${form}`,
+	);
+	const of = plural?.kind === "ordinal" ? "an ordinal" : "a plural";
+	return {
+		path: text?.path ?? [],
+		result: new MessageProblem(
+			"unsupported",
+			`${name(text)} is a message and ${forms.join(", ")} the forms of ${of}, which grai would import as one key: i18next calls the message without count and the forms with it. Rename the message or the forms in the source.`,
+		),
+		notes: [],
+	};
 }
 
 /** The entries as messages, in source order: a key's plural forms together, at its first form's place. */
