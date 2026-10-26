@@ -317,6 +317,29 @@ describe("the Vite plugin's build", () => {
 		);
 	});
 
+	it("refuses a Vite base that is not grai's basePath, under the url strategy, which reads the locale after it", async () => {
+		const { dir } = project(catalogs, { strategy: ["url"], basePath: "/shop" });
+		const buildUnder = (base: string) =>
+			build({
+				root: dir,
+				base,
+				configFile: false,
+				logLevel: "silent",
+				plugins: [grai()],
+				build: { write: false, rolldownOptions: { input: join(dir, "a.js") } },
+			});
+		writeFileSync(
+			join(dir, "a.js"),
+			`import { m } from "./out/messages.js";\nconsole.log(m.title());\n`,
+		);
+
+		await expect(buildUnder("/store/")).rejects.toThrow(
+			`grai.config.json: Vite's base "/store/" and grai's "basePath" "/shop" must name the same path: the "url" strategy reads the locale after it.`,
+		);
+		await expect(buildUnder("/shop/")).resolves.toBeDefined();
+		await expect(buildUnder("./")).resolves.toBeDefined();
+	});
+
 	it("fails the build with the compiler's errors", async () => {
 		const { dir } = project({ en: { title: "Title" }, de: {} });
 		await expect(

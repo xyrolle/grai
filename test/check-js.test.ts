@@ -61,6 +61,13 @@ it.each([
 		{ strategy: ["cookie", "url"], cookieName: "lang" },
 	],
 	[
+		"paths translated per locale",
+		{
+			strategy: ["url"],
+			pathnames: { "/products/[id]": { ar: "/muntajat/[id]" } },
+		},
+	],
+	[
 		"every strategy",
 		{
 			strategy: ["cookie", "localStorage", "preferredLanguage", "query", "url"],

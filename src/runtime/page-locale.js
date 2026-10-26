@@ -11,13 +11,15 @@
  *   locales: readonly string[],
  *   baseLocale: string,
  *   directions: readonly ("ltr" | "rtl")[],
- *   strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[],
+ *   strategy: readonly ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | `custom-${string}`)[],
  *   cookieName: string | undefined,
  *   localStorageKey: string | undefined,
  *   queryParameter: string | undefined,
  *   prefixes: readonly string[],
  *   prefixesEveryLocale: boolean,
  *   unlocalizedPaths: readonly { source: string, flags: string }[],
+ *   basePath: string,
+ *   domains: readonly string[],
  * }} PageSettings
  */
 
@@ -93,9 +95,17 @@ export function pickPageLocale(settings, localeReach) {
 	// The url strategy's rule, as the runtime's localeOfPath has it: the locale whose prefix is the
 	// path's first segment, where the base locale has one only when every locale's paths do. A path
 	// without a prefix is the base locale's, or names none when every locale's paths have one, and
-	// so does a path the strategy leaves alone.
+	// so does a path the strategy leaves alone. The prefix follows the base path. On a locale's own
+	// host, the host names the locale.
 	const fromPath = () => {
-		const { pathname } = location;
+		const hosted = locales[settings.domains.indexOf(location.host)];
+		if (hosted !== undefined) return hosted;
+		const base = settings.basePath;
+		const full = location.pathname;
+		const pathname =
+			base !== "" && (full === base || full.startsWith(`${base}/`))
+				? full.slice(base.length) || "/"
+				: full;
 		const left = settings.unlocalizedPaths.some(({ source, flags }) =>
 			new RegExp(source, flags).test(pathname),
 		);
