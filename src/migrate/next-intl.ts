@@ -18,7 +18,7 @@ import type { Binding, Use } from "./scopes.ts";
 import { literalText, type Node, propertiesOf } from "./syntax.ts";
 
 /** Where a `t` looks a key up: under its namespace, if it has one, in its locale, if it names one. */
-type Scope = { namespace: string; locale: string | undefined };
+type Scope = { namespace: string; locale: Node | undefined };
 
 /** What next-intl's `t` has beside its call, and why a use of each stays. */
 const members: ReadonlyMap<string, string> = new Map([
@@ -125,7 +125,7 @@ function serverScope(
 	if ("left" in scope || locale === undefined) return scope;
 	// getTranslations reads its locale once, and each call it becomes reads it again.
 	if (!readsTheSame(locale, module.scopes)) return movedLocale;
-	return { ...scope, locale: module.text.slice(locale.start, locale.end) };
+	return { ...scope, locale };
 }
 
 /** A call of `t(key, values)`: the key under the namespace names the message; the values are its inputs. */
@@ -156,5 +156,5 @@ function nextIntlCall(
 	const passed = writtenProperties(values, "values");
 	if ("left" in passed) return passed;
 	const { object, properties: inputs } = passed;
-	return messageCall(call, mapped, { inputs, object, locale }, module.text);
+	return messageCall(call, mapped, { inputs, object, locale }, module);
 }

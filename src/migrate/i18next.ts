@@ -143,6 +143,5 @@ function hookLookup(
 	const lng = written.properties.get("lng")?.value;
 	if (lng !== undefined && !readsTheSame(lng, module.scopes))
 		return movedLocale;
-	const locale = lng && module.text.slice(lng.start, lng.end);
-	return { loaded, namespaces, keyPrefix: prefix, locale };
+	return { loaded, namespaces, keyPrefix: prefix, locale: lng };
 }
