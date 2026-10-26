@@ -226,6 +226,31 @@ describe("grai's config beside Astro's", () => {
 		]);
 	});
 
+	it("has a regional locale, which Astro's links lowercase, written as its path and prefix", () => {
+		const regional = (config: Record<string, unknown>) =>
+			readConfig(
+				project(
+					{ en: { title: "Cart" }, "pt-BR": { title: "Carrinho" } },
+					config,
+				).config,
+			);
+
+		expect(
+			disagreements(
+				regional({ strategy: ["url"] }),
+				astroRouting(["en", "pt-BR"]),
+			),
+		).toEqual([
+			`Astro links pt-BR's pages under /pt-br/, its tag lowercased, where the "url" strategy reads /pt-BR/. List it in Astro's i18n.locales as { path: "pt-br", codes: ["pt-BR"] }, and set "localePrefixes": { "pt-BR": "pt-br" } in grai's config.`,
+		]);
+		expect(
+			disagreements(
+				regional({ strategy: ["url"], localePrefixes: { "pt-BR": "pt-br" } }),
+				astroRouting(["en", { path: "pt-br", codes: ["pt-BR"] }]),
+			),
+		).toEqual([]);
+	});
+
 	it('maps the paths outside Astro\'s routing to "unlocalizedPaths", whose locale the strategies after "url" find', () => {
 		expect(
 			disagreements(
