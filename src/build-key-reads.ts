@@ -18,7 +18,6 @@ import {
 	type Modules,
 } from "./output-names.ts";
 import { positionOf } from "./sources.ts";
-import { isTreeNode } from "./svelte-tree.ts";
 
 /** What the check follows a build's imports with: its names to keys.js, kept for the build. */
 export type KeyReading = { build: Build; names: ImportedName };
@@ -56,8 +55,6 @@ export async function keyReads(
 	{ build, names }: KeyReading,
 	resolve: Resolve,
 ): Promise<KeyReads> {
-	if (!isTreeNode(program))
-		return { keys: new Set(), computed: false, missing: [] };
 	const read = memberObjects(program);
 	const modules: Modules = {
 		// A build that ends before a module's check does drops its resolver: a name it can no
