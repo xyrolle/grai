@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { deserialize, serialize } from "node:v8";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { factsOf } from "../src/code/facts.ts";
+import { readerVersion } from "../src/code/facts-cache.ts";
 import { factsOfFiles } from "../src/code/facts-pool.ts";
 import { type ProjectCode, readProjectCode } from "../src/code/project.ts";
 import { type Config, readConfig } from "../src/config.ts";
@@ -195,6 +196,19 @@ describe("reading a project's facts", () => {
 			readFileSync(cache),
 		);
 		expect(kept.entries.map(([path]) => path)).toEqual([join(dir, "src/b.ts")]);
+	});
+
+	it("keys the facts on the reader's own code, so a change to it reads every file again, released or not", () => {
+		const { dir } = projectWith({
+			"reader/facts.js": "export const facts = 1;\n",
+			"reader/uses.js": "export const uses = 1;\n",
+		});
+		const reader = join(dir, "reader");
+		const before = readerVersion(reader);
+
+		expect(readerVersion(reader)).toBe(before);
+		writeFileSync(join(reader, "uses.js"), "export const uses = 2;\n");
+		expect(readerVersion(reader)).not.toBe(before);
 	});
 
 	it("reads files in a pool of workers into the same facts as on one thread", async () => {
