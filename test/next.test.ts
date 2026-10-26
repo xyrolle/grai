@@ -335,13 +335,16 @@ const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
  * Builds the example with the given bundler flags and serves it until the suite ends, on a port the
  * system picks, so that runs of this file side by side never meet. The origin is set once it serves.
  */
-function servedWith(flags: string[]): { origin: string } {
+function servedWith(
+	flags: string[],
+	variables: Record<string, string> = {},
+): { origin: string } {
 	const served = { origin: "" };
 	let server: ChildProcess | undefined;
 	beforeAll(async () => {
 		const build = spawnSync(next, ["build", ...flags], {
 			cwd: example,
-			env,
+			env: { ...env, ...variables },
 			encoding: "utf8",
 		});
 		if (build.status !== 0) {
@@ -350,7 +353,7 @@ function servedWith(flags: string[]): { origin: string } {
 		// The leader of a process group of its own, so that stopping it stops what it forks.
 		server = spawn(next, ["start", "--port", "0"], {
 			cwd: example,
-			env,
+			env: { ...env, ...variables },
 			detached: true,
 		});
 		served.origin = await servedAt(server);
@@ -487,6 +490,23 @@ describe("the Next example, built with Turbopack", () => {
 
 		expect(await text("h1")).toBe("A shop that speaks your language");
 		expect(await text("#cart")).toBe("1 item in your cart");
+	});
+});
+
+describe("the Next example, under a base path", () => {
+	const served = servedWith([], { EXAMPLE_BASE_PATH: "/shop" });
+
+	it("renders the locale named after the base path, and links within it under the base path", async () => {
+		await page.goto(`${served.origin}/shop/ro`);
+
+		expect(await page.locator("html").getAttribute("lang")).toBe("ro");
+		expect(await page.locator("#about").getAttribute("href")).toBe(
+			"/shop/ro/about",
+		);
+		await page.click("#about");
+		await page.waitForURL(`${served.origin}/shop/ro/about`);
+		expect(await text("h1")).toBe("Despre magazin");
+		expect(errors).toEqual([]);
 	});
 });
 
