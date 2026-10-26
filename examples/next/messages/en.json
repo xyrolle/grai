@@ -13,7 +13,7 @@
 		}
 	],
 	"cart_add": "Add an item",
-	"terms": "By ordering you accept the {#link}terms{/link}.",
+	"terms": "By ordering you accept the {#link href=|/terms|}terms{/link}.",
 	"about_link": "About us",
 	"home_link": "Back to the shop",
 	"about_title": "About the shop",

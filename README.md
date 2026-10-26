@@ -214,10 +214,10 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
 - **Client components call messages as they are.** In the browser a page keeps the locale it was loaded in; a link into another locale loads that page, and `setLocale(locale)` switches to it.
 - **Server actions and route handlers name the locale:** `m.saved({}, { locale })`. React keeps no request state there.
 - **Per-key imports** (`import { title } from "#i18n/messages/title.js"`) map to the output's keys.js through package.json `imports`, as in the example.
-- **A markup message** renders with `grai/react`'s `Markup`, in server and client components alike:
+- **A markup message** renders with `grai/react`'s `Markup`, in server and client components alike. Each element's function takes what it encloses and the options and attributes the message writes on it, so `{#link href=|/terms|}terms{/link}` gives `options.href`:
 
   ```tsx
-  <Markup parts={m.terms.parts()} markup={{ link: (children) => <a href="/terms">{children}</a> }} />
+  <Markup parts={m.terms.parts()} markup={{ link: (children, { options }) => <a href={String(options.href)}>{children}</a> }} />
   ```
 
 On a page of 400 messages in a server component and 100 in a client component, the browser downloads 129.8 KB brotli against next-intl's 230.3 KB, or its 134.4 KB with the client's keys picked, and an edit to a catalog was written in about 27 ms, 20 of them waiting for the save to settle, which the watcher now does only after a read of a catalog that does not parse; the rest of the edit is Next's refresh (`bench/nextjs.mjs`, `docs/runtime.md`).
