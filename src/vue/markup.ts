@@ -1,4 +1,5 @@
 import type { VNodeArrayChildren, VNodeChild } from "vue";
+import { ownEntry } from "../own-entry.ts";
 
 /** What a message writes on one of its elements, as in `{#link href=|/terms| @rel=nofollow}`. */
 export type MarkupDetails = {
@@ -43,8 +44,9 @@ type Open<Tag extends string> = {
  * `markup` names exactly the elements the parts name: its type takes them from `parts`, so an
  * element missing from it, or one the message does not have, is a type error. An end closes the
  * innermost element of its name, an end with none open draws nothing, and an element left open
- * closes at the end. An element `markup` does not draw throws, naming it. A functional component:
- * it keeps no state, so it costs no instance.
+ * closes at the end. An element `markup` does not draw throws, naming it: `markup`'s own functions
+ * draw, so an element the catalog names `constructor` is none of them. A functional component: it
+ * keeps no state, so it costs no instance.
  */
 export function Markup<Tag extends string>({
 	parts,
@@ -60,8 +62,7 @@ export function Markup<Tag extends string>({
 		{ name, options, attributes }: Open<Tag>["start"],
 		children?: VNodeArrayChildren,
 	) => {
-		// Undefined only for parts whose type does not name their elements.
-		const element: MarkupElement | undefined = markup[name];
+		const element = ownEntry(markup, name);
 		if (element === undefined) {
 			throw new Error(
 				`Markup has no function for the message's element "${name}". Add ${name} to its markup.`,
