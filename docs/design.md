@@ -427,14 +427,14 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - MDX: `@mdx-js/mdx`'s parser.
 
   Each expression's text is then parsed by `parse.ts` at its offset. Script and template therefore come out as one kind of tree: in TypeScript where the component's script is, and with JSX where the template allows it. Each framework is an optional peer, loaded only when the project has such a file. A component whose framework is not installed is an error that names the package. No markup is read as text.
-- **A file that does not parse fails the command,** with the parser's message at its place, as the bundler fails it (`source-invalid`). It is never read another way. `check` reports it, and `check --fix`, `find`, `rename` and `migrate` refuse to act, since the reads of a file they cannot parse are unknown.
+- **A file that does not parse fails the command,** with the parser's message at its place, as the bundler fails it (`source-invalid`). It is never read another way. `check` and `find` report it, and `check --fix` and `rename` refuse to act, since the reads of a file they cannot parse are unknown. `migrate`, which changes each file alone, leaves that file and reports why.
 - **Scopes are ECMAScript's, exactly.**
   - These declare names: `var`, which reaches the nearest function body or static block, `let`, `const`, `class` and `function` (hoisted). So do parameters, a caught error, imports, TypeScript's `enum`, `namespace` and `import x = require()`, and a template's blocks.
   - A type, an interface and `declare` bind no value.
   - A name reads the nearest declaration of it. A `const` set to the namespace (`const t = m`) is the namespace too, since it cannot change. Any other copy is a use of the namespace whole.
   - The "not checked: declares m again" path goes. Every read is placed exactly.
 - **Module reach comes from the module graph, never from a name or a path.**
-  - An import is grai's if it resolves to the output's `messages.js`, `keys.js` or a key's path, or to a module whose export of that name does, followed through re-exports. A key's path that the app maps to keys.js (`…/messages/<key>.js`) resolves to that key's own module, as the build resolves it; through keys.js, its namespace object would hold every key.
+  - An import is grai's if it resolves to the output's `messages.js`, `keys.js` or a key's path, or to a module whose export of that name does, followed through re-exports. A module's exports are those the bundler runs: an export of a type, a `declare`, a type-only import or a namespace of types alone is erased with it, so an `export *` of the same name is what an importer gets. A key's path that the app maps to keys.js (`…/messages/<key>.js`) resolves to that key's own module, as the build resolves it; through keys.js, its namespace object would hold every key.
     - `export { m } from`, and an import exported again;
     - `export * as`;
     - `export *`, where a name a module exports itself wins over a star export of the same name, as the bundler binds it;
@@ -475,7 +475,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - **A build reads each module through Vite's pipeline, at grai's own transform with `enforce: "pre"`, with the same reader and the bundler resolving.** It sees what the user wrote, plus what an earlier pre plugin added, such as an auto-imported `m`, and a virtual module's code. It sees a component before it compiles, so `components.ts` reads a `.vue`, `.svelte` or `.astro` file there exactly as the CLI does. Vue's compiled template would read a script's import through `unref(m)`, a use whole.
     - So a build and `check` find the same reads at the same places, with two exceptions, both from what only the bundler has. One is a virtual module, which the CLI cannot see. The other is code that an earlier pre plugin injects, which `check` reads only if the injecting plugin's output is a file.
     - Chunking links modules by what the bundler ships, the module's transformed code read by the same parser, since only that shows Vite's expanded globs.
-  - `migrate` parses and scopes through the reader. It finds a component's imports of the library from the component's parse, not from its text.
+  - `migrate` parses and scopes through the reader. It finds a component's imports of the library from the component's parse, not from its text, so a comment or a string that spells one is none.
 - **Performance is measured against main in one window, and earned back without losing exactness:**
   - The commands measured are `check`, `check --fix`, `find` and `rename` on the synthetic project and app B (the refactor bench), together with the build's check and `test:performance`.
   - Every command now reads every source, because exactness needs the graph. Before, `find` and `rename` read only the files that wrote the key.
