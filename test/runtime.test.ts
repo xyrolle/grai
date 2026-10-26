@@ -453,6 +453,27 @@ describe("with paths the url strategy leaves alone", () => {
 			[307, "https://shop.test/de/cart"],
 		]);
 	});
+
+	it("leaves a path it leaves alone as it is in the URL helpers, though it starts as a prefix does", async () => {
+		const { middleware, runtime } = await output({
+			strategy: ["url", "cookie"],
+			cookieName: "lang",
+			localePrefix: "always",
+			unlocalizedPaths: ["/de/api/**"],
+		});
+
+		expect([
+			await answer(middleware, "/de/api/data", "lang=ar"),
+			String(runtime.deLocalizeUrl("https://shop.test/de/api/data")),
+			runtime.localizeHref("/de/api/data", { locale: "en" }),
+			runtime.localizeHref("/de/cart", { locale: "en" }),
+		]).toEqual([
+			[200, "ar"],
+			"https://shop.test/de/api/data",
+			"/de/api/data",
+			"/en/cart",
+		]);
+	});
 });
 
 it("reads and writes a locale's own prefix, where the config gives one", async () => {
