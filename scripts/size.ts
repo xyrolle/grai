@@ -39,7 +39,7 @@ const budgets: Record<string, number> = {
 	"grai/sveltekit/client": 460,
 	"grai/sveltekit/navigation": 250,
 	"grai/next": 650,
-	"grai/next/config": 35_000,
+	"grai/next/config": 36_000,
 	"grai/next/proxy": 350,
 	"grai/react": 500,
 	"grai/astro": 55_500,

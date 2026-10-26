@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serialize } from "node:v8";
+import { basePositions, basePositionsMoved } from "./base-positions.ts";
 import {
 	type Catalog,
 	type CatalogSource,
@@ -10,10 +11,10 @@ import {
 	parseEditedCatalog,
 	readCatalogSources,
 } from "./catalog.ts";
-import { hasObjects } from "./catalog-keys.ts";
+import { localeCatalogs, type ParsedCatalogs } from "./catalog-parts.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
 import { type Config, readConfig } from "./config.ts";
-import { keyPositions, type Position } from "./declaration-maps.ts";
+import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
 import type { RuntimeSources } from "./output-modules.ts";
@@ -24,11 +25,11 @@ import { type Rendered, renderOutput } from "./render.ts";
 export type CompileResult = { written: string[]; errors: GraiError[] };
 
 /** Everything a compile read and made, kept so the next compile redoes only what changed. */
-export type Build = {
+export type Build = ParsedCatalogs & {
 	config: Config;
+	/** Each catalog file read, as `parts` has its catalog. */
 	sources: readonly CatalogSource[];
 	hashes: readonly string[];
-	catalogs: readonly Catalog[];
 	compilation: Compilation;
 	/** Where each key is in the base locale's catalog, for the declaration maps. */
 	positions: ReadonlyMap<string, Position>;
@@ -183,6 +184,7 @@ async function build(
 	if (parsed.errors.length > 0) {
 		return { result: { written: [], errors: parsed.errors } };
 	}
+	const { parts } = parsed;
 	const { config, catalogs } = pseudoLocale
 		? withPseudoLocale(configured, parsed.catalogs, previous?.catalogs)
 		: { config: configured, catalogs: parsed.catalogs };
@@ -197,17 +199,13 @@ async function build(
 	);
 	const positions =
 		moved || previous === undefined
-			? keyPositions(
-					sources[baseIndex]?.bytes.toString("utf8") ?? "",
-					catalogs[baseIndex]?.messages.keys(),
-					hasObjects(catalogs[baseIndex]?.paths.values() ?? []),
-				)
+			? basePositions(sources, parts, config.baseLocale)
 			: previous.positions;
 	const { output, rendered } = renderOutput(
 		config,
 		runtime,
 		compilation,
-		{ path: config.catalogs.get(config.baseLocale) ?? "", positions, moved },
+		{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
 		{ localeCopies },
 		previous?.rendered,
 	);
@@ -228,6 +226,7 @@ async function build(
 			config,
 			sources,
 			hashes,
+			parts,
 			catalogs,
 			compilation,
 			positions,
@@ -238,50 +237,44 @@ async function build(
 }
 
 /**
- * Parses every catalog, taking from the previous build each catalog whose bytes are the same, or
- * returns every catalog's error.
+ * Parses every catalog file, taking from the previous build each one whose bytes are the same, and
+ * makes each locale's catalog of its files', or returns every error. Without errors, `parts` are the
+ * files' catalogs in the order of `sources`.
  */
 export function parseCatalogs(
 	sources: readonly CatalogSource[],
 	previous?: Build,
-): { catalogs: Catalog[]; errors: GraiError[] } {
-	const catalogs: Catalog[] = [];
+): { parts: Catalog[]; catalogs: Catalog[]; errors: GraiError[] } {
 	const errors: GraiError[] = [];
-	sources.forEach((source, index) => {
+	const parsedParts = sources.map((source, index) => {
 		try {
-			catalogs.push(parsed(source, index, previous));
+			return parsed(source, index, previous);
 		} catch (error) {
 			if (!(error instanceof GraiError)) throw error;
 			errors.push(error);
+			return undefined;
 		}
 	});
-	return { catalogs, errors: sortErrors(errors) };
+	const parts = parsedParts.filter((part) => part !== undefined);
+	const joined = localeCatalogs(sources, parsedParts, previous);
+	return {
+		parts,
+		catalogs: joined.catalogs,
+		errors: sortErrors([...errors, ...joined.errors]),
+	};
 }
 
-/** A catalog parsed, or taken from the previous build when its bytes are the same. */
+/** A catalog file parsed, or taken from the previous build when its bytes are the same. */
 function parsed(
 	source: CatalogSource,
 	index: number,
 	previous?: Build,
 ): Catalog {
 	const old = previous?.sources[index];
-	const catalog = previous?.catalogs[index];
+	const catalog = previous?.parts[index];
 	if (old === undefined || catalog === undefined) return parseCatalog(source);
 	if (old.bytes.equals(source.bytes)) return catalog;
 	return parseEditedCatalog(source, catalog, old.bytes);
-}
-
-/** Whether the base catalog's keys can start on other lines than in the previous build's. */
-function basePositionsMoved(
-	base: Catalog | undefined,
-	previous: Catalog | undefined,
-): boolean {
-	if (base === previous) return false;
-	return (
-		base?.edit === undefined ||
-		base.edit.from !== previous?.revision ||
-		base.edit.moved
-	);
 }
 
 /**

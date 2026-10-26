@@ -1,5 +1,10 @@
-import type { Catalog } from "./catalog.ts";
-import { catalogWithMessages } from "./catalog-file.ts";
+import {
+	type Catalog,
+	fileIndexOf,
+	fileOfKey,
+	pathsInFile,
+} from "./catalog.ts";
+import { catalogsWithMessages } from "./catalog-file.ts";
 import { placedPath } from "./catalog-keys.ts";
 import {
 	type CompileResult,
@@ -33,21 +38,29 @@ export async function add(
 	const base = catalogs.find(
 		(catalog) => catalog.locale === read.config.baseLocale,
 	);
-	const where = { file: base?.file ?? "", key };
+	const where = { file: base === undefined ? "" : fileOfKey(base, key), key };
 	const invalid = invalidName(key, catalogs, where);
 	const problems =
 		invalid === undefined
 			? textProblems(catalogs, texts, read.config.fallbacks, where)
 			: [invalid];
 	if (problems.length > 0) return { written: [], errors: sortErrors(problems) };
+	// A key goes in the file the base locale has it in, and a new one in each locale's first.
+	const file = base === undefined ? 0 : fileIndexOf(base, key);
 	const placed =
-		base?.paths.get(key) ?? placedPath(key, base?.paths.values() ?? []);
+		base?.paths.get(key) ??
+		placedPath(key, base === undefined ? [] : pathsInFile(base, file));
 	const catalogTexts = new Map<string, string>();
-	for (const [locale, path] of read.config.catalogs) {
+	for (const [locale, paths] of read.config.catalogs) {
 		const text = texts[locale];
-		if (text !== undefined) {
-			catalogTexts.set(path, catalogWithMessages(path, [[placed, text]], path));
-		}
+		if (text === undefined) continue;
+		const written = catalogsWithMessages(
+			paths,
+			[[placed, text, file]],
+			paths[0],
+		);
+		for (const [path, catalogText] of written)
+			catalogTexts.set(path, catalogText);
 	}
 	writeAll(catalogTexts);
 	return compile(configFile);
@@ -122,7 +135,7 @@ function textProblem(
 	text: string | undefined,
 	fallsBack: boolean,
 ): GraiError | undefined {
-	const where = { file: catalog.file, key, locale: catalog.locale };
+	const where = { file: fileOfKey(catalog, key), key, locale: catalog.locale };
 	if (catalog.messages.has(key)) {
 		return text === undefined
 			? undefined

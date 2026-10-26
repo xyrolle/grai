@@ -33,6 +33,31 @@ export function catalogWithMessages(
 	);
 }
 
+/**
+ * The texts of a locale's catalog files, at `paths`, with the messages set: each in the file at the
+ * place its entry names, which `catalogWithMessages` gives `like`'s layout when it has none.
+ */
+export function catalogsWithMessages(
+	paths: readonly string[],
+	messages: Iterable<readonly [KeyPath, unknown, file: number]>,
+	like: string,
+): Map<string, string> {
+	const byFile = new Map<number, [KeyPath, unknown][]>();
+	for (const [path, value, file] of messages) {
+		const entries = byFile.get(file);
+		if (entries === undefined) byFile.set(file, [[path, value]]);
+		else entries.push([path, value]);
+	}
+	const texts = new Map<string, string>();
+	paths.forEach((path, file) => {
+		const entries = byFile.get(file);
+		if (entries !== undefined) {
+			texts.set(path, catalogWithMessages(path, entries, like));
+		}
+	});
+	return texts;
+}
+
 /** The `$schema` entry of a catalog's text, when it has one. */
 function schemaOf(text: string): [KeyPath, unknown][] {
 	const parsed: unknown = JSON.parse(text);

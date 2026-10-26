@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import type { Catalog } from "./catalog.ts";
+import { type Catalog, fileOfKey } from "./catalog.ts";
 import { type ProjectCode, readProjectCode } from "./code/project.ts";
 import { readingOf } from "./code/reads.ts";
 import { codeProblems } from "./code-problems.ts";
@@ -98,7 +98,8 @@ function unused(
 		testing === undefined
 			? `no shipped code under ${where} reads the key. Remove it from every catalog, or use it.`
 			: `no shipped code under ${where} reads the key, only tests, which ship nothing: ${testing}. Remove it from every catalog and from those tests, or use it.`;
-	return new GraiError("key-unused", { file: base?.file ?? "", key }, detail);
+	const file = base === undefined ? "" : fileOfKey(base, key);
+	return new GraiError("key-unused", { file, key }, detail);
 }
 
 /** A directory as the project names it: relative to its root, or in full when outside it. */
@@ -183,7 +184,7 @@ function differingInputs(
 		return [
 			new GraiError(
 				"inputs-differ",
-				{ file: catalog.file, key, locale: catalog.locale },
+				{ file: fileOfKey(catalog, key), key, locale: catalog.locale },
 				`the message never shows ${missing.map((name) => `{${name}}`).join(", ")}, which ${readers.join(", ")} show${readers.length === 1 ? "s" : ""}. Show it here too, or drop it everywhere.`,
 			),
 		];

@@ -365,7 +365,7 @@ beforeEach(() => useLocale("de"));
 |---|---|
 | `locales` | The project's locales, as BCP 47 tags in their canonical form: `en-US`, not `en-us`. |
 | `baseLocale` | One of `locales`: the one the others are translated from, whose text the editor shows and `grai seed` copies, and the locale a request gets when its strategy finds none. |
-| `catalogs` | Each locale's catalog, a path with `{locale}` in it. |
+| `catalogs` | Each locale's catalog, a path with `{locale}` in it, or a list of such paths, where a locale's messages are split across files, such as `["messages/{locale}.json", "messages/admin/{locale}.json"]`: a key is in one of its locale's files, and a new key goes in the first. |
 | `outdir` | Where the compiled output goes. |
 | `strategy` | Optional. Where the server and a page no server draws look for the locale, in order: `cookie`, `localStorage` (the page's alone), `query` (a query parameter), `preferredLanguage` (the request's `Accept-Language`, the browser's languages), `url` (the first path segment; the base locale has no prefix). |
 | `cookieName` | The cookie `cookie` reads and `setLocale` writes, when `strategy` lists `cookie`: a name RFC 6265 allows. A `__Secure-` or `__Host-` name makes the cookie Secure. |
