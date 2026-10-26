@@ -14,13 +14,20 @@ import {
 	textTest,
 	written,
 } from "./candidates.ts";
+import { keyNamesOf } from "./key-candidates.ts";
 import type { Mapping } from "./mappings.ts";
+import type { Output } from "./modules.ts";
 import { type Listing, Outside, outsideNames } from "./outside.ts";
 import { OutsidePackages } from "./workspace.ts";
 
-/** What the test reads a project's names from. */
+/**
+ * What the test reads a project's names from, and the key a reading is for alone, if any: then the
+ * names are those of what may read or reach that key (`keyNamesOf`).
+ */
 export type Naming = {
 	root: string;
+	output: Output;
+	key: string | undefined;
 	listing: Listing;
 	mappings: readonly Mapping[] | undefined;
 	links: readonly Link[];
@@ -44,20 +51,27 @@ export class TextTest {
 	}
 
 	/**
-	 * The files among these whose text may read grai's, by the barrels found and the specifiers of
-	 * installed packages that pass it on (`reached`); every one when a mapping may name the output
-	 * from any specifier. A call after the first takes the files the calls before left out, which
-	 * failed the names then, so it tests them by the names found since alone.
+	 * The files among these whose text may read grai's, or reach the key, by the barrels found and
+	 * the specifiers of installed packages that pass it on (`reached`); every one when a mapping may
+	 * name the output from any specifier. A call after the first takes the files the calls before
+	 * left out, which failed the names then, so it tests them by the names found since alone.
 	 */
 	taken(
 		files: readonly SourceFile[],
 		barrels: ReadonlySet<string>,
 		reached: ReadonlySet<string>,
 	): SourceFile[] {
-		const { listing, mappings, links, packages } = this.naming;
+		const { listing, mappings, links, packages, output, key } = this.naming;
 		const names =
 			mappings &&
-			namesOf({ outdir: listing.outdir, barrels }, mappings, links, packages);
+			(key === undefined
+				? namesOf(
+						{ outdir: listing.outdir, barrels },
+						mappings,
+						links,
+						packages,
+					)
+				: keyNamesOf(key, { ...output, barrels }, mappings, links, packages));
 		if (names === undefined) return [...files];
 		for (const name of [...this.leaving, ...reached]) names.add(name);
 		for (const name of this.passers.passing(names)) names.add(written(name));
