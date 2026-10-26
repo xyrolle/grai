@@ -9,12 +9,14 @@ import { readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
+import { keyModulePrefix } from "../locale-chunks.ts";
 import { stateDirectory } from "../outdir-contents.ts";
+import { moduleOf } from "../output-paths.ts";
 import { sourceFiles } from "../sources.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfFiles } from "./facts-pool.ts";
-import { ModuleGraph, type Output } from "./modules.ts";
+import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { projectResolve } from "./resolution.ts";
 
 /** A source file: the path the project shows, its text, and its facts. */
@@ -47,8 +49,24 @@ export async function readProjectCode(
 	config: Config,
 	roots: readonly string[],
 ): Promise<ProjectCode | GraiError> {
-	const resolve = await projectResolve(config.root);
-	if (resolve instanceof GraiError) return resolve;
+	const output: Output = {
+		messages: join(config.outdir, "messages.js"),
+		keys: join(config.outdir, "keys.js"),
+		keyOf: (path) =>
+			path.startsWith(keyModulePrefix)
+				? path.slice(keyModulePrefix.length)
+				: undefined,
+	};
+	const resolveFile = await projectResolve(config.root);
+	if (resolveFile instanceof GraiError) return resolveFile;
+	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
+	const resolve: Resolve = async (source, importer) => {
+		const path = await resolveFile(source, importer);
+		const module = moduleOf(source);
+		return path === output.keys && module.type === "key"
+			? `${keyModulePrefix}${module.key}`
+			: path;
+	};
 	const cache = new FactsCache(join(config.outdir, stateDirectory));
 	const files = sourceFiles(roots, config.root, config.outdir);
 	const facts = files.map(({ path, text }) => cache.get(path, text));
@@ -76,11 +94,6 @@ export async function readProjectCode(
 			: Promise.resolve(undefined);
 		followed.set(path, facts);
 		return facts;
-	};
-	const output: Output = {
-		messages: join(config.outdir, "messages.js"),
-		keys: join(config.outdir, "keys.js"),
-		keyOf: () => undefined,
 	};
 	return { sources, graph: new ModuleGraph(output, resolve, factsOfPath) };
 }
