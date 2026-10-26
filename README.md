@@ -334,7 +334,7 @@ Workers, Bun (`bun src/worker.ts`) and Deno (`deno serve src/worker.ts`) serve t
 app.use((c, next) => middleware(c.req.raw, () => next().then(() => c.res)));
 ```
 
-The locale stays bound while the handler runs and in every task it starts, so a page streamed as SvelteKit and React stream them renders in it to its last chunk. A stream's `pull()` is different: once the middleware has returned, the stream's reader starts it, outside the request. So on a server, a message rendered outside every request the middleware binds throws a `locale-unbound` GraiError rather than render in a locale that isn't the reader's. Render a stream in its `start()`, or in a task writing to it. Outside a request, pass `{ locale }` to the message; a test binds its locale with `useLocale`, which holds there too.
+The locale stays bound while the handler runs and in every task it starts, so a page streamed as SvelteKit and React stream them renders in it to its last chunk. A stream's `pull()` is different: once the middleware has returned, the stream's reader starts it, outside the request. So on a server, a message rendered outside every request the middleware binds throws a `locale-unbound` GraiError rather than render in a locale that isn't the reader's. Render a stream in its `start()`, or in a task writing to it. Outside a request, pass `{ locale }` to the message, or run the code in `withLocale(locale, code)` from `server.js`, as a scheduled job does.
 
 It needs `AsyncLocalStorage`, from `node:async_hooks`, which Node, Bun and Deno have. Workers have it by default from compatibility date 2026-08-04; on an earlier date, add the `nodejs_als` compatibility flag, which adds only that.
 
@@ -357,6 +357,14 @@ A test picks the locale it renders in with `useLocale` from the output's `testin
 import { useLocale } from "./src/lib/i18n/testing.js";
 
 beforeEach(() => useLocale("de"));
+```
+
+`useLocale` binds a page's or a script's locale. A process that loads `server.js` renders every message in a request instead, so a test there runs inside one, through `server.js`'s `withLocale`, which binds it as the middleware binds a request:
+
+```ts
+import { withLocale } from "./src/lib/i18n/server.js";
+
+aroundEach((test) => withLocale("de", test));
 ```
 
 ## Config
