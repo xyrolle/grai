@@ -85,6 +85,10 @@ export declare const unlocalizedPaths: readonly RegExp[];
 export declare const localeCopies: boolean;
 /** The locale a URL's path names for the \`url\` strategy, if any. Apps call extractLocaleFromUrl. */
 export declare function localeOfPath(pathname: string): Locale | undefined;
+/** A path in its locale's words as its route, its prefix kept, for an adapter that routes by the prefix. */
+export declare function routeOfPath(pathname: string): string;
+/** A route's path, its prefix kept, in its locale's words. */
+export declare function pathOfRoute(pathname: string): string;
 /** Binds a locale outside a request, by its position in \`locales\`: testing.js binds a test's with it. */
 export declare function bindLocale(index: number): void;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */

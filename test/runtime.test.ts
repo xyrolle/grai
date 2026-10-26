@@ -600,6 +600,58 @@ it("reads and writes a locale's own prefix, where the config gives one", async (
 	]);
 });
 
+it("links to a page in its locale's words, and reads them back as the app's route", async () => {
+	const { runtime } = await output({
+		strategy: ["url"],
+		pathnames: {
+			"/about": { de: "/ueber-uns", ar: "/عن" },
+			"/products/[id]": { de: "/produkte/[id]" },
+		},
+	});
+	const routeOf = (url: string) => runtime.deLocalizeUrl(url).pathname;
+
+	expect([
+		runtime.localizeHref("/about", { locale: "de" }),
+		runtime.localizeHref("/products/7?view=all", { locale: "de" }),
+		runtime.localizeHref("/cart", { locale: "de" }),
+		runtime.localizeHref("/de/ueber-uns", { locale: "ar" }),
+		runtime.localizeHref("/de/produkte/7", { locale: "en" }),
+		routeOf("https://shop.test/de/produkte/7"),
+		routeOf("https://shop.test/ar/%D8%B9%D9%86"),
+		routeOf("https://shop.test/de/cart"),
+	]).toEqual([
+		"/de/ueber-uns",
+		"/de/produkte/7?view=all",
+		"/de/cart",
+		"/ar/%D8%B9%D9%86",
+		"/products/7",
+		"/products/7",
+		"/about",
+		"/cart",
+	]);
+});
+
+it("translates the base locale's paths too, and sends an unprefixed page to its locale's words", async () => {
+	const config = {
+		strategy: ["url", "cookie"],
+		cookieName: "lang",
+		localePrefix: "always",
+		pathnames: { "/about": { en: "/about-us", de: "/ueber-uns" } },
+	};
+	const { runtime } = await output(config);
+	const { middleware } = await served(config);
+	const response = await middleware(
+		new Request("https://shop.test/about", { headers: { cookie: "lang=de" } }),
+		() => new Response("page"),
+	);
+
+	expect([
+		runtime.localizeHref("/about", { locale: "en" }),
+		runtime.deLocalizeUrl("https://shop.test/en/about-us").pathname,
+		response.headers.get("location"),
+	]).toEqual(["/en/about-us", "/about", "https://shop.test/de/ueber-uns"]);
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies, its storage and its reloads. */
 	function page(lang: string) {
