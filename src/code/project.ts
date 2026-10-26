@@ -14,18 +14,17 @@ import { stateDirectory } from "../outdir-contents.ts";
 import { moduleOf } from "../output-paths.ts";
 import { realPath } from "../real-path.ts";
 import { type Seen, sourceExtensions, sourceFiles } from "../sources.ts";
-import { namesOf, textTest, written } from "./candidates.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
 import { Installed } from "./installed.ts";
 import { projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
-import { Outside, outsideNames } from "./outside.ts";
 import { Pool } from "./pool.ts";
 import { projectResolution, resolverFor } from "./resolution.ts";
 import { importKey, resolvedImports } from "./resolved.ts";
-import { OutsidePackages, workspacePackages } from "./workspace.ts";
+import { TextTest } from "./text-test.ts";
+import { workspacePackages } from "./workspace.ts";
 
 /** A source file: the path the project shows, its text, and its facts. */
 export type SourceCode = { file: string; text: string; facts: FileFacts };
@@ -104,14 +103,17 @@ export async function readProjectCode(
 		// The files whose text may name the output, a barrel or a module outside the listed sources,
 		// read and resolved, until the barrels they hold and the packages the rest import name no file
 		// more.
-		const passers = new OutsidePackages(packages, config.root);
-		const listing = {
-			roots: listedRoots,
-			skipped: seen.skipped,
-			outdir: config.outdir,
-		};
-		const beyond = new Outside(listing, mappings ?? []);
-		const leaving = outsideNames(listing, mappings ?? [], links);
+		const test = new TextTest({
+			root: config.root,
+			listing: {
+				roots: listedRoots,
+				skipped: seen.skipped,
+				outdir: config.outdir,
+			},
+			mappings,
+			links,
+			packages,
+		});
 		const installed = new Installed(
 			config.root,
 			seen.skipped,
@@ -121,19 +123,8 @@ export async function readProjectCode(
 		let barrels = new Set<string>();
 		let reached = new Set<string>();
 		for (let round = 0; ; round += 1) {
-			const names =
-				mappings &&
-				namesOf({ outdir: config.outdir, barrels }, mappings, links, packages);
-			if (names !== undefined) {
-				for (const name of [...leaving, ...reached]) names.add(name);
-				for (const name of passers.passing(names)) names.add(written(name));
-			}
-			const test = names && textTest(names);
-			const taken = files.filter(
-				({ path, text }) =>
-					!sources.has(path) &&
-					(test === undefined || test.test(text) || beyond.test(path, text)),
-			);
+			const left = files.filter(({ path }) => !sources.has(path));
+			const taken = test.taken(left, barrels, reached);
 			// The first round goes on with no file to read, to find the packages the files may import.
 			if (taken.length === 0 && round > 0) break;
 			const read = await factsOfSources(taken, cache, pool);
@@ -149,8 +140,8 @@ export async function readProjectCode(
 			barrels = await barrelsOf(sources.keys(), holds);
 			// The installed packages the sources left out may import, and that pass grai's on.
 			if (mappings !== undefined) {
-				const left = files.filter(({ path }) => !sources.has(path));
-				reached = await installed.passing(left, holds);
+				const rest = files.filter(({ path }) => !sources.has(path));
+				reached = await installed.passing(rest, holds);
 			}
 		}
 		saveQuietly(cache);
