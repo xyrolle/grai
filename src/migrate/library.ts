@@ -65,8 +65,9 @@ export function ownApi(name: string, library: string): Left {
 }
 
 /**
- * Whether an expression reads the same wherever and whenever a rewrite evaluates it, or evaluates
- * it no more: a string, or a name the module declares that nothing assigns again.
+ * Whether an expression reads the same whenever a rewrite evaluates it, or evaluates it no more: a
+ * string, or a name the module declares that nothing assigns again. A rewrite that copies the name
+ * into a call checks that it names the same declaration there (`messageCall`).
  */
 export function readsTheSame(node: Node, scopes: Scopes): boolean {
 	if (literalText(node) !== undefined) return true;

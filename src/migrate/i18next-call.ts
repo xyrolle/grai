@@ -22,7 +22,7 @@ export type Lookup = {
 	/** Where a key that names no namespace is looked up, in order. */
 	namespaces: readonly string[];
 	keyPrefix: string;
-	locale: string | undefined;
+	locale: Node | undefined;
 };
 
 /** i18next's options that change what a call renders, which grai has no counterpart for. */
@@ -52,7 +52,7 @@ export const expressionNamespace = {
 type CallOptions = {
 	/** The namespaces its `ns` names, which i18next looks in in order. */
 	named: readonly string[] | undefined;
-	locale: string | undefined;
+	locale: Node | undefined;
 	suffix: string;
 	inputs: Map<string, ESTree.ObjectProperty>;
 };
@@ -99,7 +99,7 @@ export function i18nextCall(
 	}
 	const { inputs, locale } = options;
 	const object = passed.object;
-	return messageCall(call, mapped, { inputs, object, locale }, module.text);
+	return messageCall(call, mapped, { inputs, object, locale }, module);
 }
 
 /**
@@ -110,7 +110,7 @@ export function i18nextCall(
 function optionsOf(
 	properties: ReadonlyMap<string, ESTree.ObjectProperty>,
 	lookup: Lookup,
-	{ text, scopes }: ModuleView,
+	{ scopes }: ModuleView,
 ): CallOptions | Left {
 	let named: readonly string[] | undefined;
 	let { locale } = lookup;
@@ -139,7 +139,7 @@ function optionsOf(
 			ordinal = value.value ? "_ordinal" : "";
 		} else if (name === "lng") {
 			if (!readsTheSame(value, scopes)) return movedLocale;
-			locale = text.slice(value.start, value.end);
+			locale = value;
 		} else if (unmigratedOptions.has(name)) {
 			return {
 				left: `it passes i18next's ${name}, which grai has no counterpart for.`,

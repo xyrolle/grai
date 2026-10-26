@@ -214,6 +214,6 @@ function messageOf(
 		replace,
 		mapped,
 		{ inputs, object, locale: undefined },
-		module.text,
+		module,
 	);
 }
