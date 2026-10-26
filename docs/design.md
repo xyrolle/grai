@@ -414,7 +414,10 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - Parsing app B's 6,980 scripts (53 MB) to full ESTree takes 0.6 s through its raw transfer. The same parse returned as JSON takes 2.8 s.
   - The build uses grai's copy too, not Vite's re-export. With one version, the build and the CLI read every file into the same tree. A Next project, which has no Vite, reads code with the same parser. Loading a second copy of the parser in a Vite build costs one native binding.
   - The resolver is the one Rolldown resolves with, published for Node. It reads tsconfig `paths` (with `extends`, so SvelteKit's generated `.svelte-kit/tsconfig.json` brings `$lib`) and package.json `imports` and `exports` under the bundler's conditions. It caches by directory: app B's 24,573 distinct imports resolve in 0.6 s cold.
-  - The CLI also reads the bundler's own aliases. When the project has a Vite config, Vite's own config loader (`resolveConfig`) gives its `resolve.alias`, the plugins' among them, such as SvelteKit's. Those aliases apply first, as Vite applies them: a string matches the whole path or a path below it, and a regular expression replaces what it matches. Then the resolver runs with the tsconfig and package.json rules above.
+  - The CLI also reads the bundler's own aliases. When the project has a Vite config, Vite's own config loader, `loadConfigFromFile`, gives the aliases the config declares. Those aliases apply first, as Vite applies them: a string matches the whole path or a path below it, and a regular expression replaces what it matches. Then the resolver runs with the tsconfig and package.json rules above.
+    - The loader runs none of the config's plugins, as SvelteKit's would sync its generated directory: a command that reads code writes nothing of the app's.
+    - So a plugin's aliases come from the tsconfig the plugin generates, as SvelteKit's `$lib` does.
+  - **The output's imports resolve only once it exists, so a command that reads code compiles it first when `messages.js` or `keys.js` is missing,** as the app's dev server or build would. The output is grai's alone.
   - Node's own resolution knows neither tsconfig paths nor TypeScript's extensions. TypeScript's module resolution needs `typescript` and is slower. Running Vite's resolver needs the app's Vite config loaded, which a Next project does not have.
 - **A component is read through its framework's own parser, and its expressions through oxc.**
   - Svelte: `svelte/compiler`'s `parse` (the modern AST) gives the scripts and every expression's place.
@@ -476,7 +479,8 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - Parsing is spread over a pool of worker threads, which return each file's facts.
     - Single-threaded, Svelte's own parse takes 2.0 s for app B's 1,988 components (15 MB), and oxc 0.6 s for its scripts.
     - With 8 workers, the whole of app B parses in 0.95 s, at a load of 74. That has to be measured again on a quiet machine.
-    - The pool is sized by the work. Below the measured break-even of files it starts no worker, and above it, no more than the machine's parallelism less one.
+    - **The pool is sized by the work.** Reading starts on the main thread. Once it has taken as long as a worker takes to start, about 0.25 s, and the rest would take more than twice that, the rest goes to workers. Each worker gets at least that much, and there are never more than the machine's parallelism less one.
+      - Measured, the pool pays from about a thousand of app B's files and about four thousand of the synthetic project's, whose scripts are simpler, so a count of files would be wrong for one of them.
   - **Each file's facts are kept on disk, in the outdir's `.grai/` state, which Git ignores already, so a one-shot command reads again only the files that changed.** The facts are cached, never an AST.
     - They are keyed by the content's hash, grai's version and the parsers' versions, so a change to any of them reads the file again.
     - They are written atomically after a command reads, and an entry for a file that is gone or changed is dropped then.
