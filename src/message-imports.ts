@@ -103,9 +103,11 @@ export function messageBindings(
 	namespaceNames: ReadonlySet<string>,
 	isKeysFile: (specifier: string) => boolean = () => true,
 ): MessageBindings {
-	const destructured = statementsOf(text, destructuredImport);
-	// The dynamic import a destructuring holds is the same import, listed once.
-	const dynamic = statementsOf(text, dynamicImport).filter(
+	const loads = statementsOf(text, dynamicImport);
+	// A destructuring of a dynamic import holds it, and is the same import, listed once.
+	const destructured =
+		loads.length > 0 ? statementsOf(text, destructuredImport) : [];
+	const dynamic = loads.filter(
 		({ start }) =>
 			!destructured.some((outer) => outer.start <= start && start < outer.end),
 	);
