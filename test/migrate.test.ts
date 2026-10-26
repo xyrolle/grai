@@ -668,4 +668,28 @@ export const title = () => useMemo(() => m.cart_title(), [t]);
 `);
 		expect(project.result.changed).toEqual(["src/memo.ts"]);
 	});
+
+	it("reads a name in a parameter's default where JavaScript does, outside the body's own var", async () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/render.ts": `import { t } from "i18next";
+
+export function render(value = t("cart:title")) {
+	var t = () => "local";
+	return value + t();
+}
+`,
+		});
+
+		expect(
+			project.text("src/render.ts"),
+		).toBe(`import { m } from "../out/messages.js";
+
+export function render(value = m.cart_title()) {
+	var t = () => "local";
+	return value + t();
+}
+`);
+		expect(project.left()).toEqual([]);
+		expect((await project.load("src/render.ts")).render?.()).toBe("Cartlocal");
+	});
 });

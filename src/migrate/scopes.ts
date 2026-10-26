@@ -103,6 +103,9 @@ export class Scopes {
 		} else if (node.type === "CatchClause") {
 			if (node.param !== null) this.declarePattern(node, node.param, node, at);
 			this.visitChildren(node, { fn: at.fn, block: node }, "param");
+		} else if (node.type === "StaticBlock") {
+			// A class's static block keeps its vars, as a function's body does.
+			this.visitChildren(node, { fn: node, block: node });
 		} else if (blocks.has(node.type)) {
 			this.visitChildren(node, { fn: at.fn, block: node });
 		} else if (node.type !== "ExportNamedDeclaration" || node.source === null) {
@@ -140,24 +143,25 @@ export class Scopes {
 	}
 
 	/**
-	 * A function's own scope holds its parameters and its body, and an expression's own name; a
-	 * declaration's name is the enclosing block's.
+	 * A function's parameters are in a scope of its own, with an expression's own name; its body is
+	 * another, where its `var`s are, which a parameter's default cannot see. A declaration's name is
+	 * the enclosing block's.
 	 */
 	private visitFunction(
 		node: ESTree.Function | ESTree.ArrowFunctionExpression,
 		at: Enclosing,
 	): void {
-		const own = { fn: node, block: node };
 		if (node.id !== null) {
 			const declared = node.type === "FunctionDeclaration";
 			this.addBinding(node.id, declared ? at.block : node);
 		}
+		const parameters = { fn: node, block: node };
 		for (const param of node.params) {
-			this.declarePattern(node, param, node, own);
+			this.declarePattern(node, param, node, parameters);
 		}
 		if (node.body !== null) {
 			this.parents.set(node.body, node);
-			this.visit(node.body, own);
+			this.visit(node.body, { fn: node.body, block: node.body });
 		}
 	}
 
@@ -220,7 +224,6 @@ export class Scopes {
 /** The nodes that open a block's scope: what `let`, `const` and `class` declare in them stays in them. */
 const blocks = new Set([
 	"BlockStatement",
-	"StaticBlock",
 	"ForStatement",
 	"ForInStatement",
 	"ForOfStatement",
