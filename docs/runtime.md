@@ -150,8 +150,11 @@ Every variant agrees with `Intl.PluralRules` on 0–10,000 and on fractions befo
 |---|---|---|---|---|
 | Paraglide | 537 ns | 458 ns | 428 ns | |
 | `Intl.PluralRules`, cached | 249 ns | 162 ns | 124 ns | 97 |
-| CLDR rules compiled | 56 ns | 63 ns | 40 ns | 184 |
-| compiled, integer path first | 6.8 ns | 11.4 ns | 3.9 ns | 255 |
+| **grai, the rules plurals.js has** | 6.8 ns | 11.4 ns | 3.4 ns | 429 |
+| experiment: CLDR's rules compiled by make-plural | 56 ns | 63 ns | 40 ns | 184 |
+| experiment: the same with an integer path first, as the design began | 6.8 ns | 11.4 ns | 3.9 ns | 255 |
+
+grai's rules take the integer path first too, and for any other count read its operands as `Intl.PluralRules` rounds them, to three fraction digits, which the experiment's integer path left out: most of the 429 bytes.
 
 Ordinals are compiled the same way, from CLDR's ordinal rules, and checked against `Intl.PluralRules` of type ordinal alike (`ordinals`, four runs at a load of 10–21). A language that ranks every count alike, as `ru` does, gets a function that returns `other`, so a bundle of it is 63 bytes, not 320:
 
@@ -161,13 +164,20 @@ Ordinals are compiled the same way, from CLDR's ordinal rules, and checked again
 | `Intl.PluralRules`, cached | 143–155 ns | 100–115 ns | 261–297 ns | 103 |
 | grai | 3.3–3.6 ns | 3.0–3.5 ns | 9.8–11.1 ns | 330, 63, 375 |
 
-A formatter per locale and options formats a number in 207–213 ns and a date in 462–526 ns. Paraglide's cache takes 695–770 ns and 947–1,038 ns, and a new formatter per call 8.3–9.3 µs and 21.7–23.9 µs (`intl`).
+grai's compiled message, called on the server with a locale, formats a number in 201–220 ns and a date in 430–480 ns, as its formatter alone, made once per locale and options, does: 198–207 ns and 453–502 ns. Paraglide's cache takes 659–664 ns and 977–1,015 ns, and a new formatter per call 7.9–8.1 µs and 18.0–18.3 µs (`intl`).
 
 ## Dev
 
-One message edited in a catalog until the page shows it, through Vite's dev server and Chromium (`hmr`):
+One message edited in a catalog until the page shows it, through Vite's dev server and Chromium, and until a server render through Vite's runner shows it (`hmr`, medians of 20 edits):
 
-| | dev module | edit to page | of which the file watcher |
+| grai's plugin | edit to page | edit to server render |
+|---|---|---|
+| app A | 15.0 ms | 11.5 ms |
+| the synthetic project | 10.0 ms | 8.7 ms |
+
+The designs grai's plugin was chosen from, as experiments of the bench's own compiler and watcher (`hmr`'s other rows, earlier runs):
+
+| experiment | dev module | edit to page | of which the file watcher |
 |---|---|---|---|
 | app A, whole module re-evaluated | 1.9 MB | 202 ms | 48 ms |
 | app A, patch, Vite's watcher | 1.9 MB | 123 ms | 114 ms |
