@@ -106,7 +106,14 @@ function copyOf(app, dir) {
 	);
 	const filter = (path) => !path.includes("/paraglide");
 	cpSync(join(root, "src"), join(dir, "src"), { recursive: true, filter });
-	for (const file of ["tsconfig.json", ".svelte-kit/tsconfig.json"]) {
+	// The tsconfig SvelteKit generates, which the app's extends: in .svelte-kit/ up to SvelteKit 2,
+	// and as $app/tsconfig in node_modules from SvelteKit 3.
+	const tsconfigs = [
+		"tsconfig.json",
+		".svelte-kit/tsconfig.json",
+		"node_modules/$app/tsconfig.json",
+	];
+	for (const file of tsconfigs) {
 		try {
 			mkdirSync(dirname(join(dir, file)), { recursive: true });
 			cpSync(join(root, file), join(dir, file));
