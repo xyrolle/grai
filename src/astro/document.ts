@@ -64,7 +64,7 @@ type StartTag = {
 	attributes: readonly { name: string; source: string }[];
 };
 
-const DOCTYPE = /^\s*<!doctype\s[^>]*>/i;
+const DOCTYPE = /^<!doctype\s[^>]*>/i;
 
 /**
  * Where the start of the document in `text` ends, or undefined while more of it is needed; `ended`
@@ -73,12 +73,15 @@ const DOCTYPE = /^\s*<!doctype\s[^>]*>/i;
  * there is no `<head>`.
  */
 function documentSplit(text: string, ended: boolean): Split | undefined {
-	const doctype = DOCTYPE.exec(text);
+	// Comments may come before the doctype, such as a license's.
+	const at = afterSpacesAndComments(text, 0);
+	if (at === undefined) return ended ? asIs : undefined;
+	const doctype = DOCTYPE.exec(text.slice(at));
 	if (doctype === null) {
-		const opening = text.trimStart().slice(0, "<!doctype".length).toLowerCase();
+		const opening = text.slice(at, at + "<!doctype".length).toLowerCase();
 		return ended || !"<!doctype".startsWith(opening) ? asIs : undefined;
 	}
-	const afterDoctype = doctype[0].length;
+	const afterDoctype = at + doctype[0].length;
 	const html = elementStart(text, afterDoctype, "html");
 	if (html === "cut") return ended ? asIs : undefined;
 	const afterHtml = html?.end ?? afterDoctype;
