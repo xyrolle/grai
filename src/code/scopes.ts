@@ -1,4 +1,4 @@
-import type { ESTree } from "./parse.ts";
+import { childFields, type ESTree } from "./parse.ts";
 import {
 	assignedIn,
 	blocks,
@@ -6,7 +6,7 @@ import {
 	namesElement,
 	writesName,
 } from "./scope-rules.ts";
-import { childrenOf, type Node, type Span } from "./syntax.ts";
+import { isNode, type Node, type Span } from "./syntax.ts";
 
 /** A name a module declares: the identifier that declares it, and the code it is visible in. */
 export type Binding = { name: string; node: Node; scope: Span };
@@ -34,7 +34,11 @@ export class Scopes {
 	/** The uses in a type, `typeof x` or `x.Member` in an annotation, which read nothing at run time. */
 	private readonly typeUses = new Set<Node>();
 
-	constructor(program: ESTree.Program) {
+	/** What a reader also wants to see of every node the scopes are read from, in one walk. */
+	private readonly onNode: ((node: Node) => void) | undefined;
+
+	constructor(program: ESTree.Program, onNode?: (node: Node) => void) {
+		this.onNode = onNode;
 		const module = { start: program.start, end: program.end };
 		this.visitChildren(program, { fn: module, block: module, type: false });
 	}
@@ -83,6 +87,7 @@ export class Scopes {
 	}
 
 	private visit(node: Node, at: Enclosing): void {
+		this.onNode?.(node);
 		const target = assignedIn(node);
 		if (target !== undefined) this.markWritten(target);
 		if (node.type === "Identifier") {
@@ -135,16 +140,34 @@ export class Scopes {
 	}
 
 	private visitChildren(node: Node, at: Enclosing, skipped?: string): void {
-		for (const [field, child] of childrenOf(node)) {
-			this.parents.set(child, node);
-			if (field === skipped || writesName(node, field)) continue;
-			const type = at.type || isType(child);
-			if (child.type === "JSXIdentifier") {
-				if (namesElement(node, field)) this.addUse(child, at);
-			} else {
-				this.visit(child, type === at.type ? at : { ...at, type });
+		for (const field of childFields[node.type] ?? Object.keys(node)) {
+			const value: unknown = Reflect.get(node, field);
+			const named = field === skipped || writesName(node, field);
+			if (Array.isArray(value)) {
+				for (const item of value) {
+					if (isNode(item)) this.visitChild(node, field, item, named, at);
+				}
+			} else if (isNode(value)) {
+				this.visitChild(node, field, value, named, at);
 			}
 		}
+	}
+
+	private visitChild(
+		node: Node,
+		field: string,
+		child: Node,
+		named: boolean,
+		at: Enclosing,
+	): void {
+		this.parents.set(child, node);
+		if (named) return;
+		if (child.type === "JSXIdentifier") {
+			if (namesElement(node, field)) this.addUse(child, at);
+			return;
+		}
+		const type = at.type || isType(child);
+		this.visit(child, type === at.type ? at : { ...at, type });
 	}
 
 	/** `var` declares in the function's scope, the others in the block's. */
