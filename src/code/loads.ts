@@ -49,12 +49,20 @@ export function loadFact(
 				: undefined;
 	if (argument === undefined || argument.type === "SpreadElement")
 		return undefined;
-	const literal = literalText(argument);
-	if (literal !== undefined) {
-		return isGlob(node)
-			? { at: span(node), pattern: literal }
-			: { at: span(argument), source: literal };
+	if (isGlob(node)) {
+		const globs =
+			argument.type === "ArrayExpression"
+				? argument.elements.map((element) =>
+						element === null ? undefined : literalText(element),
+					)
+				: [literalText(argument)];
+		// Vite takes a glob's patterns only as written, each a literal.
+		return globs.every((glob) => glob !== undefined)
+			? { at: span(node), globs: globs.flatMap((glob) => glob ?? []) }
+			: undefined;
 	}
+	const literal = literalText(argument);
+	if (literal !== undefined) return { at: span(argument), source: literal };
 	const pattern = patternOf(argument);
 	return pattern === undefined ? undefined : { at: span(node), pattern };
 }

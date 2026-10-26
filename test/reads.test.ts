@@ -93,6 +93,25 @@ describe("the reads of a project's code", () => {
 		]);
 	});
 
+	it("reaches every key from a glob that takes the output in, as Vite places each glob, and none from one that leaves it out", async () => {
+		expect(
+			await readsOf({
+				"src/a.ts": [
+					'export const out = import.meta.glob(["../out/*.js", "!../out/keys.js"]);',
+					'export const root = import.meta.glob("/out/keys.js");',
+					'export const aliased = import.meta.glob("@out/*.js");',
+					'export const left = import.meta.glob(["../out/*.js", "!../out/{keys,messages}.js"]);',
+					'export const pages = import.meta.glob("./pages/*.ts");',
+					"",
+				].join("\n"),
+			}),
+		).toEqual([
+			'src/a.ts:1:20 may reach *: import.meta.glob(["../out/*.js", "!../out/keys.js"])',
+			'src/a.ts:2:21 may reach *: import.meta.glob("/out/keys.js")',
+			'src/a.ts:3:24 may reach *: import.meta.glob("@out/*.js")',
+		]);
+	});
+
 	it("takes a module a dynamic import hands to then as used whole, and a key's own module as its path", async () => {
 		expect(
 			await readsOf({
