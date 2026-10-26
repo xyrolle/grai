@@ -13,6 +13,20 @@ const catalogs = {
 const output = (config: Record<string, unknown> = {}) =>
 	project(catalogs, config).load();
 
+/** What server.js gives a server to define its own strategies by, and the `Vary` they make. */
+type ServerStrategies = {
+	defineServerStrategy(
+		name: string,
+		strategy: {
+			getLocale(
+				request: Request,
+			): string | undefined | Promise<string | undefined>;
+			vary?: readonly string[];
+		},
+	): void;
+	vary: string;
+};
+
 /** A project's output as a server loads it: its messages, runtime and middleware. */
 async function served(config: Record<string, unknown> = {}) {
 	const { dir, load } = project(catalogs, config);
@@ -23,6 +37,7 @@ async function served(config: Record<string, unknown> = {}) {
 	return {
 		m,
 		runtime,
+		server: server as ServerStrategies,
 		middleware: server.middleware as (
 			request: Request,
 			handler: (resolved: {
@@ -600,6 +615,234 @@ it("reads and writes a locale's own prefix, where the config gives one", async (
 	]);
 });
 
+it("links to a page in its locale's words, and reads them back as the app's route", async () => {
+	const { runtime } = await output({
+		strategy: ["url"],
+		pathnames: {
+			"/about": { de: "/ueber-uns", ar: "/عن" },
+			"/products/[id]": { de: "/produkte/[id]" },
+		},
+	});
+	const routeOf = (url: string) => runtime.deLocalizeUrl(url).pathname;
+
+	expect([
+		runtime.localizeHref("/about", { locale: "de" }),
+		runtime.localizeHref("/products/7?view=all", { locale: "de" }),
+		runtime.localizeHref("/cart", { locale: "de" }),
+		runtime.localizeHref("/de/ueber-uns", { locale: "ar" }),
+		runtime.localizeHref("/de/produkte/7", { locale: "en" }),
+		routeOf("https://shop.test/de/produkte/7"),
+		routeOf("https://shop.test/ar/%D8%B9%D9%86"),
+		routeOf("https://shop.test/de/cart"),
+	]).toEqual([
+		"/de/ueber-uns",
+		"/de/produkte/7?view=all",
+		"/de/cart",
+		"/ar/%D8%B9%D9%86",
+		"/products/7",
+		"/products/7",
+		"/about",
+		"/cart",
+	]);
+});
+
+it("translates the base locale's paths too, and sends an unprefixed page to its locale's words", async () => {
+	const config = {
+		strategy: ["url", "cookie"],
+		cookieName: "lang",
+		localePrefix: "always",
+		pathnames: { "/about": { en: "/about-us", de: "/ueber-uns" } },
+	};
+	const { runtime } = await output(config);
+	const { middleware } = await served(config);
+	const response = await middleware(
+		new Request("https://shop.test/about", { headers: { cookie: "lang=de" } }),
+		() => new Response("page"),
+	);
+
+	expect([
+		runtime.localizeHref("/about", { locale: "en" }),
+		runtime.deLocalizeUrl("https://shop.test/en/about-us").pathname,
+		response.headers.get("location"),
+	]).toEqual(["/en/about-us", "/about", "https://shop.test/de/ueber-uns"]);
+});
+
+it("puts the locale after the app's base path, and reads it there", async () => {
+	const config = {
+		strategy: ["url"],
+		basePath: "/shop",
+		pathnames: { "/about": { de: "/ueber-uns" } },
+	};
+	const { runtime } = await output(config);
+	const { middleware } = await served(config);
+	const localeAt = async (path: string) =>
+		(
+			await middleware(
+				new Request(`https://example.test${path}`),
+				({ locale }) => new Response(locale),
+			)
+		).text();
+
+	expect([
+		runtime.localizeHref("/shop/about", { locale: "de" }),
+		runtime.localizeHref("/shop", { locale: "de" }),
+		runtime.localizeHref("/shop/de/ueber-uns", { locale: "en" }),
+		runtime.deLocalizeUrl("https://example.test/shop/de/ueber-uns").pathname,
+		runtime.extractLocaleFromUrl("https://example.test/shop/ar/x"),
+		await localeAt("/shop/de/cart"),
+		await localeAt("/shop/cart"),
+	]).toEqual([
+		"/shop/de/ueber-uns",
+		"/shop/de",
+		"/shop/about",
+		"/shop/about",
+		"ar",
+		"de",
+		"en",
+	]);
+});
+
+it("takes a path without the base path as the app's own, as a framework that adds the base itself writes it", async () => {
+	const { runtime } = await output({ strategy: ["url"], basePath: "/shop" });
+
+	expect([
+		runtime.localizeHref("/about", { locale: "de" }),
+		runtime.deLocalizeUrl("https://example.test/de/about").pathname,
+		runtime.extractLocaleFromUrl("https://example.test/de/about"),
+	]).toEqual(["/de/about", "/about", "de"]);
+});
+
+it("sends an unprefixed page under the base path to its locale's path there", async () => {
+	const { middleware } = await served({
+		strategy: ["url", "cookie"],
+		cookieName: "lang",
+		localePrefix: "always",
+		basePath: "/shop",
+		unlocalizedPaths: ["/api/**"],
+	});
+	const answer = async (path: string) => {
+		const response = await middleware(
+			new Request(`https://example.test${path}`, {
+				headers: { cookie: "lang=de" },
+			}),
+			({ locale }) => new Response(locale),
+		);
+		return response.headers.get("location") ?? (await response.text());
+	};
+
+	expect([
+		await answer("/shop/cart"),
+		await answer("/shop/api/orders"),
+	]).toEqual(["https://example.test/shop/de/cart", "de"]);
+});
+
+describe("with a strategy the server defines", () => {
+	const config = { strategy: ["custom-session", "cookie"], cookieName: "lang" };
+
+	it("asks the server's strategy for a request's locale in the strategy's order, and goes on when it names none", async () => {
+		const { middleware, server } = await served(config);
+		server.defineServerStrategy("custom-session", {
+			getLocale: async (request) =>
+				request.headers.get("x-user-locale") ?? undefined,
+			vary: ["X-User-Locale"],
+		});
+		const answer = (headers: Record<string, string>) =>
+			middleware(
+				new Request("https://shop.test/", { headers }),
+				({ locale }) => new Response(locale),
+			);
+		const byServer = await answer({ "x-user-locale": "de", cookie: "lang=ar" });
+		const byCookie = await answer({ cookie: "lang=ar" });
+
+		expect([
+			await byServer.text(),
+			await byCookie.text(),
+			byServer.headers.get("vary"),
+			server.vary,
+		]).toEqual(["de", "ar", "X-User-Locale, Cookie", "X-User-Locale, Cookie"]);
+	});
+
+	it("refuses a request no definition answers, a definition the strategy does not list, and a locale the project lacks", async () => {
+		const { middleware, server } = await served(config);
+		const request = () =>
+			middleware(
+				new Request("https://shop.test/"),
+				() => new Response(""),
+			).catch((error: unknown) => error);
+
+		expect(await request()).toMatchObject({
+			code: "strategy-undefined",
+			message:
+				'"strategy" lists "custom-session", which no defineServerStrategy("custom-session", { getLocale }) on this server defines. Define it before the first request.',
+		});
+		expect(
+			thrown(() =>
+				server.defineServerStrategy("custom-user", { getLocale: () => "de" }),
+			),
+		).toMatchObject({
+			code: "strategy-undefined",
+			message:
+				'"custom-user" is not in the config\'s "strategy": ["custom-session","cookie"]. Name the strategy there, then define it.',
+		});
+		server.defineServerStrategy("custom-session", { getLocale: () => "fr" });
+		expect(await request()).toMatchObject({ code: "locale-unknown" });
+	});
+});
+
+describe("with a domain per locale", () => {
+	const config = {
+		strategy: ["url"],
+		domains: { en: "shop.test", de: "shop.de.test", ar: "shop.ar.test" },
+		pathnames: { "/about": { de: "/ueber-uns" } },
+	};
+
+	it("takes the locale a request's host is the domain of, and links across hosts with whole URLs", async () => {
+		const { runtime, middleware } = await served(config);
+		const answer = async (url: string, href: string, locale: string) =>
+			(
+				await middleware(
+					new Request(url),
+					({ locale: found }) =>
+						new Response(`${found} ${runtime.localizeHref(href, { locale })}`),
+				)
+			).text();
+
+		expect([
+			await answer("https://shop.de.test/cart", "/about", "de"),
+			await answer("https://shop.de.test/cart", "/about", "ar"),
+			await answer("https://shop.test/cart", "/about", "de"),
+		]).toEqual([
+			"de /ueber-uns",
+			"de https://shop.ar.test/about",
+			"en https://shop.de.test/ueber-uns",
+		]);
+		expect([
+			String(runtime.localizeUrl("https://shop.test/cart", { locale: "de" })),
+			runtime.deLocalizeUrl("https://shop.de.test/ueber-uns").pathname,
+			runtime.extractLocaleFromUrl("https://shop.ar.test/x"),
+		]).toEqual(["https://shop.de.test/cart", "/about", "ar"]);
+	});
+
+	it("routes by prefix on a host that is no locale's, as in development", async () => {
+		const { runtime, middleware } = await served(config);
+		const answer = async (url: string) =>
+			(
+				await middleware(
+					new Request(url),
+					({ locale }) =>
+						new Response(
+							`${locale} ${runtime.localizeHref("/about", { locale: "de" })}`,
+						),
+				)
+			).text();
+
+		expect([
+			await answer("http://localhost:5173/de/cart"),
+			await answer("http://localhost:5173/cart"),
+		]).toEqual(["de /de/ueber-uns", "en /de/ueber-uns"]);
+	});
+});
+
 describe("in a browser", () => {
 	/** A page drawn in a locale: its `<html lang>`, its cookies, its storage and its reloads. */
 	function page(lang: string) {
@@ -769,6 +1012,15 @@ describe("in a browser", () => {
 		});
 		runtime.setLocale("de");
 		expect([runtime.getLocale(), visited.reloads]).toEqual(["de", 0]);
+	});
+
+	it("refuses setLocale where only the server's own strategy keeps the choice, which a page cannot write", async () => {
+		page("de");
+		const { runtime } = await output({ strategy: ["custom-session"] });
+
+		expect(thrown(() => runtime.setLocale("ar"))).toMatchObject({
+			code: "locale-unkept",
+		});
 	});
 
 	it("names the new locale in the URL's query parameter with the query strategy", async () => {

@@ -21,6 +21,9 @@ const options = {
 	},
 	localePrefixes: { localePrefixes: { de: "deutsch" } },
 	unlocalizedPaths: { unlocalizedPaths: ["/api/**"] },
+	pathnames: { pathnames: { "/about": { de: "/ueber-uns" } } },
+	basePath: { basePath: "/shop" },
+	domains: { domains: { en: "shop.test", de: "shop.de.test" } },
 };
 
 /** The page's bundle for a project with the url strategy and `config`'s options. */
