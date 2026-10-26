@@ -1,8 +1,13 @@
 // Number and date formatting inside a message: a new Intl formatter per call, Paraglide's registry
-// (a cache keyed by the serialized options), and one formatter the compiler creates once per
-// locale and options at module scope, since a message's options are known when it compiles.
+// (a cache keyed by the serialized options), one formatter per locale and options made once, as
+// the compiler arranges it, and grai's compiled messages themselves, called on the server with a
+// locale, so each call also reads the locale and runs its message's function.
 //   node intl.mjs
-import { selectedApps } from "./apps.mjs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { cacheDir, selectedApps } from "./apps.mjs";
+import { graiSource } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 
@@ -14,6 +19,37 @@ const amounts = Array.from({ length: 200 }, (_, index) => index * 12.5);
 const dates = amounts.map((amount) =>
 	new Date(Date.UTC(2026, 0, 1) + amount * 86_400_000).toISOString(),
 );
+
+/** grai's output for two messages, a price and a day, formatted as the variants format them. */
+async function graiMessages() {
+	const dir = join(cacheDir, "intl-grai");
+	rmSync(dir, { recursive: true, force: true });
+	mkdirSync(join(dir, "messages"), { recursive: true });
+	for (const locale of ["ro", "ru"]) {
+		writeFileSync(
+			join(dir, "messages", `${locale}.json`),
+			JSON.stringify({
+				price: "{amount :number style=currency currency=EUR}",
+				day: "{date :datetime dateStyle=medium timeZone=UTC}",
+			}),
+		);
+	}
+	const config = join(dir, "grai.config.json");
+	writeFileSync(
+		config,
+		JSON.stringify({
+			locales: ["ro", "ru"],
+			baseLocale: "ro",
+			catalogs: "messages/{locale}.json",
+			outdir: "out",
+		}),
+	);
+	const { compile } = await import(join(graiSource, "index.ts"));
+	const { errors } = await compile(config);
+	if (errors.length > 0) throw new Error(errors[0].message);
+	return (await import(pathToFileURL(join(dir, "out", "messages.js")).href)).m;
+}
+const m = await graiMessages();
 
 function variants(locale) {
 	const number = new Intl.NumberFormat(locale, numberOptions);
@@ -30,6 +66,10 @@ function variants(locale) {
 		"one formatter per locale and options": [
 			(n) => number.format(n),
 			(d) => date.format(new Date(d)),
+		],
+		"grai's compiled messages": [
+			(n) => m.price({ amount: n }, { locale }),
+			(d) => m.day({ date: new Date(d) }, { locale }),
 		],
 	};
 }
