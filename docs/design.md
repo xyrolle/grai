@@ -352,6 +352,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
 
   It also lists, per locale, the keys still untranslated: those whose message equals its seed, but the keys `identicalToBase` lists. This is a report, not an error, since a text can rightly read as the base locale's. `--json` prints the problems and the untranslated keys for scripts.
 - `grai seed <locale>` gives a locale's catalog the base text of every key it lacks, and creates the catalog if there is none.
+  - **A key the locale takes from its fallbacks is not seeded.** It is translated already, and a seed in the locale's catalog would stop it following theirs.
   - **Every key is in every locale, so an untranslated message is a seed, and equality to it is the marker.** Nothing is kept beside the catalogs.
   - **A message that rightly reads as the base text is listed in the config, under its locale in `identicalToBase`.** The report proved noisy without it: on app B it named 319 messages in one locale and 108 in another, each equal to the base on purpose (units, codes, words both languages share).
     - The list is in the config, not in a file beside the catalogs or as markers in them, so the catalogs stay the inlang format and every exception is in one reviewed place.

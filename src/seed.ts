@@ -102,11 +102,12 @@ export async function seed(
 ): Promise<Seeded | { errors: GraiError[] }> {
 	const read = await readLocaleCatalogs(configFile, locale, "seed");
 	if ("errors" in read) return read;
-	const { config, path, base, target } = read;
+	const { config, path, base, target, inherited } = read;
 	const seeded: [KeyPath, unknown][] = [];
 	const problems: GraiError[] = [];
 	for (const [key, value] of base.messages) {
-		if (target?.messages.has(key)) continue;
+		// A key the locale takes from its fallbacks stays theirs: seeding it would end that.
+		if (target?.messages.has(key) || inherited(key) !== undefined) continue;
 		const problem = seedProblem(
 			key,
 			value,
