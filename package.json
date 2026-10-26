@@ -60,6 +60,10 @@
 			"types": "./dist/sveltekit-client.d.ts",
 			"default": "./dist/sveltekit-client.js"
 		},
+		"./sveltekit/navigation": {
+			"types": "./dist/sveltekit-navigation.d.ts",
+			"default": "./dist/sveltekit-navigation.js"
+		},
 		"./astro": {
 			"types": "./dist/astro.d.ts",
 			"default": "./dist/astro.js"
