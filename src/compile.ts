@@ -38,23 +38,36 @@ export type Build = ParsedCatalogs & {
 	key: string;
 };
 
-/** The runtime's modules, which every output carries, their imports of each other pinned. */
+const text = (url: URL): string => readFileSync(url, "utf8");
+
+/**
+ * The runtime's modules, which every output carries, their imports of each other pinned, and the
+ * templates of the output's declarations.
+ */
 const runtime: RuntimeSources = {
-	runtime: readFileSync(
-		new URL("./runtime/runtime.js", import.meta.url),
-		"utf8",
-	),
-	server: readFileSync(new URL("./runtime/server.js", import.meta.url), "utf8"),
-	testing: readFileSync(
-		new URL("./runtime/testing.js", import.meta.url),
-		"utf8",
-	),
+	runtime: text(new URL("./runtime/runtime.js", import.meta.url)),
+	server: text(new URL("./runtime/server.js", import.meta.url)),
+	testing: text(new URL("./runtime/testing.js", import.meta.url)),
+	declarations: {
+		runtime: text(new URL("./runtime/runtime.d.ts.template", import.meta.url)),
+		server: text(new URL("./runtime/server.d.ts.template", import.meta.url)),
+		testing: text(new URL("./runtime/testing.d.ts.template", import.meta.url)),
+		setLocale: {
+			live: text(
+				new URL("./runtime/set-locale.live.d.ts.template", import.meta.url),
+			),
+			reload: text(
+				new URL("./runtime/set-locale.reload.d.ts.template", import.meta.url),
+			),
+		},
+	},
 };
 
 /**
- * The compiler's own modules, the runtime's among them, hashed: what decides the output besides the
- * config and the catalogs. A new version of grai changes them, and so does a local build, which
- * keeps its version, so the output is written again after either. Taken on the first compile.
+ * The compiler's own modules, the runtime's among them, and the templates of the output's
+ * declarations, hashed: what decides the output besides the config and the catalogs. A new version
+ * of grai changes them, and so does a local build, which keeps its version, so the output is
+ * written again after either. Taken on the first compile.
  */
 let compilerHash: string | undefined;
 
@@ -65,7 +78,11 @@ function hashOfCompiler(): string {
 
 function hashOfModules(directory: string): string {
 	const modules = readdirSync(directory, { recursive: true, encoding: "utf8" })
-		.filter((file) => /\.(js|ts)$/.test(file) && !file.endsWith(".d.ts"))
+		.filter(
+			(file) =>
+				(/\.(js|ts)$/.test(file) && !file.endsWith(".d.ts")) ||
+				file.endsWith(".d.ts.template"),
+		)
 		.sort();
 	const digest = createHash("sha1");
 	for (const file of modules) {

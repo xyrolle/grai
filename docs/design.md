@@ -182,6 +182,7 @@ export declare const cart_items: Message<{ count: number }>;
 ```
 
 - **The compiler writes the `.d.ts` files itself, as text, from the same model as the JavaScript.** It never runs TypeScript. Declaration emit through TypeScript takes most of a compile at this catalog size: Paraglide's compile of app A takes 3.8 s, and 32.1 s with TypeScript's declarations (`compile-time`).
+- **The runtime's declarations ship as files beside the runtime, `runtime/<name>.d.ts.template`, which the compiler fills with the config's locales.** As strings in the compiler's modules they were 3 KB, gzipped, of every bundle of the compiler, in each adapter's plugin. They are `.template` files because TypeScript reads none: a `runtime.d.ts` beside the runtime's `runtime.js` would be the types the repo's own check takes for it.
 - **The types are named in the generated `runtime.d.ts`:**
   - `Locale` is the union of the locales.
   - `Message<I>` is `(inputs: I, options?: { locale?: Locale }) => string`.

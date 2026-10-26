@@ -1,0 +1,6 @@
+/**
+ * Sets the locale: for the rest of the request on the server, for the process in a script. In a
+ * browser it keeps the locale in the cookie or the URL and reloads, or with `{ reload: false }`
+ * switches the page in place, resolving once the locale's message chunks are in.
+ */
+export declare function setLocale(locale: Locale, options?: { reload?: boolean }): Promise<void>;

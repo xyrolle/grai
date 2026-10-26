@@ -1,0 +1,8 @@
+import type { Locale } from "./runtime.js";
+
+/**
+ * Binds a locale for the test, as if the page had loaded in it: the messages called next render in
+ * it, and so does a call that names it, which a page in another locale refuses. A build refuses
+ * this module.
+ */
+export declare function useLocale(locale: Locale): void;
