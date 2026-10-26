@@ -51,7 +51,7 @@ export function codeText(text: string, file: string): string {
 		: scripts;
 }
 
-/** Whether a file's code writes an identifier with an escape, `title`, which no scan reads as the name. */
+/** Whether a file's code writes an identifier with an escape, `t\u0069tle`, which no scan reads as the name. */
 export function escapesNames(code: string): boolean {
 	return /\\u(?:[0-9a-fA-F]{4}|\{[0-9a-fA-F]+\})/.test(code);
 }
