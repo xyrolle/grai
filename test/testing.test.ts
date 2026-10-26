@@ -49,22 +49,6 @@ it("renders a component in a locale other than the page's in jsdom, once the tes
 	expect(page.documentElement.lang).toBe("de");
 });
 
-it("binds a test's locale in a process that serves requests too, outside every request", async () => {
-	const { dir, load } = project({
-		en: { title: "Your cart" },
-		de: { title: "Ihr Warenkorb" },
-	});
-	const { m } = await load();
-	const output = (file: string) =>
-		import(pathToFileURL(join(dir, "out", file)).href);
-	await output("server.js");
-	const { useLocale } = await output("testing.js");
-
-	useLocale("de");
-
-	expect(m.title?.()).toBe("Ihr Warenkorb");
-});
-
 /** A project in English and German, loaded as a process whose middleware binds requests. */
 async function served() {
 	const { dir, load } = project({
@@ -80,6 +64,16 @@ async function served() {
 		testing: await output("testing.js"),
 	};
 }
+
+it("binds with useLocale a page's or a script's locale, which a process that serves requests renders in nowhere", async () => {
+	const { m, testing } = await served();
+
+	testing.useLocale("de");
+
+	expect(() => m.title?.()).toThrow(
+		expect.objectContaining({ code: "locale-unbound" }),
+	);
+});
 
 describe("a test in a process that serves requests, bound with server.js's withLocale around it", () => {
 	let m: Messages = {};

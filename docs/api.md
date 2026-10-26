@@ -151,7 +151,7 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 
 ### `testing.js`
 
-- `useLocale(locale: Locale): void`: binds a locale for a test, as if the page had loaded in it: the messages called next render in it, and so does a call that names it, which a page in another locale refuses. In a page it also sets `<html lang>` and `dir`. `grai/vite` refuses the module in a build.
+- `useLocale(locale: Locale): void`: binds a locale for a test in a page or a script, as if the page had loaded in it: the messages called next render in it, and so does a call that names it, which a page in another locale refuses. In a page it also sets `<html lang>` and `dir`. `grai/vite` refuses the module in a build.
 
 ### `server.js`
 
