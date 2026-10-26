@@ -1,5 +1,5 @@
 import { basename, dirname } from "node:path";
-import { type EnvironmentOptions, minifySync } from "vite";
+import { minifySync, type Rolldown } from "vite";
 import type { Build } from "./compile.ts";
 import { withoutContentHash } from "./content-names.ts";
 import { GraiError, sortErrors } from "./error.ts";
@@ -147,15 +147,16 @@ export function keyPageChunks(
 export type ChunkingGraph = { getModuleInfo: ModuleGraph };
 
 /**
- * The client build's chunking. The runtime has a chunk of its own, so a message chunk holds keys and
- * nothing else, and each key goes in the chunk `pageChunkOf` names, by the pages that load it.
+ * The client build's groups of messages. The runtime has a chunk of its own, so a message chunk
+ * holds keys and nothing else, and each key goes in the chunk `pageChunkOf` names, by the pages
+ * that load it.
  */
-export function messageChunking(
+export function messageGroups(
 	outdir: string,
 	pageChunkOf: (id: string, graph: ChunkingGraph) => string | undefined,
-): EnvironmentOptions {
+): Rolldown.CodeSplittingGroup[] {
 	const runtimeKind = runtimeKindIn(outdir);
-	const groups = [
+	return [
 		{
 			name: "grai-runtime",
 			test: (id: string) => runtimeKind(id) !== undefined,
@@ -166,9 +167,6 @@ export function messageChunking(
 			test: isMessageModule,
 		},
 	];
-	return {
-		build: { rolldownOptions: { output: { codeSplitting: { groups } } } },
-	};
 }
 
 /** A chunk's file name: in a `grai/` within its directory when it holds messages and nothing else. */

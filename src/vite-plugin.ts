@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { type Logger, type Plugin, parseSync } from "vite";
 import { type KeyReading, keyReading, keyReads } from "./build-key-reads.ts";
+import { withGroups } from "./code-splitting.ts";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
@@ -16,7 +17,7 @@ import {
 import { moduleOf } from "./message-imports.ts";
 import { type ModuleLinks, moduleLinks, seenThrough } from "./module-links.ts";
 import { realPath } from "./real-path.ts";
-import { withSharedKeys } from "./server-chunks.ts";
+import { sharedKeys } from "./server-chunks.ts";
 import {
 	type ChunkingGraph,
 	chunkFileName,
@@ -24,7 +25,7 @@ import {
 	keyPageChunks,
 	keysModule,
 	messageChunkCopies,
-	messageChunking,
+	messageGroups,
 	placeholderTexts,
 	textModule,
 } from "./vite-build.ts";
@@ -160,17 +161,14 @@ export function graiPlugin(
 			testing = environment.mode === "test";
 		},
 		configEnvironment(name, environment) {
-			if (serving || name !== "client") return undefined;
-			const chunking = messageChunking(files.outdir, pageChunkOf);
+			if (serving || name !== "client" || options.localeChunks !== true)
+				return undefined;
 			// With copies, a page's own preloads leave the shared message chunks out, for its locale
 			// script to preload the locale's copies.
-			const preloads =
-				options.localeChunks === true
-					? pagePreloads(environment.build?.modulePreload)
-					: undefined;
+			const preloads = pagePreloads(environment.build?.modulePreload);
 			return preloads === undefined
-				? chunking
-				: { build: { ...chunking.build, modulePreload: preloads } };
+				? undefined
+				: { build: { modulePreload: preloads } };
 		},
 		configResolved(resolved) {
 			site = {
@@ -197,17 +195,22 @@ export function graiPlugin(
 			},
 		},
 		outputOptions(output) {
-			if (serving) return null;
-			// Each output as Vite has resolved it: an app's or Vite's own choice not to split code
-			// stays, and an app's list of outputs gets no output of grai's.
+			// grai's groups join each output as Vite resolved it, and none that splits no code
+			// (`code-splitting.ts`).
+			if (serving || output.codeSplitting === false) return null;
 			if (this.environment.config.consumer === "server")
-				return output.codeSplitting === false
-					? null
-					: { ...output, codeSplitting: withSharedKeys(output.codeSplitting) };
+				return {
+					...output,
+					codeSplitting: withGroups(output.codeSplitting, [sharedKeys]),
+				};
 			if (!building(this.environment)) return null;
 			const named = output.chunkFileNames;
 			return {
 				...output,
+				codeSplitting: withGroups(
+					output.codeSplitting,
+					messageGroups(files.outdir, pageChunkOf),
+				),
 				chunkFileNames: (chunk) =>
 					chunkFileName(
 						chunk.moduleIds,
