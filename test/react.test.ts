@@ -28,6 +28,35 @@ describe("Markup", () => {
 		);
 	});
 
+	it("gives each element's function the options and attributes the message writes on it", async () => {
+		const { m } = await project({
+			en: {
+				legal:
+					"{#link href=|/en/terms| @translate=no}Terms{/link} and {#link href=|/en/privacy|}Privacy{/link}{#icon name=|shield|/}",
+			},
+		}).load();
+		const parts = m.legal?.parts?.() ?? [];
+		const drawn = renderToStaticMarkup(
+			createElement(Markup, {
+				parts,
+				markup: {
+					link: (children, { options, attributes }) =>
+						createElement(
+							"a",
+							{ href: String(options.href), translate: attributes.translate },
+							children,
+						),
+					icon: (_, { options }) =>
+						createElement("i", { className: String(options.name) }),
+				},
+			}),
+		);
+
+		expect(drawn).toBe(
+			'<a href="/en/terms" translate="no">Terms</a> and <a href="/en/privacy">Privacy</a><i class="shield"></i>',
+		);
+	});
+
 	it("closes an end's innermost element of its name, draws a stray end as nothing, and closes what is open at the end", () => {
 		const markupPart = (type: "markup-start" | "markup-end", name: string) =>
 			({ type, name, options: {}, attributes: {} }) satisfies Part;
