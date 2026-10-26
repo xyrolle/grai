@@ -314,3 +314,49 @@ console.log(live);
 	// Line 2: setLocale gives back nothing to await.
 	expect(await typeErrors(reload.dir, "use.ts", use)).toEqual(["2 TS2322"]);
 });
+
+it("intersects closed selections as their matching has them: :string's in NFC, and units of time as such", async () => {
+	const closed = (
+		input: string,
+		local: string,
+		match: Record<string, string>,
+	) => [
+		{
+			declarations: [`input ${input}`, ...(local === "" ? [] : [local])],
+			selectors: [local === "" ? input : "s"],
+			match,
+		},
+	];
+	const { dir, compile } = project({
+		en: {
+			place: closed("place", "local s = place: string", { "s=café": "café" }),
+			ago: closed("unit", "", {
+				"unit=day": "{n :relativetime unit=$unit}",
+				"unit=week": "{n :relativetime unit=$unit}",
+			}),
+		},
+		de: {
+			place: closed("place", "local s = place: string", {
+				"s=café": "Café",
+			}),
+			ago: closed("unit", "", {
+				"unit=day": "{n :relativetime unit=$unit}",
+				"unit=week": "{n :relativetime unit=$unit}",
+			}),
+		},
+	});
+	expect((await compile()).errors).toEqual([]);
+
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+const texts: string[] = [m.place({ place: "café" }), m.ago({ n: 1, unit: "week" })];
+m.ago({ n: 1, unit: "month" });
+console.log(texts);
+`,
+	);
+
+	// Line 3: a unit the select does not list.
+	expect(errors).toEqual(["3 TS2322"]);
+});

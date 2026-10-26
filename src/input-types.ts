@@ -4,7 +4,7 @@
  * that type-checks renders in every locale.
  */
 
-import type { IntlFormatter } from "./format-functions.ts";
+import { type IntlFormatter, timeUnits } from "./format-functions.ts";
 import type { Format } from "./format-options.ts";
 import type { LocaleMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
@@ -129,8 +129,13 @@ function usesOf(name: string, message: LocaleMessage): Use[] {
 	}
 	for (const [index, selector] of message.selectors.entries()) {
 		if (selector.kind !== "input" || selector.input !== name) continue;
+		// A :string selector matches in NFC, so its keys are taken in it, as two locales may write
+		// one key differently.
 		const keys = new Set(
-			message.variants.map((variant) => variant.keys[index] ?? catchAll),
+			message.variants.map((variant) => {
+				const key = variant.keys[index] ?? catchAll;
+				return selector.normalized ? key.normalize("NFC") : key;
+			}),
 		);
 		if (!keys.has(catchAll)) uses.push({ locale, keys });
 	}
@@ -206,7 +211,7 @@ const keyLiterals: Readonly<
 	number: (key, numeric) => (numeric ? [key] : []),
 	list: () => [],
 	string: (key) => [JSON.stringify(key)],
-	timeUnit: () => [],
+	timeUnit: (key) => (timeUnits.has(key) ? [JSON.stringify(key)] : []),
 };
 
 /** The literal types a value of a kind can match the keys by. */
