@@ -4,8 +4,9 @@
  * that type-checks renders in every locale.
  */
 
-import { type IntlFormatter, timeUnits } from "./format-functions.ts";
+import type { IntlFormatter } from "./format-functions.ts";
 import type { Format } from "./format-options.ts";
+import { literals } from "./key-literals.ts";
 import type { LocaleMessage } from "./message.ts";
 import { MessageProblem } from "./problem.ts";
 import { catchAll } from "./selection.ts";
@@ -15,7 +16,14 @@ import { catchAll } from "./selection.ts";
  * a date, which a number also gives; a number; a list of strings; a string; or one of Intl's units
  * of time, which a string also names.
  */
-type Kind = "any" | "text" | "date" | "number" | "list" | "string" | "timeUnit";
+export type Kind =
+	| "any"
+	| "text"
+	| "date"
+	| "number"
+	| "list"
+	| "string"
+	| "timeUnit";
 
 const kindTypes: Readonly<Record<Kind, string>> = {
 	any: "NonNullable<unknown>",
@@ -195,35 +203,4 @@ function common(
 	b: ReadonlySet<string>,
 ): ReadonlySet<string> {
 	return new Set([...a].filter((key) => b.has(key)));
-}
-
-/** A key's literal types: a number key's the number and its text, as `String(value)` matches it. */
-const numberOrText = (key: string, numeric: boolean): string[] =>
-	numeric ? [key, JSON.stringify(key)] : [JSON.stringify(key)];
-
-/** The literal types of a key a value of a kind can be. */
-const keyLiterals: Readonly<
-	Record<Kind, (key: string, numeric: boolean) => string[]>
-> = {
-	any: numberOrText,
-	text: numberOrText,
-	date: (key, numeric) => (numeric ? [key] : []),
-	number: (key, numeric) => (numeric ? [key] : []),
-	list: () => [],
-	string: (key) => [JSON.stringify(key)],
-	timeUnit: (key) => (timeUnits.has(key) ? [JSON.stringify(key)] : []),
-};
-
-/** The literal types a value of a kind can match the keys by. */
-function literals(kind: Kind | undefined, keys: ReadonlySet<string>): string[] {
-	const literalsOf = keyLiterals[kind ?? "any"];
-	return [...keys].sort(byValue).flatMap((key) => {
-		const number = Number(key);
-		return literalsOf(key, Number.isFinite(number) && String(number) === key);
-	});
-}
-
-function byValue(a: string, b: string): number {
-	const difference = Number(a) - Number(b);
-	return Number.isNaN(difference) ? (a < b ? -1 : a > b ? 1 : 0) : difference;
 }
