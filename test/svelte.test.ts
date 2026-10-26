@@ -206,8 +206,8 @@ describe("grai/svelte's client build", () => {
 			"out/internal.js": ["runtime", "grai-runtime"],
 			"out/runtime.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
-			"\0grai:text/title": ["text", "grai~client"],
-			"\0grai:key/greeting": ["key", "grai~client"],
+			"\0grai:text/title": ["text", "grai~key-greeting"],
+			"\0grai:key/greeting": ["key", "grai~key-greeting"],
 		});
 	});
 

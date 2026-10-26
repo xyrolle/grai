@@ -23,9 +23,9 @@ import {
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
+import { requestBytes } from "../src/key-sets.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
-import { ownChunkBytes } from "../src/vite-build.ts";
 import { type Messages, outputFile, project } from "./project.ts";
 
 /**
@@ -144,9 +144,9 @@ async function built(
 	return { entries: entryCode, sources, entryFiles, chunks };
 }
 
-/** A word repeated into a message whose key's module alone reaches `ownChunkBytes`. */
+/** A word repeated into a message far larger than a request is worth, which no merge takes. */
 const sized = (word: string) =>
-	`${word} `.repeat(Math.ceil(ownChunkBytes / word.length));
+	`${word} `.repeat(Math.ceil((8 * requestBytes) / word.length));
 
 describe("the Vite plugin's build", () => {
 	it("gives each entry only the keys its code uses, when each set of them is worth a chunk of its own", async () => {
@@ -399,7 +399,7 @@ describe("the Vite plugin's message chunks", () => {
 				]),
 		);
 
-	it("gives a set of keys the same entries use a chunk of its own once it reaches ownChunkBytes, and pools the smaller sets apart from it", async () => {
+	it("gives a set of keys the same entries use a chunk of its own, and merges a small set into one its entries load where the request saved outweighs the words loaded in vain", async () => {
 		const { dir } = project({
 			en: { article: sized("Article"), save: "Save", close: "Close" },
 			de: { article: sized("Artikel"), save: "Speichern", close: "Schließen" },
@@ -433,7 +433,7 @@ describe("the Vite plugin's message chunks", () => {
 		expect(entries.page?.includes("Später")).toBe(false);
 	});
 
-	it("pools sets of keys under ownChunkBytes, so a page of many of them makes few requests, each copy in its locale's words alone", async () => {
+	it("merges the small sets of keys of many pages into the set they all load, so each page makes one request, each copy in its locale's words alone", async () => {
 		const pages = Array.from({ length: 12 }, (_, index) => `page${index}`);
 		const catalog = (locale: string) =>
 			Object.fromEntries([
@@ -468,10 +468,10 @@ describe("the Vite plugin's message chunks", () => {
 
 	it("chunks a project alike wherever it lives", async () => {
 		// Enough keys on one page, and a directory deep enough, that the directory's path in each key
-		// module's code would alone lift the page's keys past ownChunkBytes.
+		// module's code would weigh far more than their words, were a key weighed by its module.
 		const deep = join(...Array.from({ length: 4 }, () => "d".repeat(200)));
 		const keys = Array.from(
-			{ length: Math.ceil(ownChunkBytes / deep.length) + 1 },
+			{ length: Math.ceil((8 * requestBytes) / deep.length) + 1 },
 			(_, index) => `key${index}`,
 		);
 		const catalog = Object.fromEntries(
@@ -490,7 +490,7 @@ describe("the Vite plugin's message chunks", () => {
 		const nearChunks = keysOf((await built(near, entries)).chunks);
 
 		expect(keysOf((await built(far, entries)).chunks)).toEqual(nearChunks);
-		expect(nearChunks.size).toBe(1);
+		expect(nearChunks.size).toBe(2);
 	});
 });
 
@@ -531,9 +531,9 @@ describe("grai/vite's module kinds", () => {
 			"out/config.js": ["config", "grai-runtime"],
 			"out/plurals.js": ["plurals", "grai-runtime"],
 			"out/formats.js": ["formats", "grai-runtime"],
-			"\0grai:key/title": ["key", "grai~page"],
-			"\0grai:key/total": ["key", "grai~page"],
-			"\0grai:key/items": ["key", "grai~page"],
+			"\0grai:key/title": ["key", "grai~key-items"],
+			"\0grai:key/total": ["key", "grai~key-items"],
+			"\0grai:key/items": ["key", "grai~key-items"],
 		});
 	});
 
@@ -655,7 +655,7 @@ var terms = /*#__PURE__*/ markup([,(i) => "AGB"], [,(i) => [{ type: "text", valu
 
 		expect(chunks.map((chunk) => chunk.name).sort()).toEqual([
 			"grai-runtime",
-			"grai~page",
+			"grai~key-title",
 			"page",
 		]);
 		expect([...directories].sort()).toEqual([
