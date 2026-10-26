@@ -4,9 +4,10 @@
  * its tree, by the hash of its text, under the code that read it: grai's reader, by its contents,
  * and the versions of the parsers it loads, so any change to them reads every file again. The cache
  * is written whole and atomically after a command that read a file again or found one gone, with the
- * files that command read, so an entry for a file gone or changed is dropped. It is JSON, which V8
- * reads back in about half the time its own serializer takes for the same facts (75 MB of them, for
- * 9,000 files).
+ * files that command read, so an entry for a file gone or changed is dropped. Each file's facts are
+ * kept as JSON, which V8 reads back in about half the time its own serializer takes for the same
+ * facts (75 MB of them, for 9,000 files). A file's JSON is parsed only when a command takes its
+ * facts, and a save writes each entry it kept as it was read, so it makes no file's JSON again.
  */
 
 import { createHash, hash } from "node:crypto";
@@ -22,8 +23,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FileFacts } from "./facts.ts";
 
-/** What the cache holds for a file: its text's hash, and its facts. */
-type Entry = { hash: string; facts: FileFacts };
+/** What the cache holds for a file: its text's hash, and its facts as JSON. */
+type Entry = { hash: string; json: string };
+
+/** A file's facts, read, and their JSON, which the cache keeps as it is. */
+export type FactsRead = { facts: FileFacts; json: string };
 
 /** The packages whose versions decide what a file's facts are: grai's parser and the frameworks'. */
 const readers = ["oxc-parser", "svelte", "vue", "astro", "@mdx-js/mdx"];
@@ -45,36 +49,39 @@ export class FactsCache {
 		this.read = load(this.file, this.version);
 	}
 
-	/** A file's facts, if the cache has them for this text. */
-	get(path: string, text: string): FileFacts | undefined {
+	/** A file's facts, if the cache has them for the text of this hash (`textHash`). */
+	get(path: string, hash: string): FileFacts | undefined {
 		const entry = this.read.get(path);
-		if (entry === undefined || entry.hash !== textHash(text)) return undefined;
+		if (entry === undefined || entry.hash !== hash) return undefined;
 		this.kept.set(path, entry);
-		return entry.facts;
+		return JSON.parse(entry.json);
 	}
 
-	set(path: string, text: string, facts: FileFacts): void {
-		this.kept.set(path, { hash: textHash(text), facts });
+	set(path: string, hash: string, { json }: FactsRead): void {
+		this.kept.set(path, { hash, json });
 		this.added = true;
 	}
 
 	/**
 	 * Writes the facts of the files read this time, and only those, unless they are the cache's
-	 * already: no file was read again, and every file it has was read.
+	 * already: no file was read again, and every file it has was read. An entry is written as it
+	 * was read or made, never made again.
 	 */
 	save(): void {
 		if (!this.added && this.kept.size === this.read.size) return;
 		mkdirSync(dirname(this.file), { recursive: true });
 		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
-		writeFileSync(
-			temporary,
-			JSON.stringify({ version: this.version, entries: [...this.kept] }),
-		);
+		const lines = [JSON.stringify(this.version)];
+		for (const [path, { hash, json }] of this.kept) {
+			lines.push(`${JSON.stringify(path)}\t${hash}\t${json}`);
+		}
+		writeFileSync(temporary, `${lines.join("\n")}\n`);
 		renameSync(temporary, this.file);
 	}
 }
 
-function textHash(text: string): string {
+/** The hash a file's text is kept by. */
+export function textHash(text: string): string {
 	return hash("sha1", text);
 }
 
@@ -101,23 +108,36 @@ export function readerVersion(directory: string): string {
 	return [code.digest("hex"), ...parsers].join(" ");
 }
 
+/**
+ * The entries of the cache's file: its first line the reader's version, then a line for each file,
+ * its path as JSON, its text's hash and its facts' JSON, apart by tabs, which JSON writes escaped.
+ * A cache of another version, or one no reading can use, holds nothing.
+ */
 function load(file: string, version: string): ReadonlyMap<string, Entry> {
-	let saved: unknown;
+	let lines: string[];
 	try {
-		saved = JSON.parse(readFileSync(file, "utf8"));
+		lines = readFileSync(file, "utf8").split("\n");
 	} catch {
-		// No cache yet, or none a reading can use: every file is read again.
+		// No cache yet: every file is read.
 		return new Map();
 	}
-	if (
-		typeof saved !== "object" ||
-		saved === null ||
-		!("version" in saved) ||
-		saved.version !== version ||
-		!("entries" in saved) ||
-		!Array.isArray(saved.entries)
-	) {
+	const entries = new Map<string, Entry>();
+	try {
+		if (JSON.parse(lines[0] ?? "") !== version) return entries;
+		for (const line of lines.slice(1)) {
+			if (line === "") continue;
+			const pathEnd = line.indexOf("\t");
+			const hashEnd = line.indexOf("\t", pathEnd + 1);
+			const path: unknown = JSON.parse(line.slice(0, pathEnd));
+			if (typeof path !== "string" || hashEnd === -1) return new Map();
+			entries.set(path, {
+				hash: line.slice(pathEnd + 1, hashEnd),
+				json: line.slice(hashEnd + 1),
+			});
+		}
+	} catch {
+		// A line no save wrote: every file is read again.
 		return new Map();
 	}
-	return new Map(saved.entries);
+	return entries;
 }
