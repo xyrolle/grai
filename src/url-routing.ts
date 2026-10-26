@@ -1,10 +1,12 @@
 /**
  * The config's fields the `url` strategy reads: which locales' paths have a prefix, each locale's
- * prefix, and the paths it leaves alone. Without the strategy none of them is read, so none is taken.
+ * prefix, the paths it leaves alone, and each route's path in each locale's words. Without the
+ * strategy none of them is read, so none is taken.
  */
 
 import type { GraiError } from "./error.ts";
 import { isGlob } from "./globs.ts";
+import { type Pathname, readPathnames } from "./pathnames.ts";
 
 /** Which locales' paths the `url` strategy prefixes: all but the base locale's, or every one. */
 export type LocalePrefix = "as-needed" | "always";
@@ -15,12 +17,15 @@ export type UrlRouting = {
 	prefixes: readonly string[];
 	/** Globs of the paths the `url` strategy leaves alone, which the strategies after it localize. */
 	unlocalizedPaths: readonly string[];
+	/** Each route's path in each locale's words, where the config gives one. */
+	pathnames: readonly Pathname[];
 };
 
 export const urlRoutingFields = [
 	"localePrefix",
 	"localePrefixes",
 	"unlocalizedPaths",
+	"pathnames",
 ] as const;
 
 /** A prefix of the config's own: one path segment, as a URL writes it without escapes. */
@@ -47,6 +52,7 @@ export function readUrlRouting(
 		localePrefix = "as-needed",
 		localePrefixes = {},
 		unlocalizedPaths = [],
+		pathnames = {},
 	} = raw;
 	if (localePrefix !== "as-needed" && localePrefix !== "always") {
 		throw invalid(
@@ -73,6 +79,7 @@ export function readUrlRouting(
 		localePrefix,
 		prefixes: readPrefixes(localePrefixes, locales, invalid),
 		unlocalizedPaths,
+		pathnames: readPathnames(pathnames, locales, invalid),
 	};
 }
 
