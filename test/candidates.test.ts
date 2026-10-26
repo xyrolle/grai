@@ -75,6 +75,7 @@ describe("the names a specifier of grai's output must write", () => {
 		const taken = [
 			'import { m } from "./lib/grai/messages.js";',
 			'import { m } from "./lib/gr\\u0061i/messages.js";',
+			'import { m } from "./lib/gr\\ai/messages.js";',
 			`const load = (name) => import(\`./\${name}.js\`);`,
 			"const load = (name) => import /* split */ (name);",
 			'const lib = require ("./lib" + name);',
@@ -84,10 +85,12 @@ describe("the names a specifier of grai's output must write", () => {
 			'import { format } from "./lib/format.js";\nconst global = "glob";',
 			'const lib = await import("./lib/format.js");',
 			"const text = 'a\\nb';",
+			'const quote = "a\\"b";',
+			"const digits = /\\d+/;",
 		];
 
 		expect(taken.map((text) => test.test(text))).toEqual(taken.map(() => true));
-		expect(left.map((text) => test.test(text))).toEqual([false, false, false]);
+		expect(left.map((text) => test.test(text))).toEqual(left.map(() => false));
 	});
 });
 
@@ -103,6 +106,19 @@ describe("a reading of the files that may read grai's messages", () => {
 		expect(await readingIn(dir)).toEqual({
 			read: ["src/a.ts", "src/c.ts", "src/lib/i18n.ts"],
 			reads: ["src/a.ts title", "src/c.ts title"],
+		});
+	});
+
+	it("reads a file that writes a barrel's name with an escaped character that stands for itself", async () => {
+		const dir = projectWith({
+			"src/labels.ts": 'export { m } from "../out/messages.js";\n',
+			"src/a.ts": 'import { m } from "./lab\\els.ts";\nm.title();\n',
+			"src/d.ts": "export const d = 1;\n",
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: ["src/a.ts", "src/labels.ts"],
+			reads: ["src/a.ts title"],
 		});
 	});
 
