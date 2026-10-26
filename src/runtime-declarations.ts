@@ -79,6 +79,8 @@ export declare const strategy: readonly ("cookie" | "localStorage" | "preferredL
 export declare const cookieName: string | undefined;
 export declare const readsUrl: boolean;
 export declare const prefixesEveryLocale: boolean;
+/** Whether the config gives each locale a host of its own: \`domains\`. */
+export declare const hostsLocales: boolean;
 export declare const leavesPathsAlone: boolean;
 export declare const queryParameter: string | undefined;
 export declare const unlocalizedPaths: readonly RegExp[];
@@ -87,10 +89,12 @@ export declare const localeCopies: boolean;
 export declare function localeOfPath(pathname: string): Locale | undefined;
 /** Whether a path is a page without the prefix every locale's paths have: server.js sends it to one. */
 export declare function lacksPrefix(pathname: string): boolean;
-/** A path in its locale's words as its route, its prefix kept, for an adapter that routes by the prefix. */
-export declare function routeOfPath(pathname: string): string;
-/** A route's path, its prefix kept, in its locale's words. */
-export declare function pathOfRoute(pathname: string): string;
+/** A URL's path in its locale's words as its route, its prefix kept, for an adapter that routes by the prefix. */
+export declare function routeOfPath(url: URL): string;
+/** A route's URL path, its prefix kept, in its locale's words. */
+export declare function pathOfRoute(url: URL): string;
+/** The locale whose host \`domains\` gives a host as, if any. */
+export declare function localeOfHost(host: string): Locale | undefined;
 /** Binds a locale outside a request, by its position in \`locales\`: testing.js binds a test's with it. */
 export declare function bindLocale(index: number): void;
 /** Lets server.js bind each request's locale. Apps bind it through the middleware. */

@@ -1,7 +1,8 @@
 /**
  * The config's fields the `url` strategy reads: which locales' paths have a prefix, each locale's
- * prefix, the paths it leaves alone, each route's path in each locale's words, and the base path
- * the app is served under. Without the strategy none of them is read, so none is taken.
+ * prefix, the paths it leaves alone, each route's path in each locale's words, the base path the
+ * app is served under, and each locale's host. Without the strategy none of them is read, so none
+ * is taken.
  */
 
 import type { GraiError } from "./error.ts";
@@ -21,6 +22,8 @@ export type UrlRouting = {
 	pathnames: readonly Pathname[];
 	/** The path the app is served under, such as `/shop`, or `""` for none. */
 	basePath: string;
+	/** Each locale's host, in `locales` order, where the config gives every locale one; else none. */
+	domains: readonly string[];
 };
 
 export const urlRoutingFields = [
@@ -29,6 +32,7 @@ export const urlRoutingFields = [
 	"unlocalizedPaths",
 	"pathnames",
 	"basePath",
+	"domains",
 ] as const;
 
 /** A base path: one or more path segments, without a trailing slash. */
@@ -60,6 +64,7 @@ export function readUrlRouting(
 		unlocalizedPaths = [],
 		pathnames = {},
 		basePath,
+		domains,
 	} = raw;
 	if (localePrefix !== "as-needed" && localePrefix !== "always") {
 		throw invalid(
@@ -96,7 +101,59 @@ export function readUrlRouting(
 		unlocalizedPaths,
 		pathnames: readPathnames(pathnames, locales, invalid),
 		basePath: basePath ?? "",
+		domains:
+			domains === undefined ? [] : readDomains(domains, locales, invalid),
 	};
+}
+
+/** A host as a request names it: a lowercase name, and its port if it has one. */
+const hostForm = /^[a-z\d-]+(?:\.[a-z\d-]+)*(?::\d{1,5})?$/;
+
+/**
+ * Each locale's host, which `domains` must give every locale, each its own: a locale without one
+ * would have no address that a link from another's host could name.
+ */
+function readDomains(
+	value: unknown,
+	locales: readonly string[],
+	invalid: (detail: string) => GraiError,
+): readonly string[] {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		throw invalid(
+			'"domains" must map each locale to its host, such as { "en": "example.com", "de": "example.de" }',
+		);
+	}
+	const given = new Map(Object.entries(value));
+	const stranger = [...given.keys()].find(
+		(locale) => !locales.includes(locale),
+	);
+	if (stranger !== undefined) {
+		throw invalid(
+			`"domains" names ${JSON.stringify(stranger)}, which is not one of "locales": ${locales.join(", ")}`,
+		);
+	}
+	const hosts = new Map<string, string>();
+	return locales.map((locale) => {
+		const host = given.get(locale);
+		if (host === undefined) {
+			throw invalid(
+				`"domains" must give every locale its host, and gives none to ${locale}`,
+			);
+		}
+		if (typeof host !== "string" || !hostForm.test(host)) {
+			throw invalid(
+				`"domains" gives ${locale} ${JSON.stringify(host)}, but a host is a lowercase name, such as "example.de", with a port if it has one`,
+			);
+		}
+		const other = hosts.get(host);
+		if (other !== undefined) {
+			throw invalid(
+				`"domains" gives ${locale} "${host}", which is ${other}'s host too. Give each locale a host of its own`,
+			);
+		}
+		hosts.set(host, locale);
+		return host;
+	});
 }
 
 /** Each locale's prefix, its tag unless `localePrefixes` gives it a segment of its own. */

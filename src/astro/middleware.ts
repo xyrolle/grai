@@ -23,10 +23,10 @@ export type LocaleProject = {
 	getTextDirection(locale?: string): "ltr" | "rtl";
 	/** `localeOfPath` from the output's `internal.js`: the locale a path names, if it names one. */
 	localeOfPath(pathname: string): string | undefined;
-	/** `routeOfPath` from the output's `internal.js`: a path in its locale's words as its route. */
-	routeOfPath(pathname: string): string;
-	/** `pathOfRoute` from the output's `internal.js`: a route's path in its locale's words. */
-	pathOfRoute(pathname: string): string;
+	/** `routeOfPath` from the output's `internal.js`: a URL's path in its locale's words as its route. */
+	routeOfPath(url: URL): string;
+	/** `pathOfRoute` from the output's `internal.js`: a route's URL path in its locale's words. */
+	pathOfRoute(url: URL): string;
 	/** The name of the project's grai config, which errors name. */
 	configName: string;
 	/**
@@ -68,12 +68,12 @@ export function localeMiddleware(
 			const file = localeAsFile(project, url.pathname);
 			if (file !== undefined)
 				throw namedAsFile(project, context.routePattern, url.pathname, file);
-			const words = project.pathOfRoute(url.pathname);
+			const words = project.pathOfRoute(url);
 			if (words !== url.pathname)
 				throw translatedAway(project, context.routePattern, url, words);
 		}
 		// A path in its locale's words renders its route, as Astro routes it by the prefix alone.
-		const route = project.routeOfPath(url.pathname);
+		const route = project.routeOfPath(url);
 		const render = () =>
 			route === url.pathname ? next() : next(route + url.search);
 		return project.middleware(context.request, async ({ locale }) => {
