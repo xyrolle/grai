@@ -25,7 +25,10 @@ ${callRows}
 
 /**
  * The dev module's code after its table: the hook a call names its key to, each key's live
- * variants, and each key's message made from them.
+ * variants, and each key's message made from them. The messages are made in a function of their
+ * own: V8 compiles a function whose loop runs long, and with the loop over every key in the
+ * module's top level, it compiled the whole top level, which a page then kept, 2.4 MB on a catalog
+ * of 13,326 keys in three locales.
  */
 const madeCode = `const read = Symbol.for(${JSON.stringify(readHook)});
 const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
@@ -33,8 +36,11 @@ const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
 	const variant = T[key][field][n];
 	return typeof variant === "function" ? variant(inputs) : variant;
 }), key];
-const made = Object.create(null);
-for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
+const made = (() => {
+	const made = Object.create(null);
+	for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
+	return made;
+})();
 `;
 
 /**
