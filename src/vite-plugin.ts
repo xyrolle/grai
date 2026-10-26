@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
-import { type Logger, type Plugin, parseSync } from "vite";
+import type { Logger, Plugin } from "vite";
 import { type KeyReading, keyReading, keyReads } from "./build-key-reads.ts";
+import { parse } from "./code/parse.ts";
 import { withGroups } from "./code-splitting.ts";
 import { type Build, recompile } from "./compile.ts";
 import { readConfig } from "./config.ts";
@@ -277,7 +278,7 @@ export function graiPlugin(
 					return null;
 				if (reading?.build !== build)
 					reading = keyReading(build, files.keysFile);
-				const { program } = parseSync(id, code, { lang: "js" });
+				const { program } = parse(id, code, { lang: "js" });
 				const { keys, computed, missing } = await keyReads(
 					program,
 					code,
