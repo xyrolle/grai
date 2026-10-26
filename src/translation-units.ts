@@ -5,6 +5,7 @@
  */
 
 import type { Catalog } from "./catalog.ts";
+import type { Inherited } from "./locale-catalogs.ts";
 import { parseMessage } from "./message.ts";
 import { CodeIds, type Piece, patternPieces } from "./pattern-pieces.ts";
 import { baseCategoryOf, digitsOf, noteOf } from "./plural-forms.ts";
@@ -33,22 +34,27 @@ export type Unit = {
 
 /**
  * The units of a locale, in the base catalog's order: every key, or only the untranslated ones. A
- * key in `identical`, whose message is the base text on purpose, is translated. Throws a
- * MessageProblem for an invalid base message.
+ * key in `identical`, whose message is the base text on purpose, is translated, and so is one the
+ * locale takes from its fallbacks, in their words. Throws a MessageProblem for an invalid base
+ * message.
  */
 export function exportUnits(
 	base: Catalog,
 	target: Catalog | undefined,
 	locale: string,
 	identical: ReadonlySet<string>,
+	inherited: Inherited,
 	untranslatedOnly = false,
 ): Unit[] {
 	const units: Unit[] = [];
 	for (const [key, value] of base.messages) {
-		const translation = target?.messages.get(key);
+		const own = target?.messages.get(key);
+		const fromFallback = own === undefined ? inherited(key) : undefined;
+		const translation = own ?? fromFallback;
 		const translated =
-			translation !== undefined &&
-			(identical.has(key) || !isSeed(translation, value, locale));
+			fromFallback !== undefined ||
+			(own !== undefined &&
+				(identical.has(key) || !isSeed(own, value, locale)));
 		if (untranslatedOnly && translated) continue;
 		units.push(
 			...messageUnits(
