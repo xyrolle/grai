@@ -29,7 +29,7 @@ const skippedDirectories = new Set(["node_modules", "dist", "build"]);
  */
 const identifier =
 	/(?<![\w$\\])(?:[A-Za-z_$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})(?:[\w$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})*/g;
-const escape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
+const unicodeEscape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
 
 /**
  * A source file: its path, the path the project shows (relative to its root), its text, and its
@@ -105,7 +105,7 @@ export function escapedNames(code: string): { name: string; at: number }[] {
 
 /** An identifier as the name it spells, its escapes read. */
 export function unescaped(written: string): string {
-	return written.replace(escape, (_, braced, four) =>
+	return written.replace(unicodeEscape, (_, braced, four) =>
 		String.fromCodePoint(Number.parseInt(braced ?? four, 16)),
 	);
 }
