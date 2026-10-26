@@ -220,7 +220,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
   <Markup parts={m.terms.parts()} markup={{ link: (children) => <a href="/terms">{children}</a> }} />
   ```
 
-On a page of 400 messages in a server component and 100 in a client component, the browser downloads 129.8 KB brotli against next-intl's 230.3 KB, or its 134.4 KB with the client's keys picked, and an edit to a catalog is written in about 27 ms, 20 of them waiting for the save to settle; the rest of the edit is Next's refresh (`bench/nextjs.mjs`, `docs/runtime.md`).
+On a page of 400 messages in a server component and 100 in a client component, the browser downloads 129.8 KB brotli against next-intl's 230.3 KB, or its 134.4 KB with the client's keys picked, and an edit to a catalog was written in about 27 ms, 20 of them waiting for the save to settle, which the watcher now does only after a read of a catalog that does not parse; the rest of the edit is Next's refresh (`bench/nextjs.mjs`, `docs/runtime.md`).
 
 ### Astro
 
