@@ -113,6 +113,15 @@ describe("grai check", () => {
 		expect((await grai(counting.dir, "check")).code).toBe(0);
 	});
 
+	it("reports no key a string or a comment mentions, only one the code reads", async () => {
+		const { dir } = project(catalogs);
+		writeSources(dir, {
+			"src/app.js": `import { m } from "../out/messages.js";\n// m.absent() would fail\nconsole.log("m.absent()", \`m.absent()\`, m.cart_title(), m.cart_greeting);\n`,
+		});
+
+		expect(await grai(dir, "check")).toMatchObject({ code: 0 });
+	});
+
 	it("takes a name a file declares again for none of grai's, and says it left that file's reads of it unchecked", async () => {
 		const { dir } = project(catalogs);
 		const shadowing = [

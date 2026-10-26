@@ -20,6 +20,7 @@ import {
 	occurrencesOf,
 	positionOf,
 	type SourceFile,
+	unescaped,
 } from "./sources.ts";
 
 /** A key a source names: the key, where its name starts, and how the source writes it. */
@@ -35,7 +36,7 @@ export type Unchecked = {
 
 /** After a namespace's name: `.key` or `?.key`, or `["key"]`, `?.["key"]` and the same in single quotes. */
 const access =
-	/\s*(?:\?\.|\.)\s*(?<member>[A-Za-z_$][\w$]*)|\s*(?:\?\.)?\s*\[\s*(?<quote>["'])(?<literal>[^"'\\\r\n]*)\k<quote>\s*\]/dy;
+	/\s*(?:\?\.|\.)\s*(?<member>(?:[\w$]|\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\})+)|\s*(?:\?\.)?\s*\[\s*(?<quote>["'])(?<literal>[^"'\\\r\n]*)\k<quote>\s*\]/dy;
 
 /**
  * An error for each place the files name a key that no catalog has, with the `grai add` command
@@ -50,17 +51,17 @@ export function missingKeyCalls(
 	keys: ReadonlySet<string>,
 	config: Config,
 ): { errors: GraiError[]; unchecked: Unchecked[] } {
-	const namespaces = namespaceNames(files.map(({ text }) => text));
+	const namespaces = namespaceNames(files.map(({ code }) => code));
 	const texts = config.locales.map((locale) => `--${locale} "…"`).join(" ");
 	const isKeys = keysFileOf(config);
 	const unchecked: Unchecked[] = [];
 	const errors = files.flatMap((source) => {
-		const bindings = messageBindings(source.text, namespaces, (specifier) =>
+		const bindings = messageBindings(source.code, namespaces, (specifier) =>
 			isKeys(specifier, source.path),
 		);
 		const shadowed = new Set<string>();
 		for (const name of bindings.namespaces) {
-			const [again] = redeclarations(source.text, name, bindings);
+			const [again] = redeclarations(source.code, name, bindings);
 			if (again === undefined) continue;
 			shadowed.add(name);
 			unchecked.push({
@@ -69,7 +70,7 @@ export function missingKeyCalls(
 				...positionOf(source.text, again),
 			});
 		}
-		return namedKeys(source.text, bindings, shadowed)
+		return namedKeys(source.code, bindings, shadowed)
 			.filter(({ key }) => !keys.has(key))
 			.map(({ key, at, written }) => {
 				const { line, column } = positionOf(source.text, at);
@@ -184,7 +185,7 @@ function memberAt(
 	const groups = match?.indices?.groups;
 	const span = groups?.member ?? groups?.literal;
 	if (match === null || span === undefined) return undefined;
-	const key = text.slice(span[0], span[1]);
+	const key = unescaped(text.slice(span[0], span[1]));
 	const written = text.slice(at, match.index + match[0].length).trim();
 	return { key, at: span[0], written };
 }

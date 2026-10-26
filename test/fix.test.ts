@@ -27,6 +27,18 @@ const catalogs = {
 };
 
 describe("grai check --fix", () => {
+	it("keeps a key a file reads through an import with a comment in it, or by an escaped name", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/dynamic.js": `import /* the messages */ { m } from "../out/messages.js";\nexport const show = (key) => m[key]();\nm.cart_total({ count: 1 });\n`,
+			"src/escaped.js": `import { m } from "../out/messages.js";\nm.cart_t\\u0069tle();\n`,
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed).toEqual([]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {

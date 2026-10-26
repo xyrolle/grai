@@ -17,6 +17,7 @@ import { descriptionsRenamed } from "./descriptions.ts";
 import { GraiError, type GraiErrorWhere, sortErrors } from "./error.ts";
 import { isKeyName } from "./key-checks.ts";
 import {
+	escapeProblems,
 	ownershipProblems,
 	reachProblems,
 	siteProblems,
@@ -55,6 +56,7 @@ export async function rename(
 	const problems = [
 		...sites.flatMap((site) => siteProblems(site, from, to)),
 		...reachProblems(files, from),
+		...escapeProblems(files, from),
 		...ownershipProblems(sites, from),
 	];
 	if (problems.length > 0) return unchanged(sortErrors(problems));
