@@ -657,7 +657,7 @@ describe("grai/vite's module kinds", () => {
 describe("the Vite plugin's locale copies", () => {
 	const page = `import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`;
 
-	it("copies a chunk byte for byte, each call keeping only its locale's variants, at their position, after a never-set name or holes", () => {
+	it("copies a chunk byte for byte, each call keeping only its locale's variant", () => {
 		const chunk = (calls: string) =>
 			`import { markup, message, text } from "../grai-runtime.js";\n${calls}\nexport { greeting, terms, title };\n`;
 		const copies = localeCopies(
@@ -672,9 +672,9 @@ var terms = /*#__PURE__*/ markup([(i) => "Terms", (i) => "AGB"], [(i) => [], (i)
 			en: chunk(`var title = /*#__PURE__*/ text("Title");
 var greeting = /*#__PURE__*/ message((i) => \`Hello \${i.name}\`);
 var terms = /*#__PURE__*/ markup([(i) => "Terms"], [(i) => []]);`),
-			de: `let $none;\n${chunk(`var title = /*#__PURE__*/ text($none, "Titel");
-var greeting = /*#__PURE__*/ message($none, (i) => \`Hallo \${i.name}\`);
-var terms = /*#__PURE__*/ markup([,(i) => "AGB"], [,(i) => [{ type: "text", value: "AGB" }]]);`)}`,
+			de: chunk(`var title = /*#__PURE__*/ text("Titel");
+var greeting = /*#__PURE__*/ message((i) => \`Hallo \${i.name}\`);
+var terms = /*#__PURE__*/ markup([(i) => "AGB"], [(i) => [{ type: "text", value: "AGB" }]]);`),
 		});
 	});
 
@@ -686,15 +686,7 @@ var terms = /*#__PURE__*/ markup([,(i) => "AGB"], [,(i) => [{ type: "text", valu
 			localeCopies("chunk.js", chunk(`"Title", "Titel"`), ["en", "de"]).get(
 				"de",
 			),
-		).toBe(`let $none;\n${chunk(`$none, "Titel"`)}`);
-	});
-
-	it("names its padding apart from every name and text of the chunk", () => {
-		const chunk = `import { text } from "../grai-runtime.js";\nvar $none = /*#__PURE__*/ text("$none$", "Titel");\nexport { $none };\n`;
-
-		expect(localeCopies("chunk.js", chunk, ["en", "de"]).get("de")).toBe(
-			`let $none$$;\nimport { text } from "../grai-runtime.js";\nvar $none = /*#__PURE__*/ text($none$$, "Titel");\nexport { $none };\n`,
-		);
+		).toBe(chunk(`"Titel"`));
 	});
 
 	it("says in config.js whether the build wrote them, for the server", async () => {
@@ -720,18 +712,19 @@ var terms = /*#__PURE__*/ markup([,(i) => "AGB"], [,(i) => [{ type: "text", valu
 		expect([...directories].sort()).toEqual(["assets", "assets/grai"]);
 	});
 
-	it("keeps a copy's padding a one-letter name once minified, never void 0", async () => {
+	it("gives each call of a copy, once minified, its locale's variant alone", async () => {
 		const { dir } = project(catalogs);
 		const { sources } = await built(dir, { page }, { localeChunks: true });
-		const copies = (locale: string) =>
+		const copy = (locale: string) =>
 			[...sources]
 				.filter(([file]) => file.startsWith(`assets/grai-${locale}/`))
-				.map(([, code]) => String(code));
+				.map(([, code]) => String(code))
+				.join("");
 
-		expect(copies("de").length).toBeGreaterThan(0);
-		expect(copies("de").join("")).not.toContain("void 0");
-		expect(copies("de").join("")).toMatch(/^let \w+;/);
-		expect(copies("en").join("")).not.toMatch(/^let /);
+		expect([copy("en"), copy("de")]).toEqual([
+			expect.stringMatching(/\w\(["`]Title["`]\)/),
+			expect.stringMatching(/\w\(["`]Titel["`]\)/),
+		]);
 	});
 
 	it("puts the message chunks and their copies inside the build's chunk directory, which hosts cache as immutable", async () => {
