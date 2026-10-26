@@ -211,6 +211,45 @@ it("writes again the files of the output deleted by hand, though the edit does n
 	expect(readdirSync(out)).toContain("keys.d.ts");
 });
 
+it("owns its outdir: it removes the files of an earlier layout and of a compile that stopped halfway", async () => {
+	const { dir, compile } = project(catalogs);
+	const out = join(dir, "out");
+	mkdirSync(join(out, "keys"), { recursive: true });
+	mkdirSync(join(out, ".grai"), { recursive: true });
+	// An outdir as grai wrote it before its modules were named by their content.
+	writeFileSync(
+		join(out, ".grai", "manifest.json"),
+		JSON.stringify({ inputs: "earlier", files: ["keys/0.js", "keys.js"] }),
+	);
+	writeFileSync(
+		join(out, "keys", "0.js"),
+		'import { text } from "../runtime.js";\n',
+	);
+	writeFileSync(join(out, "keys", "0.d.ts"), "export {};\n");
+	writeFileSync(join(out, "formats.js"), "export {};\n");
+	writeFileSync(join(out, ".grai", "left-by-a-crash.tmp"), "half");
+
+	expect((await compile()).errors).toEqual([]);
+
+	const files = readdirSync(out, { recursive: true, encoding: "utf8" });
+	expect(files).not.toContain("formats.js");
+	expect(files).not.toContain(join("keys", "0.js"));
+	expect(files).not.toContain(join("keys", "0.d.ts"));
+	expect(files).not.toContain(join(".grai", "left-by-a-crash.tmp"));
+	expect((await messagesOf(dir)).title?.()).toBe("Title");
+});
+
+it("refuses an outdir that holds files no compile wrote, and leaves them as they are", async () => {
+	const { dir, compile } = project(catalogs);
+	mkdirSync(join(dir, "out"));
+	writeFileSync(join(dir, "out", "notes.md"), "mine");
+
+	const [refused] = (await compile()).errors;
+
+	expect(refused?.code).toBe("outdir-not-empty");
+	expect(readdirSync(join(dir, "out"))).toEqual(["notes.md"]);
+});
+
 it("lets two compiles in one process write one outdir, one after the other", async () => {
 	for (let trial = 0; trial < 10; trial++) {
 		const { compile } = project(catalogs);
