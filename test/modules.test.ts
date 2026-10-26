@@ -97,6 +97,26 @@ describe("the module graph", () => {
 	});
 });
 
+describe("resolving as the bundler resolves", () => {
+	it("applies the project's tsconfig paths to a component its include does not list, as the framework's bundler does", async () => {
+		const { dir, config } = projectWith({
+			"tsconfig.json": JSON.stringify({
+				compilerOptions: { paths: { "@/*": ["./src/*"] } },
+				include: ["src/**/*.ts"],
+			}),
+			"src/lib/i18n.ts": 'export { m } from "../../out/messages.js";\n',
+			"src/app.ts": "",
+		});
+		const { graph } = await readProjectCode(config, [join(dir, "src")]);
+
+		for (const importer of ["src/app.ts", "src/A.svelte", "src/a.astro"]) {
+			expect(
+				await graph.imported(join(dir, importer), "@/lib/i18n.ts", "m"),
+			).toEqual({ kind: "namespace" });
+		}
+	});
+});
+
 describe("reading a project's facts", () => {
 	it("keeps each file's facts on disk, takes them while its text is the same, and drops a file gone", async () => {
 		const { dir, config } = projectWith({
