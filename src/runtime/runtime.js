@@ -580,6 +580,19 @@ export function localeIndex(options) {
 }
 
 /**
+ * A server build's message with markup: the function that gives its text, with the one that gives
+ * its parts as `.parts`.
+ *
+ * @template {object} Text
+ * @template Parts
+ * @param {Text} text
+ * @param {Parts} parts
+ */
+export function withParts(text, parts) {
+	return Object.assign(text, { parts });
+}
+
+/**
  * Why a call has no variant: it names a locale the project does not have, or one the page does
  * not render in. A production page holds one locale's variants: the page's, unless its import map
  * gave it another's.

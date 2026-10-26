@@ -1,7 +1,6 @@
 import type { Formatter } from "./formatters.ts";
 import {
 	arrow,
-	functionExpression,
 	type LocaleFunction,
 	localeFunction,
 	type Used,
@@ -16,7 +15,8 @@ export type RuntimeFunction =
 	| "markup"
 	| "message"
 	| "text"
-	| "unmatched";
+	| "unmatched"
+	| "withParts";
 
 /**
  * A key compiled: the value its module exports, in keys.js and in a server build, the runtime
@@ -28,9 +28,8 @@ export type KeyModule = {
 	/** Its value in keys.js, each locale's function an arrow function. */
 	value: string;
 	/**
-	 * Its value in a server build: a message with inputs switches on the call's locale in its own
-	 * code (server-message.ts); any other key is its value in keys.js, each locale's function a
-	 * function expression.
+	 * Its value in a server build: a message with inputs or markup switches on the call's locale in
+	 * its own code (server-message.ts); a text is its value in keys.js.
 	 */
 	serverValue: string;
 	uses: ReadonlySet<RuntimeFunction>;
@@ -111,9 +110,9 @@ export function keyModule(
 }
 
 /**
- * A message's value in a server build, and the runtime functions it calls. One with inputs
- * switches on the call's locale in its own code; one with markup is its value in keys.js, each
- * locale's function a function expression.
+ * A message's value in a server build, and the runtime functions it calls: a function of its own
+ * that switches on the call's locale (server-message.ts), and for one with markup a second such
+ * function, which gives its parts, as `.parts`.
  */
 function serverModule(
 	key: string,
@@ -122,18 +121,10 @@ function serverModule(
 	parts: readonly LocaleFunction[],
 	used: Used,
 ): Pick<KeyModule, "serverValue" | "serverUses"> {
-	if (kind === "markup")
-		return {
-			serverValue: messageValue(
-				kind,
-				strings.map(functionExpression),
-				parts.map(functionExpression),
-			),
-			serverUses: used.uses,
-		};
 	const uses = new Set(used.uses);
-	uses.delete("message");
+	uses.delete(kind);
 	uses.add("localeIndex");
+	if (kind === "markup") uses.add("withParts");
 	// Every name its code refers to, the key's own too: its options take none of them.
 	const bound = new Set<string>([
 		key,
@@ -142,7 +133,14 @@ function serverModule(
 		...used.formats.keys(),
 		...used.globals,
 	]);
-	return { serverValue: serverMessage(strings, bound), serverUses: uses };
+	const text = serverMessage(strings, bound);
+	return {
+		serverValue:
+			kind === "markup"
+				? `/*#__PURE__*/ withParts(${text}, ${serverMessage(parts, bound)})`
+				: text,
+		serverUses: uses,
+	};
 }
 
 /** A key's value: the runtime call that holds its variants, and for markup its parts. */

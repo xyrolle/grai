@@ -2,16 +2,19 @@ import { freshName } from "./key-exports.ts";
 import type { LocaleFunction } from "./locale-function.ts";
 
 /**
- * A message with inputs as a server build holds it: a function of its own that switches on the
- * locale a call renders in, `localeIndex(options)`, with each locale's code in its case.
+ * A message's function as a server build holds it, its text's or, for markup, its parts': a
+ * function of its own that switches on the locale a call renders in, `localeIndex(options)`, with
+ * each locale's code in its case.
  *
  * A server calls many messages from one place, and through the runtime's shared `message` that
  * place calls every key's function of a locale: the engine stops optimising the call, and it costs
- * about twice what it does here, where each key's code holds its own locales. A server loads every
- * key once and calls them for as long as it runs, so this shape pays there. A page loads only its
- * own keys, and a text key or one with markup gains nothing from it (docs/design.md).
+ * more than it does here, where each key's code holds its own locales. A server loads every key
+ * once and calls them for as long as it runs, so this shape pays there. A page loads only its own
+ * keys, and a text key reads a string, which no dispatch slows (docs/design.md).
  *
- * `bound` holds every name the key's code refers to; the options take a name none of them has.
+ * It is a function expression, which V8 only pre-parses as it loads a module, until its first
+ * call, where it parses an arrow function in full. `bound` holds every name the key's code refers
+ * to; the options take a name none of them has.
  */
 export function serverMessage(
 	functions: readonly LocaleFunction[],

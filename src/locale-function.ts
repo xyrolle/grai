@@ -48,18 +48,6 @@ export function arrow({
 }
 
 /**
- * A locale's function as a function expression, which a server loads faster: V8 pre-parses a
- * function expression in a module until its first call, and parses an arrow function in full.
- */
-export function functionExpression({
-	parameter,
-	declarations,
-	body,
-}: LocaleFunction): string {
-	return `function (${parameter}) { ${declarations}return ${body}; }`;
-}
-
-/**
  * One locale's function: its variants as a chain of conditions in the order they are tried. The
  * last variant needs no condition, unless a closed select can be given a value it does not list.
  */

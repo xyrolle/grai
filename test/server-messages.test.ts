@@ -33,6 +33,7 @@ const catalogs = {
 		status: status("first", "second"),
 		same: "{name}!",
 		terms: "Agree to the {#b}terms{/b}",
+		welcome: "{#b}Hi{/b} {name}",
 	},
 	de: {
 		title: "Titel",
@@ -44,6 +45,7 @@ const catalogs = {
 		status: status("erster", "zweiter"),
 		same: "{name}!",
 		terms: "Stimme den {#b}AGB{/b} zu",
+		welcome: "{#b}Hallo{/b} {name}",
 	},
 	ro: {
 		title: "Titlu",
@@ -56,6 +58,7 @@ const catalogs = {
 		status: status("primul", "al doilea"),
 		same: "{name}!",
 		terms: "Accept {#b}termenii{/b}",
+		welcome: "{#b}Salut{/b} {name}",
 	},
 };
 
@@ -110,7 +113,7 @@ const rendered = (call: (message: string, inputs: object) => unknown) => [
 	call("same", { name: "Ana" }),
 ];
 
-describe("a server build's message with inputs", () => {
+describe("a server build's message with inputs or markup", () => {
 	it("renders each locale's code, in the locale a call names and in the request's", async () => {
 		const { m, withLocale } = await serverBuild();
 		const expected = {
@@ -127,6 +130,69 @@ describe("a server build's message with inputs", () => {
 				withLocale(locale, () => rendered((key, inputs) => m[key]?.(inputs))),
 			).toEqual(texts);
 		}
+	});
+
+	it("renders a message with markup's text and its parts in each locale, named and the request's", async () => {
+		const { m, withLocale } = await serverBuild();
+		const drawn = (call: (key: string, inputs: object) => unknown) => [
+			call("terms", {}),
+			call("welcome", { name: "Ana" }),
+		];
+		const markup = m as Record<
+			string,
+			{
+				(inputs: object, options?: { locale?: string }): string;
+				parts(inputs: object, options?: { locale?: string }): unknown[];
+			}
+		>;
+		const b = (value: string) => [
+			{ type: "markup-start", name: "b", options: {}, attributes: {} },
+			{ type: "text", value },
+			{ type: "markup-end", name: "b", options: {}, attributes: {} },
+		];
+		const expected = {
+			en: {
+				text: ["Agree to the terms", "Hi Ana"],
+				parts: [
+					[{ type: "text", value: "Agree to the " }, ...b("terms")],
+					[
+						...b("Hi"),
+						{ type: "text", value: " " },
+						{ type: "text", value: "Ana" },
+					],
+				],
+			},
+			ro: {
+				text: ["Accept termenii", "Salut Ana"],
+				parts: [
+					[{ type: "text", value: "Accept " }, ...b("termenii")],
+					[
+						...b("Salut"),
+						{ type: "text", value: " " },
+						{ type: "text", value: "Ana" },
+					],
+				],
+			},
+		};
+
+		for (const [locale, { text, parts }] of Object.entries(expected)) {
+			expect(drawn((key, inputs) => markup[key]?.(inputs, { locale }))).toEqual(
+				text,
+			);
+			expect(
+				drawn((key, inputs) => markup[key]?.parts(inputs, { locale })),
+			).toEqual(parts);
+			expect(
+				withLocale(locale, () =>
+					drawn((key, inputs) => markup[key]?.parts(inputs)),
+				),
+			).toEqual(parts);
+		}
+		expect(
+			thrown(() => markup.terms?.parts({}, { locale: "fr" })),
+		).toMatchObject({
+			code: "locale-unknown",
+		});
 	});
 
 	it("throws as keys.js does: for a locale the project lacks, outside a request, and for a value a select does not list", async () => {
@@ -151,7 +217,7 @@ describe("a server build's message with inputs", () => {
 		});
 	});
 
-	it("switches on the locale in its own code, and leaves a text and a message with markup to the runtime", async () => {
+	it("switches on the locale in its own code, a message with markup in its parts too, and leaves a text to the runtime", async () => {
 		const { code } = await serverBuild();
 
 		expect(code).toMatch(
@@ -161,9 +227,9 @@ describe("a server build's message with inputs", () => {
 			'title = /*#__PURE__*/ text("Title", "Titel", "Titlu");',
 		);
 		expect(code).toMatch(
-			/terms = \/\*#__PURE__\*\/ markup\(\[\s*function\(\) \{/,
+			/terms = \/\*#__PURE__\*\/ withParts\(function\(i, o\) \{\s*switch \(localeIndex\(o\)\) \{\s*case 0: return "Agree to the terms";[^]*?\}, function\(i, o\) \{\s*switch \(localeIndex\(o\)\) \{\s*case 0: return \[/,
 		);
-		expect(code).not.toMatch(/= \/\*#__PURE__\*\/ message\(/);
+		expect(code).not.toMatch(/= \/\*#__PURE__\*\/ (message|markup)\(/);
 	});
 
 	it("names its options apart from what its module binds, the key's own name too", async () => {
@@ -178,11 +244,11 @@ describe("a server build's message with inputs", () => {
 		expect(withLocale("de", () => m.o?.({ name: "Ana" }))).toBe("Hallo Ana");
 	});
 
-	it("leaves a client build as keys.js has it: no page calls localeIndex", async () => {
+	it("leaves a client build as keys.js has it: no page calls localeIndex or withParts", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(
 			join(dir, "page.js"),
-			`import { m } from "./out/messages.js";\ndocument.body.textContent = m.greeting({ name: "Ana" }) + m.items({ count: 1 });\n`,
+			`import { m } from "./out/messages.js";\ndocument.body.textContent = m.greeting({ name: "Ana" }) + m.items({ count: 1 }) + m.terms.parts().length;\n`,
 		);
 		await build({
 			root: dir,
@@ -203,5 +269,6 @@ describe("a server build's message with inputs", () => {
 
 		expect(code).toContain("Hallo");
 		expect(code).not.toContain("localeIndex");
+		expect(code).not.toContain("withParts");
 	});
 });

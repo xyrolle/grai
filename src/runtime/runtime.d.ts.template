@@ -111,6 +111,8 @@ export declare function message(
 ): Message<CompiledInputs>;
 /** The position in `locales` of the locale a call renders in: the one it names, else the bound one. */
 export declare function localeIndex(options?: { locale?: string }): number;
+/** A server build's compiled message with markup: its text's function, with its parts' as `.parts`. */
+export declare function withParts<Text extends object, Parts>(text: Text, parts: Parts): Text & { parts: Parts };
 /** A compiled message with markup: its text and its parts, a function per locale for each. */
 export declare function markup(
 	strings: ((inputs: CompiledInputs) => string)[],
