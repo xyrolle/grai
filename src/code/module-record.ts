@@ -5,6 +5,7 @@
 
 import type { ExportFact, ImportFact, Span } from "./facts.ts";
 import type { ESTree } from "./parse.ts";
+import { declaredValues } from "./runtime-names.ts";
 
 export function importFact(
 	statement: ESTree.Statement | ESTree.Directive | ESTree.ModuleDeclaration,
@@ -57,8 +58,13 @@ export function importFact(
 	}
 }
 
+/**
+ * What a statement exports at run time, `values` being the names the module declares as values: an
+ * export of a type, a `declare` or a type-only import is erased with it (`runtime-names.ts`).
+ */
 export function exportFacts(
 	statement: ESTree.Statement | ESTree.Directive | ESTree.ModuleDeclaration,
+	values: ReadonlySet<string>,
 	exports: ExportFact[],
 ): void {
 	if (statement.type === "ExportAllDeclaration") {
@@ -75,22 +81,23 @@ export function exportFacts(
 			if (specifier.exportKind === "type") continue;
 			const exported = nameOf(specifier.exported);
 			const local = nameOf(specifier.local);
-			exports.push(
-				statement.source === null
-					? { exported, local }
-					: { exported, source: statement.source.value, imported: local },
-			);
-		}
-		const declaration = statement.declaration;
-		if (declaration?.type === "VariableDeclaration") {
-			for (const { id } of declaration.declarations) {
-				if (id.type === "Identifier")
-					exports.push({ exported: id.name, local: id.name });
+			if (statement.source !== null) {
+				exports.push({
+					exported,
+					source: statement.source.value,
+					imported: local,
+				});
+			} else if (values.has(local)) {
+				exports.push({ exported, local });
 			}
+		}
+		if (statement.declaration !== null) {
+			for (const name of declaredValues(statement.declaration))
+				exports.push({ exported: name, local: name });
 		}
 	} else if (statement.type === "ExportDefaultDeclaration") {
 		const declaration = statement.declaration;
-		if (declaration.type === "Identifier") {
+		if (declaration.type === "Identifier" && values.has(declaration.name)) {
 			exports.push({ exported: "default", local: declaration.name });
 		}
 	}

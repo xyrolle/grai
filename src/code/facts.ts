@@ -9,6 +9,7 @@
 import { isLoad, loadFact, loadsModule } from "./loads.ts";
 import { exportFacts, importFact } from "./module-record.ts";
 import { type CodeError, type ModuleCode, readCode } from "./read.ts";
+import { runtimeNames } from "./runtime-names.ts";
 import { Scopes } from "./scopes.ts";
 import { fileOffset, type Shorthand, type SourceCode } from "./source.ts";
 import type { Node } from "./syntax.ts";
@@ -182,9 +183,10 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 	const imports: ImportFact[] = [];
 	const exports: ExportFact[] = [];
 	const loads: LoadFact[] = [];
+	const values = runtimeNames(program);
 	for (const statement of program.body) {
 		importFact(statement, span, imports);
-		exportFacts(statement, exports);
+		exportFacts(statement, values, exports);
 	}
 	// A use of a load names it by its index among the loads with facts: a load by a name loads
 	// nothing the bundler follows, so it has none, and nor have its uses.
