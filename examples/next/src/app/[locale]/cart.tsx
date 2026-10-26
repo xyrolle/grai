@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { m } from "@/i18n/messages.js";
+import * as m from "@/i18n/keys.js";
 
 export function Cart() {
 	const [count, setCount] = useState(1);

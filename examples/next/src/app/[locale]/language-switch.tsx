@@ -1,5 +1,5 @@
 "use client";
-import { m } from "@/i18n/messages.js";
+import * as m from "@/i18n/keys.js";
 import { getLocale, locales, setLocale } from "@/i18n/runtime.js";
 
 export function LanguageSwitch() {
