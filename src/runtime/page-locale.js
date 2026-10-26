@@ -18,6 +18,7 @@
  *   prefixes: readonly string[],
  *   prefixesEveryLocale: boolean,
  *   unlocalizedPaths: readonly { source: string, flags: string }[],
+ *   basePath: string,
  * }} PageSettings
  */
 
@@ -93,9 +94,14 @@ export function pickPageLocale(settings, localeReach) {
 	// The url strategy's rule, as the runtime's localeOfPath has it: the locale whose prefix is the
 	// path's first segment, where the base locale has one only when every locale's paths do. A path
 	// without a prefix is the base locale's, or names none when every locale's paths have one, and
-	// so does a path the strategy leaves alone.
+	// so does a path the strategy leaves alone. The prefix follows the base path.
 	const fromPath = () => {
-		const { pathname } = location;
+		const base = settings.basePath;
+		const full = location.pathname;
+		const pathname =
+			base !== "" && (full === base || full.startsWith(`${base}/`))
+				? full.slice(base.length) || "/"
+				: full;
 		const left = settings.unlocalizedPaths.some(({ source, flags }) =>
 			new RegExp(source, flags).test(pathname),
 		);

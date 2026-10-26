@@ -64,7 +64,7 @@ describe("the config", () => {
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { outDir: "out" }),
 		).toEqual([
-			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, pathnames, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
+			'config-invalid: grai.config.json: "outDir" is not a config field; the fields are locales, baseLocale, catalogs, outdir, strategy, cookieName, cookieMaxAge, cookieDomain, cookieSameSite, localStorageKey, queryParameter, switch, localePrefix, localePrefixes, unlocalizedPaths, pathnames, basePath, tests, identicalToBase, fallbacks, pseudoLocale, descriptions.',
 		]);
 		expect(
 			await errorsOf({ en: { title: "Title" } }, { baseLocale: "de" }),
@@ -203,6 +203,25 @@ describe("the config", () => {
 			}),
 		).toEqual([
 			'config-invalid: grai.config.json: "pathnames" is read only by the "url" strategy, which "strategy" does not list.',
+		]);
+	});
+
+	it("takes basePath only as the url strategy's base, a path without a trailing slash", async () => {
+		const catalogs = { en: { title: "Title" } };
+		const message =
+			'config-invalid: grai.config.json: "basePath" must be the path the app is served under, as its framework has it, such as "/shop": it starts with / and does not end with one.';
+
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], basePath: "shop" }),
+		).toEqual([message]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], basePath: "/shop/" }),
+		).toEqual([message]);
+		expect(
+			await errorsOf(catalogs, { strategy: ["url"], basePath: "" }),
+		).toEqual([message]);
+		expect(await errorsOf(catalogs, { basePath: "/shop" })).toEqual([
+			'config-invalid: grai.config.json: "basePath" is read only by the "url" strategy, which "strategy" does not list.',
 		]);
 	});
 
