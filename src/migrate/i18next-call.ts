@@ -1,4 +1,5 @@
 import type { ESTree } from "../code/parse.ts";
+import { literalText, type Node } from "../code/syntax.ts";
 import type { MappedKey, Mapping } from "../import/mapping.ts";
 import {
 	droppedValue,
@@ -10,7 +11,6 @@ import {
 	writtenProperties,
 } from "./library.ts";
 import { messageCall } from "./message-call.ts";
-import { literalText, type Node } from "./syntax.ts";
 
 /**
  * Where a `t` looks a key up. A hook loads its namespaces but looks in its first, unless its
