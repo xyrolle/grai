@@ -2,9 +2,6 @@ import type { APIContext } from "astro";
 import { GraiError } from "../error.ts";
 import { type DocumentStart, rewriteDocumentStart } from "./document.ts";
 
-/** A page's import map to its locale's copies of the message chunks, and its hash for a CSP. */
-export type ImportMap = { script: string; hash: `sha256-${string}` };
-
 /**
  * What the middleware takes: `middleware` and `getTextDirection` from the project's compiled
  * output, as methods so that the output's functions, typed with its own locales, fit; and what
@@ -37,17 +34,21 @@ export type LocaleProject = {
 		beforeUrl: readonly string[];
 		afterUrl: readonly string[];
 	};
-	/** Each locale's import map, in a build; dev serves every locale from one module. */
-	importMaps?: Readonly<Record<string, ImportMap>> | undefined;
+	/**
+	 * Each locale's import map, a script that points the shared message chunks at its copies, in a
+	 * build; dev serves every locale from one module.
+	 */
+	importMaps?: Readonly<Record<string, string>> | undefined;
 };
 
-/** What the middleware reads of Astro's context. */
+/**
+ * What the middleware reads of Astro's context. Never its `csp`: Astro warns of every read where
+ * the app has no CSP, and the integration lists the import maps' hashes in Astro's config instead.
+ */
 export type LocaleContext = Pick<
 	APIContext,
 	"request" | "isPrerendered" | "routePattern"
-> & {
-	csp: Pick<NonNullable<APIContext["csp"]>, "insertScriptHash"> | undefined;
-};
+>;
 
 /**
  * The middleware `grai/astro` adds before the app's own: it resolves each request's locale by the
@@ -77,9 +78,6 @@ export function localeMiddleware(
 		const render = () =>
 			route === url.pathname ? next() : next(route + url.search);
 		return project.middleware(context.request, async ({ locale }) => {
-			const importMap = project.importMaps?.[locale];
-			if (importMap !== undefined)
-				context.csp?.insertScriptHash(importMap.hash);
 			const response = await render();
 			const body = documentBody(response);
 			if (body === undefined) return response;
@@ -91,7 +89,7 @@ export function localeMiddleware(
 			return withBody(response, body, {
 				lang: locale,
 				dir: project.getTextDirection(locale),
-				head: importMap?.script ?? "",
+				head: project.importMaps?.[locale] ?? "",
 			});
 		});
 	};

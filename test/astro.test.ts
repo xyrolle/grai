@@ -412,7 +412,6 @@ function context(
 		request: new Request(`https://shop.test${path}`, { headers }),
 		isPrerendered: false,
 		routePattern: "/[...locale]",
-		csp: undefined,
 		...rest,
 	};
 }
@@ -477,31 +476,28 @@ describe("the middleware", () => {
 		]);
 	});
 
-	it("opens a built page's head with its locale's import map, and lets a CSP allow it", async () => {
+	it("opens a built page's head with its locale's import map, and never reads Astro's CSP, which warns where an app has none", async () => {
 		const { m, middleware } = await compiledProject({ strategy: ["url"] });
 		const onRequest = middleware({
-			importMaps: {
-				ro: { script: "<script>ro</script>", hash: "sha256-ro" },
-				en: { script: "<script>en</script>", hash: "sha256-en" },
-			},
+			importMaps: { ro: "<script>ro</script>", en: "<script>en</script>" },
 		});
-		const allowed: unknown[] = [];
+		let read = 0;
 
 		const response = await onRequest(
-			context(
-				"/ro/",
-				{},
-				{
-					csp: { insertScriptHash: (hash) => allowed.push(hash) },
+			{
+				...context("/ro/"),
+				get csp() {
+					read++;
+					return undefined;
 				},
-			),
+			},
 			page(m),
 		);
 
 		expect(await response.text()).toBe(
 			`<!DOCTYPE html><html lang="ro" dir="ltr"><head><script>ro</script></head><body>Coșul tău</body></html>`,
 		);
-		expect(allowed).toEqual(["sha256-ro"]);
+		expect(read).toBe(0);
 	});
 
 	it("renders a path in its locale's words as the route Astro routes, its prefix kept", async () => {

@@ -165,7 +165,6 @@ it("exports from grai/astro and grai/astro/middleware only their API", async () 
 		"localeMiddleware",
 	]);
 	expect(await importableNames(dir, "grai/astro/middleware")).toEqual([
-		"ImportMap",
 		"LocaleContext",
 		"LocaleProject",
 		"localeMiddleware",

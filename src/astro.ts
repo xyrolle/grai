@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { AstroConfig, AstroIntegration } from "astro";
 import type { Plugin } from "vite";
 import { disagreements } from "./astro/agreement.ts";
-import type { ImportMap, LocaleProject } from "./astro/middleware.ts";
+import type { LocaleProject } from "./astro/middleware.ts";
 import { compile } from "./compile.ts";
 import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
@@ -25,12 +25,15 @@ const middlewareId = "grai:astro/middleware";
  * - it checks, once Astro's config is done, that the two configs agree on where a page's locale
  *   comes from (`astro/agreement.ts`);
  * - it adds the middleware that renders each request in its locale (`astro/middleware.ts`), ahead
- *   of the app's own.
+ *   of the app's own;
+ * - in a build, it lists each locale's import map by its hash in Astro's CSP, where the app has one.
  */
 export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 	let configFile = "";
 	let building = false;
 	let middleware: string | undefined;
+	// Where the import maps hashed into Astro's CSP point, which the build must serve the chunks at.
+	let hashedChunks: string | undefined;
 	return {
 		name: "grai",
 		hooks: {
@@ -63,6 +66,22 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 					},
 				});
 				addMiddleware({ order: "pre", entrypoint: middlewareId });
+				const algorithm = cspAlgorithm(config);
+				if (building && algorithm !== undefined) {
+					// Astro's CSP lets an inline script through by a hash its config lists for every
+					// page: the middleware's import map is written after Astro has drawn the policy.
+					hashedChunks = chunksUrl(config);
+					const { locales } = readConfig(configFile);
+					const maps = Object.values(importMaps(locales, hashedChunks));
+					updateConfig({
+						security: {
+							csp: {
+								algorithm,
+								scriptDirective: { hashes: maps.map(scriptHash) },
+							},
+						},
+					});
+				}
 			},
 			"astro:config:done": ({ config }) => {
 				const grai = readConfig(configFile);
@@ -74,11 +93,25 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 						`grai's config and Astro's disagree.\n${problems.join("\n")}`,
 					);
 				}
+				const chunks = chunksUrl(config);
+				if (hashedChunks !== undefined && hashedChunks !== chunks) {
+					throw new GraiError(
+						"config-invalid",
+						{ file: basename(configFile) },
+						`Astro's CSP lets each page's import map through by its hash, which grai took when its integration was set up, for chunks at ${hashedChunks}, but the build serves them at ${chunks}: an integration after grai's changed Astro's base or build.assets. List grai() after it in "integrations".`,
+					);
+				}
+				const maps = importMaps(grai.locales, chunks);
 				middleware = middlewareCode(grai, {
 					configName: basename(configFile),
 					requestStrategies: requestStrategies(grai.strategy),
 					importMaps: building
-						? importMaps(grai.locales, chunksUrl(config))
+						? Object.fromEntries(
+								Object.entries(maps).map(([locale, map]) => [
+									locale,
+									`<script type="importmap">${map}</script>`,
+								]),
+							)
 						: undefined,
 				});
 			},
@@ -144,26 +177,32 @@ function chunksUrl({ base, build }: AstroConfig): string {
 	return `${(prefix ?? base).replace(/\/$/, "")}/${build.assets}/`;
 }
 
-/** Each locale's import map, from the shared message chunks to that locale's copies. */
+/** Each locale's import map, from the shared message chunks to that locale's copies, as JSON. */
 function importMaps(
 	locales: readonly string[],
 	chunks: string,
-): Record<string, ImportMap> {
+): Record<string, string> {
 	return Object.fromEntries(
-		locales.map((locale) => {
-			const json = JSON.stringify({
+		locales.map((locale) => [
+			locale,
+			JSON.stringify({
 				imports: {
 					[`${chunks}${messageDirectory}/`]: `${chunks}${localeDirectory(locale)}/`,
 				},
-			});
-			const hash = createHash("sha256").update(json).digest("base64");
-			return [
-				locale,
-				{
-					script: `<script type="importmap">${json}</script>`,
-					hash: `sha256-${hash}`,
-				},
-			];
-		}),
+			}),
+		]),
 	);
+}
+
+/** The algorithm of the app's CSP, `true` taking Astro's default; undefined without one. */
+function cspAlgorithm({
+	security: { csp },
+}: AstroConfig): "SHA-256" | "SHA-384" | "SHA-512" | undefined {
+	if (csp === true) return "SHA-256";
+	return typeof csp === "object" ? csp.algorithm : undefined;
+}
+
+/** An inline script's hash, as a CSP lists it. */
+function scriptHash(script: string): `sha256-${string}` {
+	return `sha256-${createHash("sha256").update(script).digest("base64")}`;
 }

@@ -1,4 +1,6 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
@@ -10,8 +12,8 @@ import { stopped } from "./stopped.ts";
 const example = fileURLToPath(new URL("../examples/astro/", import.meta.url));
 const astro = join(example, "node_modules/.bin/astro");
 
-/** Runs `astro build`, failing with what it printed. */
-function built(args: string[]): void {
+/** Runs `astro build`, failing with what it printed, else giving it. */
+function built(args: string[]): string {
 	const { status, stdout, stderr } = spawnSync(astro, ["build", ...args], {
 		cwd: example,
 		encoding: "utf8",
@@ -21,6 +23,7 @@ function built(args: string[]): void {
 			`astro build ${args.join(" ")} failed:\n${stdout}${stderr}`,
 		);
 	}
+	return `${stdout}${stderr}`;
 }
 
 /** A server the suite started, and the origin it printed. */
@@ -151,8 +154,9 @@ function aSite(site: { origin: string }) {
 describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 	const site = { origin: "" };
 	let served: Served | undefined;
+	let printed = "";
 	beforeAll(async () => {
-		built([]);
+		printed = built([]);
 		// --ignore-lock: a one-off server in the foreground, which the suite stops. Astro starts its
 		// preview server in the background, out of the suite's reach, when an agent runs the suite.
 		served = await listening(astro, [
@@ -169,6 +173,11 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 
 	aSite(site);
 
+	it("reads no CSP in a site without one, which Astro would warn of on every page", () => {
+		expect(printed).toContain("page(s) built");
+		expect(printed).not.toContain("CSP was not configured");
+	});
+
 	it("type-checks with astro check, the types grai compiled for it included", () => {
 		const { status, stdout, stderr } = spawnSync(astro, ["check"], {
 			cwd: example,
@@ -177,6 +186,31 @@ describe("the Astro example, prerendered", { timeout: 30_000 }, () => {
 
 		expect(status, `${stdout}${stderr}`).toBe(0);
 	}, 60_000);
+});
+
+describe("the Astro example, prerendered under a CSP", {
+	timeout: 30_000,
+}, () => {
+	beforeAll(() => {
+		built(["--config", "astro.csp.config.ts"]);
+	}, 120_000);
+
+	it("lets each page's import map through its CSP by the map's hash", () => {
+		for (const page of ["index.html", "ro/index.html", "ar/about/index.html"]) {
+			const html = readFileSync(join(example, "dist-csp", page), "utf8");
+			const map = /<script type="importmap">(.*?)<\/script>/.exec(html)?.[1];
+			const policy =
+				/<meta http-equiv="content-security-policy" content="([^"]*)"/.exec(
+					html,
+				)?.[1];
+			const hash = createHash("sha256")
+				.update(map ?? "")
+				.digest("base64");
+
+			expect(map, page).toBeDefined();
+			expect(policy, page).toContain(`'sha256-${hash}'`);
+		}
+	});
 });
 
 describe("the Astro example, under a base path", { timeout: 30_000 }, () => {
