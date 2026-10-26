@@ -692,4 +692,58 @@ export function render(value = m.cart_title()) {
 		expect(project.left()).toEqual([]);
 		expect((await project.load("src/render.ts")).render?.()).toBe("Cartlocal");
 	});
+
+	it("moves no locale that may read otherwise where the call is, and drops no default it would no longer evaluate", () => {
+		const project = migrated("i18next", i18nextCatalogs, {
+			"src/order.ts": `import { t } from "i18next";
+
+export const greet = (choose: () => string, name: () => string) =>
+	t("common:greeting", { lng: choose(), name: name() });
+export const tracked = (track: () => string) =>
+	t("cart:title", { defaultValue: track() });
+export const fixed = (lng: string) => t("cart:title", { lng });
+`,
+		});
+		const server = migrated("icu", icuCatalogs, {
+			"src/about.ts": `import { getTranslations } from "next-intl/server";
+
+export async function later() {
+	let locale = "en";
+	const t = await getTranslations({ locale, namespace: "About" });
+	locale = "de";
+	return t("title");
+}
+
+export async function fixed(locale: string) {
+	const t = await getTranslations({ locale, namespace: "About" });
+	return t("title");
+}
+`,
+		});
+
+		expect(project.left()).toEqual([
+			"src/order.ts:4:2: its locale is an expression grai migrate cannot prove reads the same where the rewrite puts it: write it as a string, or as a name nothing assigns again.",
+			"src/order.ts:6:2: its defaultValue is an expression the rewrite would no longer evaluate: write it as a string, or remove it.",
+		]);
+		expect(project.text("src/order.ts")).toContain(
+			"export const fixed = (lng: string) => m.cart_title({}, { locale: lng });",
+		);
+		expect(server.left()).toEqual([
+			"src/about.ts:7:9: its locale is an expression grai migrate cannot prove reads the same where the rewrite puts it: write it as a string, or as a name nothing assigns again.",
+		]);
+		expect(server.text("src/about.ts")).toContain(
+			"export async function fixed(locale: string) {\n\treturn m.About_title({}, { locale });\n}",
+		);
+		const shop = migrated("icu", formatjsCatalogs, {
+			"src/shop.tsx": `import { FormattedMessage } from "react-intl";
+
+export const Title = ({ label }: { label: () => string }) => (
+	<FormattedMessage id="app.title" defaultMessage={label()} />
+);
+`,
+		});
+		expect(shop.left()).toEqual([
+			"src/shop.tsx:4:2: its defaultMessage is an expression the rewrite would no longer evaluate: write it as a string, or remove it.",
+		]);
+	});
 });

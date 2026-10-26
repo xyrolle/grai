@@ -1,7 +1,7 @@
 import type { ESTree } from "vite";
 import type { Mapping } from "../import/mapping.ts";
 import type { Binding, Scopes, Use } from "./scopes.ts";
-import { type Node, propertiesOf, type Span } from "./syntax.ts";
+import { literalText, type Node, propertiesOf, type Span } from "./syntax.ts";
 
 /** Why a use stays as it is, for the person who migrates it. */
 export type Left = { left: string };
@@ -61,6 +61,29 @@ export function passedOn(use: Use): Left {
 export function ownApi(name: string, library: string): Left {
 	return {
 		left: `${name} is ${library}'s own: replace it by hand, with grai's runtime where it has a counterpart.`,
+	};
+}
+
+/**
+ * Whether an expression reads the same wherever and whenever a rewrite evaluates it, or evaluates
+ * it no more: a string, or a name the module declares that nothing assigns again.
+ */
+export function readsTheSame(node: Node, scopes: Scopes): boolean {
+	if (literalText(node) !== undefined) return true;
+	if (node.type !== "Identifier") return false;
+	const binding = scopes.resolve(node.name, node.start);
+	return binding !== undefined && !scopes.isAssignedAgain(binding);
+}
+
+/** Why a call stays: the rewrite would move its locale where it may read otherwise. */
+export const movedLocale = {
+	left: "its locale is an expression grai migrate cannot prove reads the same where the rewrite puts it: write it as a string, or as a name nothing assigns again.",
+};
+
+/** Why a call stays: the rewrite would drop a value of its, which then no longer runs. */
+export function droppedValue(name: string): Left {
+	return {
+		left: `its ${name} is an expression the rewrite would no longer evaluate: write it as a string, or remove it.`,
 	};
 }
 
