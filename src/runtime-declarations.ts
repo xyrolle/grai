@@ -182,4 +182,19 @@ export declare function middleware(
 		locale: Locale;
 	}) => Response | Promise<Response>,
 ): Promise<Response>;
+
+/**
+ * The locale the middleware binds for a request: the first the strategy finds in it, else the base
+ * locale. For a framework that renders apart from the middleware.
+ */
+export declare function localeOf(request: Request): Locale;
+
+/**
+ * The redirect the middleware answers a request with, its \`Vary\` included, else undefined: with
+ * every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
+ */
+export declare function redirectOf(request: Request): Response | undefined;
+
+/** The request headers the strategy reads, as the \`Vary\` the middleware adds: "" for none. */
+export declare const vary: string;
 `;
