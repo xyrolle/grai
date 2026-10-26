@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, sep } from "node:path";
-import { codeText } from "./code-text.ts";
+import { type CodeText, codeText, type Uncertain } from "./code-text.ts";
 import { globMatcher } from "./globs.ts";
 
 /**
@@ -36,14 +36,16 @@ const unicodeEscape = /\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g;
 /**
  * A source file: its path, the path the project shows (relative to its root), its text, and its
  * code: the text with comments and literals blanked at the same offsets (`code-text.ts`), which a
- * scan for what the code reads goes through. The code is worked out the first time a scan reads
- * it, as most commands read only the files that write a name they look for.
+ * scan for what the code reads goes through, with the ranges the scan cannot read with certainty.
+ * The code is worked out the first time a scan reads it, as most commands read only the files
+ * that write a name they look for.
  */
 export type SourceFile = {
 	readonly path: string;
 	readonly file: string;
 	readonly text: string;
 	readonly code: string;
+	readonly uncertain: readonly Uncertain[];
 };
 
 /** A source file of a text, its code blanked when first read. */
@@ -52,14 +54,20 @@ export function sourceFile(
 	file: string,
 	text: string,
 ): SourceFile {
-	let code: string | undefined;
+	let scanned: CodeText | undefined;
+	const scan = () => {
+		scanned ??= codeText(text, path);
+		return scanned;
+	};
 	return {
 		path,
 		file,
 		text,
 		get code() {
-			code ??= codeText(text, path);
-			return code;
+			return scan().code;
+		},
+		get uncertain() {
+			return scan().uncertain;
 		},
 	};
 }

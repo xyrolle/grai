@@ -4,6 +4,7 @@
  * Svelte or Vue template such a call would ship as a call of nothing.
  */
 
+import { type Uncertain, uncertainAt } from "./code-text.ts";
 import type { Config } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { keysFileOf } from "./keys-file.ts";
@@ -25,12 +26,17 @@ import {
 /** A key a source names: the key, where its name starts, and how the source writes it. */
 type NamedKey = { key: string; at: number; written: string };
 
-/** A file whose reads of a namespace check left out, as it declares the name again there. */
+/**
+ * A file whose reads of a namespace check left out, and where: as it declares the name again, or
+ * as the scan cannot read that place with certainty (`code-text.ts`), it being maybe JSX text or
+ * after a `/` that may start a regular expression.
+ */
 export type Unchecked = {
 	file: string;
 	name: string;
 	line: number;
 	column: number;
+	why: "declared" | Uncertain["why"];
 };
 
 /** After a namespace's name: `.key` or `?.key`, or `["key"]`, `?.["key"]` and the same in single quotes. */
@@ -43,7 +49,8 @@ const access =
  * module of the app's that is named keys too is not taken for it. The text alone cannot tell which
  * of two declarations of a name a read is of, so where a file declares a namespace's name again,
  * as a parameter or a variable, its reads of that name are left out, and listed as unchecked: a
- * correct file never fails the check. The Vite plugin reads each module by scope instead.
+ * correct file never fails the check. So are the reads where the scan is uncertain. The Vite
+ * plugin reads each module by scope and with a parser instead.
  */
 export function missingKeyCalls(
 	files: readonly SourceFile[],
@@ -67,9 +74,22 @@ export function missingKeyCalls(
 				file: source.file,
 				name,
 				...positionOf(source.text, again),
+				why: "declared",
+			});
+		}
+		for (const name of bindings.namespaces) {
+			const read = uncertainRead(source, name);
+			if (read === undefined) continue;
+			const { at, why } = read;
+			unchecked.push({
+				file: source.file,
+				name,
+				...positionOf(source.text, at),
+				why,
 			});
 		}
 		return namedKeys(source.code, bindings, shadowed)
+			.filter(({ at }) => uncertainAt(source.uncertain, at) === undefined)
 			.filter(({ key }) => !keys.has(key))
 			.map(({ key, at, written }) => {
 				const { line, column } = positionOf(source.text, at);
@@ -81,6 +101,22 @@ export function missingKeyCalls(
 			});
 	});
 	return { errors, unchecked };
+}
+
+/** The first place a file may read a namespace where the scan is uncertain, and why. */
+function uncertainRead(
+	source: SourceFile,
+	name: string,
+): { at: number; why: Uncertain["why"] } | undefined {
+	if (source.uncertain.length === 0) return undefined;
+	for (const at of occurrencesOf(source.text, name)) {
+		const place = uncertainAt(source.uncertain, at);
+		access.lastIndex = at + name.length;
+		if (place !== undefined && access.test(source.text)) {
+			return { at, why: place.why };
+		}
+	}
+	return undefined;
 }
 
 /** Every key a file names, by its imports and by reading its namespaces but the shadowed ones. */

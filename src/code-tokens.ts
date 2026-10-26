@@ -90,9 +90,9 @@ function lastTokens(passed: Passed, count: number): Token[] {
 
 /**
  * Whether a `/` after the code passed starts a regular expression: at the start, after a keyword
- * before an expression, or after an operator. After an operand, a `)`, a `]` or a `}` it divides,
- * and so it does after `++` or `--`, as no regular expression is incremented. After `<` it closes a
- * JSX element.
+ * before an expression, or after an operator. After an operand or a `]` it divides, and so it does
+ * after `++` or `--`, as no regular expression is incremented; after a `)` or a `}` it is taken to
+ * divide, though it may not (`mayStartRegex`). After `<` it closes a JSX element.
  */
 export function startsRegex(passed: Passed): boolean {
 	const [previous, before] = lastTokens(passed, 2);
@@ -106,6 +106,12 @@ export function startsRegex(passed: Passed): boolean {
 		before?.text === previous.text &&
 		before.at === previous.at - 1;
 	return !doubled;
+}
+
+/** Whether a `/` after the code passed may start a regular expression or divide: after `)` or `}`. */
+export function mayStartRegex(passed: Passed): boolean {
+	const [previous] = lastTokens(passed, 1);
+	return previous?.text === ")" || previous?.text === "}";
 }
 
 /**

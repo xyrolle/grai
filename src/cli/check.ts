@@ -54,11 +54,7 @@ export const checkCommand: Command = {
 			);
 			return problems.length > 0 ? 1 : 0;
 		}
-		for (const { file, name, line, column } of unchecked) {
-			console.log(
-				`grai: not checked: ${file} declares ${name} again (${line}:${column}), so check cannot tell which of its ${name}.key reads are grai's.`,
-			);
-		}
+		for (const place of unchecked) console.log(uncheckedLine(place));
 		for (const [locale, keys] of untranslated) {
 			console.log(untranslatedLine(locale, keys));
 		}
@@ -67,6 +63,19 @@ export const checkCommand: Command = {
 		return 0;
 	},
 };
+
+/** Why check left a file's reads of a namespace out, and where. */
+function uncheckedLine({ file, name, line, column, why }: Unchecked): string {
+	if (why === "declared") {
+		return `grai: not checked: ${file} declares ${name} again (${line}:${column}), so check cannot tell which of its ${name}.key reads are grai's.`;
+	}
+	const place = `${file}:${line}:${column}`;
+	const reason =
+		why === "jsx"
+			? "may be JSX text, which check reads as JavaScript"
+			: "follows a / that may start a regular expression or divide";
+	return `grai: not checked: ${place} ${reason}, so it cannot tell whether its ${name} reads there are grai's.`;
+}
 
 /** How many keys of a locale are untranslated, and the first of them. */
 function untranslatedLine(locale: string, keys: readonly string[]): string {

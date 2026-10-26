@@ -198,6 +198,19 @@ describe("grai check", () => {
 		]);
 	});
 
+	it("says it left unchecked a read in what may be JSX text, which the scan reads as JavaScript", async () => {
+		const { dir } = project(catalogs);
+		writeSources(dir, {
+			"src/View.jsx": `import { m } from "../out/messages.js";\nm.cart_title();\nexport const View = () => <p>don't {m.cart_titel()} don't</p>;\n`,
+		});
+
+		const { stdout } = await grai(dir, "check");
+
+		expect(stdout).toContain(
+			"grai: not checked: src/View.jsx:3:37 may be JSX text, which check reads as JavaScript, so it cannot tell whether its m reads there are grai's.",
+		);
+	});
+
 	it("counts no name that ends a longer word, such as 2xl's xl, as the key", async () => {
 		const { dir } = project({
 			en: { xl: "Extra large" },
