@@ -310,7 +310,7 @@ const greeting = m.greeting({ name });</script>
 		);
 	});
 
-	it("leaves as it is a component that declares the namespace's name again", async () => {
+	it("reads each component by its scopes: the namespace's calls become texts, a nearer m's stay calls", async () => {
 		const dir = svelteApp({
 			"Each.svelte": `<script>import { m } from "./out/messages.js";</script>
 <h1>{m.title()}</h1>{#each [{ title: () => "item" }] as m}<p>{m.title()}</p>{/each}`,
@@ -323,10 +323,15 @@ const greeting = m.greeting({ name });</script>
 			"App.svelte": `<script>import Each from "./Each.svelte"; import Index from "./Index.svelte"; import Snippet from "./Snippet.svelte"; import Script from "./Script.svelte";</script>
 <Each /><Index /><Snippet /><Script />`,
 		});
+		const { files } = await built(dir, withTexts(), "client");
 
-		expect(await built(dir, withTexts(), "client")).toEqual(
-			await built(dir, withCalls(), "client"),
-		);
+		expect(code(files)).toContain('pageText("Title", "Titel")');
+		expect(await hydratedPages(dir, withCopies, ["en"])).toEqual([
+			{
+				hydrated: { kept: true, text: "TitleitemTitle10TitlerowTitleparam" },
+				errors: [],
+			},
+		]);
 	});
 
 	it("reads the server's calls as a property, and leaves dev as it is", async () => {
