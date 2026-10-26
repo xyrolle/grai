@@ -1,9 +1,10 @@
 // Startup: what a new server process pays before and during its first render, per library. It
-// loads every locale's messages (each library's modules and catalogs bundled into one file, as a
-// server build holds them, and the instances made from them), renders the 2,000-call
-// sample once cold, which is where use-intl parses each message it meets, and once warm, and
-// reports the heap it all holds. Each measurement is a new Node process, then a new Node process
-// with Node's compile cache warm, then a new workerd (startup-workerd.mjs); medians of five.
+// loads every locale's messages (each library's modules and catalogs bundled into one file with a
+// page of the sample's static calls, as a server build holds them, and the instances made from
+// them; server-page.mjs), renders the 2,000-call sample once cold, which is where use-intl parses
+// each message it meets, and once warm, and reports the heap it all holds. Each measurement is a
+// new Node process, then a new Node process with Node's compile cache warm, then a new workerd
+// (startup-workerd.mjs); medians of five.
 //   node startup.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -17,24 +18,26 @@ import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
-import { sampleRender } from "./startup-render.mjs";
+import { pageCode } from "./server-page.mjs";
 import { inWorkerd, workerFiles } from "./startup-workerd.mjs";
 
 const RUNS = 5;
 const CALLS = 2000;
 
-/** Runs in the child: loads `module`, renders the sample twice, prints times and heap. */
-async function child(module, mode, file, locale) {
-	const calls = JSON.parse(readFileSync(file, "utf8"));
+/** Runs in the child: loads a page, renders the sample twice, prints times and heap. */
+async function child(module, file, locale) {
+	const values = JSON.parse(readFileSync(file, "utf8")).map(
+		(call) => call.values,
+	);
+	const options = { locale };
 	globalThis.gc();
 	const heapBefore = process.memoryUsage().heapUsed;
 	const start = performance.now();
-	const loaded = await import(module);
+	const { render } = await import(module);
 	const imported = performance.now();
-	const render = sampleRender(loaded, mode, calls, locale);
-	render();
+	render(values, options);
 	const first = performance.now();
-	render();
+	render(values, options);
 	const warm = performance.now();
 	globalThis.gc();
 	const heap = process.memoryUsage().heapUsed - heapBefore;
@@ -62,10 +65,19 @@ function everyLocale(app, library, locale) {
 	return file;
 }
 
-/** A module and everything it imports bundled into one file, as a server build holds them. */
-async function bundled(app, name, entry) {
+/**
+ * A page of the sample's calls through a module, and everything it imports, bundled into one file
+ * as a server build holds them.
+ */
+async function bundled(app, name, entry, mode, callsFile) {
+	const names = mode === "t" ? ["t"] : Object.keys(await import(entry));
+	const keys = JSON.parse(readFileSync(callsFile, "utf8")).map(
+		(call) => call.key,
+	);
+	const page = join(cacheDir, `startup-${app.id}-${name}-page.js`);
+	writeFileSync(page, pageCode(entry, mode, names, keys));
 	const build = await rolldown({
-		input: entry,
+		input: page,
 		platform: "node",
 		logLevel: "silent",
 	});
@@ -160,7 +172,7 @@ async function benchApp(app) {
 			name,
 			mode,
 			file,
-			module: await bundled(app, String(index), entry),
+			module: await bundled(app, String(index), entry, mode, file),
 		});
 	console.log(
 		`\n### ${app.name}, ${locale}: a new Node ${process.versions.node} process, median of ${RUNS}\n`,
@@ -197,8 +209,8 @@ async function benchApp(app) {
 		"| library | load messages | first render, 2,000 calls | warm render |",
 	);
 	console.log("|---|---|---|---|");
-	for (const { name, mode, file, module } of modules) {
-		const worker = workerFiles(module, mode, file, locale);
+	for (const { name, file, module } of modules) {
+		const worker = workerFiles(module, file, locale);
 		const runs = [];
 		for (let run = 0; run < RUNS; run++) runs.push(await inWorkerd(worker));
 		console.log(`| ${name} | ${times(runs, 0).join(" | ")} |`);
@@ -209,13 +221,12 @@ async function benchApp(app) {
  * Loads a row's module in a new Node process and renders the sample there: the times and heap it
  * reports. With `compileCache`, the process reads and writes Node's compile cache in it.
  */
-function inNode({ module, mode, file }, locale, compileCache) {
+function inNode({ module, file }, locale, compileCache) {
 	const args = [
 		"--expose-gc",
 		new URL(import.meta.url).pathname,
 		"--child",
 		module,
-		mode,
 		file,
 		locale,
 	];

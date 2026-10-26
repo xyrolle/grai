@@ -8,20 +8,25 @@ import { cacheDir } from "./apps.mjs";
 
 const here = new URL(".", import.meta.url).pathname;
 
-/** A worker's files: its entry, the render, the sample as a module, and the module under test. */
-export function workerFiles(module, mode, callsFile, locale) {
+/** A worker's files: its entry, the sample's values as a module, and the page under test. */
+export function workerFiles(module, callsFile, locale) {
 	const directory = join(cacheDir, "startup-workerd", basename(module, ".mjs"));
 	mkdirSync(directory, { recursive: true });
-	for (const file of ["startup-worker.js", "startup-render.mjs"])
-		copyFileSync(join(here, file), join(directory, file));
+	copyFileSync(
+		join(here, "startup-worker.js"),
+		join(directory, "startup-worker.js"),
+	);
 	copyFileSync(module, join(directory, "module.mjs"));
+	const values = JSON.parse(readFileSync(callsFile, "utf8")).map(
+		(call) => call.values,
+	);
 	writeFileSync(
-		join(directory, "calls.js"),
-		`export default ${readFileSync(callsFile, "utf8")};\n`,
+		join(directory, "values.js"),
+		`export default ${JSON.stringify(values)};\n`,
 	);
 	writeFileSync(
 		join(directory, "settings.js"),
-		`export const mode = ${JSON.stringify(mode)};\nexport const locale = ${JSON.stringify(locale)};\n`,
+		`export const locale = ${JSON.stringify(locale)};\n`,
 	);
 	return directory;
 }
