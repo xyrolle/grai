@@ -138,7 +138,7 @@ const page = typeof document !== "undefined";
 /**
  * The locale outside a request, by its position in `locales`: in a browser, the page's
  * `<html lang>`, the locale the server drew it in; in a script or a test, the base locale, or the
- * one the test binds. A server reads it only once a test binds it.
+ * one the test binds. A server never reads it: its every call is in a request.
  */
 let current = locales.indexOf(
 	page && locales.includes(document.documentElement.lang)
@@ -188,14 +188,11 @@ export function localeOfHost(host) {
 	return hostsLocales ? locales[domains.indexOf(host)] : undefined;
 }
 
-/** Whether a test bound the locale outside a request, which then holds on a server too. */
-let boundByTest = false;
-
 /** The position in `locales` of the bound locale: the request's, else the one outside a request. */
 function bound() {
 	const request = requests?.getStore();
 	if (request !== undefined) return request.index;
-	if (requests !== undefined && !boundByTest) throw unbound();
+	if (requests !== undefined) throw unbound();
 	return current;
 }
 
@@ -207,19 +204,18 @@ function bound() {
 function unbound() {
 	return new GraiError(
 		"locale-unbound",
-		"A message was rendered outside every request the middleware binds. Render it while the handler runs, or in a task the handler starts: a stream renders in its start() or in a task writing to it, not in its pull(), which runs once the middleware has returned. Outside a request, pass { locale } to the message.",
+		"A message was rendered outside every request the middleware binds. Render it while the handler runs, or in a task the handler starts: a stream renders in its start() or in a task writing to it, not in its pull(), which runs once the middleware has returned. Outside a request, pass { locale } to the message, or run the code in server.js's withLocale(locale, code), as a job or a test does.",
 	);
 }
 
 /**
  * Binds a locale outside a request, by its position in `locales`: for the process, or the page.
- * testing.js binds a test's locale with it, which holds on a server too.
+ * testing.js binds a test's locale with it.
  *
  * @param {number} index
  */
 export function bindLocale(index) {
 	current = index;
-	boundByTest = true;
 }
 
 /** @returns {string} */
@@ -229,13 +225,12 @@ export function getLocale() {
 
 /**
  * Sets the locale. In a request, for the rest of the request; on a server outside every request,
- * it throws `locale-unbound`, unless a test bound one; in a script or a test, for the process. A
- * page renders in its locale for as long as it lives, so in a page it keeps the choice where the
- * strategy reads it: its cookie, its key in localStorage, its URL's prefix or query parameter.
- * Then it loads the page again in it, at the URL that names it, unless `{ reload: false }`, which
- * only keeps the choice, for the page's next load. A page whose strategy keeps the choice nowhere
- * would load in its old locale again, so there it throws. The page's own locale is kept too, but
- * loads nothing again.
+ * it throws `locale-unbound`; in a script or a test, for the process. A page renders in its locale
+ * for as long as it lives, so in a page it keeps the choice where the strategy reads it: its
+ * cookie, its key in localStorage, its URL's prefix or query parameter. Then it loads the page
+ * again in it, at the URL that names it, unless `{ reload: false }`, which only keeps the choice,
+ * for the page's next load. A page whose strategy keeps the choice nowhere would load in its old
+ * locale again, so there it throws. The page's own locale is kept too, but loads nothing again.
  *
  * @param {string} locale
  * @param {{ reload?: boolean }} [options]
@@ -247,7 +242,7 @@ export function setLocale(locale, options) {
 		request.index = index;
 		return;
 	}
-	if (requests !== undefined && !boundByTest) throw unbound();
+	if (requests !== undefined) throw unbound();
 	if (!page) {
 		current = index;
 		return;
