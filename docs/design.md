@@ -413,7 +413,7 @@ The runtime's names are the ones existing Paraglide call sites use, so migrating
   - a removal takes the entry with the separator before it, and an object it leaves empty goes too;
   - `import` writes new catalogs, an entry per line indented by a tab.
 
-  The files are written all or none: each new text goes to a temporary file of the writer's own, created anew beside its file so that it overwrites nothing, and they are renamed into place once all are written. A file that then cannot be replaced, such as a path that is now a directory, has the files already replaced get back what they held, so a command that fails leaves every catalog as it was.
+  The files are written all or none: each new text goes to a temporary file of the writer's own, created anew beside its file so that it overwrites nothing, and they are renamed into place once all are written, each with the permissions of the file it replaces, so a script that a rename edits stays executable. A file that then cannot be replaced, such as a path that is now a directory, has the files already replaced get back what they held, so a command that fails leaves every catalog as it was.
 - Every command prints each error on its own line, sorted by file, key and locale, then how many, and exits with 1. A usage error exits with 2.
 
 ## Next.js
