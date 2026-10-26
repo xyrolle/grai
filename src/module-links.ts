@@ -5,7 +5,7 @@
  * whose side effects it keeps: the others it leaves out for that importer, and so does a key's reach.
  */
 
-import type { ESTree } from "vite";
+import type { ESTree } from "./code/parse.ts";
 
 /**
  * One static import or re-export, by its source: the names it takes from the source (`"*"`, every

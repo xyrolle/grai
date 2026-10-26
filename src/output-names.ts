@@ -1,4 +1,4 @@
-import { type ESTree, parseSync } from "vite";
+import { type ESTree, parse } from "./code/parse.ts";
 import { keyModulePrefix } from "./locale-chunks.ts";
 
 /** What an import names in grai's output: the namespace of every key (`m`), or one key. */
@@ -40,7 +40,7 @@ export function importedName(
 			modules
 				.code(id)
 				.then((code) =>
-					code === undefined ? undefined : parseSync(id, code).program,
+					code === undefined ? undefined : parse(id, code).program,
 				);
 		programs.set(id, parsed);
 		return parsed;

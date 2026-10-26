@@ -7,7 +7,8 @@
 
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
-import { type ESTree, transformWithOxc } from "vite";
+import { transformWithOxc } from "vite";
+import type { ESTree } from "./code/parse.ts";
 import type { Build } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { memberObjects, namespaceReads } from "./namespace-reads.ts";

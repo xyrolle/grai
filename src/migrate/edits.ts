@@ -1,4 +1,4 @@
-import type { ESTree } from "vite";
+import type { ESTree } from "../code/parse.ts";
 import type { Node, Span } from "./syntax.ts";
 
 /** A change to a module's text: the span it replaces, and what it writes there. */
