@@ -116,7 +116,7 @@ export function namesOf(
 }
 
 /** The name a path to a module goes through: its file's, or for an index, its folder's. */
-function nameOf(file: string): string {
+export function nameOf(file: string): string {
 	return isIndex(file)
 		? basename(dirname(file))
 		: basename(file, extname(file));
@@ -128,7 +128,7 @@ function isIndex(file: string): boolean {
 }
 
 /** Whether a path names a module file: the file, its path without an extension, or an index's folder. */
-function pathNames(path: string, file: string): boolean {
+export function pathNames(path: string, file: string): boolean {
 	const stem = file.slice(0, file.length - extname(file).length);
 	if (path === file || path === stem) return true;
 	return basename(stem) === "index" && path === dirname(file);

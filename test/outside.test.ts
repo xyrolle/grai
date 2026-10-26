@@ -59,6 +59,12 @@ describe("a reading of the files that may name a module outside the listed sourc
 				"src/e.ts title",
 			],
 		});
+		expect((await readingIn(dir, "title")).read).toEqual([
+			"src/a.ts",
+			"src/b.ts",
+			"src/c.ts",
+			"src/e.ts",
+		]);
 	});
 
 	it("reads every file when a tsconfig's baseUrl is outside the roots, as any specifier may name a module through it", async () => {
@@ -116,6 +122,10 @@ describe("a reading of the files that may name a module outside the listed sourc
 		});
 
 		expect(await readingIn(dir)).toEqual({
+			read: ["src/a.ts", "src/lib/i18n.ts"],
+			reads: ["src/a.ts title"],
+		});
+		expect(await readingIn(dir, "title")).toEqual({
 			read: ["src/a.ts", "src/lib/i18n.ts"],
 			reads: ["src/a.ts title"],
 		});

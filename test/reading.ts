@@ -36,17 +36,28 @@ export function projectWith(files: Record<string, string>): string {
 	return dir;
 }
 
-/** The sources a project's reading reads, and the reads it finds, each by file. */
+/** The sources a project's reading reads, and the reads it finds, each by file; with a key, for it. */
 export async function readingIn(
 	dir: string,
+	key?: string,
 ): Promise<{ read: string[]; reads: string[] }> {
+	const { read, reads } = await fullReadingIn(dir, key);
+	return { read, reads };
+}
+
+/** A project's reading as `readingIn` gives it, with the files that reach the messages. */
+export async function fullReadingIn(
+	dir: string,
+	key?: string,
+): Promise<{ read: string[]; reads: string[]; reaches: string[] }> {
 	const config = readConfig(join(dir, "grai.config.json"));
-	const code = await readProjectCode(config, [join(dir, "src")]);
+	const code = await readProjectCode(config, [join(dir, "src")], key);
 	if (code instanceof GraiError) throw code;
-	const { reads } = await readingOf(code);
+	const { reads, reaches } = await readingOf(code);
 	return {
 		read: [...code.sources.keys()].map((path) => relative(dir, path)).sort(),
 		reads: reads.map(({ path, key }) => `${relative(dir, path)} ${key}`).sort(),
+		reaches: reaches.map(({ path }) => relative(dir, path)).sort(),
 	};
 }
 
