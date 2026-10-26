@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
-import { type ESTree, parseSync } from "vite";
+import type { ESTree } from "vite";
 import type { Build } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { memberObjects, namespaceReads } from "./namespace-reads.ts";
@@ -34,18 +34,29 @@ export type Resolve = (
 ) => Promise<string | undefined>;
 
 /**
- * An error for each key a module's code names through a namespace that no catalog has. Only an
- * import the module reads members of is followed, so a module's other imports cost no resolving.
- * A named import of a key keys.js lacks the bundler fails itself.
+ * The keys a module's code reads through grai's namespace, whether it reads one by a computed name,
+ * which may be any key, and an error for each key it names that no catalog has.
  */
-export async function missingKeyReads(
+export type KeyReads = {
+	keys: ReadonlySet<string>;
+	computed: boolean;
+	missing: GraiError[];
+};
+
+/**
+ * The keys a module's code, parsed as `program`, names through a namespace, and an error for each
+ * that no catalog has. Only an import the module reads members of is followed, so a module's other
+ * imports cost no resolving. A named import of a key keys.js lacks the bundler fails itself.
+ */
+export async function keyReads(
+	program: ESTree.Program,
 	code: string,
 	id: string,
 	{ build, names }: KeyReading,
 	resolve: Resolve,
-): Promise<GraiError[]> {
-	const { program } = parseSync(id, code, { lang: "js" });
-	if (!isTreeNode(program)) return [];
+): Promise<KeyReads> {
+	if (!isTreeNode(program))
+		return { keys: new Set(), computed: false, missing: [] };
 	const read = memberObjects(program);
 	const modules: Modules = {
 		// A build that ends before a module's check does drops its resolver: a name it can no
@@ -65,10 +76,15 @@ export async function missingKeyReads(
 	const keys = new Set(
 		build.catalogs.flatMap(({ messages }) => [...messages.keys()]),
 	);
-	const missing = namespaceReads(program, namespaces)
+	const { reads, computed } = namespaceReads(program, namespaces);
+	const missing = reads
 		.filter(({ key }) => !keys.has(key))
 		.map(({ key, start, end }) => ({ key, written: code.slice(start, end) }));
-	return located(missing, id, build);
+	return {
+		keys: new Set(reads.flatMap(({ key }) => (keys.has(key) ? [key] : []))),
+		computed,
+		missing: located(missing, id, build),
+	};
 }
 
 type ImportStatement = {

@@ -14,6 +14,12 @@ The dev plugin patches a server environment's runner in place only when `isRunna
 
 Done when: a server environment that runs its modules in a runner is patched whichever copy of Vite made it, with a test that makes the server with another copy.
 
+## Keys read through `m` passed whole, or named from keys.js, in a key's reach
+
+A key's reach follows `m.key` and `m[name]` through the app's re-exports, a per-key path, and a module that only re-exports (`docs/design.md`). It does not follow `m` passed whole (`fn(m)`, `const t = m`) or a named import of a key from keys.js, so such a key is reached only from its other readers, and a page that reads it so loads its chunk as one more request.
+
+Done when: the plugin's check follows each import a module binds that leads to keys.js, by its name, and a page-chunks test of each form chunks the key with the pages that read it.
+
 ## A page's later imports at its first paint
 
 The merge rule may put a key a page needs only through a later import in a chunk that page's first paint loads, when another page's first paint needs the key: on app B four pages load one such key at first paint. Keeping a set that later imports load off the first paints it is not on, without knowing which pages make which later imports, cost the rule most of its merges: 46 chunks a page against 13. Telling it exactly needs each later import's pages, from its dynamic importers' reach.

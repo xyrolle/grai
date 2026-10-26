@@ -4,7 +4,7 @@ import type { Build } from "./compile.ts";
 import { withoutContentHash } from "./content-names.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
-import { keyReach, type ModuleGraph } from "./key-reach.ts";
+import { type KeyLinks, keyReach, type ModuleGraph } from "./key-reach.ts";
 import { pageChunks } from "./key-sets.ts";
 import {
 	besideDirectory,
@@ -113,19 +113,14 @@ export function moduleKindIn(
 }
 
 /**
- * The bytes of key modules' code, every locale's words with them, at which a set of keys the same
- * entries use is worth a request of its own. Measured on both reference apps (`docs/design.md`).
- */
-export const ownChunkBytes = 4096;
-
-/**
- * The chunk of each key and text module of `build`, by the pages that load it (`pageChunks`), when
- * the module graph tells every one's reach; none otherwise.
+ * The chunk of each key and text module of `build`, by the pages that load it (`pageChunks`): its
+ * reach read from the module graph as `links` amends it (`keyReach`).
  */
 export function keyPageChunks(
 	build: Build,
 	keysFile: string,
 	graph: ModuleGraph,
+	links: KeyLinks,
 	pages: readonly (readonly string[])[] | undefined,
 ): Map<string, string> {
 	const { keys } = build.compilation;
@@ -140,8 +135,7 @@ export function keyPageChunks(
 		`${keyModulePrefix}${key}`,
 		`${textModulePrefix}${key}`,
 	]);
-	const reach = keyReach(graph, ids, keysFile);
-	return reach === undefined ? new Map() : pageChunks(reach, bytesOf, pages);
+	return pageChunks(keyReach(graph, ids, keysFile, links), bytesOf, pages);
 }
 
 /** The bundler's chunking context, as much as grai's chunking reads of it. */
@@ -149,31 +143,13 @@ export type ChunkingGraph = { getModuleInfo: ModuleGraph };
 
 /**
  * The client build's chunking. The runtime has a chunk of its own, so a message chunk holds keys and
- * nothing else. Each key whose reach the module graph tells goes in the chunk `pageChunkOf` names,
- * by the pages that load it. The others are chunked by the entries that use them, the keys a first
- * paint needs (Rolldown's `$initial`) before the keys only a later import needs, so no chunk holds
- * both. Among each, a set of `ownChunkBytes` or more has a chunk of its own, which every entry that
- * loads it uses whole, and each smaller set joins the set nearest it by those entries until it is as
- * large. The larger sets keep their own chunks, so the words a page loads and does not use come only
- * from sets under `ownChunkBytes`.
+ * nothing else, and each key goes in the chunk `pageChunkOf` names, by the pages that load it.
  */
 export function messageChunking(
 	outdir: string,
 	pageChunkOf: (id: string, graph: ChunkingGraph) => string | undefined,
 ): EnvironmentOptions {
 	const runtimeKind = runtimeKindIn(outdir);
-	const keyChunks = (modules: { tags?: "$initial"[] }) => {
-		const keys = {
-			name: messageDirectory,
-			test: isMessageModule,
-			entriesAware: true,
-			...modules,
-		};
-		return [
-			{ ...keys, minSize: ownChunkBytes },
-			{ ...keys, entriesAwareMergeThreshold: ownChunkBytes },
-		];
-	};
 	const groups = [
 		{
 			name: "grai-runtime",
@@ -184,8 +160,6 @@ export function messageChunking(
 				pageChunkOf(id, graph) ?? null,
 			test: isMessageModule,
 		},
-		...keyChunks({ tags: ["$initial"] }),
-		...keyChunks({}),
 	];
 	return {
 		build: { rolldownOptions: { output: { codeSplitting: { groups } } } },

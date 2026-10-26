@@ -37,17 +37,22 @@ const typeFields: ReadonlySet<string> = new Set([
 	"implements",
 ]);
 
-/** Each read of a key through one of the namespaces the program imports by these names. */
+/**
+ * Each read of a key through one of the namespaces the program imports by these names, and whether
+ * it reads one by a computed name too, `m[name]`, which may be any key.
+ */
 export function namespaceReads(
 	program: TreeNode,
 	namespaces: ReadonlySet<string>,
-): NamespaceRead[] {
+): { reads: NamespaceRead[]; computed: boolean } {
 	const reads: NamespaceRead[] = [];
+	let computed = false;
 	const visit = (node: TreeNode, shadowed: ReadonlySet<string>) => {
 		const inner = withDeclarations(node, shadowed, namespaces);
 		if (node.type === "MemberExpression") {
 			const read = memberRead(node, inner, namespaces);
-			if (read !== undefined) reads.push(read);
+			if (read === "computed") computed = true;
+			else if (read !== undefined) reads.push(read);
 		}
 		reads.push(...patternReads(node, inner, namespaces));
 		for (const [field, value] of Object.entries(node)) {
@@ -58,7 +63,7 @@ export function namespaceReads(
 		}
 	};
 	visit(program, new Set());
-	return reads;
+	return { reads, computed };
 }
 
 /**
@@ -125,12 +130,15 @@ function patternReads(
 	});
 }
 
-/** The key a member names through an unshadowed namespace, if it is one. */
+/**
+ * The key a member names through an unshadowed namespace, if it is one, or `"computed"` for a
+ * member of one by any other computed name.
+ */
 function memberRead(
 	node: TreeNode,
 	shadowed: ReadonlySet<string>,
 	namespaces: ReadonlySet<string>,
-): NamespaceRead | undefined {
+): NamespaceRead | "computed" | undefined {
 	const name = identifierName(child(node, "object"));
 	if (name === undefined || !namespaces.has(name) || shadowed.has(name))
 		return undefined;
@@ -147,7 +155,7 @@ function memberRead(
 	const literal = property?.type === "Literal" ? property.value : undefined;
 	return typeof literal === "string"
 		? { key: literal, start, end, keyStart: at + 1 }
-		: undefined;
+		: "computed";
 }
 
 /** The names shadowed inside a node: those it declares that are the namespaces' names. */
