@@ -60,6 +60,7 @@ function pseudoCatalog(
 			messages,
 			paths: base.paths,
 			revision: Symbol(locale),
+			...splitOf(base),
 		};
 	}
 	const messages = new Map(before.messages);
@@ -77,5 +78,11 @@ function pseudoCatalog(
 		paths,
 		revision: Symbol(locale),
 		edit: pseudoEdit,
+		...splitOf(base),
 	};
+}
+
+/** The base's files, for a base split across them: a pseudo message's key is in the base's file. */
+function splitOf({ split }: Catalog): Pick<Catalog, "split"> {
+	return split === undefined ? {} : { split };
 }

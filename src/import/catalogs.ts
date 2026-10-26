@@ -49,18 +49,31 @@ const schema = "https://inlang.com/schema/inlang-message-format";
  * A catalog for each configured locale, the base locale's keys in their order first. A locale's
  * catalog leaves out a key it takes from its fallbacks, as compiling does, so it keeps taking it. A
  * key that some locale cannot convert, or lacks with no fallback that has it, is left out of every
- * locale, with the reasons, so the catalogs compile.
+ * locale, with the reasons, so the catalogs compile. Every key goes in a locale's first
+ * file, as a new key does, and a locale's other files are written without messages.
  */
 export function catalogsOf(
 	messages: MessagesByLocale,
 	config: Config,
 ): ImportedCatalogs {
-	const imported: ImportedCatalogs = {
-		files: [...config.catalogs].map(([locale, path]) => ({
+	const firsts = [...config.catalogs].map(
+		([locale, [path]]): CatalogFile => ({
 			locale,
 			path,
 			catalog: new Map([["$schema", schema]]),
-		})),
+		}),
+	);
+	const others = [...config.catalogs].flatMap(([locale, [, ...paths]]) =>
+		paths.map(
+			(path): CatalogFile => ({
+				locale,
+				path,
+				catalog: new Map([["$schema", schema]]),
+			}),
+		),
+	);
+	const imported: ImportedCatalogs = {
+		files: [...firsts, ...others],
 		keys: [],
 		descriptions: new Map(),
 		leftOut: [],
@@ -70,7 +83,7 @@ export function catalogsOf(
 	for (const key of keysInOrder(messages, config.baseLocale)) {
 		const values = valuesOf(key, messages, inherits, imported);
 		if (values === undefined) continue;
-		for (const { locale, catalog } of imported.files) {
+		for (const { locale, catalog } of firsts) {
 			const value = values.get(locale)?.value;
 			if (value !== undefined) catalog.set(key, value);
 		}
