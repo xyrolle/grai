@@ -21,7 +21,8 @@ import { build } from "vite";
 import { grai } from "../src/vite.ts";
 
 /**
- * Each one's budget, in bytes. The runtime's is the design's. An entry's is about a fifth over its
+ * Each one's budget, in bytes. The runtime's is the design's 1 KB, and the 37 B that read a
+ * relative href from the page's URL. An entry's is about a fifth over its
  * size when it was set. The entries that carry the compiler, set with the templates of the output's
  * declarations beside it as files: grai 32,551 B, grai/next/config 34,496 B, grai/vite 45,300 B
  * with its locale script, and with grai/vite's plugin grai/svelte 46,515 B, grai/sveltekit/vite
@@ -31,7 +32,7 @@ import { grai } from "../src/vite.ts";
  * and grai/vue/client 292 B.
  */
 const budgets: Record<string, number> = {
-	runtime: 1024,
+	runtime: 1061,
 	grai: 39_100,
 	"grai/vite": 54_400,
 	"grai/svelte": 55_900,
