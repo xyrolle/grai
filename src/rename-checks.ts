@@ -7,7 +7,11 @@
 import type { FileUses } from "./call-sites.ts";
 import { dynamicReadsIn } from "./dynamic-reads.ts";
 import { GraiError } from "./error.ts";
-import { messageBindings, namespaceNames } from "./message-imports.ts";
+import {
+	messageBindings,
+	namespaceNames,
+	projectNamespaces,
+} from "./message-imports.ts";
 import { redeclarations } from "./redeclarations.ts";
 import {
 	escapedNames,
@@ -50,17 +54,19 @@ export function escapeProblems(
 	files: readonly SourceFile[],
 	from: string,
 ): GraiError[] {
-	return files.flatMap((source) =>
-		escapedNames(source.code)
-			.filter(({ name }) => name === from)
-			.map(({ at }) =>
-				placed(
-					source,
-					at,
-					`it writes ${from} with an escape, which the rename cannot change safely. Write it plainly, or rename it by hand.`,
+	return files
+		.filter(({ text }) => text.includes("\\u"))
+		.flatMap((source) =>
+			escapedNames(source.code)
+				.filter(({ name }) => name === from)
+				.map(({ at }) =>
+					placed(
+						source,
+						at,
+						`it writes ${from} with an escape, which the rename cannot change safely. Write it plainly, or rename it by hand.`,
+					),
 				),
-			),
-	);
+		);
 }
 
 /** An error for each read by a computed name in the files that may reach the key. */
@@ -68,7 +74,7 @@ export function reachProblems(
 	files: readonly SourceFile[],
 	from: string,
 ): GraiError[] {
-	const namespaces = namespaceNames(files.map(({ code }) => code));
+	const namespaces = projectNamespaces(files);
 	return files.flatMap((source) =>
 		dynamicReadsIn(source.code, messageBindings(source.code, namespaces))
 			.filter(({ prefix }) => from.startsWith(prefix))

@@ -1,4 +1,4 @@
-import { before, nameEndingAt } from "./sources.ts";
+import { before, nameEndingAt, type SourceFile } from "./sources.ts";
 
 /** A module of the output, by its import path: `messages.js` (`m`), `keys.js`, one key's path, or another. */
 type MessageModule =
@@ -76,6 +76,21 @@ export function namespaceNames(texts: Iterable<string>): Set<string> {
 		}
 	}
 	return names;
+}
+
+/** The names a namespace goes by in a project's files, read from the code of those that may rename it. */
+export function projectNamespaces(files: readonly SourceFile[]): Set<string> {
+	return namespaceNames(
+		files.filter(mayRenameNamespace).map(({ code }) => code),
+	);
+}
+
+/**
+ * Whether a file may export the namespace under another name: its text writes `export`, `m` and
+ * `as`, as every file whose code writes `export { m as t }` does.
+ */
+export function mayRenameNamespace({ text }: SourceFile): boolean {
+	return /\bexport\b/.test(text) && /\bm\b/.test(text) && /\bas\b/.test(text);
 }
 
 /**

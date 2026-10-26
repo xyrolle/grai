@@ -11,7 +11,7 @@ import { GraiError } from "./error.ts";
 import {
 	type MessageBindings,
 	messageBindings,
-	namespaceNames,
+	projectNamespaces,
 	statementAt,
 } from "./message-imports.ts";
 import { redeclarations } from "./redeclarations.ts";
@@ -51,7 +51,7 @@ export function missingKeyCalls(
 	keys: ReadonlySet<string>,
 	config: Config,
 ): { errors: GraiError[]; unchecked: Unchecked[] } {
-	const namespaces = namespaceNames(files.map(({ code }) => code));
+	const namespaces = projectNamespaces(files);
 	const texts = config.locales.map((locale) => `--${locale} "…"`).join(" ");
 	const isKeys = keysFileOf(config);
 	const unchecked: Unchecked[] = [];
