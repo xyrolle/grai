@@ -9,9 +9,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, onTestFinished } from "vitest";
+import { compileCatalogs } from "../src/compilation.ts";
+import { parseCatalogs, readProject } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { type CompileResult, compile } from "../src/index.ts";
 import { readManifest } from "../src/manifest.ts";
+import { unrecordedCalls } from "./recorded-names.ts";
 
 /**
  * A temporary project of catalogs by locale, the first locale its base, each laid out one entry
@@ -86,9 +89,9 @@ export function project(
 	return {
 		dir,
 		config: file,
-		compile: () => compile(file),
+		compile: () => checkedCompile(file),
 		load: async () => {
-			const result = await compile(file);
+			const result = await checkedCompile(file);
 			expect(result.errors.map((error) => error.message)).toEqual([]);
 			const url = (name: string) => pathToFileURL(join(dir, "out", name)).href;
 			return {
@@ -97,6 +100,23 @@ export function project(
 			};
 		},
 	};
+}
+
+/**
+ * Compiles, and when the catalogs compile, checks that each key's code calls only the names it
+ * records, so that every test's catalog checks the invariant a key's own binding rests on.
+ */
+async function checkedCompile(config: string): Promise<CompileResult> {
+	const result = await compile(config);
+	if (result.errors.length > 0) return result;
+	// Compiled again in memory, so that the check writes nothing a test may look at.
+	const read = await readProject(config);
+	if ("errors" in read) return result;
+	const { catalogs, errors } = parseCatalogs(read.sources);
+	if (errors.length > 0) return result;
+	const { keys } = compileCatalogs(read.config, catalogs);
+	expect(unrecordedCalls(keys)).toEqual([]);
+	return result;
 }
 
 /** Compiles and returns each error's code and message, in the order reported. */
