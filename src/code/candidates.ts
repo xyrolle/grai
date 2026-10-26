@@ -26,10 +26,11 @@ export type Package = { name: string; directory: string };
 
 /**
  * What may spell a specifier the text does not write as it is: an escape in a string (`\u`, `\x`,
- * an octal one or a line continuation), and a load or a glob, whose path may be built at run time.
+ * an octal one or a line continuation); a load whose argument is anything but one whole string,
+ * as a template or a sum of strings builds its path at run time; and a glob.
  */
 const unwritten =
-	/\\(?:u|x|[0-7]|\r|\n)|\b(?:import|require)\s*(?:\(|\/[*/])|\bglob\s*(?:\(|<|\/[*/])/;
+	/\\(?:u|x|[0-7]|\r|\n)|\b(?:import|require)\s*(?:\/[*/]|\((?!\s*(?:'[^'\n]*'|"[^"\n]*")\s*\)))|\bglob\s*(?:\(|<|\/[*/])/;
 
 /** The test a file's text must pass to be read, from the names that may name a destination. */
 export function textTest(names: ReadonlySet<string>): RegExp {
