@@ -338,6 +338,7 @@ for (const app of selectedApps()) {
 		app: app.name,
 		locale,
 		keys: { server: keys.server.length, client: keys.client.length },
+		edits: EDITS,
 		chromium: browser.version(),
 	});
 }
