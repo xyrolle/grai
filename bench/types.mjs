@@ -3,7 +3,7 @@
 // the locale's JSON (`CustomTypeOptions`), and use-intl's, inferred from the messages it is
 // given. `tsc --noEmit` with TypeScript 7, median of three, and the editor's completion after
 // `m.` or inside `t("`, from TypeScript 6's language service, which tsserver runs: the first
-// request, which checks the program, and the next.
+// request, which checks the program, and the next, each a median of three new language services.
 //   node types.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -15,14 +15,23 @@ import { graiSource, writeGraiProject } from "./grai.mjs";
 import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput, resolveTypeScript6 } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 const CALLS = 500;
+const RUNS = 3;
 const require = createRequire(import.meta.url);
 const ts6 = require("typescript6");
 const tsc7 = join(
 	new URL(".", import.meta.url).pathname,
 	"node_modules/.bin/tsc",
 );
+
+/** TypeScript 7's version, as its tsc prints it. */
+const ts7Version = () =>
+	execFileSync(tsc7, ["--version"], { encoding: "utf8" })
+		.trim()
+		.split(" ")
+		.at(-1);
 
 const compilerOptions = {
 	target: "es2024",
@@ -131,6 +140,7 @@ const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 for (const app of selectedApps()) {
+	const recorded = [];
 	const projects = await writeProjects(app);
 	console.log(`\n### ${app.name}: type checking ${CALLS} message calls, ms\n`);
 	console.log(
@@ -138,7 +148,7 @@ for (const app of selectedApps()) {
 	);
 	console.log("|---|---|---|---|---|");
 	for (const project of projects) {
-		const runs = Array.from({ length: 3 }, () => {
+		const runs = Array.from({ length: RUNS }, () => {
 			const start = performance.now();
 			execFileSync(
 				tsc7,
@@ -147,9 +157,22 @@ for (const app of selectedApps()) {
 			);
 			return performance.now() - start;
 		});
-		const done = completion(project);
+		const completions = Array.from({ length: RUNS }, () => completion(project));
+		const done = {
+			tsc: median(runs),
+			first: median(completions.map((each) => each.first)),
+			next: median(completions.map((each) => each.next)),
+			entries: completions[0].entries,
+		};
 		console.log(
-			`| ${project.title} | ${median(runs).toFixed(0)} | ${done.first.toFixed(0)} | ${done.next.toFixed(0)} | ${done.entries} |`,
+			`| ${project.title} | ${done.tsc.toFixed(0)} | ${done.first.toFixed(0)} | ${done.next.toFixed(0)} | ${done.entries} |`,
 		);
+		recorded.push({ library: project.title, ...done });
 	}
+	recordResults(`types-${app.id}`, recorded, {
+		app: app.name,
+		calls: CALLS,
+		runs: RUNS,
+		typescript: { tsc: ts7Version(), languageService: ts6.version },
+	});
 }
