@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { build } from "vite";
 import { selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, writeGraiProject } from "./grai.mjs";
 import { inWorkerd } from "./startup-workerd.mjs";
 
 const PAGES = 64;
@@ -68,7 +68,7 @@ async function builtPages(app) {
 			input[`page${index}`] = file;
 		},
 	);
-	const { grai } = await import(join(graiSource, "vite.ts"));
+	const { grai } = await import(graiEntry("./vite"));
 	const outDir = join(root, "server");
 	rmSync(outDir, { recursive: true, force: true });
 	await build({

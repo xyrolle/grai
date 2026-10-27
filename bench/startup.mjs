@@ -13,7 +13,7 @@ import { rolldown } from "rolldown";
 import { build } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, writeGraiProject } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
@@ -89,7 +89,7 @@ async function bundled(app, name, entry, mode, callsFile) {
 
 /** Every key of a compiled project as grai's Vite plugin builds them for a server. */
 async function viteServerBuild(config) {
-	const { grai } = await import(join(graiSource, "vite.ts"));
+	const { grai } = await import(graiEntry("./vite"));
 	const root = dirname(config);
 	const entry = join(root, "server-entry.js");
 	writeFileSync(entry, `export * from "./out/keys.js";\n`);
@@ -126,7 +126,7 @@ async function benchApp(app) {
 	);
 	const prototype = writePrototype(app);
 	const config = writeGraiProject(app, "startup");
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	await compile(config);
 	const rows = [
 		[

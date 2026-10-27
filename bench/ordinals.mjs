@@ -8,13 +8,13 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { rolldown } from "rolldown";
 import { cacheDir, selectedApps } from "./apps.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiModule } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { recordResults } from "./results.mjs";
 
 const locales = ["ro", "ru", "en"];
-const { pluralModule, pluralName } = await import(`${graiSource}plurals.ts`);
+const { pluralModule, pluralName } = await import(graiModule("plurals.ts"));
 const directory = join(cacheDir, "ordinals");
 mkdirSync(directory, { recursive: true });
 const plurals = join(directory, "plurals.js");

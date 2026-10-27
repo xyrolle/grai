@@ -1,12 +1,78 @@
-// grai's own compiler, from this repository's source, on an app's catalogs: a project under
-// .cache with a copy of the catalogs, so benches may edit them, and the app's strategy, so that
-// grai's middleware resolves a request's locale as the app's server does. `graiServerBuild` is the
-// output as grai's Vite plugin builds it for a server.
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+// grai as the benches reach it, from this one place: the package as published, this repository's
+// build (`dist`, which `pnpm build` writes), its entries where package.json's `exports` and `bin`
+// map them, and its other modules beside them. A bench that times grai's own code running would
+// otherwise charge it Node's stripping of TypeScript as each module of the source loads, which no
+// app pays. A bench refuses to run on a build older than the source.
+//
+// On an app's catalogs grai compiles a project under .cache with a copy of the catalogs, so
+// benches may edit them, and the app's strategy, so that grai's middleware resolves a request's
+// locale as the app's server does. `graiServerBuild` is the output as grai's Vite plugin builds it
+// for a server.
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { cacheDir } from "./apps.mjs";
 
-export const graiSource = new URL("../src/", import.meta.url).pathname;
+const repository = new URL("../", import.meta.url).pathname;
+const manifest = JSON.parse(
+	readFileSync(join(repository, "package.json"), "utf8"),
+);
+
+/** The modification times of every file under a directory, none when it is missing. */
+function modified(directory) {
+	if (!existsSync(directory)) return [];
+	return readdirSync(directory, { recursive: true, withFileTypes: true })
+		.filter((entry) => entry.isFile())
+		.map((entry) => statSync(join(entry.parentPath, entry.name)).mtimeMs);
+}
+
+/** Refuses a build that is missing, or that has a file older than a file of the source. */
+function assertBuilt() {
+	const build = modified(join(repository, "dist"));
+	const source = modified(join(repository, "src"));
+	if (build.length === 0 || Math.max(...source) > Math.min(...build))
+		throw new Error(
+			"grai's build is missing or older than its source: run pnpm build in the repository first.",
+		);
+}
+assertBuilt();
+
+/** An entry of the package by its path in `exports`, such as "." or "./vite", as an app imports it. */
+export function graiEntry(path) {
+	const target = manifest.exports[path]?.default;
+	if (target === undefined)
+		throw new Error(`grai's package exports no ${JSON.stringify(path)}.`);
+	return join(repository, target);
+}
+
+/**
+ * A module of the build the package does not export, by its source's name, such as "compile.ts":
+ * for a bench of the compiler's own parts.
+ */
+export function graiModule(source) {
+	return join(repository, "dist", source.replace(/\.ts$/, ".js"));
+}
+
+/** grai's CLI, as the package's `bin` names it. */
+export const graiCli = join(repository, manifest.bin.grai);
+
+/**
+ * The Vite grai's build imports, from the repository's node_modules. An app has one Vite: grai's
+ * plugin tells a server environment it can patch in place by Vite's own class, so a server made by
+ * another copy of Vite would have its messages taken again on every edit.
+ */
+export const graiVite = join(
+	repository,
+	"node_modules/vite/dist/node/index.js",
+);
 
 /** The strategies grai has; an app's custom ones are left out, and the base locale is grai's last resort. */
 const strategies = new Set(["cookie", "preferredLanguage", "url"]);
@@ -45,7 +111,7 @@ export function graiOutput(app) {
 
 async function compileOutput(app) {
 	const config = writeGraiProject(app, "grai-output");
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	const { errors } = await compile(config);
 	if (errors.length > 0)
 		throw new Error(errors.map((error) => error.message).join("\n"));
@@ -66,7 +132,7 @@ export function graiServerBuild(app) {
 
 async function serverBuild(app) {
 	const { config, outdir } = await graiOutput(app);
-	const { grai } = await import(join(graiSource, "vite.ts"));
+	const { grai } = await import(graiEntry("./vite"));
 	const { build } = await import("vite");
 	const directory = join(dirname(config), "server");
 	await build({

@@ -11,7 +11,7 @@ import { createRequire } from "node:module";
 import { join, relative } from "node:path";
 import { selectedApps } from "./apps.mjs";
 import { sampleCalls, takesInputs } from "./calls.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, writeGraiProject } from "./grai.mjs";
 import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput, resolveTypeScript6 } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
@@ -49,7 +49,7 @@ const compilerOptions = {
 async function writeProjects(app) {
 	const config = writeGraiProject(app, "types");
 	const directory = join(config, "..");
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	await compile(config);
 	resolveTypeScript6();
 	const paraglide = await paraglideOutput(app, { emitTsDeclarations: true });

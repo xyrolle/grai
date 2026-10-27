@@ -19,14 +19,14 @@ import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
 import { build } from "vite";
 import { selectedApps } from "./apps.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, graiModule, writeGraiProject } from "./grai.mjs";
 import { PAGE_CALLS, pageProps, pageSource } from "./page.mjs";
 import { otherLocale } from "./request.mjs";
 import { stringsAfterCompile } from "./strings-after-compile.mjs";
 
-const { grai: graiVite } = await import(join(graiSource, "vite.ts"));
-const { grai: graiSvelte } = await import(join(graiSource, "svelte.ts"));
-const { recompile } = await import(join(graiSource, "compile.ts"));
+const { grai: graiVite } = await import(graiEntry("./vite"));
+const { grai: graiSvelte } = await import(graiEntry("./svelte"));
+const { recompile } = await import(graiModule("compile.ts"));
 
 const RUNS = 15;
 const THROTTLING = [1, 4];
