@@ -1,10 +1,11 @@
 // The catalogs every bench runs on. Two real apps' catalogs are read in place from the checkouts
 // named by GRAI_BENCH_A and GRAI_BENCH_B, and never copied here; GRAI_BENCH_A_STRATEGY (or _B_)
 // gives that app's Paraglide strategy, comma-separated. The synthetic catalog has app A's shape
-// and needs nothing, so anyone can run every bench.
+// and needs nothing, so anyone can run every bench; `synthetic-<keys>`, such as synthetic-13326 for
+// app B's size, has as many keys in the same shares.
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { writeSyntheticProject } from "./synthetic.mjs";
+import { KEYS, writeSyntheticProject } from "./synthetic.mjs";
 
 export const cacheDir = new URL(".cache/", import.meta.url).pathname;
 
@@ -16,11 +17,19 @@ const roots = {
 	synthetic: undefined,
 };
 
+/** The number of keys a synthetic app's name gives: `synthetic` app A's, `synthetic-<keys>` its own. */
+function syntheticKeys(name) {
+	if (name === "synthetic") return KEYS;
+	const keys = /^synthetic-(\d+)$/.exec(name)?.[1];
+	return keys === undefined ? undefined : Number(keys);
+}
+
 function loadApp(name) {
+	const keys = syntheticKeys(name);
 	const root =
-		name === "synthetic"
-			? writeSyntheticProject(join(cacheDir, "synthetic"))
-			: roots[name];
+		keys === undefined
+			? roots[name]
+			: writeSyntheticProject(join(cacheDir, name), keys);
 	const settings = JSON.parse(
 		readFileSync(join(root, "project.inlang/settings.json"), "utf8"),
 	);
@@ -38,7 +47,10 @@ function loadApp(name) {
 		process.env[`GRAI_BENCH_${name.toUpperCase()}_STRATEGY`] ?? DEFAULT_STRATEGY
 	).split(",");
 	return {
-		name: name === "synthetic" ? name : `app ${name.toUpperCase()}`,
+		name:
+			keys === undefined
+				? `app ${name.toUpperCase()}`
+				: `synthetic, ${keys.toLocaleString("en")} keys`,
 		id: name,
 		root,
 		baseLocale: settings.baseLocale,
@@ -59,11 +71,12 @@ export function selectedApps(argv = process.argv.slice(2)) {
 					(name) => name === "synthetic" || roots[name],
 				);
 	for (const name of chosen) {
+		if (syntheticKeys(name) !== undefined) continue;
 		if (!(name in roots))
 			throw new Error(
 				`Unknown app ${JSON.stringify(name)}: use ${Object.keys(roots).join(", ")}.`,
 			);
-		if (name !== "synthetic" && !roots[name])
+		if (!roots[name])
 			throw new Error(
 				`Set GRAI_BENCH_${name.toUpperCase()} to the app's checkout to bench its catalogs.`,
 			);

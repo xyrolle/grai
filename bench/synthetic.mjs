@@ -1,10 +1,11 @@
 // A catalog with app A's shape, for anyone without the apps' checkouts: 6,366 keys in ro, ru and
 // en, of which 1,294 have inputs, 240 are plurals and 226 hold markup, with words of about the
-// same length. The same seed always writes the same files.
+// same length. Another size keeps those shares, as 13,326 keys gives app B's size. The same seed
+// always writes the same files.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const KEYS = 6366;
+export const KEYS = 6366;
 const WITH_INPUTS = 1294;
 const PLURALS = 240;
 const WITH_MARKUP = 226;
@@ -58,15 +59,19 @@ function sentence(random, locale, words) {
 	return parts.join(" ");
 }
 
-function catalog(locale) {
+function catalog(locale, keys) {
 	const random = generator(7);
+	const share = (count) => Math.round((count * keys) / KEYS);
+	const plurals = share(PLURALS);
+	const withInputs = share(WITH_INPUTS);
+	const withMarkup = share(WITH_MARKUP);
 	const entries = {
 		$schema: "https://inlang.com/schema/inlang-message-format",
 	};
-	for (let n = 0; n < KEYS; n++) {
+	for (let n = 0; n < keys; n++) {
 		const key = `area${n % 97}_part${n % 13}_message${n}`;
 		const words = 3 + Math.floor(random() * 6);
-		if (n < PLURALS) {
+		if (n < plurals) {
 			const match = {};
 			for (const category of categories[locale])
 				match[`countPlural=${category}`] =
@@ -78,9 +83,9 @@ function catalog(locale) {
 					match,
 				},
 			];
-		} else if (n < PLURALS + WITH_INPUTS) {
+		} else if (n < plurals + withInputs) {
 			entries[key] = `${sentence(random, locale, words)} {name}`;
-		} else if (n < PLURALS + WITH_INPUTS + WITH_MARKUP) {
+		} else if (n < plurals + withInputs + withMarkup) {
 			// As app A holds it: mostly an element the app draws in the text's place, some a link.
 			entries[key] =
 				n % 4 === 0
@@ -99,14 +104,14 @@ function keep(path, content) {
 		writeFileSync(path, content);
 }
 
-/** Writes the synthetic inlang project, as this file describes it, and returns its root. */
-export function writeSyntheticProject(root) {
+/** Writes the synthetic inlang project of `keys` keys, as this file describes it, and returns its root. */
+export function writeSyntheticProject(root, keys = KEYS) {
 	mkdirSync(join(root, "messages"), { recursive: true });
 	mkdirSync(join(root, "project.inlang"), { recursive: true });
 	for (const locale of Object.keys(categories)) {
 		keep(
 			join(root, "messages", `${locale}.json`),
-			`${JSON.stringify(catalog(locale), null, "\t")}\n`,
+			`${JSON.stringify(catalog(locale, keys), null, "\t")}\n`,
 		);
 	}
 	const settings = {
