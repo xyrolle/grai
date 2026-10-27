@@ -49,3 +49,14 @@ export async function readingIn(
 		reads: reads.map(({ path, key }) => `${relative(dir, path)} ${key}`).sort(),
 	};
 }
+
+/** The imports of the output a project's reading finds unresolved, each by file and specifier. */
+export async function unresolvedIn(dir: string): Promise<string[]> {
+	const config = readConfig(join(dir, "grai.config.json"));
+	const code = await readProjectCode(config, [join(dir, "src")]);
+	if (code instanceof GraiError) throw code;
+	const { unresolved } = await readingOf(code);
+	return unresolved
+		.map(({ path, specifier }) => `${relative(dir, path)} ${specifier}`)
+		.sort();
+}

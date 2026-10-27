@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { namesOf, textTest } from "../src/code/candidates.ts";
-import { projectWith, readingIn } from "./reading.ts";
+import { projectWith, readingIn, unresolvedIn } from "./reading.ts";
 
 const outdir = "/p/src/lib/grai";
 
@@ -123,6 +123,18 @@ describe("a reading of the files that may read grai's messages", () => {
 			read: ["src/a.ts", "src/labels.ts"],
 			reads: ["src/a.ts title"],
 		});
+	});
+
+	it("reads a file that imports a key's path nothing resolves, whose reads are unknown, whatever names it", async () => {
+		const dir = projectWith({
+			"src/a.ts":
+				'import { title } from "./old/messages/title.js";\ntitle();\n',
+			"src/d.ts": "export const d = 1;\n",
+		});
+
+		expect(await unresolvedIn(dir)).toEqual([
+			"src/a.ts ./old/messages/title.js",
+		]);
 	});
 
 	it("reads a file that names the output by a Vite alias, a tsconfig path or a package.json import", async () => {
