@@ -2,7 +2,7 @@
 // files of its route segments that render around it, each layout, template, loading and error UI
 // from the app's root down, and the proxy compiles on its own.
 import { existsSync, readdirSync } from "node:fs";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 
 /** What Next compiles together: a route's page or handler and its segments' files, or the proxy. */
 export type Route = { files: readonly string[] };
@@ -49,9 +49,7 @@ export function nextRoutes(
 		entriesOf(directory)
 			.filter(
 				(entry) =>
-					entry.isFile() &&
-					extensions.includes(extname(entry.name).slice(1)) &&
-					names.has(entry.name.slice(0, -extname(entry.name).length)),
+					entry.isFile() && names.has(baseName(entry.name, extensions)),
 			)
 			.map((entry) => join(directory, entry.name));
 	const app = [join(root, "app"), join(root, "src", "app")].find((each) =>
@@ -74,6 +72,17 @@ export function nextRoutes(
 	const proxy = named(beside, proxyNames);
 	if (proxy.length > 0) routes.push({ files: proxy });
 	return routes;
+}
+
+/**
+ * A file's name without the longest page extension it ends in: `page` for `page.tsx`, and for
+ * `page.page.tsx` under Next's `pageExtensions: ["page.tsx"]`; empty for one that ends in none.
+ */
+function baseName(name: string, extensions: readonly string[]): string {
+	const extension = [...extensions]
+		.sort((a, b) => b.length - a.length)
+		.find((each) => name.endsWith(`.${each}`));
+	return extension === undefined ? "" : name.slice(0, -(extension.length + 1));
 }
 
 /** A directory's entries, by name, so that the routes come in the same order on every system. */
