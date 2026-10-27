@@ -14,6 +14,7 @@
 // - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
 //   is complete, COLD_ROUNDS times for each app, the apps taking turns, so the load from other work
 //   weighs on both alike.
+// Every first response is checked to list each of the page's messages.
 import { spawnSync } from "node:child_process";
 import {
 	readdirSync,
@@ -189,7 +190,7 @@ const browser = await chromium.launch();
 for (const app of selectedApps()) {
 	const locale = app.locales.find((other) => other !== app.baseLocale);
 	const path = `/${locale}`;
-	const { keys, apps } = await writeNextApps(app, locale);
+	const { keys, words, apps } = await writeNextApps(app, locale);
 	console.log(
 		`\n### ${app.name}: a page of ${keys.server.length} messages in a server component and ${keys.client.length} in a client component, in ${locale}; Next ${nextVersion}, Turbopack, Chromium ${browser.version()}\n`,
 	);
@@ -223,7 +224,7 @@ for (const app of selectedApps()) {
 	console.log("|---|---|---|---|---|---|---|");
 	for (const name of ["grai", "next-intl"]) {
 		const root = apps[name];
-		const empty = await devStart(root, path, { empty: true });
+		const empty = await devStart(root, path, words, { empty: true });
 		const catalogFile = join(root, "messages", `${locale}.json`);
 		const outdir = name === "grai" ? join(root, "src/i18n") : undefined;
 		const edits = {};
@@ -238,7 +239,7 @@ for (const app of selectedApps()) {
 			);
 		}
 		await stopServer(empty.server.child);
-		const kept = await devStart(root, path, { empty: false });
+		const kept = await devStart(root, path, words, { empty: false });
 		await stopServer(kept.server.child);
 		const edit = ({ shown, written }) =>
 			written === undefined
@@ -264,7 +265,7 @@ for (const app of selectedApps()) {
 		const order =
 			round % 2 === 0 ? ["grai", "next-intl"] : ["next-intl", "grai"];
 		for (const name of order) {
-			const run = await devStart(apps[name], path, { empty: true });
+			const run = await devStart(apps[name], path, words, { empty: true });
 			await stopServer(run.server.child);
 			runs[name].push({ ready: run.ready, page: run.page });
 		}
