@@ -121,6 +121,7 @@ The compiler writes these modules, with their declarations, into `outdir`.
 ### `keys.js`
 
 - Every message as a named export, `export const key: Message<…>`. Per-key import paths map to this file, as in `"#i18n/messages/*": "./src/lib/i18n/keys.js"` in `package.json`'s `imports`.
+- A key's path names its key by its last segment, case and all, `…/messages/<key>.js`, and its import names that key: `import { title } from "#i18n/messages/title.js"`. A tool that walks an app's imports reads the key there, as grai's resolvers do.
 
 ### `runtime.js`
 
