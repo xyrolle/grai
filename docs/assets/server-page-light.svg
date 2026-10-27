@@ -17,15 +17,15 @@
 <text x="388" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">5,000</text>
 <text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
 <path d="M99,74H99A3.3,3.3 0 0 1 102.3,77.3V84.7A3.3,3.3 0 0 1 99,88H99Z" fill="#2a78d6"/>
-<text x="108.3" y="86" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">57 ns</text>
+<text x="108.3" y="86" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">57 ns</text>
 <text x="89" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
 <path d="M99,106H102.3A4,4 0 0 1 106.3,110V116A4,4 0 0 1 102.3,120H99Z" fill="#898781"/>
-<text x="112.3" y="118" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">126 ns</text>
+<text x="112.3" y="118" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">126 ns</text>
 <text x="89" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
 <path d="M99,138H244.4A4,4 0 0 1 248.4,142V148A4,4 0 0 1 244.4,152H99Z" fill="#898781"/>
-<text x="254.4" y="150" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">2,584 ns</text>
+<text x="254.4" y="150" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2,584 ns</text>
 <text x="89" y="182" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
 <path d="M99,170H362.4A4,4 0 0 1 366.4,174V180A4,4 0 0 1 362.4,184H99Z" fill="#898781"/>
-<text x="372.4" y="182" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">4,627 ns</text>
+<text x="372.4" y="182" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4,627 ns</text>
 <text x="388" y="234" font-size="12" text-anchor="end" fill="#52514e">nanoseconds a call</text>
 </svg>

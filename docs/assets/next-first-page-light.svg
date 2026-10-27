@@ -14,9 +14,9 @@
 <text x="388" y="167" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,500</text>
 <text x="89" y="103" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl</text>
 <path d="M99,91H326.3A4,4 0 0 1 330.3,95V101A4,4 0 0 1 326.3,105H99Z" fill="#898781"/>
-<text x="336.3" y="103" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">1.20 s</text>
+<text x="336.3" y="103" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">1.20 s</text>
 <text x="89" y="135" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
 <path d="M99,123H367.5A4,4 0 0 1 371.5,127V133A4,4 0 0 1 367.5,137H99Z" fill="#2a78d6"/>
-<text x="377.5" y="135" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">1.41 s</text>
+<text x="377.5" y="135" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">1.41 s</text>
 <text x="388" y="187" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>

@@ -15,30 +15,30 @@
 <text x="16" y="100" font-size="13" font-weight="600" fill="#c3c2b7">grai check</text>
 <text x="112" y="131" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
 <path d="M122,119H333.2A4,4 0 0 1 337.2,123V129A4,4 0 0 1 333.2,133H122Z" fill="#3987e5"/>
-<text x="343.2" y="131" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">2.43 s</text>
+<text x="343.2" y="131" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.43 s</text>
 <text x="112" y="163" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
 <path d="M122,151H162.6A4,4 0 0 1 166.6,155V161A4,4 0 0 1 162.6,165H122Z" fill="#3987e5"/>
-<text x="172.6" y="163" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.50 s</text>
+<text x="172.6" y="163" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.50 s</text>
 <text x="16" y="192" font-size="13" font-weight="600" fill="#c3c2b7">grai check --fix</text>
 <text x="112" y="223" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
 <path d="M122,211H322.8A4,4 0 0 1 326.8,215V221A4,4 0 0 1 322.8,225H122Z" fill="#3987e5"/>
-<text x="332.8" y="223" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">2.31 s</text>
+<text x="332.8" y="223" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.31 s</text>
 <text x="112" y="255" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
 <path d="M122,243H165.4A4,4 0 0 1 169.4,247V253A4,4 0 0 1 165.4,257H122Z" fill="#3987e5"/>
-<text x="175.4" y="255" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.54 s</text>
+<text x="175.4" y="255" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.54 s</text>
 <text x="16" y="284" font-size="13" font-weight="600" fill="#c3c2b7">grai find</text>
 <text x="112" y="315" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
 <path d="M122,303H364.6A4,4 0 0 1 368.6,307V313A4,4 0 0 1 364.6,317H122Z" fill="#3987e5"/>
-<text x="374.6" y="315" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">2.78 s</text>
+<text x="374.6" y="315" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.78 s</text>
 <text x="112" y="347" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
 <path d="M122,335H159.4A4,4 0 0 1 163.4,339V345A4,4 0 0 1 159.4,349H122Z" fill="#3987e5"/>
-<text x="169.4" y="347" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.47 s</text>
+<text x="169.4" y="347" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.47 s</text>
 <text x="16" y="376" font-size="13" font-weight="600" fill="#c3c2b7">grai rename</text>
 <text x="112" y="407" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
 <path d="M122,395H370.4A4,4 0 0 1 374.4,399V405A4,4 0 0 1 370.4,409H122Z" fill="#3987e5"/>
-<text x="380.4" y="407" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">2.85 s</text>
+<text x="380.4" y="407" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.85 s</text>
 <text x="112" y="439" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
 <path d="M122,427H168.9A4,4 0 0 1 172.9,431V437A4,4 0 0 1 168.9,441H122Z" fill="#3987e5"/>
-<text x="178.9" y="439" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.57 s</text>
+<text x="178.9" y="439" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.57 s</text>
 <text x="388" y="491" font-size="12" text-anchor="end" fill="#c3c2b7">seconds</text>
 </svg>
