@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { namesOf, textTest } from "../src/code/candidates.ts";
+import { keyPath, namesOf, textTest } from "../src/code/candidates.ts";
 import { projectWith, readingIn, unresolvedIn } from "./reading.ts";
 
 const outdir = "/p/src/lib/grai";
@@ -19,7 +19,7 @@ describe("the names a specifier of grai's output must write", () => {
 		const barrels = new Set(["/p/src/lib/i18n.ts", "/p/src/locale/index.ts"]);
 
 		expect(namesOf({ outdir, barrels }, [], [], [])).toEqual(
-			new Set(["grai", "i18n", "locale"]),
+			new Set(["grai", keyPath, "i18n", "locale"]),
 		);
 	});
 
@@ -41,7 +41,7 @@ describe("the names a specifier of grai's output must write", () => {
 		);
 
 		expect(names).toEqual(
-			new Set(["grai", "@i18n", "#k/", "@g/", "#pkg", "@t/", "@s/"]),
+			new Set(["grai", keyPath, "@i18n", "#k/", "@g/", "#pkg", "@t/", "@s/"]),
 		);
 	});
 
@@ -67,7 +67,7 @@ describe("the names a specifier of grai's output must write", () => {
 			],
 		);
 
-		expect(names).toEqual(new Set(["grai", "i18n", "@app/web"]));
+		expect(names).toEqual(new Set(["grai", keyPath, "i18n", "@app/web"]));
 	});
 
 	it("takes a text that writes a name, an escape in a specifier, a comment where one may be, or a load or a glob by a built path, and no load by a whole string", () => {
