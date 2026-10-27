@@ -213,6 +213,20 @@ describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
 		);
 	}
 
+	it("loads each page's locale's words alone, the locale the server drew it in", async () => {
+		const fetched: string[] = [];
+		page.on("request", (request) =>
+			fetched.push(new URL(request.url()).pathname),
+		);
+		await openIn(origin, "ro");
+
+		expect(await page.locator("html").getAttribute("lang")).toBe("ro");
+		expect(fetched.filter((path) => path.includes("grai:keys"))).toEqual([
+			"/@id/__x00__grai:keys/ro",
+		]);
+		expect(logged).toEqual([]);
+	});
+
 	it("renders an edited message again in place, keeping the page's state, and hydrates without a mismatch", async () => {
 		await openIn(origin, "ro");
 		await page.getByRole("button", { name: "Adaugă un produs" }).click();
@@ -226,5 +240,29 @@ describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
 		expect(await page.evaluate(() => "unreloaded" in globalThis)).toBe(true);
 		expect(await text("#cart")).toBe("2 produse în coș");
 		expect(logged).toEqual([]);
+	});
+});
+
+describe("the Vue example under Vite's dev server, a message invalid in a locale no page loads", {
+	timeout: 60_000,
+}, () => {
+	it("serves no page's words, the page's locale's neither", async () => {
+		const file = join(example, "messages/en.json");
+		const catalog = readFileSync(file, "utf8");
+		onTestFinished(() => writeFileSync(file, catalog));
+		writeFileSync(
+			file,
+			JSON.stringify(
+				{ ...JSON.parse(catalog), title: "{$count :weekday}" },
+				null,
+				"\t",
+			),
+		);
+		const app = await served(["--dev"]);
+		onTestFinished(() => stopped(app.server));
+		const response = await fetch(`${app.origin}/@id/__x00__grai:keys/ro`);
+
+		// The example's server answers a module that failed with an empty 500 of its own.
+		expect([response.status, await response.text()]).toEqual([500, ""]);
 	});
 });

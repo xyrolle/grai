@@ -32,6 +32,13 @@ document.body.textContent = m.title();
 window.switchTo = (locale) => setLocale(locale);
 window.keep = (locale) => setLocale(locale, { reload: false });
 window.holds = () => [document.documentElement.lang, getLocale(), m.title()].join(" ");
+window.inEnglish = () => {
+	try {
+		return m.title({}, { locale: "en" });
+	} catch (error) {
+		return error.message;
+	}
+};
 `;
 
 /** A project of one page, with the config's strategy. */
@@ -336,6 +343,122 @@ describe("a page's locale, when no server picks it", () => {
 				`document.documentElement.lang + " " + document.body.textContent`,
 			),
 		).toBe("ro Coșul tău");
+	});
+});
+
+describe("a page the dev server serves", () => {
+	/**
+	 * The dev server of a site, and a browser page in the `language` it prefers, which records the
+	 * paths of the dev modules of keys.js it loads.
+	 */
+	async function devPage(
+		dir: string,
+		language: string,
+		plugins: Plugin[] = grai(),
+	) {
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { port: 0, watch: fixtures },
+			plugins,
+		});
+		await server.listen();
+		onTestFinished(() => server.close());
+		const browser = await chromium.launch();
+		onTestFinished(() => browser.close());
+		const context = await browser.newContext({ locale: language });
+		const tab = await context.newPage();
+		const keys: string[] = [];
+		tab.on("request", (request) => {
+			const { pathname } = new URL(request.url());
+			if (pathname.includes("grai:keys")) keys.push(pathname);
+		});
+		return { origin: server.resolvedUrls?.local[0] ?? "", tab, keys };
+	}
+
+	it("loads its locale's words alone, through the import map its locale script writes", async () => {
+		const { origin, tab, keys } = await devPage(
+			site({ strategy: ["preferredLanguage"] }),
+			"ro-MD",
+		);
+		await tab.goto(origin);
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+		const served = await (
+			await fetch(new URL("@id/__x00__grai:keys/ro", origin))
+		).text();
+
+		expect(await tab.evaluate("window.holds()")).toBe("ro ro Coșul tău");
+		expect(keys).toEqual(["/@id/__x00__grai:keys/ro"]);
+		expect([
+			served.includes("Coșul tău"),
+			served.includes("Your cart"),
+			served.includes("سلتك"),
+		]).toEqual([true, false, false]);
+	});
+
+	it("takes its locale's words alone through keys.js itself, with no import map, by its <html lang>", async () => {
+		const dir = site(
+			{ strategy: ["preferredLanguage"] },
+			page.replace("<html>", '<html lang="ar">'),
+		);
+		const { origin, tab, keys } = await devPage(
+			dir,
+			"ro-MD",
+			graiPlugin({}).plugins,
+		);
+		await tab.goto(origin);
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+
+		expect(await tab.evaluate("window.holds()")).toBe("ar ar سلتك");
+		expect(keys).toEqual(["/@id/__x00__grai:keys", "/@id/__x00__grai:keys/ar"]);
+	});
+
+	it("throws for a call in another locale, naming its key, as a page in its locale's words alone", async () => {
+		const { origin, tab } = await devPage(
+			site({ strategy: ["preferredLanguage"] }),
+			"ro-MD",
+		);
+		await tab.goto(origin);
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+
+		expect(await tab.evaluate("window.inEnglish()")).toBe(
+			'title was called in "en", but this page renders in "ro" alone.',
+		);
+	});
+
+	it("loads the other locale's words alone after setLocale switches to it", async () => {
+		const { origin, tab, keys } = await devPage(
+			site({ strategy: ["cookie", "preferredLanguage"], cookieName: "lang" }),
+			"ro-MD",
+		);
+		await tab.goto(origin);
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+		await Promise.all([
+			tab.waitForEvent("load"),
+			tab.evaluate("window.switchTo('ar')"),
+		]);
+		await tab.waitForFunction(`document.body.textContent !== ""`);
+
+		expect(await tab.evaluate("window.holds()")).toBe("ar ar سلتك");
+		expect(keys).toEqual([
+			"/@id/__x00__grai:keys/ro",
+			"/@id/__x00__grai:keys/ar",
+		]);
+	});
+
+	it("serves no locale's words while a message of a locale the page does not load is invalid", async () => {
+		const dir = site({ strategy: ["preferredLanguage"] });
+		const catalog = join(dir, "messages", "ar.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"سلتك"', '"{$count :weekday}"'),
+		);
+		const { origin } = await devPage(dir, "ro-MD");
+		const response = await fetch(new URL("@id/__x00__grai:keys/ro", origin));
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toContain("ar.json");
 	});
 });
 

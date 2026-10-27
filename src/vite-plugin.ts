@@ -4,7 +4,7 @@ import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import type { BuildReading } from "./code/build-reading.ts";
 import { type Build, recompile } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
-import { devModule } from "./dev-module.ts";
+import { devModule, pageKeysShell } from "./dev-module.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import {
 	isMessageModule,
@@ -14,6 +14,7 @@ import {
 	textPrefix,
 } from "./locale-chunks.ts";
 import { moduleOf } from "./output-paths.ts";
+import { isDevKeys, pageKeysLocale } from "./page-keys.ts";
 import { realPath } from "./real-path.ts";
 import type { Bundling } from "./vite-bundling.ts";
 import {
@@ -99,10 +100,18 @@ export function graiPlugin(
 	let closeMessages = async () => {};
 	/** The plugin's part in a build, which a dev server never runs: loaded as a build's config is. */
 	let bundling: Bundling | undefined;
-	/** keys.js, or a key's module, as the dev server serves them from memory; nothing for any other id. */
-	const devCode = (id: string, compiled: Build) => {
+	/**
+	 * keys.js, a page's in one locale, or a key's module, as the dev server serves them from memory;
+	 * nothing for any other id. A page's keys.js takes its locale's: a server renders any.
+	 */
+	const devCode = (id: string, compiled: Build, page: boolean) => {
 		if (id === devKeysId || id === files.keysFile)
-			return devModule(files.outdir, compiled, patchesMade());
+			return page
+				? pageKeysShell(compiled)
+				: devModule(files.outdir, compiled, patchesMade());
+		const locale = pageKeysLocale(id, compiled.config.locales);
+		if (locale !== undefined)
+			return devModule(files.outdir, compiled, patchesMade(), locale);
 		return id.startsWith(keyModulePrefix)
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
 			: undefined;
@@ -268,7 +277,7 @@ export function graiPlugin(
 			}
 			const served = devModuleOf(id);
 			if (served !== undefined) return served;
-			if (id !== devKeysId && id !== files.keysFile && !isMessageModule(id))
+			if (!isDevKeys(id) && id !== files.keysFile && !isMessageModule(id))
 				return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;
@@ -276,7 +285,7 @@ export function graiPlugin(
 			// Without side effects, a build leaves out every key a chunk's code does not use, so a key
 			// lands in the chunks of the entries that use it.
 			const code = serving
-				? devCode(id, compiled)
+				? devCode(id, compiled, this.environment.config.consumer === "client")
 				: bundling?.moduleCode(id, compiled, this.environment.config.consumer);
 			if (code === undefined) return null;
 			// No source map in dev: the module is the compiler's, with no source of its own to map back

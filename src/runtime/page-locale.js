@@ -73,8 +73,10 @@ export function pickPageLocale({ locales, baseLocale, directions }, readers) {
 /**
  * In a build that copies each message chunk per locale, points the page at its locale's copies:
  * the script's `data-grai-chunks` names the page's chunks, which an import map maps to the copies
- * before any module loads, and the copies the page's entry imports are preloaded. It gives both the
- * script's own nonce, for a page whose Content Security Policy allows scripts by nonce.
+ * before any module loads, and the copies the page's entry imports are preloaded. In dev, it names
+ * keys.js, which the map points at the dev module with the locale's words alone, preloaded. It
+ * gives both the script's own nonce, for a page whose Content Security Policy allows scripts by
+ * nonce.
  */
 export function pointAtCopies() {
 	const script = document.currentScript;
