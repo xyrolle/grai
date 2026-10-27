@@ -109,19 +109,6 @@ A client component's messages ship with every locale's variants: one Next build 
 
 Done when: a Next page's client chunks hold only its locale's variants, with a browser test that it loads no other locale's words.
 
-## Make Next's first compile of a page cheaper
-
-On the bench's page, `next dev`'s first response from an empty `.next` still takes longer with grai than with next-intl (`docs/runtime.md`). What costs is compiling the shards, not calling them. Turbopack's CPU until that response, medians of 7 with the alias written by hand, at a load of 17–18: the page with its words written in and no messages, 3,910 ms; with its 500 messages, 5,250 ms, and with each component calling one message and its others written in, 5,240, as Turbopack compiles all 16 shards, 1.4 MB, in each of the three layers that import keys.js. next-intl's whole page takes 4,220 ms, its catalog being JSON.
-
-Measured and not taken, as each wins on one count and loses on another:
-- **A module per key**, which Turbopack follows from `m.title` to the key's module once a package.json in the outdir says no module but server.js has side effects. Each layer then compiles only the keys it names, but Turbopack spends about 2.5 ms of CPU on each module, one plain function's included, so on the synthetic catalog the page's 600 modules cost what the shards did (1,521 ms against 1,624), while on app B's, twice the keys, they took 1,552 ms against 2,018, next-intl's being 1,452. It writes a file per key, 6,366 more for the synthetic catalog and 0.75 s more on a first compile, Node and a test runner without grai's plugin load keys.js in 785 ms against 45, and `import { m }` reaches every key's module: 7.6 s to the first response.
-- **A shard binding each function its keys call once** (`const text = $text`). Turbopack writes about 130 characters for each reference to an import, so the shards' code in `next dev` drops by 40%, and the CPU to the first response by 300–440 ms on the synthetic catalog and 840 ms on app B's. But Turbopack then puts two shards in a chunk, and an edit to a server component's message showed 20–70 ms later in two windows of three.
-- **A shard's text keys as one JSON table, made into messages by a loop,** as the Vite dev module has them: 5,060 ms against 5,230.
-- **The output under `node_modules`**, which Turbopack builds more cheaply: 1,827 ms against 2,039 in one window, next-intl's being 1,610.
-- Tried, and no better: one keys module, 64 shards, and Turbopack's module fragments (`experimental.turbopackModuleFragments`), 18.5 s.
-
-Done when: a change brings the first compile level with next-intl's, or the design records why it stays.
-
 ## `import { m }` in `next dev`
 
 `next dev` builds `m`, the namespace messages.js re-exports, whole in each layer that imports it, and again after each edit, so the frameworks guide has Next's modules import the namespace of keys.js, which Turbopack reads member by member (`docs/design.md`). Turbopack tracks a member read through a re-exported namespace when it builds for production ([vercel/next.js#96396](https://github.com/vercel/next.js/pull/96396)), but `next dev` 16.4.3 and 16.5.0-canary.27 still compile the namespace's module whole: with four modules behind it and a page reading one, all four are compiled through `import { m }`, one through `import * as m`. Meanwhile `grai migrate` writes the namespace import in a Next app, and `import { m }` everywhere else.
