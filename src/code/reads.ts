@@ -53,11 +53,15 @@ export type Unreadable = Place & { message: string };
 /** An import whose path is one of grai's output's, but which nothing the project declares resolves. */
 export type Unresolved = Place & { specifier: string };
 
+/** A static import of names from keys.js itself, `import { title } from "./out/keys.js"`, at its path. */
+export type KeysImport = Place & { fact: ImportFact };
+
 export type Reading = {
 	reads: Read[];
 	reaches: Reach[];
 	unreadable: Unreadable[];
 	unresolved: Unresolved[];
+	keysImports: KeysImport[];
 };
 
 /** Every read of a project's code. */
@@ -67,6 +71,7 @@ export async function readingOf(code: ProjectCode): Promise<Reading> {
 		reaches: [],
 		unreadable: [],
 		unresolved: [],
+		keysImports: [],
 	};
 	for (const [path, source] of code.sources) {
 		const { facts } = source;
@@ -110,6 +115,10 @@ async function readModule(
 		}
 		const pathKey = graph.output.keyOf(target);
 		if (pathKey !== undefined) readPath(context, module, fact, pathKey);
+		// A re-export or a load lists no names.
+		if (target === graph.output.keys && fact.names.length > 0) {
+			reading.keysImports.push({ path, source, at: fact.path, fact });
+		}
 		for (const name of fact.names) {
 			const value = await graph.exported(target, name.imported, new Set());
 			if (value === undefined) continue;

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { withoutKeys } from "./catalog-text.ts";
 import { type ProjectCode, readProjectCode } from "./code/project.ts";
-import { type Reach, readingOf } from "./code/reads.ts";
+import { type Reach, type Reading, readingOf } from "./code/reads.ts";
 import { codeProblems, mayReach } from "./code-problems.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { withListedKeysChanged } from "./config-file.ts";
@@ -30,6 +30,8 @@ export type FixResult = {
 	 * source that parses holds; none when it stopped before reading it.
 	 */
 	code: ProjectCode | undefined;
+	/** The reads it found in that code, for `--fix` to move the imports of keys from keys.js by. */
+	reading: Reading | undefined;
 };
 
 /**
@@ -52,6 +54,7 @@ export async function removeUnusedKeys(
 		changed: [],
 		errors: [],
 		code: undefined,
+		reading: undefined,
 	};
 	const read = await readProject(configFile);
 	if ("errors" in read) return { ...result, errors: read.errors };
@@ -74,6 +77,7 @@ export async function removeUnusedKeys(
 	);
 	if (unknown.length > 0) return { ...result, errors: unknown };
 	result.code = code;
+	result.reading = reading;
 	const { shipped, tests } = problems;
 	const named = new Set(shipped.reads.map(({ key }) => key));
 	const reaches = shipped.reaches.map(

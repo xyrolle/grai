@@ -110,6 +110,7 @@ describe("grai check's reads of components", () => {
 		const { problems } = await check(config);
 
 		expect(problems.map(({ message }) => message)).toEqual([
+			'app/components/About.vue:2:29: imports about_title from keys.js, though package.json gives each key its own path: a mock of "#i18n/messages/about_title.js" reaches only the files that import the key by that path. Import each from its own path, as grai check --fix does.',
 			'app/pages/index.vue:7:52: "titel": m.titel names a key no catalog has. Add it with grai add titel --en "…" --de "…", or fix the name.',
 			'messages/en.json: "unused": no shipped code under . reads the key. Remove it from every catalog, or use it.',
 		]);

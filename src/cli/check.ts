@@ -3,6 +3,11 @@ import type { ProjectCode } from "../code/project.ts";
 import type { GraiError } from "../error.ts";
 import { fixLines, removeUnusedKeys } from "../fix.ts";
 import {
+	importKeysByPath,
+	keysImports,
+	movedLines,
+} from "../key-path-imports.ts";
+import {
 	type Command,
 	failed,
 	parsed,
@@ -18,7 +23,8 @@ export const checkCommand: Command = {
                                and the keys each locale has not translated yet
   check --fix [--source <dir>]...
                                remove the keys no shipped source can name from every catalog,
-                               then check`,
+                               import each key from its own path where an import takes it from
+                               keys.js, then check`,
 	async run(args) {
 		const { config, values } = parsed(args, {
 			...sourceOption,
@@ -29,14 +35,19 @@ export const checkCommand: Command = {
 		if (values.fix === true && values.json === true) {
 			throw new UsageError("check takes --fix or --json, not both");
 		}
-		// A fix writes catalogs, the config and the descriptions, none of them code, so the check
-		// after it takes the code the fix read.
+		// Removing keys writes catalogs, the config and the descriptions, none of them code, so the
+		// check after it takes the code the fix read, unless the fix moved an import.
 		let code: ProjectCode | undefined;
 		if (values.fix === true) {
 			const fixed = await removeUnusedKeys(config, sources);
 			for (const line of fixLines(fixed)) console.log(line);
 			if (fixed.errors.length > 0) return failed(fixed.errors);
-			code = fixed.code;
+			if (fixed.code !== undefined && fixed.reading !== undefined) {
+				const found = await keysImports(fixed.code, fixed.reading);
+				const moved = await importKeysByPath(found);
+				for (const line of movedLines(moved)) console.log(line);
+				code = moved.length > 0 ? undefined : fixed.code;
+			}
 		}
 		const { problems, untranslated } = await check(config, sources, code);
 		if (values.json === true) {

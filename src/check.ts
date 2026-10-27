@@ -8,6 +8,7 @@ import { parseCatalogs, readProject } from "./compile.ts";
 import type { Config } from "./config.ts";
 import { descriptionProblems } from "./descriptions.ts";
 import { GraiError, sortErrors } from "./error.ts";
+import { keysImportProblems, keysImports } from "./key-path-imports.ts";
 import { parseMessage } from "./message.ts";
 import { compileOutputIfMissing } from "./output-present.ts";
 import { MessageProblem } from "./problem.ts";
@@ -24,14 +25,15 @@ export type Checked = {
 /**
  * Every problem of a project: each error a compile would report, each key no shipped code reads or
  * may reach, each place code names a key no catalog has, each file whose code does not parse, each
- * input one locale shows and another never does, each key `identicalToBase` lists that the
- * catalogs no longer bear out, and each description of a key no catalog has. The code is read as
+ * import of keys from keys.js where package.json gives each key its own path, each input one
+ * locale shows and another never does, each key `identicalToBase` lists that the catalogs no
+ * longer bear out, and each description of a key no catalog has. The code is read as
  * the bundler reads it (`code/`): the source files under the project's root, or under `sources`
  * when given, outside the outdir, dependencies, build output and dot-directories, with their
  * imports followed to the output, which is compiled first when it is missing, as its imports
  * resolve only then. Those the config's `tests` match ship nothing. Beside them, the keys each
  * locale has not translated yet, which are not problems: a message can rightly read as the base
- * locale's. The check after a fix takes the code the fix read as `code`, as a fix writes none of it.
+ * locale's. The check after a fix takes the code the fix read as `code`, unless the fix wrote some.
  */
 export async function check(
 	configFile: string,
@@ -63,7 +65,11 @@ export async function check(
 		reached,
 		tests,
 	} = codeProblems(reading, keys, config);
-	const problems = [...compilation.errors, ...codeErrors];
+	const problems = [
+		...compilation.errors,
+		...codeErrors,
+		...keysImportProblems(await keysImports(project, reading)),
+	];
 	for (const key of compilation.keys.keys()) {
 		if (!reached(key)) {
 			problems.push(unused(key, config, catalogs, roots, tests));

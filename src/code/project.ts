@@ -18,7 +18,7 @@ import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
 import { Installed } from "./installed.ts";
-import { projectMappings } from "./mappings.ts";
+import { keyPathPatterns, projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Pool } from "./pool.ts";
 import { projectResolution, resolverFor } from "./resolution.ts";
@@ -29,10 +29,14 @@ import { workspacePackages } from "./workspace.ts";
 /** A source file: the path the project shows, its text, and its facts. */
 export type SourceCode = { file: string; text: string; facts: FileFacts };
 
-/** A project's sources, by path, and the graph of their modules. */
+/**
+ * A project's sources, by path, the graph of their modules, and the package.json `imports`
+ * patterns that give each key its own path (`#i18n/messages/*`).
+ */
 export type ProjectCode = {
 	sources: ReadonlyMap<string, SourceCode>;
 	graph: ModuleGraph;
+	keyPaths: readonly string[];
 };
 
 /** A project's code under the roots, or the error that keeps its imports from resolving. */
@@ -92,10 +96,11 @@ export async function readProjectCode(
 		return facts;
 	};
 	const manifest = join(config.root, "package.json");
-	const mappings = projectMappings(resolution, [
+	const manifests = [
 		...(existsSync(manifest) ? [manifest] : []),
 		...seen.manifests.filter((each) => each !== manifest),
-	]);
+	];
+	const mappings = projectMappings(resolution, manifests);
 	const links = seen.links.map((path) => ({ path, real: realPath(path) }));
 	const packages = workspacePackages(config.root);
 	const pool = new Pool();
@@ -149,7 +154,11 @@ export async function readProjectCode(
 	} finally {
 		await pool.close();
 	}
-	return { sources, graph: new ModuleGraph(output, resolve, factsOfPath) };
+	return {
+		sources,
+		graph: new ModuleGraph(output, resolve, factsOfPath),
+		keyPaths: keyPathPatterns(manifests, output.keys),
+	};
 }
 
 /** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */

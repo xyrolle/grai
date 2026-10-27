@@ -43,6 +43,21 @@ export function projectMappings(
 	return mappings;
 }
 
+/**
+ * The `imports` patterns of the package.json files that map a key's own path to keys.js, as
+ * `"#i18n/messages/*": "./src/lib/i18n/keys.js"` does: how the app writes a key's path.
+ */
+export function keyPathPatterns(
+	manifests: readonly string[],
+	keys: string,
+): string[] {
+	return manifests.flatMap((manifest) =>
+		(packageImports(manifest) ?? []).flatMap(({ key, targets }) =>
+			key.includes("*") && targets.includes(keys) ? [key] : [],
+		),
+	);
+}
+
 /** A package.json's `imports`, each target from its directory; undefined when it does not read. */
 function packageImports(manifest: string): Mapping[] | undefined {
 	let value: unknown;
