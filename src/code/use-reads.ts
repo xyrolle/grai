@@ -63,7 +63,7 @@ export async function readUse(
 					edits: named(name, value.key, keyAt),
 					binding: undefined,
 					type: use.type,
-					written: text(source, readAt),
+					writtenAt: readAt,
 				},
 			),
 		);
@@ -137,17 +137,19 @@ export function read(
 		edits: Edit[];
 		binding: Binding | undefined;
 		type: boolean;
+		/** The text the read is written as: this, or the text at `writtenAt`, or else at its place. */
 		written?: string;
+		writtenAt?: Span;
 	},
 ): Read {
-	const { written, ...rest } = fields;
+	const { written, writtenAt = place.at, ...rest } = fields;
 	if (written !== undefined) return { ...place, ...rest, written };
 	// The text it reads by, taken from the file only when a report asks for it.
 	return {
 		...place,
 		...rest,
 		get written() {
-			return text(place.source, place.at);
+			return text(place.source, writtenAt);
 		},
 	};
 }
