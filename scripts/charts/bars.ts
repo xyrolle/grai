@@ -149,7 +149,8 @@ export function barChart(chart: BarChart, theme: Theme): string {
 			parts.push(
 				`<text x="${x0 - 10}" y="${middle + 5}" font-size="14" text-anchor="end" ${each.grai && contrasted ? 'font-weight="600" ' : ""}fill="${theme.primary}">${xmlText(each.label)}</text>`,
 				`<path d="${barPath(x0, middle - bar / 2, length)}" fill="${fill}"/>`,
-				`<text x="${at(x0 + length + 6)}" y="${middle + 5}" font-size="14" fill="${theme.primary}" style="font-variant-numeric: tabular-nums">${xmlText(each.shown)}</text>`,
+				// The surface's halo keeps a gridline the value crosses out of its glyphs.
+				`<text x="${at(x0 + length + 6)}" y="${middle + 5}" font-size="14" fill="${theme.primary}" stroke="${theme.surface}" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">${xmlText(each.shown)}</text>`,
 			);
 			y += row;
 		}

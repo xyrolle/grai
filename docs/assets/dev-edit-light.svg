@@ -15,15 +15,15 @@
 <text x="388" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
 <text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
 <path d="M99,74H99A1.1,1.1 0 0 1 100.1,75.1V86.9A1.1,1.1 0 0 1 99,88H99Z" fill="#2a78d6"/>
-<text x="106.1" y="86" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">15 ms</text>
+<text x="106.1" y="86" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">15 ms</text>
 <text x="89" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
 <path d="M99,106H100.2A4,4 0 0 1 104.2,110V116A4,4 0 0 1 100.2,120H99Z" fill="#898781"/>
-<text x="110.2" y="118" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">72 ms</text>
+<text x="110.2" y="118" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">72 ms</text>
 <text x="89" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
 <path d="M99,138H100.4A4,4 0 0 1 104.4,142V148A4,4 0 0 1 100.4,152H99Z" fill="#898781"/>
-<text x="110.4" y="150" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">74 ms</text>
+<text x="110.4" y="150" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">74 ms</text>
 <text x="89" y="182" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
 <path d="M99,170H317.1A4,4 0 0 1 321.1,174V180A4,4 0 0 1 317.1,184H99Z" fill="#898781"/>
-<text x="327.1" y="182" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">3.07 s</text>
+<text x="327.1" y="182" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.07 s</text>
 <text x="388" y="234" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>

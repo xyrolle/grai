@@ -18,15 +18,15 @@
 <text x="388" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">13</text>
 <text x="89" y="103" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
 <path d="M99,91H109.4A4,4 0 0 1 113.4,95V101A4,4 0 0 1 109.4,105H99Z" fill="#3987e5"/>
-<text x="119.4" y="103" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.6 KB</text>
+<text x="119.4" y="103" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.6 KB</text>
 <text x="89" y="135" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
 <path d="M99,123H178.6A4,4 0 0 1 182.6,127V133A4,4 0 0 1 178.6,137H99Z" fill="#898781"/>
-<text x="188.6" y="135" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">3.6 KB</text>
+<text x="188.6" y="135" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.6 KB</text>
 <text x="89" y="167" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
 <path d="M99,155H331.6A4,4 0 0 1 335.6,159V165A4,4 0 0 1 331.6,169H99Z" fill="#898781"/>
-<text x="341.6" y="167" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">10.2 KB</text>
+<text x="341.6" y="167" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">10.2 KB</text>
 <text x="89" y="199" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
 <path d="M99,187H374A4,4 0 0 1 378,191V197A4,4 0 0 1 374,201H99Z" fill="#898781"/>
-<text x="384" y="199" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">12.1 KB</text>
+<text x="384" y="199" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">12.1 KB</text>
 <text x="388" y="251" font-size="12" text-anchor="end" fill="#c3c2b7">KB, brotli</text>
 </svg>

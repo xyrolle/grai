@@ -16,16 +16,16 @@
 <text x="16" y="83" font-size="13" font-weight="600" fill="#c3c2b7">6,366 keys</text>
 <text x="89" y="114" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
 <path d="M99,102H99A1,1 0 0 1 100,103V115A1,1 0 0 1 99,116H99Z" fill="#3987e5"/>
-<text x="106" y="114" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">11 ms</text>
+<text x="106" y="114" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">11 ms</text>
 <text x="89" y="146" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
 <path d="M99,134H255.8A4,4 0 0 1 259.8,138V144A4,4 0 0 1 255.8,148H99Z" fill="#898781"/>
-<text x="265.8" y="146" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">4.45 s</text>
+<text x="265.8" y="146" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.45 s</text>
 <text x="16" y="175" font-size="13" font-weight="600" fill="#c3c2b7">13,326 keys</text>
 <text x="89" y="206" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
 <path d="M99,194H99A1,1 0 0 1 100,195V207A1,1 0 0 1 99,208H99Z" fill="#3987e5"/>
-<text x="106" y="206" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">12 ms</text>
+<text x="106" y="206" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">12 ms</text>
 <text x="89" y="238" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
 <path d="M99,226H323.5A4,4 0 0 1 327.5,230V236A4,4 0 0 1 323.5,240H99Z" fill="#898781"/>
-<text x="333.5" y="238" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">6.32 s</text>
+<text x="333.5" y="238" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">6.32 s</text>
 <text x="388" y="290" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
 </svg>

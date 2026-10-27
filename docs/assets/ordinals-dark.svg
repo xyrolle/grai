@@ -17,12 +17,12 @@
 <text x="388" y="182" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">500</text>
 <text x="206" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
 <path d="M216,74H216A1.5,1.5 0 0 1 217.5,75.5V86.5A1.5,1.5 0 0 1 216,88H216Z" fill="#3987e5"/>
-<text x="223.5" y="86" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">4.4 ns</text>
+<text x="223.5" y="86" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.4 ns</text>
 <text x="206" y="118" font-size="14" text-anchor="end" fill="#f0efec">Intl.PluralRules, cached</text>
 <path d="M216,106H260.4A4,4 0 0 1 264.4,110V116A4,4 0 0 1 260.4,120H216Z" fill="#898781"/>
-<text x="270.4" y="118" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">141 ns</text>
+<text x="270.4" y="118" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">141 ns</text>
 <text x="206" y="150" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
 <path d="M216,138H381.7A4,4 0 0 1 385.7,142V148A4,4 0 0 1 381.7,152H216Z" fill="#898781"/>
-<text x="391.7" y="150" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">493 ns</text>
+<text x="391.7" y="150" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">493 ns</text>
 <text x="388" y="202" font-size="12" text-anchor="end" fill="#c3c2b7">nanoseconds a choice</text>
 </svg>
