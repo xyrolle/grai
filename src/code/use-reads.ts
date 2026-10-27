@@ -14,6 +14,8 @@ export type Context = {
 	source: SourceCode;
 	graph: ModuleGraph;
 	reading: Reading;
+	/** The key a reading is for alone, if any: it leaves out the reads of other keys. */
+	key: string | undefined;
 };
 
 /** What a promise hands its value on by. */
@@ -21,12 +23,17 @@ const promised: ReadonlySet<string> = new Set(["then", "catch", "finally"]);
 
 /** The reads one use makes, following its names from what it starts from. */
 export async function readUse(
-	{ path, source, graph, reading }: Context,
+	{ path, source, graph, reading, key }: Context,
 	use: UseFact,
 	origin: Value,
 ): Promise<void> {
 	// A key an import binds is read where it is imported, its uses that binding's references.
 	if (origin.kind === "key") return;
+	// A name read off the namespace is that key's read and no other's.
+	const first = use.chain[0];
+	if (origin.kind === "namespace" && first !== undefined && key !== undefined) {
+		if (first.name !== key) return;
+	}
 	const ownKey =
 		origin.kind === "module" ? graph.output.keyOf(origin.path) : undefined;
 	// A load's promise hands its module to a callback, `import(path).then((module) => …)`, which

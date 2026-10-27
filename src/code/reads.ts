@@ -70,8 +70,14 @@ export type Reading = {
 	keysImports: KeysImport[];
 };
 
-/** Every read of a project's code. */
-export async function readingOf(code: ProjectCode): Promise<Reading> {
+/**
+ * Every read of a project's code, or with a key, every read of it and every read that may reach it
+ * among others, and the reads of other keys where they come free.
+ */
+export async function readingOf(
+	code: ProjectCode,
+	key?: string,
+): Promise<Reading> {
 	const reading: Reading = {
 		reads: [],
 		reaches: [],
@@ -88,7 +94,10 @@ export async function readingOf(code: ProjectCode): Promise<Reading> {
 			continue;
 		}
 		for (const module of facts.modules) {
-			await readModule({ path, source, graph: code.graph, reading }, module);
+			await readModule(
+				{ path, source, graph: code.graph, reading, key },
+				module,
+			);
 		}
 	}
 	// A `const` that holds a key read (`const t = m.title`) reads it once, however often it is used.

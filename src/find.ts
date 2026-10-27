@@ -59,7 +59,7 @@ export async function find(
 	if (compiled.length > 0) return { ...found, errors: [...compiled] };
 	const code = await readProjectCode(config, roots ?? [config.root], key);
 	if (code instanceof GraiError) return { ...found, errors: [code] };
-	const reading = await readingOf(code);
+	const reading = await readingOf(code, key);
 	found.errors.push(...readErrors(reading));
 	const sites = new Map<string, FoundLine & { at: number }>();
 	const site = ({ file, text }: { file: string; text: string }, at: number) =>
