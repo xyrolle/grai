@@ -42,6 +42,20 @@ const compilerOptions = {
 	resolveJsonModule: true,
 };
 
+/** A plural's suffix in i18next's keys, which its types also offer the key without. */
+const pluralSuffix = /_(zero|one|two|few|many|other)$/;
+
+/**
+ * The keys i18next's types offer `t`: each key of the catalog and each plural's key without its
+ * suffix, alone and after the namespace, `translation:`.
+ */
+function i18nextKeys(catalogKeys) {
+	const keys = new Set(catalogKeys);
+	for (const key of catalogKeys) keys.add(key.replace(pluralSuffix, ""));
+	for (const key of [...keys]) keys.add(`translation:${key}`);
+	return keys;
+}
+
 /**
  * Each library's project: its files (the declarations it needs and a file of 500 calls) and the
  * text after which the editor is asked to complete a key.
@@ -79,13 +93,26 @@ declare module "i18next" {
 		i18next: `import i18next from "i18next";\nconst t = i18next.t;\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${takesInputs(call) ? `, ${values(call, i18nextValues(app, call.key, call.inputs))}` : ""})`)}\n];\n`,
 		"use-intl": `import { createTranslator } from "use-intl/core";\nimport messages from "./messages.json" with { type: "json" };\nconst t = createTranslator({ locale: ${JSON.stringify(locale)}, messages });\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${takesInputs(call) ? `, ${values(call)}` : ""})`)}\n];\n`,
 	};
+	const catalogKeys = new Set(Object.keys(app.messages[app.baseLocale]));
 	const projects = [
-		["grai's declarations", "grai", [], "\nm."],
-		["Paraglide's declarations", "paraglide", [], "\nm."],
-		["i18next's CustomTypeOptions", "i18next", ["i18next.d.ts"], '\nt("'],
-		["use-intl, keys inferred from the messages", "use-intl", [], '\nt("'],
+		["grai's declarations", "grai", [], "\nm.", catalogKeys],
+		["Paraglide's declarations", "paraglide", [], "\nm.", catalogKeys],
+		[
+			"i18next's CustomTypeOptions",
+			"i18next",
+			["i18next.d.ts"],
+			'\nt("',
+			i18nextKeys(Object.keys(i18next)),
+		],
+		[
+			"use-intl, keys inferred from the messages",
+			"use-intl",
+			[],
+			'\nt("',
+			new Set(Object.keys(icu)),
+		],
 	];
-	return projects.map(([title, name, declarations, marker]) => {
+	return projects.map(([title, name, declarations, marker, keys]) => {
 		writeFileSync(join(directory, `${name}.ts`), sources[name]);
 		const files = [...declarations, `${name}.ts`];
 		writeFileSync(
@@ -98,6 +125,7 @@ declare module "i18next" {
 			files: files.map((file) => join(directory, file)),
 			marker,
 			directory,
+			keys,
 		};
 	});
 }
@@ -107,7 +135,8 @@ declare module "i18next" {
  * next one. The host gives the project a version, as tsserver's does, so that a request on a
  * project that has not changed skips synchronizing it.
  */
-function completion({ name, files, marker, directory }) {
+function completion(project) {
+	const { name, files, marker, directory } = project;
 	const path = join(directory, `${name}.ts`);
 	const text = `${readFileSync(path, "utf8")}${marker}`;
 	const host = {
@@ -131,14 +160,24 @@ function completion({ name, files, marker, directory }) {
 	const service = ts6.createLanguageService(host, ts6.createDocumentRegistry());
 	const at = (start) => {
 		const result = service.getCompletionsAtPosition(path, text.length, {});
-		return {
-			ms: performance.now() - start,
-			entries: result?.entries.length ?? 0,
-		};
+		const ms = performance.now() - start;
+		assertKeys(project, result?.entries ?? []);
+		return { ms, entries: result.entries.length };
 	};
 	const first = at(performance.now());
 	const next = at(performance.now());
 	return { first: first.ms, next: next.ms, entries: first.entries };
+}
+
+/** Throws unless a completion lists exactly the keys the library's types give, every one of them. */
+function assertKeys({ title, keys }, entries) {
+	const names = new Set(entries.map((entry) => entry.name));
+	const missing = [...keys].filter((key) => !names.has(key));
+	const extra = [...names].filter((name) => !keys.has(name));
+	if (missing.length > 0 || extra.length > 0)
+		throw new Error(
+			`${title}: the completion misses ${missing.length} of its ${keys.size} keys (${missing.slice(0, 3).join(", ")}) and lists ${extra.length} names that are none (${extra.slice(0, 3).join(", ")})`,
+		);
 }
 
 const median = (values) =>
