@@ -1,10 +1,7 @@
-// Runs work as a server does inside one request for a locale: Paraglide's middleware and grai's
-// own resolve it from the request as the app's strategy says, and the prototype's server entries
-// bind the same locale.
-import { join } from "node:path";
-import { graiServerBuild } from "./grai.mjs";
-import { paraglideOutput } from "./paraglide.mjs";
-import { writePrototype } from "./prototype.mjs";
+// Runs work as a server does inside one request for a locale, through the library's own server
+// entry as its build has it, so that the request's locale reaches the same runtime as the
+// messages: grai's middleware and Paraglide's resolve it from the request as the app's strategy
+// says, and the prototype's entries bind it.
 
 /** The path of a page in `locale`: prefixed when the app's strategy reads the URL first. */
 export function localePath(app, locale) {
@@ -13,40 +10,38 @@ export function localePath(app, locale) {
 		: "/page";
 }
 
-export async function inRequest(app, locale, work) {
-	const { paraglideMiddleware } = await import(
-		join(await paraglideOutput(app), "server.js")
-	);
-	const { middleware } = await import(
-		join(await graiServerBuild(app), "server.js")
-	);
-	const prototype = writePrototype(app);
-	const { withLocale } = await import(join(prototype, "server.js"));
-	const { withLocale: withVariable } = await import(
-		join(prototype, "server-variable.js")
-	);
+/** The request a reader in `locale` sends for the page: at the locale's URL, with the app's cookie. */
+function requestIn(app, locale) {
 	const { strategy, cookieName } = app.compilerOptions;
-	const path = localePath(app, locale);
 	const headers = strategy.includes("cookie")
 		? { cookie: `${cookieName}=${locale}` }
 		: {};
-	const request = new Request(`https://bench.test${path}`, { headers });
-	const resolvedAs = (library, resolved) => {
+	return new Request(`https://bench.test${localePath(app, locale)}`, {
+		headers,
+	});
+}
+
+/**
+ * Runs `work` inside one request for `locale` and returns what it returns. `server` is the
+ * library's server entry as built: grai's `middleware` or Paraglide's `paraglideMiddleware`, whose
+ * handler answers with a Response as a server's does, or else the prototype's `withLocale`. A
+ * library without one, whose translator is made for the locale, runs `work` as it is.
+ */
+export async function inRequest(app, locale, server, work) {
+	const middleware = server.middleware ?? server.paraglideMiddleware;
+	if (middleware === undefined)
+		return server.withLocale === undefined
+			? work()
+			: server.withLocale(locale, work);
+	const request = requestIn(app, locale);
+	let result;
+	await middleware(request, ({ locale: resolved }) => {
 		if (resolved !== locale)
 			throw new Error(
-				`${library} resolved ${resolved} for ${path}, expected ${locale}`,
+				`The middleware resolved ${resolved} for ${request.url}, expected ${locale}`,
 			);
-	};
-	// Each middleware's handler answers with a Response, as a server's does; the work's own result
-	// is kept beside it.
-	let result;
-	await paraglideMiddleware(request, ({ locale: resolved }) => {
-		resolvedAs("Paraglide", resolved);
-		return middleware(request, ({ locale: graiLocale }) => {
-			resolvedAs("grai", graiLocale);
-			result = withLocale(locale, () => withVariable(locale, work));
-			return new Response("");
-		});
+		result = work();
+		return new Response("");
 	});
 	return result;
 }

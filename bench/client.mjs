@@ -1,18 +1,17 @@
 // Browser: what a message call costs in a page, in Chromium: the calls `server` makes
-// (render-calls.mjs), bundled into the page's one script as each library ships them: Paraglide's
-// output; grai's client build, with the page's locale copies or every locale's chunks
-// (browser-bundle.mjs); i18next and use-intl with the locale's catalog. Each page checks its text
-// against Paraglide's, then times its calls as `server` times them in Node.
+// (render-calls.mjs), in a page each library's production build makes with its own plugins
+// (production.mjs): Paraglide's output; grai's client build, the page pointed at its locale's
+// copies or loading every locale's chunks; i18next and use-intl with the locale's catalog. Each
+// page checks its text against Paraglide's, then times its calls as `server` times them in Node.
 //   node client.mjs [app...]
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { cacheDir, selectedApps } from "./apps.mjs";
-import { browserBundle } from "./browser-bundle.mjs";
 import { kindsOf, sampleCalls } from "./calls.mjs";
-import { benchDocument, benchPage } from "./chromium.mjs";
-import { graiOutput } from "./grai.mjs";
+import { benchPage } from "./chromium.mjs";
 import { paraglideVersion } from "./paraglide.mjs";
+import { clientBuild, PAGE_ENTRY, pluginsOf } from "./production.mjs";
 import {
 	CALLS,
 	callsOf,
@@ -37,27 +36,42 @@ const text = render(values);
 window.bench = { text, ns: nanosecondsPer(() => render(values), ${calls.length}) };
 `;
 
-/** The libraries' variants, with grai's as its client build ships them. */
+/** The libraries' variants, with grai's page pointed at its locale's copies or at every locale's chunks. */
 async function variants(app, locale) {
 	const {
 		"grai `m.key()`": grai,
 		"grai `m.key(i, { locale })`": forced,
 		...others
-	} = await libraryVariants(
-		app,
-		locale,
-		join((await graiOutput(app)).outdir, "keys.js"),
-	);
-	const copies = { app, locale };
+	} = await libraryVariants(app, locale);
 	return {
 		...others,
-		"grai `m.key()`, the locale's copies": { ...grai, grai: copies },
+		"grai `m.key()`, the locale's copies": { ...grai, localeChunks: true },
 		"grai `m.key(i, { locale })`, the locale's copies": {
 			...forced,
-			grai: copies,
+			localeChunks: true,
 		},
-		"grai `m.key()`, every locale's chunks": { ...grai, grai: { app } },
+		"grai `m.key()`, every locale's chunks": grai,
 	};
+}
+
+/** Writes the page of a variant's calls and builds it as its library's client build does. */
+async function pageOf(app, root, render, entry, spec) {
+	mkdirSync(root, { recursive: true });
+	writeFileSync(join(root, "render.js"), render);
+	writeFileSync(join(root, PAGE_ENTRY), entry);
+	writeFileSync(
+		join(root, "index.html"),
+		`<!doctype html><html lang="${app.baseLocale}"><head><meta charset="utf-8"></head><body><script type="module" src="./${PAGE_ENTRY}"></script></body></html>\n`,
+	);
+	const directory = join(root, "dist");
+	const { html } = await clientBuild(
+		root,
+		directory,
+		await pluginsOf(spec.library, app, {
+			localeChunks: spec.localeChunks === true,
+		}),
+	);
+	return { html, directory };
 }
 
 async function benchLocale(browser, app, locale) {
@@ -72,17 +86,19 @@ async function benchLocale(browser, app, locale) {
 		for (const [index, [name, variant]] of all.entries()) {
 			const spec = callsOf(variant, kind);
 			if (spec === undefined) continue;
-			const render = join(directory, `${index}-${locale}.render.js`);
-			writeFileSync(render, renderSource(calls, spec));
-			const page = join(directory, `${index}-${locale}.js`);
-			writeFileSync(page, entry(render, withValues(app, calls), locale));
-			const script = await browserBundle(page, { grai: spec.grai });
-			const { text, ns } = await benchPage(
-				browser,
+			const { html, directory: built } = await pageOf(
 				app,
-				locale,
-				benchDocument(locale, { script }),
+				join(directory, `${index}-${locale}`),
+				renderSource(calls, spec),
+				entry("./render.js", withValues(app, calls), locale),
+				spec,
 			);
+			const {
+				bench: { text, ns },
+			} = await benchPage(browser, app, locale, {
+				html: html.replace(`lang="${app.baseLocale}"`, `lang="${locale}"`),
+				directory: built,
+			});
 			expected ??= text;
 			if (text !== expected)
 				throw new Error(

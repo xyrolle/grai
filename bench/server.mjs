@@ -1,9 +1,11 @@
-// Server: what a message call costs inside a request, in Node: grai's output as its Vite plugin
-// builds it for a server, called as an app calls it and with a forced locale, against Paraglide,
-// i18next and use-intl, and against the prototype's dispatchers that grai did not adopt. Each
-// variant makes the same 2,000 calls (render-calls.mjs), of each kind and in the page's mix, and
-// its text is checked against Paraglide's before it is timed. A message with markup is drawn from
-// its parts; i18next has none.
+// Server: what a message call costs inside a request, in Node: grai's output called as an app
+// calls it and with a forced locale, against Paraglide, i18next and use-intl, and against the
+// prototype's dispatchers that grai did not adopt. Each variant makes the same 2,000 calls
+// (render-calls.mjs), of each kind and in the page's mix, built as an app's server build has them,
+// with its library's own plugins, beside its server entry (production.mjs). Its text is checked
+// against Paraglide's before it is timed. A message with markup is drawn from its parts; i18next
+// has none. The clock is a warm batch inside one request: each run of the calls, divided by their
+// number, after a warm-up; the imports, the inputs and the middleware are outside it.
 //   node server.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -11,9 +13,9 @@ import { join } from "node:path";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { callValues } from "./call-values.mjs";
 import { kindsOf, sampleCalls } from "./calls.mjs";
-import { graiServerBuild } from "./grai.mjs";
 import { nanosecondsPer } from "./measure.mjs";
-import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
+import { paraglideForVite, paraglideVersion } from "./paraglide.mjs";
+import { pluginsOf, serverBuild } from "./production.mjs";
 import { writePrototype } from "./prototype.mjs";
 import {
 	CALLS,
@@ -31,52 +33,113 @@ import { recordResults } from "./results.mjs";
 
 /** The libraries' variants, then the floor of Paraglide's calls and the shapes grai did not adopt. */
 async function variants(app, locale) {
+	const paraglide = await paraglideForVite(app);
 	const prototype = writePrototype(app);
-	const grai = join(await graiServerBuild(app), "keys.js");
+	const prototypeEntry = (file) => ({
+		library: "prototype",
+		server: join(prototype, file),
+		from: join(prototype, file),
+		call: plainCall,
+	});
 	return {
-		...(await libraryVariants(app, locale, grai)),
+		...(await libraryVariants(app, locale)),
 		"Paraglide `getLocale()` alone": {
-			from: join(await paraglideOutput(app), "runtime.js"),
+			library: "paraglide",
+			server: join(paraglide, "server.js"),
+			from: join(paraglide, "runtime.js"),
 			name: () => "getLocale",
 			call: (_, f) => `${f}()`,
 			markup: {},
 			renders: false,
 		},
-		"prototype, dispatcher per key, ALS": {
-			from: join(prototype, "server.js"),
-			call: plainCall,
-		},
-		"prototype, dispatcher per key, module variable": {
-			from: join(prototype, "server-variable.js"),
-			call: plainCall,
-		},
+		"prototype, dispatcher per key, ALS": prototypeEntry("server.js"),
+		"prototype, dispatcher per key, module variable":
+			prototypeEntry("server-variable.js"),
 	};
 }
 
-/** Times the calls in a locale, and returns each variant's nanoseconds a call, by kind. */
-async function benchLocale(app, locale) {
+const localesOf = (app) => [app.baseLocale, otherLocale(app)];
+const cellOf = (kind, locale) => `${kind}-${locale}`;
+const callsFor = (app, kind) =>
+	sampleCalls(app, CALLS, kind === "page" ? undefined : kind);
+
+/**
+ * Writes each variant's calls, kind by kind in each locale, and builds them as an app's server
+ * build has them, beside the library's server entry. Returns, by name, each variant's build and
+ * the cells it measures, for the processes that time them.
+ */
+async function buildVariants(app) {
+	const plan = {};
+	for (const locale of localesOf(app)) {
+		const all = Object.entries(await variants(app, locale));
+		for (const kind of KINDS) {
+			const calls = callsFor(app, kind);
+			if (calls.length === 0) continue;
+			for (const [index, [name, variant]] of all.entries()) {
+				const spec = callsOf(variant, kind);
+				if (spec === undefined) continue;
+				const root = join(cacheDir, "server", app.id, String(index));
+				mkdirSync(join(root, "src"), { recursive: true });
+				const cell = cellOf(kind, locale);
+				const source = join(root, "src", `${cell}.js`);
+				writeFileSync(source, renderSource(calls, spec));
+				plan[name] ??= {
+					library: variant.library,
+					server: variant.server,
+					root,
+					directory: join(root, "dist"),
+					modules: {},
+					cells: [],
+				};
+				plan[name].modules[cell] = source;
+				plan[name].cells.push({
+					kind,
+					locale,
+					renders: spec.renders !== false,
+				});
+			}
+		}
+	}
+	for (const variant of Object.values(plan)) {
+		const server =
+			variant.server === undefined ? {} : { server: variant.server };
+		await serverBuild(
+			variant.root,
+			variant.directory,
+			{ ...server, ...variant.modules },
+			await pluginsOf(variant.library, app),
+		);
+	}
+	return plan;
+}
+
+/** Times the built calls in a locale, and returns each variant's nanoseconds a call, by kind. */
+async function benchLocale(app, plan, locale) {
 	const rows = new Map();
-	const all = Object.entries(await variants(app, locale));
 	for (const kind of KINDS) {
-		const calls = sampleCalls(app, CALLS, kind === "page" ? undefined : kind);
+		const calls = callsFor(app, kind);
 		if (calls.length === 0) continue;
 		const values = callValues(withValues(app, calls), locale);
-		const directory = join(cacheDir, "server", app.id, kind);
-		mkdirSync(directory, { recursive: true });
 		let expected;
-		for (const [index, [name, variant]] of all.entries()) {
-			const spec = callsOf(variant, kind);
-			if (spec === undefined) continue;
-			const path = join(directory, `${index}-${locale}.mjs`);
-			writeFileSync(path, renderSource(calls, spec));
-			const { render } = await import(path);
-			const text = await inRequest(app, locale, () => render(values));
+		for (const [name, variant] of Object.entries(plan)) {
+			const cell = variant.cells.find(
+				(each) => each.kind === kind && each.locale === locale,
+			);
+			if (cell === undefined) continue;
+			const server =
+				variant.server === undefined
+					? {}
+					: await import(join(variant.directory, "server.js"));
+			const { render } = await import(
+				join(variant.directory, `${cellOf(kind, locale)}.js`)
+			);
+			const text = await inRequest(app, locale, server, () => render(values));
 			expected ??= text;
-			if (spec.renders !== false && text !== expected)
+			if (cell.renders && text !== expected)
 				throw new Error(
 					`${name} renders other text than Paraglide in ${locale} (${kind})`,
 				);
-			const ns = await inRequest(app, locale, () =>
+			const ns = await inRequest(app, locale, server, () =>
 				nanosecondsPer(() => render(values), calls.length),
 			);
 			rows.set(name, { ...rows.get(name), [kind]: ns });
@@ -97,14 +160,15 @@ if (apps.length > 1) {
 		);
 } else {
 	const [app] = apps;
-	const mix = kindsOf(sampleCalls(app, CALLS));
+	const plan = await buildVariants(app);
+	const mix = kindsOf(callsFor(app, "page"));
 	console.log(
 		`\n### ${app.name}: Paraglide ${paraglideVersion}, Node ${process.versions.node}, page of ${CALLS} calls ${JSON.stringify(mix)}\n`,
 	);
 	console.log(TABLE_HEAD);
 	const recorded = [];
-	for (const locale of [app.baseLocale, otherLocale(app)])
-		recorded.push(...(await benchLocale(app, locale)));
+	for (const locale of localesOf(app))
+		recorded.push(...(await benchLocale(app, plan, locale)));
 	recordResults(`server-${app.id}`, recorded, {
 		app: app.name,
 		calls: CALLS,

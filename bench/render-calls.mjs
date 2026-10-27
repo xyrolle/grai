@@ -1,12 +1,15 @@
 // The calls `server` and `client` time: every call of the sample through its own call site, 20 to
 // a function as a component holds them, so the engine optimizes them as it would a real render. A
-// variant says where each call's message comes from and how the call is written; for a message
-// with markup, how it is drawn from its parts, where the library has them.
+// variant says which library's build its calls go through (production.mjs), where each call's
+// message comes from and how the call is written; for a message with markup, how it is drawn from
+// its parts, where the library has them; and on a server, the library's server entry, which runs
+// each request.
 import { join } from "node:path";
 import { takesInputs } from "./calls.mjs";
+import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { formatNs } from "./measure.mjs";
-import { paraglideOutput } from "./paraglide.mjs";
+import { paraglideForVite } from "./paraglide.mjs";
 
 export const CALLS = 2000;
 const PER_FUNCTION = 20;
@@ -69,36 +72,48 @@ const translate = (field) => (c, f, n) =>
 
 /**
  * The libraries' variants in `locale`: grai's output and Paraglide's, as an app calls them, and
- * i18next and use-intl. `grai` is the module grai's messages come from: on a server, its server
- * build, and in a page, the output its client build reads.
+ * i18next and use-intl, each translator made for the locale.
  */
-export async function libraryVariants(app, locale, grai) {
-	const paraglide = join(await paraglideOutput(app), "messages.js");
+export async function libraryVariants(app, locale) {
+	const paraglide = await paraglideForVite(app);
+	const { outdir } = await graiOutput(app);
 	const { directory } = writeLibraryModules(app, locale);
 	const library = (name) => join(directory, `${locale}.${name}.js`);
+	const fromParaglide = {
+		library: "paraglide",
+		server: join(paraglide, "server.js"),
+		from: join(paraglide, "messages.js"),
+	};
+	const fromGrai = {
+		library: "grai",
+		server: join(outdir, "server.js"),
+		from: join(outdir, "keys.js"),
+	};
 	return {
 		"Paraglide `m.key()`": {
-			from: paraglide,
+			...fromParaglide,
 			call: plainCall,
 			markup: { call: parts },
 		},
 		"Paraglide `m.key(i, { locale })`": {
-			from: paraglide,
+			...fromParaglide,
 			call: forced,
 			markup: { call: forcedParts },
 		},
-		"grai `m.key()`": { from: grai, call: plainCall, markup: { call: parts } },
+		"grai `m.key()`": { ...fromGrai, call: plainCall, markup: { call: parts } },
 		"grai `m.key(i, { locale })`": {
-			from: grai,
+			...fromGrai,
 			call: forced,
 			markup: { call: forcedParts },
 		},
 		"i18next `t(key, values)`": {
+			library: "i18next",
 			from: library("i18next"),
 			name: () => "t",
 			call: translate("d.i18next"),
 		},
 		"use-intl `t(key, values)`, `t.markup`": {
+			library: "use-intl",
 			from: library("use-intl"),
 			name: () => "t",
 			call: translate("d"),

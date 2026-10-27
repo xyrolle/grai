@@ -1,41 +1,46 @@
-// Browser: the message-heavy page (page.mjs) server-rendered, then loaded and hydrated in Chromium,
-// with its messages from Paraglide's client runtime; from grai's client build, its locale's copies
-// or every locale's chunks (browser-bundle.mjs); from i18next or use-intl with the page's own keys
-// in the bundle, as both advise, or with the locale's whole catalog; or inlined into the template
-// by the prototype. Each run is a fresh page
-// with the whole bundle inline, so nothing but parsing, evaluating and hydrating is timed; runs
-// alternate between variants. After hydrating, the page mounts itself again, the client work of a
-// locale switch that does not reload.
+// Browser: the message-heavy page (page.mjs) built as a Svelte app with Vite (page-app.mjs), each
+// library's build with its own plugins, server-rendered by its server build, then loaded and
+// hydrated in Chromium. Its messages come from Paraglide; from grai, the page pointed at its
+// locale's copies of the message chunks, or loading the chunks with every locale; from i18next or
+// use-intl with the page's own keys, as both advise, or with the locale's whole catalog; or inlined
+// into the template by the prototype.
+//
+// The page is served as the build wrote it, with the server's render drawn into it, and loads its
+// files one by one; its JS is the sum of the scripts it loads, each compressed on its own, and of
+// those its index.html holds inline. The bench's own script goes in the page beside them, outside
+// that sum: it imports what the page's entry gives, then times `hydrate`, from when every module
+// has been evaluated until it returns. The page then mounts itself again, the client work of a
+// locale switch that does not reload. Runs alternate between variants, each in a fresh context.
 //   node hydrate.mjs [app...]
-import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { brotliCompressSync } from "node:zlib";
 import { chromium } from "playwright-core";
-import { render } from "svelte/server";
 import { selectedApps } from "./apps.mjs";
-import { browserBundle } from "./browser-bundle.mjs";
-import { benchDocument, benchPage } from "./chromium.mjs";
+import { benchPage } from "./chromium.mjs";
 import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
+import { median } from "./medians.mjs";
+import { PAGE_CALLS, pageKeys, pageProps } from "./page.mjs";
 import {
-	PAGE_CALLS,
-	pageKeys,
-	pageProps,
-	pageSource,
-	writePage,
-} from "./page.mjs";
-import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
+	APP_HEAD,
+	APP_HTML,
+	buildClient,
+	buildServer,
+	writePageApp,
+} from "./page-app.mjs";
+import { paraglideForVite, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
 import { recordResults } from "./results.mjs";
 
 const RUNS = 15;
 const THROTTLING = [1, 4];
+const GRAI = "grai, the locale's copies";
 
-const entry = (page) => `
-import { hydrate, mount, unmount } from "svelte";
-import Page from ${JSON.stringify(page)};
+/** The bench's script: what the page's entry gives, timed as the page hydrates and mounts again. */
+const harness = (entry) => `
+import { hydrate, mount, unmount, Page } from ${JSON.stringify(entry)};
 const evaluated = performance.now();
+const loaded = Math.max(...performance.getEntriesByType("resource").filter((resource) => resource.name.endsWith(".js")).map((resource) => resource.responseEnd));
 const target = document.getElementById("app");
 const props = JSON.parse(document.getElementById("props").textContent);
 let app = hydrate(Page, { target, props });
@@ -44,29 +49,44 @@ const text = target.textContent;
 unmount(app);
 const unmounted = performance.now();
 app = mount(Page, { target, props });
-window.bench = { started, evaluated, hydrated, mounted: performance.now() - unmounted, text };
+const mounted = performance.now() - unmounted;
+window.bench = { loaded, evaluated, hydrated, mounted, text };
 `;
 
 async function variants(app, locale) {
-	const grai = join((await graiOutput(app)).outdir, "keys.js");
+	const paraglide = await paraglideForVite(app);
+	const { outdir } = await graiOutput(app);
 	const translators = (options) =>
 		writeLibraryModules(app, locale, options).directory;
 	const page = translators({ keys: pageKeys(app), set: "page" });
 	const whole = translators();
+	const fromParaglide = {
+		library: "paraglide",
+		server: join(paraglide, "server.js"),
+		from: join(paraglide, "messages.js"),
+	};
+	const fromGrai = {
+		library: "grai",
+		server: join(outdir, "server.js"),
+		from: join(outdir, "keys.js"),
+	};
 	const i18next = (directory) => ({
+		library: "i18next",
 		from: join(directory, `${locale}.i18next.js`),
 		translate: true,
 		values: (call) => i18nextValues(app, call.key, call.inputs),
 	});
 	const intl = (directory) => ({
+		library: "use-intl",
 		from: join(directory, `${locale}.use-intl.js`),
 		translate: true,
 	});
 	return {
-		Paraglide: { from: join(await paraglideOutput(app), "messages/_index.js") },
-		"grai, the locale's copies": { from: grai, grai: { app, locale } },
-		"grai, every locale's chunks": { from: grai, grai: { app } },
+		Paraglide: fromParaglide,
+		[GRAI]: { ...fromGrai, localeChunks: true },
+		"grai, every locale's chunks": fromGrai,
 		"prototype, inlined into the template": {
+			library: "prototype",
 			from: join(writePrototype(app), `${locale}.js`),
 			inline: app.messages[locale],
 		},
@@ -77,90 +97,91 @@ async function variants(app, locale) {
 	};
 }
 
-async function documentFor(app, locale, file, variant, props) {
-	const name = `hydrate-${locale}-${file}`;
-	const source = pageSource(app, variant);
-	const { default: ServerPage } = await import(
-		writePage(app, name, source, "server")
+/**
+ * A variant's page in a locale: the app built, the page rendered by its server build inside a
+ * request and drawn into the built index.html with the request's locale, its props beside it,
+ * and the bench's script after them; with the scripts the page holds inline.
+ */
+async function documentFor(app, locale, index, variant) {
+	const root = writePageApp(app, `hydrate-${locale}-${index}`, variant);
+	const props = pageProps(app, variant.values);
+	const { render, Page, ...server } = await import(
+		await buildServer(app, root, variant)
 	);
-	const { body, head } = await inRequest(app, locale, () =>
-		render(ServerPage, { props }),
-	);
-	const page = writePage(app, name, source, "client");
-	const entryFile = page.replace(/\.client\.js$/, ".entry.js");
-	writeFileSync(entryFile, entry(page));
-	const code = await browserBundle(entryFile, {
-		banner: "const started = performance.now();",
-		grai: variant.grai,
+	// Svelte renders when the output is first read, so both are read inside the request.
+	const { head, body } = await inRequest(app, locale, server, () => {
+		const output = render(Page, { props });
+		return { head: output.head, body: output.body };
 	});
+	const client = await buildClient(app, root, variant);
 	const json = JSON.stringify(props).replaceAll("<", "\\u003c");
-	const html = benchDocument(locale, {
-		head,
-		body: `<div id="app">${body}</div><script id="props" type="application/json">${json}</script>`,
-		script: code,
-	});
-	return {
-		html,
-		bytes: {
-			raw: Buffer.byteLength(code),
-			brotli: brotliCompressSync(code).length,
-		},
-	};
+	const bench = harness(client.entry).replaceAll("</script", "<\\/script");
+	const html = client.html
+		.replace(`lang="${app.baseLocale}"`, `lang="${locale}"`)
+		.replace(APP_HEAD, () => head)
+		.replace(APP_HTML, () => body)
+		.replace(
+			"</body>",
+			() =>
+				`<script id="props" type="application/json">${json}</script><script type="module">${bench}</script></body>`,
+		);
+	return { html, directory: client.directory, inline: client.inline };
 }
 
-const median = (values) =>
-	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+/** The JS a page loads: each script it asked for and each it holds inline, compressed on its own. */
+const bytesOf = (scripts) => ({
+	raw: scripts.reduce((sum, script) => sum + script.raw, 0),
+	brotli: scripts.reduce((sum, script) => sum + script.brotli, 0),
+});
 
 /** Benches the page in a locale, and returns each variant's bytes and times, as the run measured them. */
 async function benchLocale(browser, app, locale) {
 	const recorded = [];
 	const documents = [];
-	for (const [name, variant] of Object.entries(await variants(app, locale))) {
-		const props = pageProps(app, variant.values);
+	for (const [index, [name, variant]] of Object.entries(
+		await variants(app, locale),
+	).entries())
 		documents.push({
 			name,
-			...(await documentFor(app, locale, documents.length, variant, props)),
+			page: await documentFor(app, locale, index, variant),
 		});
-	}
 	let expected;
 	for (const rate of THROTTLING) {
 		const samples = documents.map(() => []);
 		for (let run = 0; run < RUNS; run++) {
 			for (const [index, document] of documents.entries()) {
-				const result = await benchPage(
-					browser,
-					app,
-					locale,
-					document.html,
-					rate,
-				);
-				expected ??= result.text;
-				if (result.text !== expected)
+				const load = await benchPage(browser, app, locale, document.page, rate);
+				document.scripts ??= load.scripts;
+				expected ??= load.bench.text;
+				if (load.bench.text !== expected)
 					throw new Error(
 						`${document.name} hydrates other text than Paraglide in ${locale}`,
 					);
-				samples[index].push(result);
+				samples[index].push(load.bench);
 			}
 		}
 		for (const [index, document] of documents.entries()) {
 			const runs = samples[index];
-			const cell = (pick) => median(runs.map(pick)).toFixed(1);
-			recorded.push({
+			const ms = (pick) => median(runs.map(pick));
+			const bytes = bytesOf(document.scripts);
+			const row = {
 				variant: document.name,
 				locale,
 				slowdown: rate,
-				bytes: document.bytes,
+				bytes,
+				resources: document.scripts,
 				ms: {
-					starts: median(runs.map((r) => r.started)),
-					evaluates: median(runs.map((r) => r.evaluated - r.started)),
-					hydrates: median(runs.map((r) => r.hydrated - r.evaluated)),
-					hydratedAt: median(runs.map((r) => r.hydrated)),
-					mounts: median(runs.map((r) => r.mounted)),
+					starts: ms((r) => r.loaded),
+					evaluates: ms((r) => r.evaluated - r.loaded),
+					hydrates: ms((r) => r.hydrated - r.evaluated),
+					hydratedAt: ms((r) => r.hydrated),
+					mounts: ms((r) => r.mounted),
 				},
-			});
-			const kb = `${(document.bytes.brotli / 1024).toFixed(1)} (${(document.bytes.raw / 1024).toFixed(0)})`;
+			};
+			recorded.push(row);
+			const cell = (value) => value.toFixed(1);
 			console.log(
-				`| ${document.name} | ${locale} | ${rate}× | ${kb} | ${cell((r) => r.started)} | ${cell((r) => r.evaluated - r.started)} | ${cell((r) => r.hydrated - r.evaluated)} | ${cell((r) => r.hydrated)} | ${cell((r) => r.mounted)} |`,
+				`| ${document.name} | ${locale} | ${rate}× | ${(bytes.brotli / 1024).toFixed(1)} (${(bytes.raw / 1024).toFixed(0)}) | ${cell(row.ms.starts)} | ${cell(row.ms.evaluates)} | ${cell(row.ms.hydrates)} | ${cell(row.ms.hydratedAt)} | ${cell(row.ms.mounts)} |`,
 			);
 		}
 	}
@@ -170,10 +191,10 @@ async function benchLocale(browser, app, locale) {
 const browser = await chromium.launch();
 for (const app of selectedApps()) {
 	console.log(
-		`\n### ${app.name}: a page with ${PAGE_CALLS} message calls in Chromium ${browser.version()} (Paraglide ${paraglideVersion}), median of ${RUNS} loads, ms\n`,
+		`\n### ${app.name}: a page with ${PAGE_CALLS} message calls of ${pageKeys(app).length} keys in Chromium ${browser.version()} (Paraglide ${paraglideVersion}), median of ${RUNS} loads, ms\n`,
 	);
 	console.log(
-		"| variant | locale | CPU slowdown | JS KB brotli (raw) | script starts | evaluates | hydrates | hydrated at | mounts again |",
+		"| variant | locale | CPU slowdown | JS KB brotli (raw) | scripts loaded | evaluated | hydrates | hydrated at | mounts again |",
 	);
 	console.log("|---|---|---|---|---|---|---|---|---|");
 	const recorded = [];
@@ -182,6 +203,7 @@ for (const app of selectedApps()) {
 	recordResults(`hydrate-${app.id}`, recorded, {
 		app: app.name,
 		calls: PAGE_CALLS,
+		keys: pageKeys(app).length,
 		runs: RUNS,
 		chromium: browser.version(),
 	});
