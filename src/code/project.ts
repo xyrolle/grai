@@ -17,6 +17,7 @@ import { stateDirectory } from "../state-directory.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
+import { barrelsOf, holding } from "./holders.ts";
 import { Installed } from "./installed.ts";
 import { keyPathPatterns, projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
@@ -172,30 +173,6 @@ export async function readProjectCode(
 
 /** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */
 const holdsNothing: FileFacts = { modules: [] };
-
-/** Whether a module passes grai's on: whether it holds a key or more, or this key. */
-function holding(
-	graph: ModuleGraph,
-	key: string | undefined,
-): (path: string) => Promise<boolean> {
-	return async (path) => {
-		const held = await graph.keysHeld({ kind: "module", path });
-		if (held === "every") return true;
-		return key === undefined ? held.size > 0 : held.has(key);
-	};
-}
-
-/** The sources that pass grai's on. */
-async function barrelsOf(
-	paths: Iterable<string>,
-	holds: (path: string) => Promise<boolean>,
-): Promise<Set<string>> {
-	const barrels = new Set<string>();
-	for (const path of paths) {
-		if (await holds(path)) barrels.add(path);
-	}
-	return barrels;
-}
 
 /** Writes the cache; a cache that cannot be written only costs the next command its reading. */
 function saveQuietly(cache: FactsCache): void {
