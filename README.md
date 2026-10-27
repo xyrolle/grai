@@ -405,7 +405,9 @@ node:test's `mock.module` resolves through the hook from Node 24.12 and 25.1 ([n
 
 The key changes with the lockfile, which pins the parsers, and with the config. While both stay the same, each run restores the latest facts and saves its own. The facts are kept by each file's path, and a runner checks out to the same path every run.
 
-Take app B: 8,971 source files, of which 2,664 may read messages. There a check takes 3.1 s without the facts and 1.6 s with them.
+On a developer's machine, grai also knows each unchanged file by its stat (`.grai/files`), so a command reads only the files that changed since the last. A fresh checkout gives every file a new stat, so in CI grai reads each file's text and takes its facts by their hash.
+
+Take app B: 8,971 source files, of which 2,269 may read messages. A check takes 2.9 s with nothing kept, 1.8 s in CI with the facts kept, and 1.0 s on a machine where nothing changed.
 
 ## Config
 
@@ -477,7 +479,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A Next app started on a loopback address, `127.0.0.1` or `[::1]`, never answers a page:** there Next 16.4 sends each of the proxy's rewrites back to itself, and grai/next's proxy rewrites each one again. Start Next on its default host, `0.0.0.0` or the machine's address, as behind a reverse proxy, until Next ships the fix to [vercel/next.js#94745](https://github.com/vercel/next.js/issues/94745) (`docs/followups.md`).
 - **Under a CSP of hashes, a built SvelteKit page downloads its locale's message chunks and the shared ones.** The browser refuses the import map, which carries Kit's nonce but no hash yet. A CSP of nonces works, as Kit's `auto` mode gives a page it renders on request.
 - **A Vite build refuses a text that holds `!~{…}~`, such as `!~{000}~`:** that is Rolldown's placeholder for a chunk's hash, which it replaces with the hash wherever it is in a chunk's code. No way of writing it survives: Rolldown prints a string by its value, and folds an escaped template, a concatenation or a join back into one string, before the hashes go in (`docs/followups.md`).
-- **A check with no facts kept takes longer than matching text would:** 3.1 s on app B, against 1.6 s with its facts kept (see CI above). It parses each file that may read messages and resolves its imports, which is what makes its reads exact. Matching text cannot tell a read from a mention, and follows no import.
+- **A check with no facts kept takes longer than matching text would:** 2.9 s on app B, against 1.8 s with its facts kept in CI (see CI above). It parses each file that may read messages and resolves its imports, which is what makes its reads exact. Matching text cannot tell a read from a mention, and follows no import.
 - **Not supported yet:**
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, other than a currency, a unit and a time zone (`currency=$code` and `:relativetime`'s `unit=$unit` work), such as `style=$style`.
