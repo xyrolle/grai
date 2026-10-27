@@ -12,6 +12,12 @@ pnpm add -D grai
 
 Its commands and plugins need Node 22.18 or later.
 
+The output's `server.js` imports `node:async_hooks`, so a project whose type checker reads the output's JavaScript, as a SvelteKit app's reads all of `src`, needs Node's types too:
+
+```sh
+pnpm add -D @types/node
+```
+
 ## Usage
 
 Catalogs are the inlang message format, one JSON file per locale, as Paraglide reads them. `grai.config.json` names them:
