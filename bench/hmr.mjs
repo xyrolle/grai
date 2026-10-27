@@ -9,9 +9,8 @@
 // Beside them: Paraglide's own Vite plugin, which compiles again on an edit, and i18next and
 // use-intl, whose page imports the locale's JSON and accepts its update. Each page's heap, once
 // collected, is taken at load and after the edits, and against the same page with no messages
-// grai's plugin has a budget for it (HEAP_BUDGET). Each design's dev server starts cold, in a new
-// directory, and is timed from its creation until its page shows. The pages and their plugins are
-// dev-pages.mjs's. The edits go to a copy of the catalogs under .cache, never the app's.
+// grai's plugin has a budget for it (HEAP_BUDGET). The pages and their plugins are dev-pages.mjs's.
+// The edits go to a copy of the catalogs under .cache, never the app's.
 //   node hmr.mjs [app...]
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -39,8 +38,6 @@ async function measure(browser, app, design) {
 	const root = join(cacheDir, "hmr", app.id);
 	const key = writeFixture(root, app, locale, design);
 	const timings = { edits: [] };
-	// A cold start: the fixture's directory is new, with no output and no cache.
-	const startAt = performance.now();
 	const server = await createServer({
 		root,
 		configFile: false,
@@ -60,7 +57,6 @@ async function measure(browser, app, design) {
 	await page.goto(server.resolvedUrls.local[0]);
 	await page.waitForFunction(() => window.ready);
 	const load = performance.now() - loadStart;
-	const startToPage = performance.now() - startAt;
 	// What the page keeps, its messages among it: V8's heap once a full collection has run.
 	const cdp = await page.context().newCDPSession(page);
 	const retained = async () => {
@@ -144,7 +140,6 @@ async function measure(browser, app, design) {
 		heap,
 		measured: {
 			design,
-			startToPage,
 			pageLoad: load,
 			editToPage: ms("total"),
 			editToServer: ms("server"),
