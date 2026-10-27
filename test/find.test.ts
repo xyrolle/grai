@@ -6,6 +6,8 @@ import {
 	cartTest,
 	headerTsx,
 	i18nTs,
+	installPackage,
+	packageApp,
 	writeSources,
 } from "./sources.ts";
 
@@ -97,6 +99,23 @@ describe("grai find", () => {
 			`src/pick.ts:2:39: export const pick = (name: string) => m[\`cart_\${name}\`](); (may read it)`,
 			"src/pick.ts:3:38: export const all = () => Object.keys(m); (may read it)",
 			'grai: "cart_title" is in 2 catalogs and 0 call sites, and may be read at 2 other places',
+		]);
+	});
+
+	it("finds a key's call sites in a project that imports the package's entries by its name", async () => {
+		const { dir, config } = project({
+			en: { cart_title: "Your cart", cart_terms: "Read the {#b}terms{/b}" },
+		});
+		writeSources(dir, packageApp);
+		installPackage(dir);
+
+		const found = await find(config, "cart_terms");
+
+		expect(found.errors).toEqual([]);
+		expect(foundLines("cart_terms", found).toSorted()).toEqual([
+			'grai: "cart_terms" is in 1 catalog and 1 call site',
+			'messages/en.json:3:2: "cart_terms": "Read the {#b}terms{/b}"',
+			"src/Cart.tsx:7:20: <Markup parts={m.cart_terms.parts()} markup={{ b: (children) => <b>{children}</b> }} />",
 		]);
 	});
 });

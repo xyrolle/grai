@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { check } from "../src/check.ts";
 import { project } from "./project.ts";
-import { writeSources } from "./sources.ts";
+import { installPackage, packageApp, writeSources } from "./sources.ts";
 
 /** The problems check reports for the catalogs, with a source that names each key. */
 async function problemsOf(
@@ -265,5 +265,25 @@ describe("grai check's reads of a Svelte component's scripts", () => {
 		const { problems } = await check(config);
 
 		expect(problems.map(({ message }) => message)).toEqual([]);
+	});
+});
+
+describe("grai check's reads of a project that installs grai", () => {
+	it("reads a project that imports the package's entries by its name", async () => {
+		const { dir, config } = project({
+			en: {
+				cart_title: "Your cart",
+				cart_terms: "Read the {#b}terms{/b}",
+				unused: "Unused",
+			},
+		});
+		writeSources(dir, packageApp);
+		installPackage(dir);
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([
+			'messages/en.json: "unused": no shipped code under . reads the key. Remove it from every catalog, or use it.',
+		]);
 	});
 });
