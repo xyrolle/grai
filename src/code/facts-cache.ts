@@ -24,7 +24,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { FileFacts, ModuleFacts } from "./facts.ts";
+import { type FileFacts, type ModuleFacts, table } from "./facts.ts";
 
 /** What the cache holds for a file: its text's hash, and its facts' text (`keptText`). */
 type Entry = { hash: string; kept: string };
@@ -125,7 +125,12 @@ export function keptFacts(kept: string): FileFacts {
 	const tab = kept.indexOf("\t");
 	if (tab === -1) return JSON.parse(kept);
 	const facts: FileFacts = JSON.parse(kept.slice(0, tab));
-	if ("error" in facts || tab === kept.length - 1) return facts;
+	if ("error" in facts) return facts;
+	for (const module of facts.modules) {
+		module.uses = table();
+		module.aliases = table(module.aliases);
+	}
+	if (tab === kept.length - 1) return facts;
 	for (const group of kept.slice(tab + 1).split(record)) {
 		const [index, origin, json] = group.split(unit);
 		const module = facts.modules[Number(index)];

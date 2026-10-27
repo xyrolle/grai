@@ -9,6 +9,7 @@ import {
 	type Binding,
 	originOf,
 	type Span,
+	table,
 	type UseEnd,
 	type UseFact,
 	type Uses,
@@ -34,8 +35,8 @@ export function usesOf(
 	loads: readonly Node[],
 	span: (node: Span) => Span,
 ): { uses: Uses; aliases: Record<string, Alias> } {
-	const uses: Uses = {};
-	const aliases: Record<string, Alias> = {};
+	const uses: Uses = table();
+	const aliases = table<Alias>();
 	const add = (use: UseFact) => {
 		const origin = originOf(use.from);
 		const list = uses[origin];
