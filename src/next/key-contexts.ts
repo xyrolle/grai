@@ -3,10 +3,10 @@
 // "use client" one, which the SSR and browser layers both compile (`route-reach.ts`). Each route's
 // side is a context, and a key's contexts are those whose modules read it.
 import { add, type Bits, bits } from "../bits.ts";
-import { PackageEffects } from "../code/package-effects.ts";
+import type { Span } from "../code/facts.ts";
 import type { ProjectCode } from "../code/project.ts";
 import type { Reading } from "../code/reads.ts";
-import { reachedFrom } from "./route-reach.ts";
+import { routeReach } from "./route-reach.ts";
 import type { Route } from "./routes.ts";
 
 /** How many contexts there are, and each read key's, by name. */
@@ -30,13 +30,9 @@ export async function keyContexts(
 	const count = routes.length * 2;
 	const of = new Map<string, Bits>();
 	const readBy = keysReadBy(code, reading, keys);
-	const effects = new PackageEffects();
+	const reach = routeReach(code);
 	for (const [index, route] of routes.entries()) {
-		for (const { path, client } of await reachedFrom(
-			code,
-			effects,
-			route.files,
-		)) {
+		for (const { path, client } of await reach(route.files)) {
 			for (const key of readBy.get(path) ?? []) {
 				let contexts = of.get(key);
 				if (contexts === undefined) {
@@ -69,7 +65,7 @@ function keysReadBy(
 	};
 	const reexports = reexportsByPath(code);
 	for (const { path, at, key, type } of reading.reads) {
-		if (!type && !reexports.get(path)?.has(at.start)) read(path, key);
+		if (!type && !reexported(reexports.get(path), at)) read(path, key);
 	}
 	for (const { path, prefix, choices, type } of reading.reaches) {
 		if (type) continue;
@@ -79,17 +75,43 @@ function keysReadBy(
 	return readBy;
 }
 
-/** Where each source's re-exports name what they take, by the source's path. */
-function reexportsByPath(code: ProjectCode): Map<string, Set<number>> {
-	const reexports = new Map<string, Set<number>>();
+/**
+ * Where each source's re-exports are, by the source's path: the names a re-export takes, and the
+ * path of each re-export from a key's own path (`export { title } from "#i18n/messages/title.js"`),
+ * which the reading reads at the key's name in it.
+ */
+function reexportsByPath(code: ProjectCode): Map<string, ReexportPlaces> {
+	const reexports = new Map<string, ReexportPlaces>();
 	for (const [path, { facts }] of code.sources) {
 		if ("error" in facts) continue;
-		const starts = new Set<number>();
-		for (const module of facts.modules)
-			for (const fact of module.imports)
+		const places: ReexportPlaces = { names: new Set(), paths: [] };
+		for (const module of facts.modules) {
+			const stars = new Set(
+				module.exports.flatMap((fact) =>
+					"source" in fact && fact.exported === undefined ? [fact.source] : [],
+				),
+			);
+			for (const fact of module.imports) {
 				for (const { importedAt } of fact.reexports)
-					starts.add(importedAt.start);
-		if (starts.size > 0) reexports.set(path, starts);
+					places.names.add(importedAt.start);
+				if (fact.reexports.length > 0 || stars.has(fact.source))
+					places.paths.push(fact.path);
+			}
+		}
+		if (places.names.size + places.paths.length > 0)
+			reexports.set(path, places);
 	}
 	return reexports;
+}
+
+/** A source's re-exports: where each name a re-export takes is, and each re-export's path. */
+type ReexportPlaces = { names: Set<number>; paths: Span[] };
+
+/** Whether a read is a re-export's, by where it is. */
+function reexported(places: ReexportPlaces | undefined, at: Span): boolean {
+	if (places === undefined) return false;
+	return (
+		places.names.has(at.start) ||
+		places.paths.some(({ start, end }) => at.start >= start && at.start < end)
+	);
 }

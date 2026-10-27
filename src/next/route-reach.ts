@@ -5,7 +5,7 @@
 // those whose package keeps their side effects, which the bundler loads with it whatever is taken
 // (`module-links.ts`): an app's own modules keep theirs, unless its package.json says otherwise.
 import type { ModuleFacts } from "../code/facts.ts";
-import type { PackageEffects } from "../code/package-effects.ts";
+import { PackageEffects } from "../code/package-effects.ts";
 import type { ProjectCode } from "../code/project.ts";
 import { type ModuleLink, takenThrough, union } from "../module-links.ts";
 
@@ -18,50 +18,122 @@ type Visit = Reached & { takes: ReadonlySet<string> | "*" };
 /**
  * The project's modules a route's files reach: each module of the sources once on each side.
  * A module the sources do not hold, a package's or the output's, reads none of the app's keys and
- * is not followed. Imports for types alone load nothing.
+ * is not followed. Imports for types alone load nothing. What it learns of packages and of the
+ * names each module exports, it keeps for the routes after.
  */
-export async function reachedFrom(
+export function routeReach(
 	code: ProjectCode,
-	effects: PackageEffects,
-	files: readonly string[],
-): Promise<Reached[]> {
-	const reached: Reached[] = [];
-	const taken = new Map<string, ReadonlySet<string> | "*">();
-	const pending: Visit[] = files.map((path) => ({
-		path,
-		client: false,
-		takes: "*",
-	}));
-	for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
-		const facts = code.sources.get(next.path)?.facts;
-		if (facts === undefined || "error" in facts) continue;
-		const client =
-			next.client ||
-			facts.modules.some(({ directives }) => directives.includes("use client"));
-		const seenAs = `${client}\0${next.path}`;
-		const before = taken.get(seenAs);
-		const takes =
-			before === undefined ? next.takes : union([before, next.takes]);
-		if (before !== undefined && covers(before, takes)) continue;
-		taken.set(seenAs, takes);
-		if (before === undefined) reached.push({ path: next.path, client });
-		const reexportsOnly = facts.modules.every((module) => module.reexportsOnly);
-		for (const module of facts.modules) {
-			for (const link of linksOf(module)) {
-				const passed =
-					link.exports === undefined
-						? reexportsOnly
-							? undefined
-							: link.takes
-						: takenThrough(link, takes, () => true);
-				const target = await code.graph.resolve(link.source, next.path);
-				if (target === undefined || !code.sources.has(target)) continue;
-				if (passed === undefined && !effects.keeps(target)) continue;
-				pending.push({ path: target, client, takes: passed ?? new Set() });
+): (files: readonly string[]) => Promise<Reached[]> {
+	const effects = new PackageEffects();
+	const exported = exportedNames(code);
+	return async (files) => {
+		const reached: Reached[] = [];
+		const taken = new Map<string, ReadonlySet<string> | "*">();
+		const pending: Visit[] = files.map((path) => ({
+			path,
+			client: false,
+			takes: "*",
+		}));
+		for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+			const facts = code.sources.get(next.path)?.facts;
+			if (facts === undefined || "error" in facts) continue;
+			const client =
+				next.client ||
+				facts.modules.some(({ directives }) =>
+					directives.includes("use client"),
+				);
+			const seenAs = `${client}\0${next.path}`;
+			const before = taken.get(seenAs);
+			const takes =
+				before === undefined ? next.takes : union([before, next.takes]);
+			if (before !== undefined && covers(before, takes)) continue;
+			taken.set(seenAs, takes);
+			if (before === undefined) reached.push({ path: next.path, client });
+			const reexportsOnly = facts.modules.every(
+				(module) => module.reexportsOnly,
+			);
+			for (const module of facts.modules) {
+				const links = linksOf(module);
+				const named = namedIn(links);
+				for (const link of links) {
+					const target = await code.graph.resolve(link.source, next.path);
+					if (target === undefined || !code.sources.has(target)) continue;
+					// An `export *` passes on a name only when its source exports it, and never
+					// `default` or a name the module re-exports by name.
+					const theirs = link.exports === "*" ? await exported(target) : "*";
+					const passed =
+						link.exports === undefined
+							? reexportsOnly
+								? undefined
+								: link.takes
+							: takenThrough(
+									link,
+									takes,
+									(name) =>
+										name !== "default" &&
+										!named.has(name) &&
+										(theirs === "*" || theirs.has(name)),
+								);
+					if (passed === undefined && !effects.keeps(target)) continue;
+					pending.push({ path: target, client, takes: passed ?? new Set() });
+				}
 			}
 		}
-	}
-	return reached;
+		return reached;
+	};
+}
+
+/** The names a module's links re-export by name, which no `export *` beside them passes on. */
+function namedIn(links: readonly ModuleLink[]): ReadonlySet<string> {
+	return new Set(
+		links.flatMap(({ exports }) =>
+			exports instanceof Map ? [...exports.keys()] : [],
+		),
+	);
+}
+
+/**
+ * The names each module of the sources exports, by its path, an `export *`'s too, which passes on
+ * each name its source exports but `default`; `*`, any name, for a module the sources do not hold,
+ * whose exports the walk does not know.
+ */
+function exportedNames(
+	code: ProjectCode,
+): (path: string) => Promise<ReadonlySet<string> | "*"> {
+	const known = new Map<string, Promise<ReadonlySet<string> | "*">>();
+	const of = async (
+		path: string,
+		seen: ReadonlySet<string>,
+	): Promise<ReadonlySet<string> | "*"> => {
+		const facts = code.sources.get(path)?.facts;
+		if (facts === undefined || "error" in facts) return "*";
+		// A cycle of `export *` adds no name.
+		if (seen.has(path)) return new Set();
+		const names = new Set<string>();
+		for (const module of facts.modules) {
+			for (const fact of module.exports) {
+				if (fact.exported !== undefined) {
+					names.add(fact.exported);
+					continue;
+				}
+				if (!("source" in fact)) continue;
+				const source = await code.graph.resolve(fact.source, path);
+				if (source === undefined) continue;
+				const theirs = await of(source, new Set([...seen, path]));
+				if (theirs === "*") return "*";
+				for (const name of theirs) if (name !== "default") names.add(name);
+			}
+		}
+		return names;
+	};
+	return (path) => {
+		let names = known.get(path);
+		if (names === undefined) {
+			names = of(path, new Set());
+			known.set(path, names);
+		}
+		return names;
+	};
 }
 
 /** Whether names taken before cover those taken now. */
