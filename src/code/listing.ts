@@ -16,10 +16,10 @@ import {
 	mkdirSync,
 	readFileSync,
 	renameSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { stat } from "node:fs/promises";
+import { dirname, join, relative, sep } from "node:path";
 import { type Seen, sourcePaths } from "../sources.ts";
 import { specifiersIn, spellsOtherwise } from "./candidates.ts";
 import { textHash } from "./facts-cache.ts";
@@ -70,15 +70,28 @@ export class FileListing {
 	 * The source files under the roots, as `sourceFiles` lists them. The listing keeps what it
 	 * kept of a file outside the roots, and drops a file gone from under them.
 	 */
-	list(
+	async list(
 		roots: readonly string[],
 		projectRoot: string,
 		outdir: string,
 		seen: Seen,
-	): Listed[] {
-		const listed = sourcePaths(roots, outdir, seen).map((path) =>
-			this.listed(path, relative(projectRoot, path)),
+	): Promise<Listed[]> {
+		const paths = sourcePaths(roots, outdir, seen);
+		// Every file's stat at once, on the system's threads, all taken after this time.
+		const checked = Date.now();
+		const stated = await Promise.all(
+			paths.map(async (path) => ({
+				path,
+				stat: await stat(path, { bigint: true }),
+			})),
 		);
+		const below = `${projectRoot}${sep}`;
+		const listed = stated.map(({ path, stat }) => {
+			const file = path.startsWith(below)
+				? path.slice(below.length)
+				: relative(projectRoot, path);
+			return this.listed(path, file, stat, checked);
+		});
 		for (const [path, kept] of this.read) {
 			if (this.kept.has(path)) continue;
 			if (roots.some((root) => path.startsWith(`${root}/`))) {
@@ -100,9 +113,12 @@ export class FileListing {
 		renameSync(temporary, this.file);
 	}
 
-	private listed(path: string, file: string): Listed {
-		const checked = Date.now();
-		const stat = statSync(path, { bigint: true });
+	private listed(
+		path: string,
+		file: string,
+		stat: BigIntStats,
+		checked: number,
+	): Listed {
 		const known = this.read.get(path);
 		if (known !== undefined && unchanged(known, stat)) {
 			this.kept.set(path, known);

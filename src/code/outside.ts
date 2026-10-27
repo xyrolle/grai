@@ -74,8 +74,17 @@ export class Outside {
 	/** How many directories a listed source is below the root it is listed under. */
 	depth(path: string): number {
 		const root = this.roots.find((each) => within(path, each));
-		const below = root === undefined ? "" : relative(root, dirname(path));
-		return below === "" ? 0 : below.split(sep).length;
+		if (root === undefined) return 0;
+		// A separator for each directory between the root and the file.
+		let depth = 0;
+		for (
+			let at = path.indexOf(sep, root.length + 1);
+			at !== -1;
+			at = path.indexOf(sep, at + 1)
+		) {
+			depth += 1;
+		}
+		return depth;
 	}
 
 	/**
@@ -107,6 +116,8 @@ function segments(path: string): string[] {
 
 /** Whether a path from a directory `depth` levels below its root climbs out of it at some step. */
 function climbsOut(path: string, depth: number): boolean {
+	// Only a segment `..` climbs.
+	if (!path.includes("..")) return false;
 	let level = depth;
 	for (const each of segments(path)) {
 		level += each === ".." ? -1 : 1;

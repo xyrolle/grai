@@ -12,9 +12,9 @@ import { FileListing } from "../src/code/listing.ts";
 import { projectWith } from "./reading.ts";
 
 /** A listing of a project's `src`, kept in its outdir's state, as a reading lists it. */
-function listingOf(dir: string) {
+async function listingOf(dir: string) {
 	const listing = new FileListing(join(dir, "out/.grai"), "version");
-	const files = listing.list([join(dir, "src")], dir, join(dir, "out"), {
+	const files = await listing.list([join(dir, "src")], dir, join(dir, "out"), {
 		links: [],
 		manifests: [],
 		skipped: [],
@@ -51,11 +51,11 @@ const readLater = (entry: unknown[]) => {
 };
 
 describe("a listing of the sources that knows a file by its stat", () => {
-	it("takes a file whose stat is the one kept, and its times a tick older than its reading, as unchanged", () => {
+	it("takes a file whose stat is the one kept, and its times a tick older than its reading, as unchanged", async () => {
 		const dir = projectWith({ "src/a.ts": 'import "./b.ts";\n' });
 		const a = join(dir, "src/a.ts");
 		aged(a);
-		listingOf(dir);
+		await listingOf(dir);
 		// What the listing keeps of a.ts, but for another text, which it takes on the stat alone.
 		plantedEntry(dir, a, (entry) => {
 			readLater(entry);
@@ -63,16 +63,16 @@ describe("a listing of the sources that knows a file by its stat", () => {
 			entry[7] = ["./planted.ts"];
 		});
 
-		const a2 = listingOf(dir).get("src/a.ts");
+		const a2 = (await listingOf(dir)).get("src/a.ts");
 
 		expect([a2?.hash, a2?.specifiers]).toEqual(["planted", ["./planted.ts"]]);
 		expect(a2?.text).toBe('import "./b.ts";\n');
 	});
 
-	it("reads a file again by its content when it changed within a tick of its reading, though its stat is the one kept", () => {
+	it("reads a file again by its content when it changed within a tick of its reading, though its stat is the one kept", async () => {
 		const dir = projectWith({ "src/a.ts": 'import "./b.ts";\n' });
 		const a = join(dir, "src/a.ts");
-		listingOf(dir);
+		await listingOf(dir);
 		// An edit within the same second, of the same size, whose times the system keeps no finer.
 		writeFileSync(a, 'import "./c.ts";\n');
 		const stat = statSync(a, { bigint: true });
@@ -87,26 +87,28 @@ describe("a listing of the sources that knows a file by its stat", () => {
 			);
 		});
 
-		const a2 = listingOf(dir).get("src/a.ts");
+		const a2 = (await listingOf(dir)).get("src/a.ts");
 
 		expect(a2?.hash).toBe(textHash('import "./c.ts";\n'));
 		expect(a2?.specifiers).toEqual(["./c.ts"]);
 	});
 
-	it("reads a file again after an edit of the same size whose modification time was put back", () => {
+	it("reads a file again after an edit of the same size whose modification time was put back", async () => {
 		const dir = projectWith({ "src/a.ts": 'import "./b.ts";\n' });
 		const a = join(dir, "src/a.ts");
 		aged(a);
-		listingOf(dir);
+		await listingOf(dir);
 		plantedEntry(dir, a, readLater);
 		const { atime, mtime } = statSync(a);
 		writeFileSync(a, 'import "./c.ts";\n');
 		utimesSync(a, atime, mtime);
 
-		expect(listingOf(dir).get("src/a.ts")?.specifiers).toEqual(["./c.ts"]);
+		expect((await listingOf(dir)).get("src/a.ts")?.specifiers).toEqual([
+			"./c.ts",
+		]);
 	});
 
-	it("reads a file again when another file of the same size and times is renamed over it", () => {
+	it("reads a file again when another file of the same size and times is renamed over it", async () => {
 		const dir = projectWith({
 			"src/a.ts": 'import "./b.ts";\n',
 			"src/next.txt": 'import "./c.ts";\n',
@@ -115,27 +117,29 @@ describe("a listing of the sources that knows a file by its stat", () => {
 		const next = join(dir, "src/next.txt");
 		aged(a);
 		aged(next);
-		listingOf(dir);
+		await listingOf(dir);
 		plantedEntry(dir, a, readLater);
 		renameSync(next, a);
 
-		expect(listingOf(dir).get("src/a.ts")?.specifiers).toEqual(["./c.ts"]);
+		expect((await listingOf(dir)).get("src/a.ts")?.specifiers).toEqual([
+			"./c.ts",
+		]);
 	});
 
-	it("reads a touched file again, keeps its hash, and takes it on its stat after that", () => {
+	it("reads a touched file again, keeps its hash, and takes it on its stat after that", async () => {
 		const dir = projectWith({ "src/a.ts": 'import "./b.ts";\n' });
 		const a = join(dir, "src/a.ts");
 		aged(a);
-		const hash = listingOf(dir).get("src/a.ts")?.hash;
+		const hash = (await listingOf(dir)).get("src/a.ts")?.hash;
 		plantedEntry(dir, a, readLater);
 		aged(a, 1_800);
 
-		expect(listingOf(dir).get("src/a.ts")?.hash).toBe(hash);
+		expect((await listingOf(dir)).get("src/a.ts")?.hash).toBe(hash);
 		// Once its change is a tick older than its reading, a listing that reads nothing again
 		// writes nothing, so the same file stays.
 		plantedEntry(dir, a, readLater);
 		const file = statSync(listingFile(dir)).ino;
-		listingOf(dir);
+		await listingOf(dir);
 		expect(statSync(listingFile(dir)).ino).toBe(file);
 	});
 });
