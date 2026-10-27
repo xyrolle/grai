@@ -94,18 +94,20 @@ function readPath(
 	key: string,
 ): void {
 	const imported = fact.names.find((name) => name.imported === key);
-	const literal = source.text.slice(fact.path.start, fact.path.end);
 	const segment = fact.source.lastIndexOf("/") + 1;
-	const plain = literal.slice(1, -1) === fact.source;
+	// An escape writes more than the character it stands for, so a path written as long as its
+	// value and its quotes is written plainly, and its text needs no reading.
+	const plain = fact.path.end - fact.path.start === fact.source.length + 2;
 	const start = fact.path.start + 1 + segment;
 	const at = plain ? { start, end: start + key.length } : fact.path;
+	const literal = () => source.text.slice(fact.path.start, fact.path.end);
 	const edits: Edit[] = [
 		plain
 			? { at, before: "", after: "" }
 			: {
 					at,
-					before: `${literal[0]}${fact.source.slice(0, segment)}`,
-					after: `${fact.source.slice(segment + key.length)}${literal.at(-1)}`,
+					before: `${literal()[0]}${fact.source.slice(0, segment)}`,
+					after: `${fact.source.slice(segment + key.length)}${literal().at(-1)}`,
 				},
 	];
 	if (imported !== undefined)

@@ -140,8 +140,16 @@ export function read(
 		written?: string;
 	},
 ): Read {
-	const { written = text(place.source, place.at), ...rest } = fields;
-	return { ...place, ...rest, written };
+	const { written, ...rest } = fields;
+	if (written !== undefined) return { ...place, ...rest, written };
+	// The text it reads by, taken from the file only when a report asks for it.
+	return {
+		...place,
+		...rest,
+		get written() {
+			return text(place.source, place.at);
+		},
+	};
 }
 
 export function reachAt(
@@ -149,8 +157,15 @@ export function reachAt(
 	{ prefix, choices }: { prefix: string; choices: string[] | undefined },
 	type: boolean,
 ): Reach {
-	const written = text(place.source, place.at);
-	return { ...place, written, prefix, choices, type };
+	return {
+		...place,
+		prefix,
+		choices,
+		type,
+		get written() {
+			return text(place.source, place.at);
+		},
+	};
 }
 
 function text({ text: file }: SourceCode, at: Span): string {
