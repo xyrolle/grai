@@ -161,6 +161,11 @@ export type ModuleFacts = {
 	aliases: Record<string, Alias>;
 	/** Where in the file an import of the module's own may go, if it may take one. */
 	importsAt: number | undefined;
+	/**
+	 * The directives the module opens with, as `"use client"`, which tells React where its code runs:
+	 * Next reads it to put a module, and every module it imports, in the client's graphs.
+	 */
+	directives: string[];
 };
 
 /**
@@ -230,7 +235,22 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 		uses,
 		aliases,
 		importsAt: source.importsAt,
+		directives: directivesOf(program),
 	};
+}
+
+/** The directives that open a module's code: the leading statements that are each one. */
+function directivesOf(program: { body: readonly Node[] }): string[] {
+	const directives: string[] = [];
+	for (const statement of program.body) {
+		if (
+			statement.type !== "ExpressionStatement" ||
+			typeof statement.directive !== "string"
+		)
+			break;
+		directives.push(statement.directive);
+	}
+	return directives;
 }
 
 /** The file's span of a node of the module's code. */
