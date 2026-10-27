@@ -357,3 +357,73 @@ it("places the keys by the groups saved in the running server at its next catalo
 	expect(moduleOf(dir, "de key7, edited")).toMatch(/^keys\/g0-/);
 	expect(moduleOf(dir, "de key900")).toMatch(/^keys\/g1-/);
 });
+
+it("groups apart the keys two routes take through one barrel, and a re-exported client component's with every route that loads its barrel, as each layer compiles them", {
+	timeout: 240_000,
+}, async () => {
+	const dir = nextProject(
+		1200,
+		{
+			"app/messages.js": 'export { key100, key200 } from "../i18n/keys.js";\n',
+			"app/components.js":
+				'export { Hello } from "./hello.jsx";\nexport { Bye } from "./bye.jsx";\n',
+			"app/hello.jsx": `"use client";
+import * as m from "../i18n/keys.js";
+
+export function Hello() {
+	return <p>{m.key300({}, { locale: "de" })}</p>;
+}
+`,
+			"app/bye.jsx": `"use client";
+import * as m from "../i18n/keys.js";
+
+export function Bye() {
+	return <p>{m.key400({}, { locale: "de" })}</p>;
+}
+`,
+			"app/a/page.jsx": `import { key100 } from "../messages.js";
+import { Hello } from "../components.js";
+
+export default function A() {
+	return <main>{key100({}, { locale: "de" })}<Hello /></main>;
+}
+`,
+			"app/b/page.jsx": `import { key200 } from "../messages.js";
+import { Bye } from "../components.js";
+
+export default function B() {
+	return <main>{key200({}, { locale: "de" })}<Bye /></main>;
+}
+`,
+		},
+		{ withGrai: true },
+	);
+	const first = await started(dir);
+	await requested(first.origin, "/a");
+	await requested(first.origin, "/b");
+	// The app's own modules keep their side effects, so a route that loads the components' barrel
+	// compiles both components, and their keys go together.
+	expect(await savedGroups(dir, (groups) => groups.length > 0)).toEqual([
+		["key100"],
+		["key200"],
+		["key300", "key400"],
+	]);
+	await stopped(first.server);
+
+	for (const [route, server] of [
+		["/a", "de key100"],
+		["/b", "de key200"],
+	] as const) {
+		rmSync(join(dir, ".next"), { recursive: true, force: true });
+		const { server: running, origin } = await started(dir);
+		expect(await requested(origin, route)).toContain(server);
+		const client = moduleOf(dir, "de key300");
+		expect(moduleOf(dir, "de key400")).toBe(client);
+		expect(compiledKeys(dir)).toEqual({
+			"app-rsc": [moduleOf(dir, server)],
+			"app-ssr": [client],
+			"app-client": [client],
+		});
+		await stopped(running);
+	}
+});
