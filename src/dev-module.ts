@@ -24,18 +24,32 @@ ${callRows}
 `;
 
 /**
+ * The positions in the config's `locales` whose variants the table's rows hold, in order, and how
+ * many locales there are: every locale's for a server, the page's alone for a page.
+ */
+const slotsCode = (slots: readonly number[], count: number) =>
+	`const slots = ${JSON.stringify(slots)};
+const count = ${count};
+`;
+
+/**
  * The dev module's code after its table: the hook a call names its key to, each key's live
- * variants, and each key's message made from them. The messages are made in a function of their
- * own: V8 compiles a function whose loop runs long, and with the loop over every key in the
- * module's top level, it compiled the whole top level, which a page then kept, 2.4 MB on a catalog
- * of 13,326 keys in three locales.
+ * variants, one per locale, none for a locale the table does not hold, and each key's message made
+ * from them, and how a patch's row, which holds every locale, is taken into the table. The
+ * messages are made in a function of their own: V8 compiles a function whose loop runs long, and
+ * with the loop over every key in the module's top level, it compiled the whole top level, which a
+ * page then kept, 2.4 MB on a catalog of 13,326 keys in three locales.
  */
 const madeCode = `const read = Symbol.for(${JSON.stringify(readHook)});
-const live = (key, field) => [...T[key][field].map((_, n) => (inputs) => {
-	globalThis[read]?.(key);
-	const variant = T[key][field][n];
-	return typeof variant === "function" ? variant(inputs) : variant;
+const live = (key, field) => [...Array.from({ length: count }, (_, n) => {
+	const at = slots.indexOf(n);
+	return at === -1 ? undefined : (inputs) => {
+		globalThis[read]?.(key);
+		const variant = T[key][field][at];
+		return typeof variant === "function" ? variant(inputs) : variant;
+	};
 }), key];
+const taken = (row) => ({ v: slots.map((n) => row.v[n]), ...(row.p === undefined ? {} : { p: slots.map((n) => row.p[n]) }) });
 const made = (() => {
 	const made = Object.create(null);
 	for (const key in T) made[key] = T[key].p === undefined ? message(...live(key, "v")) : markup(live(key, "v"), live(key, "p"));
@@ -56,7 +70,7 @@ const patchCode = (version: number) => `if (import.meta.hot) {
 		if (patch.version !== version) return;
 		version += 1;
 		const { rows } = await import(/* @vite-ignore */ patch.url);
-		for (const [key, row] of Object.entries(rows)) Object.assign(T[key], row);
+		for (const [key, row] of Object.entries(rows)) Object.assign(T[key], taken(row));
 		if (typeof window === "undefined") return import.meta.hot.send(${JSON.stringify(patchedEvent)});
 		const detail = { keys: Object.keys(rows) };
 		if (window.dispatchEvent(new CustomEvent(${JSON.stringify(changeEvent)}, { cancelable: true, detail }))) location.reload();
@@ -71,7 +85,9 @@ const patchCode = (version: number) => `if (import.meta.hot) {
  * of its own.
  */
 const devWords = new Set(
-	`${table("", "")}${madeCode}${patchCode(0)}`.match(/[A-Za-z_$][\w$]*/g),
+	`${slotsCode([], 0)}${table("", "")}${madeCode}${patchCode(0)}`.match(
+		/[A-Za-z_$][\w$]*/g,
+	),
 );
 
 /**
@@ -82,21 +98,34 @@ const devWords = new Set(
  * first passes its key to `globalThis[Symbol.for("grai.read")]`, if an adapter set it, so the
  * adapter knows which renders read which keys. A server's runner sends `grai:patched` once it has
  * written the patch. `version` is how many patches the server has made, every one of which the
- * build has. Each key passes its name after its variants, for the runtime's errors to name. A
- * build leaves names out: they would add about a third to a page's gzipped message bytes.
+ * build has. Each key passes its name after its variants, one for each of the config's locales,
+ * for the runtime's errors to name. A build leaves names out: they would add about a third to a
+ * page's gzipped message bytes.
+ *
+ * With `locale`, the module is a page's in that locale: its table holds that locale's variants
+ * alone, and each key's other variants are none, which the runtime refuses to call, as a page
+ * renders in its locale alone. A server's module holds every locale's.
  */
 export function devModule(
 	outdir: string,
 	build: Build,
 	version: number,
+	locale?: string,
 ): string {
+	const { locales } = build.config;
+	const slots =
+		locale === undefined
+			? locales.map((_, index) => index)
+			: [locales.indexOf(locale)];
+	const held = (variants: readonly string[]) =>
+		slots.map((slot) => variants[slot]);
 	const keys = [...build.compilation.keys];
 	const texts = keys.filter(([, compiled]) => compiled.kind === "text");
 	const calls = keys.filter(([, compiled]) => compiled.kind !== "text");
 	const textRows = texts
 		.map(
 			([key, compiled]) =>
-				`${JSON.stringify(key)}:{"v":[${compiled.variants.join(",")}]}`,
+				`${JSON.stringify(key)}:{"v":[${held(compiled.variants).join(",")}]}`,
 		)
 		.join(",");
 	const names = calledNames(build.compilation.keys.values(), [
@@ -104,14 +133,45 @@ export function devModule(
 		"message",
 	]);
 	const callRows = calls
-		.map(([key, compiled]) => `\t${identifierKey(key)}: ${row(compiled)},`)
+		.map(
+			([key, compiled]) => `\t${identifierKey(key)}: ${row(compiled, held)},`,
+		)
 		.join("\n");
 	return `${outputImports(names, (file) => join(outdir, file), build.rendered.modules)}
-${table(textRows, callRows)}${madeCode}${destructuredExports(
+${slotsCode(slots, locales.length)}${table(textRows, callRows)}${madeCode}${destructuredExports(
 	"made",
 	keys.map(([key]) => key),
 	new Set([...everyName(names), ...devWords]),
 )}${patchCode(version)}`;
+}
+
+/**
+ * The code of keys.js for a page that no import map points at its locale's: it takes the module of
+ * the page's locale, by the page's `<html lang>`, as the runtime reads the locale, from beside its
+ * own URL, and exports its keys. It holds no words, so it costs little where Vite takes it ahead of
+ * a page, as it takes every module a page's modules import, while the page itself loads its
+ * locale's module through its import map.
+ */
+const shellCode = (locales: readonly string[], baseLocale: string) =>
+	`const locales = ${JSON.stringify(locales)};
+const lang = document.documentElement.lang;
+const url = new URL(import.meta.url);
+url.pathname += \`/\${locales.includes(lang) ? lang : ${JSON.stringify(baseLocale)}}\`;
+url.search = "";
+const keys = await import(/* @vite-ignore */ url.href);
+`;
+
+/** Every word of the shell's own code, which a key's export takes no name of. */
+const shellWords = new Set(shellCode([], "").match(/[A-Za-z_$][\w$]*/g));
+
+/** keys.js for a page in dev, with no import map to its locale's (`shellCode`). */
+export function pageKeysShell(build: Build): string {
+	const { locales, baseLocale } = build.config;
+	return `${shellCode(locales, baseLocale)}${destructuredExports(
+		"keys",
+		[...build.compilation.keys.keys()],
+		shellWords,
+	)}`;
 }
 
 /**
@@ -139,15 +199,20 @@ export function patchModule(
 	const keys = changed.flatMap((key) => build.compilation.keys.get(key) ?? []);
 	const rows = changed.map(
 		(key) =>
-			`\t${identifierKey(key)}: ${row(build.compilation.keys.get(key))},`,
+			`\t${identifierKey(key)}: ${row(build.compilation.keys.get(key), (variants) => variants)},`,
 	);
 	return `${outputImports(calledNames(keys, []), (file) => join(outdir, file), build.rendered.modules)}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }
 
-/** A key's row in the dev table: its locales' variants, and their parts for markup. */
-function row(compiled: CompiledKey | undefined): string {
+/** A key's row in the dev table: the variants `held` keeps of its locales', and their parts for markup. */
+function row(
+	compiled: CompiledKey | undefined,
+	held: (variants: readonly string[]) => readonly (string | undefined)[],
+): string {
 	if (compiled === undefined) return "{}";
 	const parts =
-		compiled.kind === "markup" ? `, p: [${compiled.parts.join(", ")}]` : "";
-	return `{ v: [${compiled.variants.join(", ")}]${parts} }`;
+		compiled.kind === "markup"
+			? `, p: [${held(compiled.parts).join(", ")}]`
+			: "";
+	return `{ v: [${held(compiled.variants).join(", ")}]${parts} }`;
 }
