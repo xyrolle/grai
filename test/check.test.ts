@@ -150,10 +150,23 @@ describe("grai check's modules, named as the bundler names them", () => {
 describe("grai check's reads of a Svelte component's scripts", () => {
 	it("reads a Svelte component's instance script and template in a scope of their own, inside its module script's", async () => {
 		const { dir, config } = project({
-			en: { title: "Title" },
-			de: { title: "Titel" },
+			en: { title: "Title", subtitle: "Subtitle", note: "Note" },
+			de: { title: "Titel", subtitle: "Untertitel", note: "Hinweis" },
 		});
 		writeSources(dir, {
+			"src/Labelled.svelte": [
+				"<script module>",
+				"\texport const kind = 1;",
+				"</script>",
+				"<script>",
+				'\timport { m } from "../out/messages.js";',
+				"\texport let label = m.subtitle();",
+				"\tconst noted = () => m.note();",
+				"\texport { noted };",
+				"</script>",
+				"<p>{label} {noted()}</p>",
+				"",
+			].join("\n"),
 			"src/Heading.svelte": [
 				"<script module>",
 				'\timport * as messages from "../out/messages.js";',
