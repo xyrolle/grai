@@ -26,7 +26,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { requestBytes } from "../src/key-sets.ts";
-import { localeCopies } from "../src/locale-chunks.ts";
+import { localeCopies } from "../src/locale-copies.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { fixtures, type Messages, outputFile, project } from "./project.ts";
 

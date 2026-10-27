@@ -13,11 +13,11 @@ import {
 	isMessageModule,
 	keyModulePrefix,
 	keyPrefix,
-	localeCopies,
 	messageOnly,
 	outputPrefix,
 	textModulePrefix,
 } from "./locale-chunks.ts";
+import { localeCopies } from "./locale-copies.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
 
