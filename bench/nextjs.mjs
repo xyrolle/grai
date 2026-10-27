@@ -12,8 +12,8 @@
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
 // - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
-//   is complete, and the CPU of Next's processes until then, COLD_ROUNDS times for each app, the apps
-//   taking turns, so the load from other work weighs on both alike.
+//   is complete, and the CPU of Next's processes until then, COLD_ROUNDS times for each app in
+//   rotating order, with each round's paired differences (next-cold.mjs).
 // Every first response is checked to list each of the page's messages.
 import { spawnSync } from "node:child_process";
 import {
@@ -28,12 +28,18 @@ import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeNextApps } from "./next-apps.mjs";
+import {
+	COLD_ROUNDS,
+	coldApps,
+	coldRounds,
+	coldSummary,
+	printCold,
+} from "./next-cold.mjs";
 import { devStart, next, nextEnv, nextVersion, started } from "./next-dev.mjs";
 import { recordResults } from "./results.mjs";
 import { stopServer } from "./servers.mjs";
 
 const EDITS = 7;
-const COLD_ROUNDS = 7;
 const SAVE_INTERVAL_MS = 1500;
 
 const brotli = (bytes) =>
@@ -203,7 +209,7 @@ for (const app of selectedApps()) {
 		bytes[name] = await pageBytes(browser, root, path);
 	}
 	const total = ({ document, script, other }) => document + script + other;
-	const recorded = { bytes, dev: {}, cold: {} };
+	const recorded = { bytes, dev: {}, cold: {}, pairs: [] };
 	for (const [name, sizes] of Object.entries(bytes)) {
 		console.log(
 			`| ${name} | ${kb(sizes.document)} | ${kb(sizes.script)} | ${kb(sizes.other)} | ${kb(total(sizes))} | ${name === "plain" ? "" : kb(total(sizes) - total(bytes.plain))} |`,
@@ -255,30 +261,18 @@ for (const app of selectedApps()) {
 		};
 	}
 
-	console.log(
-		`\n\`next dev\` from an empty .next, from its launch until the page's first response, the apps taking turns, median of ${COLD_ROUNDS}, ms\n`,
-	);
-	console.log("| app | ready | page | CPU until the page |");
-	console.log("|---|---|---|---|");
-	const runs = { grai: [], "next-intl": [] };
-	for (let round = 0; round < COLD_ROUNDS; round++) {
-		const order =
-			round % 2 === 0 ? ["grai", "next-intl"] : ["next-intl", "grai"];
-		for (const name of order) {
-			const run = await devStart(apps[name], path, words, { empty: true });
-			await stopServer(run.server.child);
-			runs[name].push({ ready: run.ready, page: run.page, cpu: run.cpu });
-		}
+	const cold = coldApps(apps);
+	const runs = await coldRounds(cold, path, words, COLD_ROUNDS);
+	const summary = coldSummary(runs, cold.length);
+	printCold(summary, COLD_ROUNDS);
+	for (const [name, measures] of Object.entries(summary.apps)) {
+		const medians = Object.entries(measures).map(([measure, { median }]) => [
+			measure,
+			median,
+		]);
+		recorded.cold[name] = { ...Object.fromEntries(medians), runs: runs[name] };
 	}
-	for (const [name, samples] of Object.entries(runs)) {
-		const ready = median(samples.map((run) => run.ready));
-		const page = median(samples.map((run) => run.page));
-		const cpu = median(samples.map((run) => run.cpu));
-		console.log(
-			`| ${name} | ${ready.toFixed(0)} | ${page.toFixed(0)} | ${cpu.toFixed(0)} |`,
-		);
-		recorded.cold[name] = { ready, page, cpu, runs: samples };
-	}
+	recorded.pairs = summary.pairs;
 	recordResults(`nextjs-${app.id}`, recorded, {
 		app: app.name,
 		locale,
