@@ -9,13 +9,24 @@ grai compile
 ```
 
 - **`grai import`** writes the grai catalogs, and `grai.import.json` beside the config. That file maps each key as the app's calls name it to its grai key and the inputs it takes, so any tool can migrate a call by looking it up.
-- **`grai migrate`** rewrites each call that names its message plainly as a call of the grai message, and imports `m` from the outdir's `messages.js`. In a Next app, one whose package.json depends on `next`, it imports `m` as the namespace of `keys.js` instead (`import * as m from "…/keys.js"`), which `next dev` reads key by key (README, Next.js). Once every call of a `t` or an `intl` is rewritten, it removes the hook call that gave it, its place in React's hook dependencies, and the imports nothing uses. Every other call is listed with its file, line and the reason, and stays as it is: a call it cannot read for certain is never guessed. It writes every file or none, and a second run changes nothing it has done. `--source <dir>` limits it to some directories.
+- **`grai migrate`** rewrites each call that names its message plainly as a call of the grai message, and imports `m` from the outdir's `messages.js`. In a Next app, one whose package.json depends on `next`, it imports `m` as the namespace of `keys.js` instead (`import * as m from "…/keys.js"`), which `next dev` reads key by key ([Frameworks, Next.js](frameworks.md#nextjs)). Once every call of a `t` or an `intl` is rewritten, it removes the hook call that gave it, its place in React's hook dependencies, and the imports nothing uses. Every other call is listed with its file, line and the reason, and stays as it is: a call it cannot read for certain is never guessed. It writes every file or none, and a second run changes nothing it has done. `--source <dir>` limits it to some directories.
 - **A call it cannot prove safe stays as it is**, with a note. That covers a locale or a default value that may read otherwise once the rewrite moves or drops it, an `m` that names another import, and a list a hook that is not React's takes.
 - **What is left** is the list it prints: the calls to migrate by hand, then the library's own API, such as its provider, its setup and its locale switch, which grai's runtime and middleware replace.
 
 `grai migrate` reads JavaScript and TypeScript modules, JSX included, with grai's parser, oxc's. It lists each Svelte, Vue, Astro or MDX component that imports the library, read through the component's own parser as `grai check` reads it, for a person to migrate.
 
 Each library has a small app in `bench/migrate/`. `node bench/migrate-equivalence.mjs` imports and migrates each one, then renders its pages before and after, for three locales and 30 sets of inputs, and fails on any difference.
+
+## What `grai import` converts
+
+From i18next or ICU MessageFormat (next-intl, react-intl), `grai import --from i18next|icu <dir>` writes new grai catalogs.
+- **Converted:** plurals with their offsets, ordinals, selects, nested keys, tags, ICU's `#` and its `number`, `date` and `time` arguments with their styles and skeletons, and i18next's built-in formats with their options: `number`, `currency`, `datetime`, `relativetime` and `list`.
+- **Left out:** anything else, from every locale, and named in the report.
+- **Kept beside them:** FormatJS's descriptions, in the file the config's `descriptions` names.
+
+From Lingui's PO catalogs, have Lingui write them as JSON instead, with its `@lingui/format-json` format and `style: "minimal"`: each message id then maps to its ICU message, which `--from icu` imports. A message's id becomes its key, so the messages need explicit ids, such as `cart.title`, not ids made from their text.
+
+A key becomes its path joined by `_`, so `t("cart.title")` becomes `m.cart_title()`. The import writes `grai.import.json` beside the config, mapping each key as the source's calls name it, an i18next namespace included (`common:cart.title`), to its grai key and the inputs it takes.
 
 ## From i18next and react-i18next
 
