@@ -3,15 +3,17 @@
 // - Bytes: each app is built (`next build`, Turbopack) and started, Chromium loads the page, and
 //   every response the page downloads is compressed with brotli at quality 11. "Beyond plain" is
 //   what the page costs more than the same page with its words written in.
-// - Start: `next dev` until it is ready, then until the page's first response, from an empty .next
-//   and from the one the last run left. grai's share is withGrai's work when `next dev` asks for
-//   its config, in a process of its own, from an empty outdir and from one already up to date:
-//   how long it holds Next back, and its CPU until the watch's first compile is done.
+// - Start: `next dev` from its launch until it is ready, and until the page's first response is
+//   complete, from an empty .next and from the one the last run left. grai's share is withGrai's
+//   work when `next dev` asks for its config, in a process of its own, from an empty outdir and
+//   from one already up to date: how long it holds Next back, and its CPU until the watch's first
+//   compile is done.
 // - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
-// - Cold first page: `next dev` from an empty .next until the page's first response, COLD_ROUNDS
-//   times for each app, the apps taking turns, so the load from other work weighs on both alike.
+// - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
+//   is complete, COLD_ROUNDS times for each app, the apps taking turns, so the load from other work
+//   weighs on both alike.
 import { spawnSync } from "node:child_process";
 import {
 	readdirSync,
@@ -51,7 +53,7 @@ async function pageBytes(browser, root, path) {
 	});
 	if (build.status !== 0) throw new Error(build.stdout + build.stderr);
 	const server = started(root, "start", /Ready|started/);
-	const origin = await server.listening;
+	const { origin } = await server.listening;
 	const page = await browser.newPage();
 	const sizes = { document: 0, script: 0, other: 0 };
 	const bodies = [];
@@ -213,7 +215,7 @@ for (const app of selectedApps()) {
 	);
 
 	console.log(
-		"`next dev`: until ready and the page's first response, from an empty .next and from the last run's; then one message edited until the page shows it, and until grai wrote it, ms\n",
+		"`next dev`: from its launch until ready and until the page's first response, from an empty .next and from the last run's; then one message edited until the page shows it, and until grai wrote it, ms\n",
 	);
 	console.log(
 		"| app | ready, empty .next | page | ready, .next kept | page | edit, server component | edit, client component |",
@@ -253,7 +255,7 @@ for (const app of selectedApps()) {
 	}
 
 	console.log(
-		`\n\`next dev\` from an empty .next until the page's first response, the apps taking turns, median of ${COLD_ROUNDS}, ms\n`,
+		`\n\`next dev\` from an empty .next, from its launch until the page's first response, the apps taking turns, median of ${COLD_ROUNDS}, ms\n`,
 	);
 	console.log("| app | ready | page |");
 	console.log("|---|---|---|");

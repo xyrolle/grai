@@ -1,5 +1,5 @@
-// Starting `next` in one of the bench's apps (next-apps.mjs), and timing `next dev` until it is
-// ready and until the page's first response.
+// Starting `next` in one of the bench's apps (next-apps.mjs), and timing `next dev` from the
+// process's launch: until Next says it is ready, and until the page's first response is complete.
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { startServer } from "./servers.mjs";
@@ -10,12 +10,15 @@ export const nextVersion = JSON.parse(
 ).version;
 /** Next's environment: no telemetry, which would phone home and outlive the run in a process of its own. */
 export const nextEnv = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
+const now = () => performance.timeOrigin + performance.now();
 
 /**
  * Starts `next <command>` in an app on a port the system picks, so that runs side by side never
- * meet, and resolves with the URL it serves once it prints a line matching `ready`.
+ * meet. `listening` resolves once Next prints a line matching `ready`, with the URL it serves and
+ * the ms since `launched`, the moment before the process was spawned.
  */
 export function started(root, command, ready) {
+	const launched = now();
 	const child = startServer(next, [command, "--port", "0"], {
 		cwd: root,
 		env: nextEnv,
@@ -33,36 +36,35 @@ export function started(root, command, ready) {
 			const origin = /- Local:\s+(http:\/\/\S+)/.exec(output)?.[1];
 			if (origin !== undefined && ready.test(output)) {
 				clearTimeout(deadline);
-				resolve(origin);
+				resolve({ origin, ready: now() - launched });
 			}
 		};
 		child.stdout.on("data", read);
 		child.stderr.on("data", read);
 	});
-	return { child, listening, output: () => output };
+	return { child, launched, listening };
 }
 
-/** Requests a URL until it answers 200, for at most two minutes; resolves with the time it took. */
+/** Requests a URL until it answers 200, for at most two minutes; resolves with its whole body. */
 async function firstResponse(url) {
 	const start = performance.now();
 	while (performance.now() - start < 120_000) {
 		const response = await fetch(url).catch(() => undefined);
-		if (response?.ok) {
-			await response.text();
-			return performance.now() - start;
-		}
+		if (response?.ok) return response.text();
 		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
 	throw new Error(`${url} did not answer in 120 s`);
 }
 
-/** `next dev` until it is ready, then until the page's first response: from an empty .next, or not. */
+/**
+ * `next dev` from its launch until it is ready, and until the page's first response is complete:
+ * from an empty .next, or not. The server is left running.
+ */
 export async function devStart(root, path, { empty }) {
 	if (empty) rmSync(join(root, ".next"), { recursive: true, force: true });
-	const start = performance.now();
 	const server = started(root, "dev", /Ready in/);
-	const origin = await server.listening;
-	const ready = performance.now() - start;
-	const page = await firstResponse(`${origin}${path}`);
-	return { server, url: `${origin}${path}`, ready, page };
+	const { origin, ready } = await server.listening;
+	const url = `${origin}${path}`;
+	await firstResponse(url);
+	return { server, url, ready, page: now() - server.launched };
 }
