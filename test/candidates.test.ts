@@ -112,6 +112,30 @@ describe("a reading of the files that may read grai's messages", () => {
 		});
 	});
 
+	it("reads a file that imports an index barrel by its file's name or by a path of dots alone, which write no folder's name", async () => {
+		const dir = projectWith({
+			"src/index.js": 'export { m } from "../out/messages.js";\n',
+			"src/page.js": 'import { m } from "./index.js";\nm.title();\n',
+			"src/nested/deep.js": 'import { m } from "..";\nm.title();\n',
+			"src/nested/near.js": 'import { m } from "../";\nm.title();\n',
+			"src/d.ts": "export const d = 1;\n",
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: [
+				"src/index.js",
+				"src/nested/deep.js",
+				"src/nested/near.js",
+				"src/page.js",
+			],
+			reads: [
+				"src/nested/deep.js title",
+				"src/nested/near.js title",
+				"src/page.js title",
+			],
+		});
+	});
+
 	it("reads a file that writes a barrel's name with an escaped character that stands for itself", async () => {
 		const dir = projectWith({
 			"src/labels.ts": 'export { m } from "../out/messages.js";\n',

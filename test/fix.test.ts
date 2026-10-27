@@ -40,6 +40,20 @@ describe("grai check --fix", () => {
 		expect(fixed.removed).toEqual([]);
 	});
 
+	it("keeps a key a page reads through an index barrel it imports by the file's name", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/index.js": 'export { m } from "../out/messages.js";\n',
+			"src/page.js": 'import { m } from "./index.js";\nm.cart_title();\n',
+			"src/total.js":
+				'import { m } from "../out/messages.js";\nm.cart_total({ count: 1 });\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
