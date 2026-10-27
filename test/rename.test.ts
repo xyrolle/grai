@@ -336,6 +336,27 @@ describe("grai rename", () => {
 		expect(result.changed).toEqual([]);
 	});
 
+	it("renames a binding named after the key where a longer name holds the new one, as that is another name", async () => {
+		const { dir, config } = app();
+		writeSources(dir, {
+			"src/total.ts": [
+				'import { cart_total } from "#i18n/messages/cart_total.js";',
+				"export const total = (count: number) => {",
+				"\tconst basket_total_count = count;",
+				"\treturn cart_total({ count: basket_total_count });",
+				"};",
+				"",
+			].join("\n"),
+		});
+
+		const result = await rename(config, "cart_total", "basket_total");
+
+		expect(result.errors).toEqual([]);
+		expect(readText(dir, "src/total.ts")).toContain(
+			"return basket_total({ count: basket_total_count });",
+		);
+	});
+
 	it("refuses where the new name would read the key's binding, or a nearer one would take its reference", async () => {
 		const { dir, config } = app();
 		writeSources(dir, {
