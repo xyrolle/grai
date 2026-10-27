@@ -2,6 +2,7 @@ import {
 	localeDirectory,
 	messageDirectory,
 } from "../../message-directories.ts";
+import { pageKeysImports, pageKeysUrl } from "../../page-keys.ts";
 
 /** A tag of the page's head, as unhead gives it to its `ssr:render` hook. */
 export type HeadTag = {
@@ -38,6 +39,42 @@ export function pointAtLocaleChunks(tags: HeadTag[], locale: string): void {
 			props.href = copies + props.href.slice(shared.length);
 		}
 	}
+}
+
+/**
+ * Points a page `nuxi dev` serves at its locale's keys.js, the dev module with its locale's words
+ * alone: an entry in the page's import map, which comes first in its head, ahead of every module
+ * the page loads, and right after the map a preload of it, so the dev server makes it while the
+ * page loads the modules that import it. `base` is where the dev server serves the app's modules.
+ */
+export function pointAtLocaleKeys(
+	tags: HeadTag[],
+	locale: string,
+	base: string,
+): void {
+	const imports = pageKeysImports(base, locale);
+	const preload: HeadTag = {
+		tag: "link",
+		props: { rel: "modulepreload", href: pageKeysUrl(base, locale) },
+	};
+	const map = tags.find(
+		(tag) => tag.tag === "script" && tag.props.type === "importmap",
+	);
+	const parsed: unknown = JSON.parse(map?.innerHTML ?? "null");
+	if (map !== undefined && isRecord(parsed) && isRecord(parsed.imports)) {
+		Object.assign(parsed.imports, imports);
+		map.innerHTML = JSON.stringify(parsed);
+		tags.splice(tags.indexOf(map) + 1, 0, preload);
+		return;
+	}
+	tags.unshift(
+		{
+			tag: "script",
+			props: { type: "importmap" },
+			innerHTML: JSON.stringify({ imports }),
+		},
+		preload,
+	);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

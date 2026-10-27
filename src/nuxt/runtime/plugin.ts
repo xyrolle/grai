@@ -15,9 +15,14 @@ import {
 	tryUseNuxtApp,
 	useHead,
 	useRequestURL,
+	useRuntimeConfig,
 } from "nuxt/app";
 import "../../vue/client.ts";
-import { type HeadTag, pointAtLocaleChunks } from "./locale-chunks.ts";
+import {
+	type HeadTag,
+	pointAtLocaleChunks,
+	pointAtLocaleKeys,
+} from "./locale-chunks.ts";
 import { requestLocale } from "./request-locale.ts";
 
 // Nuxt renders each request in an app of its own, which every setup, template, plugin and route
@@ -51,6 +56,18 @@ const plugin: Plugin = defineNuxtPlugin({
 				hooks: {
 					"ssr:render": ({ tags }: { tags: HeadTag[] }) =>
 						pointAtLocaleChunks(tags, locale()),
+				},
+			});
+		}
+		if (import.meta.server && import.meta.dev) {
+			// Where Vite's dev server serves the app's modules: Nuxt's assets under its base URL.
+			const { baseURL, buildAssetsDir } = useRuntimeConfig().app;
+			const base = `${baseURL.replace(/\/$/, "")}${buildAssetsDir}`;
+			nuxtApp.ssrContext?.head.use({
+				key: "grai:dev",
+				hooks: {
+					"ssr:render": ({ tags }: { tags: HeadTag[] }) =>
+						pointAtLocaleKeys(tags, locale(), base),
 				},
 			});
 		}
