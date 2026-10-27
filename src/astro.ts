@@ -22,7 +22,7 @@ import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { packageName } from "./package-name.ts";
-import { pageKeysImports, pageKeysUrl } from "./page-keys.ts";
+import { pageKeysHead } from "./page-keys.ts";
 import { graiPlugin } from "./vite-plugin.ts";
 
 /** The integration's options. `config` is the path of the project's grai.config.json, from Astro's root. */
@@ -267,20 +267,13 @@ function importMaps(
 	);
 }
 
-/**
- * What each locale's page gets first in its head in dev: the import map from keys.js's dev module,
- * every locale's words, to that locale's, under the dev server's `base`, and its preload, so the
- * dev server makes it while the page loads the modules that import it.
- */
+/** What each locale's page gets first in its head in dev, under the dev server's `base` (`pageKeysHead`). */
 function devKeys(
 	locales: readonly string[],
 	base: string,
 ): Record<string, string> {
 	return Object.fromEntries(
-		locales.map((locale) => [
-			locale,
-			`<script type="importmap">${JSON.stringify({ imports: pageKeysImports(base, locale) })}</script><link rel="modulepreload" href="${pageKeysUrl(base, locale)}">`,
-		]),
+		locales.map((locale) => [locale, pageKeysHead(base, locale)]),
 	);
 }
 
