@@ -70,6 +70,21 @@ describe("grai check --fix", () => {
 		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
 	});
 
+	it("keeps a key read through an import a module re-exports under the name of an Object property, `constructor`", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/i18n.js":
+				'import { m as constructor } from "../out/messages.js";\nexport { constructor as m };\n',
+			"src/page.js": 'import { m } from "./i18n.js";\nm.cart_title();\n',
+			"src/total.js":
+				'import { m } from "../out/messages.js";\nm.cart_total({ count: 1 });\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
