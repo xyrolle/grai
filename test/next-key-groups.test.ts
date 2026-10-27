@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { members } from "../src/bits.ts";
 import { readProjectCode } from "../src/code/project.ts";
 import { readingOf } from "../src/code/reads.ts";
-import { compileCatalogs } from "../src/compilation.ts";
+import { type Compilation, compileCatalogs } from "../src/compilation.ts";
 import { parseCatalogs, readProject } from "../src/compile.ts";
+import type { Config } from "../src/config.ts";
 import { GraiError } from "../src/error.ts";
 import { keyContexts } from "../src/next/key-contexts.ts";
 import { nextKeyGroups } from "../src/next/key-groups.ts";
@@ -98,10 +99,14 @@ function catalog(long: readonly string[] = []) {
 	);
 }
 
-/** The app, its catalog compiled to `out`, and its compilation. */
-async function compiledApp(long?: readonly string[]) {
-	const { dir, config, compile } = project({ en: catalog(long) });
-	writeSources(dir, app);
+/** An app of these files, its catalog compiled to `out`, and its compilation. */
+async function compiledApp(
+	long?: readonly string[],
+	files: Record<string, string> = app,
+	words: Record<string, string> = catalog(long),
+) {
+	const { dir, config, compile } = project({ en: words });
+	writeSources(dir, files);
 	expect((await compile()).errors).toEqual([]);
 	const read = await readProject(config);
 	if ("errors" in read) throw read.errors[0];
@@ -113,25 +118,31 @@ async function compiledApp(long?: readonly string[]) {
 	};
 }
 
+/** Each read key's contexts in an app, each by its route's page and side, the keys in order. */
+async function contextsIn(
+	dir: string,
+	config: Config,
+	compilation: Compilation,
+) {
+	const code = await readProjectCode(config, [dir], { every: true });
+	if (code instanceof GraiError) throw code;
+	const routes = nextRoutes(dir);
+	const keys = [...compilation.keys.keys()];
+	const { of } = await keyContexts(code, await readingOf(code), routes, keys);
+	const named = (context: number) =>
+		`${relative(join(dir, "app"), routes[context >> 1]?.files[0] ?? "")} ${context % 2 === 0 ? "server" : "client"}`;
+	return Object.fromEntries(
+		[...of]
+			.sort(([a], [b]) => (a < b ? -1 : 1))
+			.map(([key, contexts]) => [key, members(contexts).map(named).sort()]),
+	);
+}
+
 describe("the contexts that read a key", () => {
 	it('are the sides of the routes whose modules read it: a server component\'s on the server, past a "use client" module on the client', async () => {
 		const { dir, config, compilation } = await compiledApp();
-		const code = await readProjectCode(config, [dir], { every: true });
-		if (code instanceof GraiError) throw code;
-		const routes = nextRoutes(dir);
-		const keys = [...compilation.keys.keys()];
 
-		const { of } = await keyContexts(code, await readingOf(code), routes, keys);
-
-		const named = (context: number) =>
-			`${relative(join(dir, "app"), routes[context >> 1]?.files[0] ?? "")} ${context % 2 === 0 ? "server" : "client"}`;
-		expect(
-			Object.fromEntries(
-				[...of]
-					.sort(([a], [b]) => (a < b ? -1 : 1))
-					.map(([key, contexts]) => [key, members(contexts).map(named).sort()]),
-			),
-		).toEqual({
+		expect(await contextsIn(dir, config, compilation)).toEqual({
 			about_heading: ["about/page.tsx server"],
 			badge_text: ["page.jsx client"],
 			home_button: ["page.jsx client"],
@@ -141,6 +152,92 @@ describe("the contexts that read a key", () => {
 			nav_about: ["about/page.tsx server", "page.jsx server"],
 			nav_home: ["about/page.tsx server", "page.jsx server"],
 			shared_footer: ["about/page.tsx server", "page.jsx server"],
+		});
+	});
+});
+
+/**
+ * Two routes that take their messages through one barrel of keys, and their client components
+ * through one barrel of components, each taking one of what each barrel re-exports.
+ */
+const barrels = {
+	"app/messages.js": 'export { heading_a, heading_b } from "../out/keys.js";\n',
+	"app/components.js":
+		'export { Hello } from "./hello.jsx";\nexport { Bye } from "./bye.jsx";\n',
+	"app/hello.jsx": `"use client";
+import * as m from "../out/keys.js";
+
+export function Hello() {
+	return <p>{m.hello_text()}</p>;
+}
+`,
+	"app/bye.jsx": `"use client";
+import * as m from "../out/keys.js";
+
+export function Bye() {
+	return <p>{m.bye_text()}</p>;
+}
+`,
+	"app/layout.jsx":
+		"export default function Layout({ children }) {\n\treturn <html><body>{children}</body></html>;\n}\n",
+	"app/a/page.jsx": `import { heading_a } from "../messages.js";
+import { Hello } from "../components.js";
+
+export default function A() {
+	return <main>{heading_a()}<Hello /></main>;
+}
+`,
+	"app/b/page.jsx": `import { heading_b } from "../messages.js";
+import { Bye } from "../components.js";
+
+export default function B() {
+	return <main>{heading_b()}<Bye /></main>;
+}
+`,
+};
+const barrelWords = {
+	bye_text: "Bye",
+	heading_a: "Heading A ".repeat(2000),
+	heading_b: "Heading B ".repeat(2000),
+	hello_text: "Hello",
+};
+
+describe("the contexts that read a key through a barrel", () => {
+	it("are those of the routes that take the key from the barrel, not of every route the barrel reaches; a component barrel's modules, which keep their side effects, reach every route that loads it", async () => {
+		const { dir, config, compilation } = await compiledApp(
+			[],
+			barrels,
+			barrelWords,
+		);
+
+		expect(await contextsIn(dir, config, compilation)).toEqual({
+			bye_text: ["a/page.jsx client", "b/page.jsx client"],
+			heading_a: ["a/page.jsx server"],
+			heading_b: ["b/page.jsx server"],
+			hello_text: ["a/page.jsx client", "b/page.jsx client"],
+		});
+		expect(await nextKeyGroups(config, compilation)).toEqual([
+			["bye_text", "hello_text"],
+			["heading_a"],
+			["heading_b"],
+		]);
+	});
+
+	it("follow a component barrel to the components a route takes, when the app's package.json says its modules have no side effects", async () => {
+		const { dir, config, compilation } = await compiledApp(
+			[],
+			barrels,
+			barrelWords,
+		);
+		writeSources(dir, {
+			"package.json": JSON.stringify({ type: "module", sideEffects: false }),
+		});
+
+		expect(await contextsIn(dir, config, compilation)).toEqual({
+			bye_text: ["b/page.jsx client"],
+			heading_a: ["a/page.jsx server"],
+			heading_b: ["b/page.jsx server"],
+			hello_text: ["a/page.jsx client"],
 		});
 	});
 });
