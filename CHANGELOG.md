@@ -2,7 +2,7 @@
 
 What changes for those who use grai, release by release, newest first. Until 1.0, a minor release may change the API that `docs/api.md` lists.
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-27)
 
 The first release.
 
