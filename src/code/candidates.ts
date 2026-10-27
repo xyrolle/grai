@@ -3,7 +3,8 @@
  * and resolved. A file reads them only through an import, a load or a glob that names grai's output
  * or a module that passes it on (a barrel), so its text must hold what names one:
  * - the output directory's name, or a barrel's, its file's or, for an index, its folder's, as a
- *   path through them writes it;
+ *   path through them writes it; or, for an index, `/index` ending a specifier, or a relative path
+ *   of dots alone (`.`, `../`), as a file in or below its folder may name it without the folder;
  * - the key of a mapping (`mappings.ts`) that may name one without that name, such as an alias of
  *   the output itself, or the name of a symlink or of a package that holds one;
  * - or what may spell any specifier otherwise (`unwritten`): an escape in one, or a load or a glob
@@ -56,6 +57,14 @@ export function specifiersIn(text: string): string[] {
  */
 export const keyPath: string = String.raw`(?:['"]|\/)messages\/[A-Za-z_$][\w$]*(?:\.[cm]?[jt]s)?['"]`;
 
+/**
+ * What a specifier of an index module may write without its folder's name: `/index`, with an
+ * extension or none, ending it (`./index.js`), or a relative path of dots alone (`.`, `..`, `../`)
+ * right after a load's word, which names the folder of a file in or below it. A string of dots
+ * elsewhere, as `split(".")` writes, names no module.
+ */
+export const indexPath: string = String.raw`\/index(?:\.\w+)?['"]|\b(?:from|import|require)\s*(?:\(\s*)?['"]\.\.?(?:\/\.\.?)*\/?['"]`;
+
 /** The test a file's text must pass to be read, from the names that may name a destination. */
 export function textTest(names: ReadonlySet<string>): RegExp {
 	return new RegExp([unwritten.source, ...names].join("|"));
@@ -77,7 +86,10 @@ export function namesOf(
 	packages: readonly Package[],
 ): Set<string> | undefined {
 	const names = new Set([written(basename(destinations.outdir)), keyPath]);
-	for (const barrel of destinations.barrels) names.add(written(nameOf(barrel)));
+	for (const barrel of destinations.barrels) {
+		names.add(written(nameOf(barrel)));
+		if (isIndex(barrel)) names.add(indexPath);
+	}
 	const lands = (path: string) => landsOn(path, destinations);
 	for (const { key, targets } of mappings) {
 		const star = key.indexOf("*");
@@ -105,8 +117,14 @@ export function namesOf(
 
 /** The name a path to a module goes through: its file's, or for an index, its folder's. */
 function nameOf(file: string): string {
-	const stem = basename(file, extname(file));
-	return stem === "index" ? basename(dirname(file)) : stem;
+	return isIndex(file)
+		? basename(dirname(file))
+		: basename(file, extname(file));
+}
+
+/** Whether a module is its folder's index, which a path may name by the folder alone. */
+function isIndex(file: string): boolean {
+	return basename(file, extname(file)) === "index";
 }
 
 /** Whether a path names a module file: the file, its path without an extension, or an index's folder. */

@@ -9,17 +9,22 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { keyPath, namesOf, textTest } from "../src/code/candidates.ts";
+import {
+	indexPath,
+	keyPath,
+	namesOf,
+	textTest,
+} from "../src/code/candidates.ts";
 import { projectWith, readingIn, unresolvedIn } from "./reading.ts";
 
 const outdir = "/p/src/lib/grai";
 
 describe("the names a specifier of grai's output must write", () => {
-	it("names the output's directory and each barrel, an index by its folder", () => {
+	it("names the output's directory and each barrel, an index by its folder, by `/index` and by a path of dots", () => {
 		const barrels = new Set(["/p/src/lib/i18n.ts", "/p/src/locale/index.ts"]);
 
 		expect(namesOf({ outdir, barrels }, [], [], [])).toEqual(
-			new Set(["grai", keyPath, "i18n", "locale"]),
+			new Set(["grai", keyPath, "i18n", "locale", indexPath]),
 		);
 	});
 
