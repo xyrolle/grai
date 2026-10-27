@@ -1,4 +1,4 @@
-import { addAll, type Bits, sharedSize, size } from "./bits.ts";
+import { addAll, type Bits, has, members, sharedSize, size } from "./bits.ts";
 
 /**
  * Keys that the same contexts load, and what they weigh: what each context that loads them pays for
@@ -65,21 +65,30 @@ function bySameContexts(keys: readonly WeighedKey[]): KeySet[] {
 /**
  * The sets merged, the smallest first, each into the set whose merging gains the most if one gains
  * anything: `setCost` saved for every context that loads both, less the weight loaded in vain by the
- * contexts that load only one. Pass after pass, while one merges any.
+ * contexts that load only one. Pass after pass, while one merges any. Only a set that shares a
+ * context can gain, so each set weighs those alone, found through the sets of each context, in the
+ * order of the pass: a merge then costs the sets that share its contexts, not every pair of sets.
  */
 function merged(sets: KeySet[], setCost: number): KeySet[] {
 	let live = [...sets];
 	for (let merging = true; merging; ) {
 		merging = false;
 		live.sort((a, b) => a.weight - b.weight || byFirstKey(a, b));
+		const order = new Map(live.map((set, at) => [set, at]));
+		const loading = setsOfContexts(live);
 		const gone = new Set<KeySet>();
 		for (const from of live) {
-			const into = bestPartner(
-				from,
-				live.filter((set) => !gone.has(set)),
-				setCost,
-			);
+			const sharing = new Set<KeySet>();
+			for (const context of members(from.contexts))
+				for (const set of loading.get(context) ?? []) sharing.add(set);
+			const candidates = [...sharing]
+				.filter((set) => !gone.has(set))
+				.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+			const into = bestPartner(from, candidates, setCost);
 			if (into === undefined) continue;
+			for (const context of members(from.contexts)) {
+				if (!has(into.contexts, context)) loading.get(context)?.push(into);
+			}
 			into.keys.push(...from.keys);
 			into.weight += from.weight;
 			addAll(into.contexts, from.contexts);
@@ -90,6 +99,19 @@ function merged(sets: KeySet[], setCost: number): KeySet[] {
 		live = live.filter((set) => !gone.has(set));
 	}
 	return live;
+}
+
+/** The sets each context loads, by the context. */
+function setsOfContexts(sets: readonly KeySet[]): Map<number, KeySet[]> {
+	const loading = new Map<number, KeySet[]>();
+	for (const set of sets) {
+		for (const context of members(set.contexts)) {
+			const known = loading.get(context);
+			if (known === undefined) loading.set(context, [set]);
+			else known.push(set);
+		}
+	}
+	return loading;
 }
 
 /** The set `from` gains most by merging into, if any gains. */
