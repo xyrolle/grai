@@ -8,6 +8,7 @@ import {
 	type PageChunks,
 } from "./locale-script.ts";
 import { localeDirectory } from "./message-directories.ts";
+import { pageKeysImports, pageKeysUrl } from "./page-keys.ts";
 import type { GraiOptions, GraiPlugin } from "./vite-plugin.ts";
 
 /**
@@ -60,8 +61,9 @@ type Site = {
 
 /**
  * A page with its locale script, and the Content Security Policy hashes of what the script runs
- * and writes: itself, and in a build that copies the message chunks per locale, each locale's
- * import map. A build minifies the script; dev serves it as written.
+ * and writes: itself, and each locale's import map, which in a build that copies the message chunks
+ * per locale points them at the locale's copies, and in dev points keys.js at the locale's. A build
+ * minifies the script; dev serves it as written.
  */
 function withPageLocale(
 	html: string,
@@ -72,7 +74,10 @@ function withPageLocale(
 	const script = localeScript(config, context.bundle !== undefined);
 	const chunks =
 		context.bundle === undefined
-			? undefined
+			? {
+					imports: pageKeysImports(site.base, "{locale}"),
+					preload: [pageKeysUrl(site.base, "{locale}")],
+				}
 			: pageChunks(context.bundle, context.chunk, context.path.slice(1), site);
 	const maps =
 		chunks === undefined
@@ -96,8 +101,9 @@ const htmlLang =
  * A page with its locale script ahead of every module script and module preload, and after the
  * tags before them, such as `<meta charset>`, which must come within the page's first 1024 bytes.
  * The `<html lang>` the page is built with goes in the script's `data-grai-lang`, for the script to
- * tell it from one a server writes in its place, and a page's chunks, in a build that copies them
- * per locale, in its `data-grai-chunks`.
+ * tell it from one a server writes in its place, and in its `data-grai-chunks` the modules it
+ * points at its locale's: in a build that copies them per locale, the page's chunks, and in dev,
+ * keys.js.
  */
 function withLocaleScript(
 	html: string,

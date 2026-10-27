@@ -27,6 +27,7 @@ import { recompile } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { requestBytes } from "../src/key-sets.ts";
 import { localeCopies } from "../src/locale-copies.ts";
+import { isDevKeys } from "../src/page-keys.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { fixtures, type Messages, outputFile, project } from "./project.ts";
 
@@ -976,7 +977,8 @@ describe("the Vite plugin's dev server", devTest, () => {
 
 	/**
 	 * A plugin that holds the dev module an environment takes between the plugin's load and the
-	 * environment's evaluation, as a slow first request does: `loaded` once it holds the module, and
+	 * environment's evaluation, as a slow first request does, every locale's for a server and the
+	 * page's locale's for a page: `loaded` once it holds the module, and
 	 * `sent` once the environment has been sent an edit's patch, which the module, not yet evaluated,
 	 * has no handler for. `release` lets the module go.
 	 */
@@ -997,8 +999,7 @@ describe("the Vite plugin's dev server", devTest, () => {
 				};
 			},
 			async transform(_code, id) {
-				if (id !== "\0grai:keys" || this.environment.name !== environment)
-					return;
+				if (!isDevKeys(id) || this.environment.name !== environment) return;
 				loaded.resolve();
 				await released.promise;
 			},

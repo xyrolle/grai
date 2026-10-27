@@ -9,6 +9,7 @@ import type { Build } from "./compile.ts";
 import { patchedEvent, sinceEvent, updateEvent } from "./dev-events.ts";
 import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
+import { devKeysId, pageKeysId } from "./page-keys.ts";
 import { watch } from "./watch.ts";
 
 /** Where a project's grai files are, for the plugin. */
@@ -19,13 +20,14 @@ export type ProjectFiles = {
 };
 
 /**
- * The id keys.js goes by in dev, where the plugin serves it from memory: not the path of the file
- * the compile writes for Node and TypeScript. Vite's module graph ties a module to the file of its
- * id, and its watcher takes each write of that file, which every compile makes, for a change of the
- * module: it would mark keys.js and every importer changed, and the server's runner would evaluate
- * the program again on its next render, where the plugin patches it in place.
+ * keys.js goes by an id of its own in dev (`devKeysId`), where the plugin serves it from memory: not
+ * the path of the file the compile writes for Node and TypeScript. Vite's module graph ties a
+ * module to the file of its id, and its watcher takes each write of that file, which every compile
+ * makes, for a change of the module: it would mark keys.js and every importer changed, and the
+ * server's runner would evaluate the program again on its next render, where the plugin patches it
+ * in place.
  */
-export const devKeysId = "\0grai:keys";
+export { devKeysId };
 
 /** How the page imports an edit's patch, and that module's id. */
 export const patchPrefix = "grai:patch/";
@@ -101,6 +103,13 @@ export function serveMessages(
 			before.rendered.files.get(anchor) === next.rendered.files.get(anchor);
 		if (changed.length === 0 && sameRuntime) return;
 		const environments = Object.values(server.environments);
+		// keys.js, and each page's, one locale's alone, by the locales of either build.
+		const keysIds = [
+			devKeysId,
+			...new Set(
+				[...before.config.locales, ...next.config.locales].map(pageKeysId),
+			),
+		];
 		// A patch writes a key's new variants into the table, under the export made when the module
 		// was evaluated: it reaches a key called the same way, and a key turned from text into markup,
 		// or back, needs an export with its parts, or without them.
@@ -122,7 +131,7 @@ export function serveMessages(
 				.flatMap(([, modules]) => [...modules]);
 			const runtime = sameRuntime ? [] : [join(files.outdir, anchor)];
 			for (const environment of environments) {
-				for (const id of [devKeysId, ...runtime, ...reimporting])
+				for (const id of [...keysIds, ...runtime, ...reimporting])
 					await reload(environment, id);
 			}
 			client.hot.send({ type: "full-reload" });
@@ -151,8 +160,10 @@ export function serveMessages(
 		}
 		// The pages last, after the servers are sent the patch. A module loaded after the edit takes
 		// it afresh, with the edit in it.
-		const module = client.moduleGraph.getModuleById(devKeysId);
-		if (module !== undefined) client.moduleGraph.invalidateModule(module);
+		for (const id of keysIds) {
+			const module = client.moduleGraph.getModuleById(id);
+			if (module !== undefined) client.moduleGraph.invalidateModule(module);
+		}
 		client.hot.send(
 			reloadOnEdit
 				? { type: "full-reload" }

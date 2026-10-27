@@ -41,8 +41,9 @@
  *
  * In a build that copies each message chunk per locale, the script's `data-grai-chunks` names the
  * page's chunks, and it maps them to the locale's copies with an import map, before any module
- * loads, then preloads the copies the page's entry imports. It gives both its own nonce, for a page
- * whose Content Security Policy allows scripts by nonce.
+ * loads, then preloads the copies the page's entry imports; in dev, it maps keys.js to the dev
+ * module with the locale's words alone. It gives both its own nonce, for a page whose Content
+ * Security Policy allows scripts by nonce.
  *
  * @param {PageSettings} settings
  * @param {(locales: readonly string[]) => (range: string) => string[]} localeReach
