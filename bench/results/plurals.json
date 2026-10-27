@@ -1,0 +1,83 @@
+{
+	"bench": "plurals",
+	"date": "2026-10-27T14:15:23.959Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 21.5,
+		"end": 18.6
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"counts": 1000,
+	"rows": [
+		{
+			"variant": "Paraglide registry.plural",
+			"ns": {
+				"ro": 736,
+				"ru": 537,
+				"en": 524.9
+			},
+			"bytes": "registry"
+		},
+		{
+			"variant": "grai's rules, as plurals.js has them",
+			"ns": {
+				"ro": 9.7,
+				"ru": 15,
+				"en": 4.4
+			},
+			"bytes": 429
+		},
+		{
+			"variant": "new Intl.PluralRules per call",
+			"ns": {
+				"ro": 7697.4,
+				"ru": 7894.8,
+				"en": 5709.7
+			},
+			"bytes": 77
+		},
+		{
+			"variant": "Intl.PluralRules cached per locale",
+			"ns": {
+				"ro": 329,
+				"ru": 205.6,
+				"en": 128.8
+			},
+			"bytes": 97
+		},
+		{
+			"variant": "CLDR rules compiled (make-plural)",
+			"ns": {
+				"ro": 69.9,
+				"ru": 71.9,
+				"en": 38.6
+			},
+			"bytes": 184
+		},
+		{
+			"variant": "compiled, integer path first",
+			"ns": {
+				"ro": 4.7,
+				"ru": 5.4,
+				"en": 3.5
+			},
+			"bytes": 255
+		}
+	]
+}

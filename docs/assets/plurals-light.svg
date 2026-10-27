@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 211" width="480" height="211" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>Choosing a plural form in ru</title>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Choosing a plural form in ru</text>
+<text x="16" y="44" font-size="13" fill="#52514e">Nanoseconds a choice, for each count from 0 to 999; lower is better</text>
+<line x1="216" y1="65" x2="216" y2="165" stroke="#c3c2b7" stroke-width="1"/>
+<text x="216" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="273.3" y1="65" x2="273.3" y2="165" stroke="#e1e0d9" stroke-width="1"/>
+<text x="273.3" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">200</text>
+<line x1="330.7" y1="65" x2="330.7" y2="165" stroke="#e1e0d9" stroke-width="1"/>
+<text x="330.7" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">400</text>
+<line x1="388" y1="65" x2="388" y2="165" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">600</text>
+<text x="206" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M216,74H216.3A4,4 0 0 1 220.3,78V84A4,4 0 0 1 216.3,88H216Z" fill="#2a78d6"/>
+<text x="226.3" y="86" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">15 ns</text>
+<text x="206" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">Intl.PluralRules, cached</text>
+<path d="M216,106H270.9A4,4 0 0 1 274.9,110V116A4,4 0 0 1 270.9,120H216Z" fill="#898781"/>
+<text x="280.9" y="118" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">206 ns</text>
+<text x="206" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M216,138H365.9A4,4 0 0 1 369.9,142V148A4,4 0 0 1 365.9,152H216Z" fill="#898781"/>
+<text x="375.9" y="150" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">537 ns</text>
+<text x="388" y="202" font-size="12" text-anchor="end" fill="#52514e">nanoseconds a choice</text>
+</svg>

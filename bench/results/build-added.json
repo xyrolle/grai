@@ -1,6 +1,6 @@
 {
 	"bench": "build-added",
-	"date": "2026-10-27T13:20:42.285Z",
+	"date": "2026-10-27T14:51:57.152Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,8 +8,8 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 18.6,
-		"end": 15.4
+		"start": 7.7,
+		"end": 10.7
 	},
 	"node": "24.16.0",
 	"grai": "cee60fe2",
@@ -30,20 +30,20 @@
 			"keys": 6366,
 			"calls": 6366,
 			"stub": {
-				"build": 29.9,
+				"build": 22,
 				"runs": [
-					27.5,
-					28.7,
-					29.9,
-					34.2,
-					38.5
+					20.3,
+					21.8,
+					22,
+					24,
+					22
 				]
 			},
 			"grai": {
-				"build": 594,
-				"added": 564.1,
-				"compile": 136.9,
-				"rest": 427.2,
+				"build": 475.9,
+				"added": 453.9,
+				"compile": 109.9,
+				"rest": 344,
 				"hooks": [
 					[],
 					[],
@@ -53,32 +53,32 @@
 				],
 				"runs": {
 					"builds": [
-						525.5,
-						500.4,
-						687.6,
-						594,
-						761.2
+						384.5,
+						544.2,
+						454.2,
+						475.9,
+						508.9
 					],
 					"compiles": [
-						104,
-						122.2,
-						136.9,
-						213.6,
-						156
+						111,
+						104.9,
+						186.5,
+						104.5,
+						109.9
 					]
 				}
 			},
 			"paraglide": {
-				"build": 5594.8,
-				"added": 5564.9,
-				"compile": 5623.2,
-				"rest": -58.3,
+				"build": 4239.2,
+				"added": 4217.1,
+				"compile": 4054.5,
+				"rest": 162.6,
 				"hooks": [
 					[
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 4300,
+							"ms": 3700,
 							"calls": 1
 						}
 					],
@@ -86,7 +86,7 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 5400,
+							"ms": 4000,
 							"calls": 1
 						}
 					],
@@ -94,7 +94,7 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 4900,
+							"ms": 4100,
 							"calls": 1
 						}
 					],
@@ -102,7 +102,7 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 5500,
+							"ms": 4100,
 							"calls": 1
 						}
 					],
@@ -110,25 +110,25 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 5700,
+							"ms": 4000,
 							"calls": 1
 						}
 					]
 				],
 				"runs": {
 					"builds": [
-						4496.1,
-						5594.8,
-						5068.8,
-						5701.2,
-						6055.5
+						3924.1,
+						4230.4,
+						4261.5,
+						4320.1,
+						4239.2
 					],
 					"compiles": [
-						4075.8,
-						5060.4,
-						5623.2,
-						5633.3,
-						5958.1
+						4134.1,
+						3881.7,
+						3859.5,
+						4234.9,
+						4054.5
 					]
 				}
 			}
@@ -138,20 +138,20 @@
 			"keys": 13326,
 			"calls": 13326,
 			"stub": {
-				"build": 28.1,
+				"build": 24.5,
 				"runs": [
-					59.8,
-					28.1,
-					30.2,
-					22.5,
-					19
+					24.5,
+					24.5,
+					25.2,
+					34.1,
+					24.2
 				]
 			},
 			"grai": {
-				"build": 1148.9,
-				"added": 1120.8,
-				"compile": 191,
-				"rest": 929.7,
+				"build": 946.1,
+				"added": 921.6,
+				"compile": 195.4,
+				"rest": 726.2,
 				"hooks": [
 					[],
 					[],
@@ -161,32 +161,32 @@
 				],
 				"runs": {
 					"builds": [
-						1126,
-						2910.6,
-						1847.7,
-						1021,
-						1148.9
+						899.1,
+						946.1,
+						1039.6,
+						968.6,
+						833
 					],
 					"compiles": [
-						267.6,
-						184.8,
-						262.4,
-						191,
-						153.4
+						195.4,
+						209.1,
+						201.1,
+						184,
+						195.4
 					]
 				}
 			},
 			"paraglide": {
-				"build": 9815.8,
-				"added": 9787.7,
-				"compile": 9109.7,
-				"rest": 677.9,
+				"build": 8428.4,
+				"added": 8403.9,
+				"compile": 7947.4,
+				"rest": 456.5,
 				"hooks": [
 					[
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 10800,
+							"ms": 7800,
 							"calls": 1
 						}
 					],
@@ -194,7 +194,7 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 14000,
+							"ms": 8000,
 							"calls": 1
 						}
 					],
@@ -202,7 +202,7 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 9400,
+							"ms": 8000,
 							"calls": 1
 						}
 					],
@@ -210,7 +210,7 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 8300,
+							"ms": 8000,
 							"calls": 1
 						}
 					],
@@ -218,25 +218,25 @@
 						{
 							"plugin": "unplugin-paraglide-js",
 							"hook": "buildStart",
-							"ms": 8900,
+							"ms": 8000,
 							"calls": 1
 						}
 					]
 				],
 				"runs": {
 					"builds": [
-						11379.3,
-						14569.4,
-						9815.8,
-						8709.5,
-						9324.7
+						8261.5,
+						8432.7,
+						8428.4,
+						8432.5,
+						8397
 					],
 					"compiles": [
-						16768.6,
-						9249.9,
-						9109.7,
-						7863.5,
-						8095
+						7947.4,
+						8253.7,
+						8171.3,
+						7932.6,
+						7157.2
 					]
 				}
 			}

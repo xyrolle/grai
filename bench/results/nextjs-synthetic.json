@@ -1,6 +1,6 @@
 {
 	"bench": "nextjs-synthetic",
-	"date": "2026-10-27T13:22:47.822Z",
+	"date": "2026-10-27T14:53:43.914Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,8 +8,8 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 15.4,
-		"end": 14.9
+		"start": 10.7,
+		"end": 8.7
 	},
 	"node": "24.16.0",
 	"grai": "cee60fe2",
@@ -29,26 +29,27 @@
 		"server": 400,
 		"client": 100
 	},
+	"edits": 7,
 	"chromium": "156.0.8078.4",
 	"rows": {
 		"bytes": {
 			"grai": {
-				"document": 9535,
+				"document": 9552,
 				"script": 122595,
 				"other": 0
 			},
 			"next-intl": {
-				"document": 109245,
+				"document": 109191,
 				"script": 127201,
 				"other": 0
 			},
 			"next-intl, client keys picked": {
-				"document": 10826,
+				"document": 10828,
 				"script": 127166,
 				"other": 0
 			},
 			"plain": {
-				"document": 9466,
+				"document": 9565,
 				"script": 116852,
 				"other": 0
 			}
@@ -56,109 +57,109 @@
 		"dev": {
 			"grai": {
 				"empty": {
-					"ready": 371.1,
-					"page": 1738
+					"ready": 538.5,
+					"page": 1938.8
 				},
 				"kept": {
-					"ready": 477.1,
-					"page": 3271.5
+					"ready": 222.8,
+					"page": 1369.7
 				},
 				"edits": {
 					"server": {
-						"shown": 162.9,
-						"written": 7.1
+						"shown": 141.6,
+						"written": 5.2
 					},
 					"client": {
-						"shown": 109.2,
-						"written": 12.6
+						"shown": 72.8,
+						"written": 4.7
 					}
 				}
 			},
 			"next-intl": {
 				"empty": {
-					"ready": 694,
-					"page": 2800.8
+					"ready": 224.2,
+					"page": 1191.9
 				},
 				"kept": {
-					"ready": 345.5,
-					"page": 1887.4
+					"ready": 220.4,
+					"page": 1158.9
 				},
 				"edits": {
 					"server": {
-						"shown": 185
+						"shown": 146.4
 					},
 					"client": {
-						"shown": 189.5
+						"shown": 149.9
 					}
 				}
 			}
 		},
 		"cold": {
 			"grai": {
-				"ready": 258.1,
-				"page": 1872.8,
+				"ready": 217.5,
+				"page": 1414.6,
 				"runs": [
 					{
-						"ready": 372.9,
-						"page": 1839
+						"ready": 222.3,
+						"page": 1414.6
 					},
 					{
-						"ready": 223.5,
-						"page": 2113.4
+						"ready": 232.8,
+						"page": 1425.7
 					},
 					{
-						"ready": 423.9,
-						"page": 1975.4
+						"ready": 214.9,
+						"page": 1372.8
 					},
 					{
-						"ready": 220.2,
-						"page": 2096.1
+						"ready": 206.8,
+						"page": 1338.9
 					},
 					{
-						"ready": 258.1,
-						"page": 1597.9
+						"ready": 212.2,
+						"page": 1364.3
 					},
 					{
-						"ready": 214.4,
-						"page": 1872.8
+						"ready": 217.5,
+						"page": 1447.6
 					},
 					{
-						"ready": 276.8,
-						"page": 1542.9
+						"ready": 235.2,
+						"page": 1449.5
 					}
 				]
 			},
 			"next-intl": {
-				"ready": 298.1,
-				"page": 1835.3,
+				"ready": 220.5,
+				"page": 1200.3,
 				"runs": [
 					{
-						"ready": 514.7,
-						"page": 2050.8
+						"ready": 230.2,
+						"page": 1206.1
 					},
 					{
-						"ready": 331.7,
-						"page": 2351.3
+						"ready": 220.5,
+						"page": 1204.3
 					},
 					{
-						"ready": 252.7,
-						"page": 1599.8
+						"ready": 213.9,
+						"page": 1128.7
 					},
 					{
-						"ready": 334.7,
-						"page": 1260.7
+						"ready": 232.3,
+						"page": 1173.4
 					},
 					{
-						"ready": 274.9,
-						"page": 1835.3
+						"ready": 212.2,
+						"page": 1167.6
 					},
 					{
-						"ready": 298.1,
-						"page": 1278.3
+						"ready": 212.5,
+						"page": 1200.3
 					},
 					{
-						"ready": 286.3,
-						"page": 1953.8
+						"ready": 229.8,
+						"page": 1236.5
 					}
 				]
 			}

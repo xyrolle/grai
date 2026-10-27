@@ -1,0 +1,63 @@
+{
+	"bench": "types-synthetic",
+	"date": "2026-10-27T14:20:45.053Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 17.6,
+		"end": 18.1
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 6,366 keys",
+	"calls": 500,
+	"runs": 3,
+	"typescript": {
+		"tsc": "7.0.2",
+		"languageService": "6.0.3"
+	},
+	"rows": [
+		{
+			"library": "grai's declarations",
+			"tsc": 102.4,
+			"first": 233.1,
+			"next": 37.6,
+			"entries": 6366
+		},
+		{
+			"library": "Paraglide's declarations",
+			"tsc": 291.9,
+			"first": 1333.9,
+			"next": 50.5,
+			"entries": 6366
+		},
+		{
+			"library": "i18next's CustomTypeOptions",
+			"tsc": 720.5,
+			"first": 72932.1,
+			"next": 5.1,
+			"entries": 14652
+		},
+		{
+			"library": "use-intl, keys inferred from the messages",
+			"tsc": 681.8,
+			"first": 27086.5,
+			"next": 2.3,
+			"entries": 6366
+		}
+	]
+}

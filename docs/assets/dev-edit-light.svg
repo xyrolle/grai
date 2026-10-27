@@ -4,27 +4,25 @@
 <text x="16" y="44" font-size="13" fill="#52514e">Milliseconds in Vite's dev server; lower is better</text>
 <line x1="99" y1="65" x2="99" y2="197" stroke="#c3c2b7" stroke-width="1"/>
 <text x="99" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="156.8" y1="65" x2="156.8" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="156.8" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
-<line x1="214.6" y1="65" x2="214.6" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="214.6" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
-<line x1="272.4" y1="65" x2="272.4" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="272.4" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">3,000</text>
-<line x1="330.2" y1="65" x2="330.2" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="330.2" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
+<line x1="171.3" y1="65" x2="171.3" y2="197" stroke="#e1e0d9" stroke-width="1"/>
+<text x="171.3" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
+<line x1="243.5" y1="65" x2="243.5" y2="197" stroke="#e1e0d9" stroke-width="1"/>
+<text x="243.5" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
+<line x1="315.8" y1="65" x2="315.8" y2="197" stroke="#e1e0d9" stroke-width="1"/>
+<text x="315.8" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">3,000</text>
 <line x1="388" y1="65" x2="388" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">5,000</text>
+<text x="388" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
 <text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M99,74H99A1,1 0 0 1 100,75V87A1,1 0 0 1 99,88H99Z" fill="#2a78d6"/>
-<text x="106" y="86" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">15 ms</text>
+<path d="M99,74H99A1.1,1.1 0 0 1 100.1,75.1V86.9A1.1,1.1 0 0 1 99,88H99Z" fill="#2a78d6"/>
+<text x="106.1" y="86" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">15 ms</text>
 <text x="89" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
-<path d="M99,106H99.4A4,4 0 0 1 103.4,110V116A4,4 0 0 1 99.4,120H99Z" fill="#898781"/>
-<text x="109.4" y="118" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">76 ms</text>
+<path d="M99,106H100.2A4,4 0 0 1 104.2,110V116A4,4 0 0 1 100.2,120H99Z" fill="#898781"/>
+<text x="110.2" y="118" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">72 ms</text>
 <text x="89" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
-<path d="M99,138H100A4,4 0 0 1 104,142V148A4,4 0 0 1 100,152H99Z" fill="#898781"/>
-<text x="110" y="150" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">87 ms</text>
+<path d="M99,138H100.4A4,4 0 0 1 104.4,142V148A4,4 0 0 1 100.4,152H99Z" fill="#898781"/>
+<text x="110.4" y="150" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">74 ms</text>
 <text x="89" y="182" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M99,170H359.5A4,4 0 0 1 363.5,174V180A4,4 0 0 1 359.5,184H99Z" fill="#898781"/>
-<text x="369.5" y="182" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">4,576 ms</text>
+<path d="M99,170H317.1A4,4 0 0 1 321.1,174V180A4,4 0 0 1 317.1,184H99Z" fill="#898781"/>
+<text x="327.1" y="182" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">3.07 s</text>
 <text x="388" y="234" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>
