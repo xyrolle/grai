@@ -115,6 +115,27 @@ describe("grai check's reads of components", () => {
 			'messages/en.json: "unused": no shipped code under . reads the key. Remove it from every catalog, or use it.',
 		]);
 	});
+
+	it("reads an MDX document whose expressions hold only a comment, as MDX compiles them to nothing", async () => {
+		const { dir, config } = project({
+			en: { title: "Title" },
+			de: { title: "Titel" },
+		});
+		writeSources(dir, {
+			"src/page.mdx": [
+				'import { m } from "../out/messages.js"',
+				"",
+				"{/* A translator note */}",
+				"",
+				"# {m.title()} {/* inline */}",
+				"",
+			].join("\n"),
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([]);
+	});
 });
 
 describe("grai check's loads", () => {
