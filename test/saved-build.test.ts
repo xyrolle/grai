@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
 import { savedBuild } from "../src/saved-build.ts";
+import { saveGroups } from "../src/saved-groups.ts";
 import { savingFile } from "../src/state-saves.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
@@ -58,6 +59,26 @@ it("starts a watcher from the build the last one saved, compiling and saving not
 	);
 	expect(after.build?.rendered).toStrictEqual(before.build?.rendered);
 	expect(after.build?.positions).toStrictEqual(before.build?.positions);
+	expect(statSync(savedFile(dir)).mtimeMs).toBe(saved);
+});
+
+it("saves a first build that placed the keys by groups saved since, and the next start takes it up, placing nothing again", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	await saveGroups(join(dir, "out"), [["title"]]);
+
+	const grouped = await started(file);
+	expect(grouped.build?.compilation.changed.size).toBe(0);
+	expect(grouped.build?.rendered.groups).toBe(JSON.stringify([["title"]]));
+	expect(
+		(await savedBuild(file, { pseudoLocale: true }))?.rendered.groups,
+	).toBe(JSON.stringify([["title"]]));
+	const saved = statSync(savedFile(dir)).mtimeMs;
+
+	const after = await started(file);
+
+	expect(after.result).toEqual({ written: [], errors: [] });
+	expect(after.build?.rendered).toStrictEqual(grouped.build?.rendered);
 	expect(statSync(savedFile(dir)).mtimeMs).toBe(saved);
 });
 
