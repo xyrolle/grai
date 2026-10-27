@@ -30,6 +30,8 @@ export type Naming = {
 	mappings: readonly Mapping[] | undefined;
 	links: readonly Link[];
 	packages: readonly Package[];
+	/** The folders whose package.json may name a barrel as their entry. */
+	entries: ReadonlySet<string>;
 };
 
 export class TextTest {
@@ -61,17 +63,24 @@ export class TextTest {
 		barrels: ReadonlySet<string>,
 		reached: ReadonlySet<string>,
 	): Listed[] {
-		const { listing, mappings, links, packages, output, key } = this.naming;
+		const { listing, mappings, links, packages, output, key, entries } =
+			this.naming;
 		const names =
 			mappings &&
 			(key === undefined
 				? namesOf(
-						{ outdir: listing.outdir, barrels },
+						{ outdir: listing.outdir, barrels, entries },
 						mappings,
 						links,
 						packages,
 					)
-				: keyNamesOf(key, { ...output, barrels }, mappings, links, packages));
+				: keyNamesOf(
+						key,
+						{ ...output, barrels, entries },
+						mappings,
+						links,
+						packages,
+					));
 		if (names === undefined) {
 			this.leading = undefined;
 			return [...files];

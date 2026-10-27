@@ -10,6 +10,7 @@ describe("the names a file must write to read one key", () => {
 		messages: `${outdir}/messages.js`,
 		keys: `${outdir}/keys.js`,
 		barrels: new Set(["/p/src/lib/labels.ts"]),
+		entries: new Set<string>(),
 	};
 
 	it("takes the key's name whole, a path that ends at messages.js or keys.js, and a barrel that holds the key", () => {
