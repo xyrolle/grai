@@ -525,7 +525,12 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
     - A command keeps the entries of the files it leaves out unread and of those outside its roots, so that a command that reads fewer files, or under a folder, costs the next one nothing. An entry for a file changed is replaced when a command reads it.
     - They are a line per file, its facts as JSON, which V8 reads back in 0.35 s for app B's facts, against 0.63 s for its own serializer's 75 MB. A save writes each entry again as it was read.
     - A module's uses are kept by what they start from, and a reading parses only those of what holds grai's. They are 70% of app B's facts, and about 6% of them start from grai's.
-    - A warm run reads each file and hashes it, and parses nothing that is unchanged. The target is a warm `find` and `rename` at or under main's times. A cold run costs what reading every file exactly costs, and the pool keeps that as low as it can.
+    - **A warm run reads only the files that changed, known by their stat** (`code/listing.ts`). The listing in `.grai/files` keeps each file's size, modification time, change time and inode, its text's hash, and what the text test needs from its text: the specifiers it loads, and whether it may spell one otherwise. A file whose stat is the one kept is taken as unchanged, and its text is read only if a reading asks for it. A tool may set a modification time back, but never a change time.
+      - Git's rule for a racy entry keeps that exact. A file changed within two seconds of when it was read (a FAT volume's resolution, the coarsest a system keeps) may change again with the same times. So the next command reads it by its content, and takes it on its stat after that.
+      - So the text test tests each file's specifiers, not its whole text. A file names a module only by a specifier, unless its text may spell one otherwise, which reads it. A name in a comment or a string reads no file now.
+      - On app B, statting the 8,971 files takes 37–52 ms, against 228–245 ms to read them, and the first round's test takes a few ms instead of about 0.2 s.
+      - A fresh checkout gives every file a new stat, so CI reads each file's text and takes its facts by its hash, from the facts it keeps.
+    - A cold run costs what reading every file exactly costs, and the pool keeps that as low as it can.
     - In memory, the facts are also kept across a watch, between `check --fix`'s fix and its check, and across a build's rebuilds.
   - The bench's projects have to resolve as real ones do. The synthetic project gets a package.json `imports` and an `i18n` module that re-exports `m`, and app B's copy keeps its package.json and tsconfig, since a guessed import is no longer read.
 
