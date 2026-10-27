@@ -120,7 +120,7 @@ async function readModule(
 			reading.keysImports.push({ path, source, at: fact.path, fact });
 		}
 		for (const name of fact.names) {
-			const value = await graph.exported(target, name.imported, new Set());
+			const value = await graph.exported(target, name.imported);
 			if (value === undefined) continue;
 			held.set(name.local, value);
 			if (value.kind !== "key" || pathKey !== undefined) continue;
@@ -136,9 +136,7 @@ async function readModule(
 		if ("source" in load) {
 			const target = await graph.resolve(load.source, path);
 			loads.push(
-				target === undefined
-					? undefined
-					: await graph.exported(target, "*", new Set()),
+				target === undefined ? undefined : await graph.exported(target, "*"),
 			);
 			continue;
 		}

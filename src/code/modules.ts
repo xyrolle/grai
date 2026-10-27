@@ -34,11 +34,18 @@ export type FactsOf = (path: string) => Promise<FileFacts | undefined>;
 /** The keys a value holds: every key, or these. */
 export type KeysHeld = "every" | ReadonlySet<string>;
 
+/**
+ * A resolution under way: the exports it is following, each as `path\0name`, and those its cycle
+ * guard cut short, which it answered as nothing for now.
+ */
+type Trail = { seen: ReadonlySet<string>; cut: Set<string> };
+
 export class ModuleGraph {
 	readonly output: Output;
 	readonly resolve: Resolve;
 	private readonly facts: FactsOf;
-	private readonly exportsMemo = new Map<string, Promise<Value | undefined>>();
+	/** Each export resolved whole, by `path\0name`, which no cycle cut short. */
+	private readonly exportsMemo = new Map<string, Value | undefined>();
 
 	constructor(output: Output, resolve: Resolve, facts: FactsOf) {
 		this.output = output;
@@ -53,23 +60,21 @@ export class ModuleGraph {
 		name: string,
 	): Promise<Value | undefined> {
 		const path = await this.resolve(source, importer);
-		return path === undefined
-			? undefined
-			: this.exported(path, name, new Set());
+		return path === undefined ? undefined : this.exported(path, name);
 	}
 
 	/** What a value read by `name` from another is: a module object's export, or a namespace's key. */
 	member(value: Value, name: string): Promise<Value | undefined> {
-		return this.memberOf(value, name, new Set());
+		return this.memberOf(value, name, fresh());
 	}
 
-	/** `member`, within a resolution that follows the names in `seen`. */
+	/** `member`, within a resolution under way. */
 	private async memberOf(
 		value: Value,
 		name: string,
-		seen: ReadonlySet<string>,
+		trail: Trail,
 	): Promise<Value | undefined> {
-		if (value.kind === "module") return this.exported(value.path, name, seen);
+		if (value.kind === "module") return this.resolved(value.path, name, trail);
 		return value.kind === "namespace" ? { kind: "key", key: name } : undefined;
 	}
 
@@ -100,7 +105,7 @@ export class ModuleGraph {
 			for (const fact of module.exports) {
 				const exported =
 					fact.exported !== undefined
-						? await this.exported(path, fact.exported, new Set())
+						? await this.exported(path, fact.exported)
 						: "source" in fact
 							? await this.starred(path, fact.source)
 							: undefined;
@@ -125,24 +130,42 @@ export class ModuleGraph {
 	}
 
 	/** What a module exports by `name`, followed to where it is declared. */
-	exported(
+	exported(path: string, name: string): Promise<Value | undefined> {
+		return this.resolved(path, name, fresh());
+	}
+
+	/**
+	 * `exported`, within a resolution under way. An export it is following already, as a cycle of
+	 * `export *` comes back to, is nothing for now, and is cut short. An answer that nothing was cut
+	 * short in is the export's whatever asks, and is kept; one that was holds for this resolution
+	 * alone, as the export cut short may hold the name, so its cuts go to the resolution's own.
+	 */
+	private async resolved(
 		path: string,
 		name: string,
-		seen: ReadonlySet<string>,
+		trail: Trail,
 	): Promise<Value | undefined> {
 		const id = `${path}\0${name}`;
-		if (seen.has(id)) return Promise.resolve(undefined);
-		const memo = this.exportsMemo.get(id);
-		if (memo !== undefined) return memo;
-		const value = this.follow(path, name, new Set([...seen, id]));
-		this.exportsMemo.set(id, value);
+		if (trail.seen.has(id)) {
+			trail.cut.add(id);
+			return undefined;
+		}
+		if (this.exportsMemo.has(id)) return this.exportsMemo.get(id);
+		const within: Trail = {
+			seen: new Set([...trail.seen, id]),
+			cut: new Set(),
+		};
+		const value = await this.follow(path, name, within);
+		within.cut.delete(id);
+		if (within.cut.size === 0) this.exportsMemo.set(id, value);
+		for (const cut of within.cut) trail.cut.add(cut);
 		return value;
 	}
 
 	private async follow(
 		path: string,
 		name: string,
-		seen: ReadonlySet<string>,
+		trail: Trail,
 	): Promise<Value | undefined> {
 		const own = this.outputExport(path, name);
 		if (own !== "app") return own;
@@ -150,7 +173,7 @@ export class ModuleGraph {
 		const facts = await this.facts(path);
 		if (facts === undefined || "error" in facts) return undefined;
 		for (const module of facts.modules) {
-			const value = await this.explicit(path, module, name, seen);
+			const value = await this.explicit(path, module, name, trail);
 			if (value !== "none") return value;
 		}
 		if (name === "default") return undefined;
@@ -161,7 +184,7 @@ export class ModuleGraph {
 				const value =
 					target === undefined
 						? undefined
-						: await this.exported(target, name, seen);
+						: await this.resolved(target, name, trail);
 				if (value !== undefined) return value;
 			}
 		}
@@ -192,7 +215,7 @@ export class ModuleGraph {
 		path: string,
 		module: ModuleFacts,
 		name: string,
-		seen: ReadonlySet<string>,
+		trail: Trail,
 	): Promise<Value | undefined | "none"> {
 		for (const fact of module.exports) {
 			if (fact.exported !== name) continue;
@@ -200,7 +223,7 @@ export class ModuleGraph {
 				const target = await this.resolve(fact.source, path);
 				return target === undefined
 					? undefined
-					: this.exported(target, fact.imported, seen);
+					: this.resolved(target, fact.imported, trail);
 			}
 			const { local, members } = module.aliases[fact.local] ?? {
 				local: fact.local,
@@ -213,10 +236,10 @@ export class ModuleGraph {
 				let value =
 					target === undefined
 						? undefined
-						: await this.exported(target, imported.imported, seen);
+						: await this.resolved(target, imported.imported, trail);
 				for (const member of members) {
 					if (value === undefined) break;
-					value = await this.memberOf(value, member, seen);
+					value = await this.memberOf(value, member, trail);
 				}
 				return value;
 			}
@@ -224,4 +247,9 @@ export class ModuleGraph {
 		}
 		return "none";
 	}
+}
+
+/** A resolution's start: following nothing, and nothing cut short. */
+function fresh(): Trail {
+	return { seen: new Set(), cut: new Set() };
 }
