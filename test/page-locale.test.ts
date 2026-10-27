@@ -1,10 +1,18 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { build, createLogger, createServer, type InlineConfig } from "vite";
+import {
+	build,
+	createLogger,
+	createServer,
+	type InlineConfig,
+	type Plugin,
+} from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
+import { grai as graiSvelte } from "../src/svelte.ts";
+import { grai as graiSvelteKit } from "../src/sveltekit-vite.ts";
 import { grai } from "../src/vite.ts";
-import type { GraiOptions } from "../src/vite-plugin.ts";
+import { type GraiOptions, graiPlugin } from "../src/vite-plugin.ts";
 import { fixtures, project } from "./project.ts";
 
 const catalogs = {
@@ -411,4 +419,17 @@ it("points a page in a subdirectory, under a relative base, at the copies from i
 		imports: { "../assets/grai/": "../assets/grai-{locale}/" },
 		preload: [expect.stringMatching(/^\.\.\/assets\/grai-\{locale\}\//)],
 	});
+});
+
+it("gives the locale script's index.html hook to the plugins of apps whose pages Vite serves alone, as SvelteKit warns of a plugin with one", () => {
+	const hooked = (plugins: Plugin[]) =>
+		plugins
+			.filter((plugin) => plugin.transformIndexHtml !== undefined)
+			.map((plugin) => plugin.name);
+
+	expect(hooked(grai())).toEqual(["grai:page-locale"]);
+	expect(hooked(graiSvelte())).toEqual(["grai:page-locale"]);
+	expect(hooked(graiSvelteKit())).toEqual([]);
+	// Astro's and Nuxt's, which draw their pages too.
+	expect(hooked(graiPlugin({}).plugins)).toEqual([]);
 });
