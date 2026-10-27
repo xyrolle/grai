@@ -205,8 +205,9 @@ describe("@xyrolle/grai/svelte's client build", () => {
 			),
 		);
 
+		// The anchor, internal.js, only re-exports the runtime, so the build leaves it out, as the
+		// outdir's package.json says no module of it but server.js has effects of its own.
 		expect(placed).toEqual({
-			"out/internal.js": ["runtime", "grai-runtime"],
 			"out/runtime.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"\0grai:text/title": ["text", "grai~key-greeting"],
