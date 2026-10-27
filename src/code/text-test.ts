@@ -42,7 +42,8 @@ export class TextTest {
 	/** The names the files were tested by, once they were: as they only grow, a file left out failed them. */
 	private tested: ReadonlySet<string> | undefined;
 	/** The test of an import's path by the names last tested, or undefined to take every import. */
-	private leading: RegExp | undefined;
+	private leading: ((source: string) => boolean) | undefined;
+	private readonly depths = new Map<string, number>();
 
 	constructor(naming: Naming) {
 		this.naming = naming;
@@ -89,21 +90,21 @@ export class TextTest {
 		for (const name of this.passers.passing(names)) names.add(written(name));
 		const tested = this.tested;
 		this.tested = names;
-		const leading = new RegExp([...names].join("|"));
+		const leading = byName(new RegExp([...names].join("|")));
 		this.leading = leading;
 		if (tested === undefined) {
-			return files.filter(
-				({ path, unwritten, specifiers }) =>
-					unwritten ||
-					specifiers.some((source) => this.named(source, path, leading)),
-			);
+			return files.filter(({ path, unwritten, specifiers }) => {
+				if (unwritten) return true;
+				const depth = this.beyond.depth(path);
+				return specifiers.some(
+					(source) => leading(source) || this.beyond.leads(source, depth),
+				);
+			});
 		}
 		const found = [...names].filter((name) => !tested.has(name));
 		if (found.length === 0) return [];
-		const fresh = new RegExp(found.join("|"));
-		return files.filter(({ specifiers }) =>
-			specifiers.some((source) => endless(source) || fresh.test(`"${source}"`)),
-		);
+		const fresh = byName(new RegExp(found.join("|")));
+		return files.filter(({ specifiers }) => specifiers.some(fresh));
 	}
 
 	/**
@@ -111,23 +112,29 @@ export class TextTest {
 	 * sources, by its path and the names the last call of `taken` tested by.
 	 */
 	leads(source: string, importer: string): boolean {
-		return (
-			this.leading === undefined || this.named(source, importer, this.leading)
-		);
-	}
-
-	/** Whether a specifier may name what holds grai's, by these names, or lead outside the sources. */
-	private named(source: string, importer: string, names: RegExp): boolean {
-		if (endless(source)) return true;
-		const quoted = `"${source}"`;
-		return names.test(quoted) || this.beyond.test(importer, quoted);
+		if (this.leading === undefined || this.leading(source)) return true;
+		let depth = this.depths.get(importer);
+		if (depth === undefined) {
+			depth = this.beyond.depth(importer);
+			this.depths.set(importer, depth);
+		}
+		return this.beyond.leads(source, depth);
 	}
 }
 
 /**
- * Whether a specifier holds a quote or a line break, which would end it within the test's quotes,
- * so that it is taken as one that may name anything.
+ * The test of a specifier by these names, in quotes as a text writes it, once for each specifier,
+ * as many files write the same ones. A specifier that holds a quote or a line break, which would
+ * end it within the quotes, is taken as one that may name anything.
  */
-function endless(source: string): boolean {
-	return /['"`\n\r\u2028\u2029]/.test(source);
+function byName(names: RegExp): (source: string) => boolean {
+	const known = new Map<string, boolean>();
+	return (source) => {
+		let named = known.get(source);
+		if (named === undefined) {
+			named = /['"`\n\r\u2028\u2029]/.test(source) || names.test(`"${source}"`);
+			known.set(source, named);
+		}
+		return named;
+	};
 }
