@@ -1,7 +1,9 @@
 /**
  * An MDX document's code, read through MDX's own parser: its `import` and `export` blocks as they
  * are, then its expressions, its JSX attributes' expressions and its components' names, each where
- * MDX found it, as one module. Markdown text is no code, and an expression's scopes are its own.
+ * MDX found it, as one module. Markdown text is no code, and an expression's scopes are its own. An
+ * expression that holds only a comment, as a translator's note does, is no code either, as MDX
+ * compiles it to nothing.
  */
 
 import type { MdxParse } from "./frameworks.ts";
@@ -24,8 +26,9 @@ export function mdxCode(source: string, parse: MdxParse): SourceCode {
 		if (node.type === "mdxjsEsm") {
 			writer.piece(start, end).write("\n;\n");
 		} else if (
-			node.type === "mdxFlowExpression" ||
-			node.type === "mdxTextExpression"
+			(node.type === "mdxFlowExpression" ||
+				node.type === "mdxTextExpression") &&
+			!holdsNoCode(node)
 		) {
 			writer.expression(start + 1, end - 1);
 		} else if (
@@ -62,6 +65,12 @@ function attributeCode(writer: CodeWriter, attribute: TreeNode): void {
 	if (expression !== undefined) {
 		writer.expression(end - 1 - expression.length, end - 1);
 	}
+}
+
+/** Whether an expression's program, as MDX parsed it, has no statement: it holds comments alone. */
+function holdsNoCode(node: TreeNode): boolean {
+	const body = field(field(field(node, "data"), "estree"), "body");
+	return Array.isArray(body) && body.length === 0;
 }
 
 /** Where a node of MDX's tree is in the document, by its position's offsets. */
