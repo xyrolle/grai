@@ -17,11 +17,14 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 const root = fileURLToPath(new URL("..", import.meta.url));
 /** The package manager running the tests, as it names itself to scripts; else pnpm on the PATH. */
 const pnpm = process.env.npm_execpath ?? "pnpm";
-/** What the build and `pnpm pack` read: the manifest, the docs it ships, the sources and configs. */
+/** What the build and `pnpm pack` read: the manifest, the files it ships, the sources and configs. */
 const packageFiles = [
 	"package.json",
 	"README.md",
 	"LICENSE",
+	"CHANGELOG.md",
+	"SECURITY.md",
+	"config.schema.json",
 	"tsconfig.json",
 	"tsconfig.build.json",
 	"src",
@@ -114,8 +117,11 @@ function text(dir: string, file: string): string {
 it("packs each module compiled with its declarations, and nothing else", () => {
 	expect(packed.files).toEqual(
 		[
+			"CHANGELOG.md",
 			"LICENSE",
 			"README.md",
+			"SECURITY.md",
+			"config.schema.json",
 			"package.json",
 			...compiledModules(),
 			...runtimeFiles().map((file) => `dist/${file}`),
