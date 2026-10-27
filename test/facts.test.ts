@@ -199,6 +199,25 @@ describe("a file's facts", () => {
 		).toEqual(["title => title: x", "tooltip"]);
 	});
 
+	it("records the directives a module opens with, and none written after its first statement", async () => {
+		expect(
+			(
+				await moduleOf(
+					"client.jsx",
+					`"use client";\n'use strict';\nimport { m } from "./i18n/keys.js";\n"use server";\n`,
+				)
+			).directives,
+		).toEqual(["use client", "use strict"]);
+		expect(
+			(
+				await moduleOf(
+					"page.jsx",
+					`import { m } from "./i18n/keys.js";\n"use client";\n`,
+				)
+			).directives,
+		).toEqual([]);
+	});
+
 	it("is a file's error where it does not parse", async () => {
 		expect(await factsOf("src/a.ts", "const = 1;")).toEqual({
 			error: { at: 6, message: "Unexpected token" },
