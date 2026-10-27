@@ -30,7 +30,7 @@ export function svelteCode(text: string, root: AST.Root): SourceCode {
 			: undefined;
 	if (root.module && instance) {
 		const { start, end } = spanOf(root.module.content);
-		writer.piece(start, end).write("\n;\n");
+		writer.imports(start).piece(start, end).write("\n;\n");
 		instanceInBlock(writer, instance, () =>
 			new Template(writer).fragment(root.fragment),
 		);
