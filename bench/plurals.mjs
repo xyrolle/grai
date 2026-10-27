@@ -16,6 +16,7 @@ import { graiOutput } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { pluralRuleOf } from "./prototype.mjs";
+import { recordResults } from "./results.mjs";
 
 /** CLDR's cardinal rules for integers only (v = 0), as a compiler would emit them per locale. */
 const integerRules = {
@@ -111,6 +112,7 @@ for (const locale of ["ro", "ru", "en"]) {
 		rows.set(name, { ...rows.get(name), [locale]: ns });
 	}
 }
+const recorded = [];
 for (const [name, ns] of rows) {
 	const source = variantSources("ru")[name];
 	const bytes =
@@ -122,4 +124,6 @@ for (const [name, ns] of rows) {
 	console.log(
 		`| ${name} | ${formatNs(ns.ro)} | ${formatNs(ns.ru)} | ${formatNs(ns.en)} | ${bytes} |`,
 	);
+	recorded.push({ variant: name, ns, bytes });
 }
+recordResults("plurals", recorded, { counts: integers.length });

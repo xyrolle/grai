@@ -13,6 +13,7 @@ import { graiSource, writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { resolveTypeScript6, writeProject } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 const RUNS = 3;
 const self = new URL(import.meta.url).pathname;
@@ -83,6 +84,7 @@ const times = (count, measure) => Array.from({ length: count }, measure);
 if (process.argv[2] === "--child") {
 	await child(...process.argv.slice(3));
 } else {
+	const recorded = [];
 	for (const app of selectedApps()) {
 		const config = writeGraiProject(app, "compile-time");
 		const directory = join(config, "..");
@@ -174,5 +176,17 @@ if (process.argv[2] === "--child") {
 		console.log(
 			"| i18next, use-intl | none, the catalogs are read at run time | | |",
 		);
+		recorded.push({
+			app: app.name,
+			keys: Object.keys(app.messages[app.baseLocale]).length,
+			grai: {
+				cold: median(grai.map((r) => r.cold)),
+				noop: median(grai.map((r) => r.noop)),
+				edit: median(edits.map((r) => r.edit)),
+			},
+			paraglide: Object.fromEntries(paraglideRows),
+			formatjs: median(formatjs.map((r) => r.cold)),
+		});
 	}
+	recordResults("compile-time", recorded, { runs: RUNS });
 }

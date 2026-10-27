@@ -11,6 +11,7 @@ import { cacheDir, selectedApps } from "./apps.mjs";
 import { graiSource } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
+import { recordResults } from "./results.mjs";
 
 const locales = ["ro", "ru", "en"];
 const { pluralModule, pluralName } = await import(`${graiSource}plurals.ts`);
@@ -83,13 +84,20 @@ for (const locale of locales) {
 			return { length };
 		}, integers.length);
 		const bytes = await bytesOf(source);
-		const row = rows.get(name) ?? { ns: [], bytes: [] };
+		const row = rows.get(name) ?? { ns: {}, bytes: {} };
 		rows.set(name, {
-			ns: [...row.ns, formatNs(ns)],
-			bytes: [...row.bytes, bytes],
+			ns: { ...row.ns, [locale]: ns },
+			bytes: { ...row.bytes, [locale]: bytes },
 		});
 	}
 }
 for (const [name, { ns, bytes }] of rows) {
-	console.log(`| ${name} | ${ns.join(" | ")} | ${bytes.join(", ")} |`);
+	console.log(
+		`| ${name} | ${locales.map((locale) => formatNs(ns[locale])).join(" | ")} | ${locales.map((locale) => bytes[locale]).join(", ")} |`,
+	);
 }
+recordResults(
+	"ordinals",
+	[...rows].map(([variant, { ns, bytes }]) => ({ variant, ns, bytes })),
+	{ counts: integers.length },
+);
