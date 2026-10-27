@@ -235,3 +235,9 @@ Done when: the plugin merges the page's own import map into the one the locale s
 A Vite build refuses a text with `!~{…}~` in it (`placeholderTexts` in `src/vite-build.ts`). Rolldown writes each chunk's hash over its placeholder wherever that is in a chunk's code, a string's value included, and grai does the same in each locale's copy. Every other way of writing the text, such as `\x7e` for the `~`, an escaped template, a concatenation or a join, comes out of Rolldown's printer and minifier as the one string again before the hashes go in.
 
 Done when: Rolldown leaves the placeholder's shape in a string's value alone, and the build takes the text as it is.
+
+## The dev start's baseline from CI's runs
+
+The performance check's `dev` step had no runs on CI when it was added, so its baseline is its median on an M5 Pro times the ratio of CI's first compile to that machine's (`scripts/performance.ts`).
+
+Done when: the step's baseline is the median of ten runs on CI's runners, as every other step's is.
