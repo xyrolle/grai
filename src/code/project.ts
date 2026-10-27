@@ -74,7 +74,12 @@ export async function readProjectCode(
 	const seen: Seen = { links: [], manifests: [], skipped: [] };
 	const listedRoots = roots.map(realPath);
 	const listing = new FileListing(state, cache.version);
-	const files = listing.list(listedRoots, config.root, config.outdir, seen);
+	const files = await listing.list(
+		listedRoots,
+		config.root,
+		config.outdir,
+		seen,
+	);
 	const listed = new Set(files.map(({ path }) => path));
 	const sources = new Map<string, SourceCode>();
 	const pool = new Pool();

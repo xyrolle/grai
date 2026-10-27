@@ -57,9 +57,9 @@ export class Resolutions {
 		wanted: Wanted,
 	): Promise<void> {
 		const taken: Import[] = [];
-		for (const each of importsOf(sources)) {
+		for (const [key, each] of importsOf(sources)) {
 			if (wanted(each.source, each.importer)) taken.push(each);
-			else this.kept.set(importKey(each.source, each.importer), each);
+			else this.kept.set(key, each);
 		}
 		await this.resolveAll(taken);
 	}
@@ -120,10 +120,13 @@ export class Resolutions {
 	}
 }
 
-/** Each import the sources make, once: what each module imports and exports from, and loads. */
+/**
+ * Each import the sources make, once, by its key (`importKey`): what each module imports and exports
+ * from, and loads.
+ */
 function importsOf(
 	sources: ReadonlyMap<string, { facts: FileFacts }>,
-): Import[] {
+): Map<string, Import> {
 	const imports = new Map<string, Import>();
 	for (const [importer, { facts }] of sources) {
 		if ("error" in facts) continue;
@@ -138,7 +141,7 @@ function importsOf(
 			}
 		}
 	}
-	return [...imports.values()];
+	return imports;
 }
 
 /** The key an import is resolved under: its importer and the path it names. */
