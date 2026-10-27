@@ -4,10 +4,11 @@
 // shows beside it; types two letters of a key and asks; finishes that call and starts another on
 // the next line, and asks; and, after the library's tool has written the catalog with a key added,
 // asks once more. Each time covers the editor telling the server of the change and the request.
-// Every list must hold exactly the keys the library's types give at that point. An engine opens a
-// file, takes its edits and the files its catalog changed, lists the names it completes at an
-// offset, after the character that triggered it if one did, and describes the last list's first
-// entry.
+// Every list must hold exactly the keys the library's types give at that point. An engine is
+// prepared for a file's project before the sample, as an editor starts its server when a folder
+// opens; it opens the file, takes its edits and the files its catalog changed, lists the names it
+// completes at an offset, after the character that triggered it if one did, describes the last
+// list's first entry, and stops.
 import {
 	existsSync,
 	mkdirSync,
@@ -41,8 +42,9 @@ export async function sample(description, engine) {
 		await engine.change(text);
 		return engine.complete(text.length, trigger);
 	};
+	await engine.prepare(path);
 	await listed("first", before, async () => {
-		await engine.open(path, text);
+		await engine.open(text);
 		return engine.complete(text.length, typed);
 	});
 	await listed("next", before, () => engine.complete(text.length));
@@ -60,6 +62,7 @@ export async function sample(description, engine) {
 		await engine.changed(changes);
 		return engine.complete(text.length);
 	});
+	await engine.stop();
 	return times;
 }
 
