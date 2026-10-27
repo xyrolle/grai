@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 461" width="480" height="461" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>An editor's next completion of a key</title>
+<rect x="0.5" y="0.5" width="479" height="460" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">An editor's next completion of a key</text>
 <text x="16" y="44" font-size="13" fill="#52514e">Milliseconds for TypeScript's language service, the program already</text>
 <text x="16" y="61" font-size="13" fill="#52514e">checked;</text>

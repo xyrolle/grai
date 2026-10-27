@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>The runtime in a page</title>
+<rect x="0.5" y="0.5" width="479" height="259" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">The runtime in a page</text>
 <text x="16" y="44" font-size="13" fill="#52514e">KB brotli, bundled and minified, messages not counted;</text>
 <text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>
