@@ -8,6 +8,7 @@
 
 import {
 	type Binding,
+	type ImportFact,
 	type ModuleFacts,
 	originOf,
 	type Span,

@@ -2,9 +2,9 @@
  * Which source files may read grai's messages, by their text alone, so that only they are parsed
  * and resolved. A file reads them only through an import, a load or a glob that names grai's output
  * or a module that passes it on (a barrel), so its text must hold what names one:
- * - the output directory's name, or a barrel's, its file's or, for an index, its folder's, as a
- *   path through them writes it; or, for an index, `/index` ending a specifier, or a relative path
- *   of dots alone (`.`, `../`), as a file in or below its folder may name it without the folder;
+ * - the output directory's name, or a barrel's: its file's, its folder's too for an index, or that
+ *   of a folder above it whose package.json may name it as its entry, as a path through them writes
+ *   it; or a path whose last segment is `.` or `..`, which names a folder without its name;
  * - the key of a mapping (`mappings.ts`) that may name one without that name, such as an alias of
  *   the output itself, or the name of a symlink or of a package that holds one;
  * - or what may spell any specifier otherwise (`unwritten`): an escape in one, or a load or a glob
@@ -16,8 +16,16 @@
 import { basename, dirname, extname, isAbsolute } from "node:path";
 import type { Mapping } from "./mappings.ts";
 
-/** What a specifier may name and hold grai's: the output directory, and each barrel module. */
-export type Destinations = { outdir: string; barrels: ReadonlySet<string> };
+/**
+ * What a specifier may name and hold grai's: the output directory, and each barrel module, with the
+ * folders whose package.json may name a barrel as their entry (`entries`), as a path to such a
+ * folder resolves to its entry.
+ */
+export type Destinations = {
+	outdir: string;
+	barrels: ReadonlySet<string>;
+	entries: ReadonlySet<string>;
+};
 
 /** A symlink, by its path and the real path it names. */
 export type Link = { path: string; real: string };
@@ -62,14 +70,6 @@ export function specifiersIn(text: string): string[] {
  */
 export const keyPath: string = String.raw`(?:['"]|\/)messages\/[A-Za-z_$][\w$]*(?:\.[cm]?[jt]s)?['"]`;
 
-/**
- * What a specifier of an index module may write without its folder's name: `/index`, with an
- * extension or none, ending it (`./index.js`), or a relative path of dots alone (`.`, `..`, `../`)
- * right after a load's word, which names the folder of a file in or below it. A string of dots
- * elsewhere, as `split(".")` writes, names no module.
- */
-export const indexPath: string = String.raw`\/index(?:\.\w+)?['"]|\b(?:from|import|require)\s*(?:\(\s*)?['"]\.\.?(?:\/\.\.?)*\/?['"]`;
-
 /** The test a file's text must pass to be read, from the names that may name a destination. */
 export function textTest(names: ReadonlySet<string>): RegExp {
 	return new RegExp([unwritten.source, ...names].join("|"));
@@ -90,10 +90,15 @@ export function namesOf(
 	links: readonly Link[],
 	packages: readonly Package[],
 ): Set<string> | undefined {
-	const names = new Set([written(basename(destinations.outdir)), keyPath]);
+	const names = new Set([
+		written(basename(destinations.outdir)),
+		keyPath,
+		dotted,
+	]);
 	for (const barrel of destinations.barrels) {
-		names.add(written(nameOf(barrel)));
-		if (isIndex(barrel)) names.add(indexPath);
+		for (const name of barrelNames(barrel, destinations.entries)) {
+			names.add(written(name));
+		}
 	}
 	const lands = (path: string) => landsOn(path, destinations);
 	for (const { key, targets } of mappings) {
@@ -120,23 +125,42 @@ export function namesOf(
 	return names;
 }
 
-/** The name a path to a module goes through: its file's, or for an index, its folder's. */
-export function nameOf(file: string): string {
-	return isIndex(file)
-		? basename(dirname(file))
-		: basename(file, extname(file));
+/**
+ * A path whose last segment is `.` or `..`, which names a folder, and so its index or entry,
+ * without writing the folder's name.
+ */
+export const dotted: string = String.raw`(?:['"]|\/)\.\.?\/?['"]`;
+
+/**
+ * The names a path to a barrel may end in: its file's, its folder's for an index, and those of the
+ * folders above it whose package.json may name it as their entry (`entries`).
+ */
+export function barrelNames(
+	barrel: string,
+	entries: ReadonlySet<string>,
+): string[] {
+	const stem = basename(barrel, extname(barrel));
+	const names = [stem];
+	if (stem === "index") names.push(basename(dirname(barrel)));
+	for (const entry of entries) {
+		if (barrel.startsWith(`${entry}/`)) names.push(basename(entry));
+	}
+	return names;
 }
 
-/** Whether a module is its folder's index, which a path may name by the folder alone. */
-function isIndex(file: string): boolean {
-	return basename(file, extname(file)) === "index";
-}
-
-/** Whether a path names a module file: the file, its path without an extension, or an index's folder. */
-export function pathNames(path: string, file: string): boolean {
+/**
+ * Whether a path names a module file: the file, its path without an extension, an index's folder,
+ * or a folder above it whose package.json may name it as its entry.
+ */
+export function pathNames(
+	path: string,
+	file: string,
+	entries: ReadonlySet<string>,
+): boolean {
 	const stem = file.slice(0, file.length - extname(file).length);
 	if (path === file || path === stem) return true;
-	return basename(stem) === "index" && path === dirname(file);
+	if (basename(stem) === "index" && path === dirname(file)) return true;
+	return entries.has(path) && file.startsWith(`${path}/`);
 }
 
 /** Whether a mapping without `*` may name a destination: its target lands on one, or is a specifier. */
@@ -169,7 +193,10 @@ function namesBelow(target: string, destinations: Destinations): boolean {
 }
 
 /** Whether a path names a destination: in the output directory, or a barrel's module. */
-function landsOn(path: string, { outdir, barrels }: Destinations): boolean {
+function landsOn(
+	path: string,
+	{ outdir, barrels, entries }: Destinations,
+): boolean {
 	if (path === outdir || path.startsWith(`${outdir}/`)) return true;
-	return [...barrels].some((barrel) => pathNames(path, barrel));
+	return [...barrels].some((barrel) => pathNames(path, barrel, entries));
 }

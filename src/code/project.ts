@@ -6,7 +6,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { dirname, extname, join } from "node:path";
 import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { keyModulePrefix } from "../locale-chunks.ts";
@@ -128,6 +128,7 @@ export async function readProjectCode(
 			mappings,
 			links,
 			packages,
+			entries: new Set(manifests.map(dirname)),
 		});
 		const installed = new Installed(
 			config.root,

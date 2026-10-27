@@ -9,28 +9,37 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
-import {
-	indexPath,
-	keyPath,
-	namesOf,
-	textTest,
-} from "../src/code/candidates.ts";
+import { dotted, keyPath, namesOf, textTest } from "../src/code/candidates.ts";
 import { projectWith, readingIn, unresolvedIn } from "./reading.ts";
 
 const outdir = "/p/src/lib/grai";
 
 describe("the names a specifier of grai's output must write", () => {
-	it("names the output's directory and each barrel, an index by its folder, by `/index` and by a path of dots", () => {
-		const barrels = new Set(["/p/src/lib/i18n.ts", "/p/src/locale/index.ts"]);
+	it("names the output's directory and each barrel: an index by its file and its folder, and a barrel by the folder whose package.json may name it", () => {
+		const barrels = new Set([
+			"/p/src/lib/i18n.ts",
+			"/p/src/locale/index.ts",
+			"/p/src/ui/src/main.ts",
+		]);
+		const entries = new Set(["/p/src/ui"]);
 
-		expect(namesOf({ outdir, barrels }, [], [], [])).toEqual(
-			new Set(["grai", keyPath, "i18n", "locale", indexPath]),
+		expect(namesOf({ outdir, barrels, entries }, [], [], [])).toEqual(
+			new Set([
+				"grai",
+				keyPath,
+				dotted,
+				"i18n",
+				"index",
+				"locale",
+				"main",
+				"ui",
+			]),
 		);
 	});
 
 	it("names a mapping's key where it may name the output without the specifier writing its name", () => {
 		const names = namesOf(
-			{ outdir, barrels: new Set() },
+			{ outdir, barrels: new Set(), entries: new Set<string>() },
 			[
 				{ key: "@i18n", targets: [`${outdir}/messages.js`] },
 				{ key: "$lib/*", targets: ["/p/src/lib/*"] },
@@ -46,21 +55,49 @@ describe("the names a specifier of grai's output must write", () => {
 		);
 
 		expect(names).toEqual(
-			new Set(["grai", keyPath, "@i18n", "#k/", "@g/", "#pkg", "@t/", "@s/"]),
+			new Set([
+				"grai",
+				keyPath,
+				dotted,
+				"@i18n",
+				"#k/",
+				"@g/",
+				"#pkg",
+				"@t/",
+				"@s/",
+			]),
 		);
+	});
+
+	it("names a mapping's key whose target is the folder whose package.json may name a barrel", () => {
+		const barrels = new Set(["/p/src/ui/src/main.ts"]);
+		const entries = new Set(["/p/src/ui"]);
+		const names = namesOf(
+			{ outdir, barrels, entries },
+			[{ key: "~ui", targets: ["/p/src/ui"] }],
+			[],
+			[],
+		);
+
+		expect(names?.has("~ui")).toBe(true);
 	});
 
 	it("leaves no name to test when a mapping may name the output from any specifier", () => {
 		const mappings = [{ key: "*", targets: [`${outdir}/*`] }];
 
-		expect(namesOf({ outdir, barrels: new Set() }, mappings, [], [])).toBe(
-			undefined,
-		);
+		expect(
+			namesOf(
+				{ outdir, barrels: new Set(), entries: new Set<string>() },
+				mappings,
+				[],
+				[],
+			),
+		).toBe(undefined);
 	});
 
 	it("names a symlink into the output, and a package that holds it", () => {
 		const names = namesOf(
-			{ outdir, barrels: new Set() },
+			{ outdir, barrels: new Set(), entries: new Set<string>() },
 			[],
 			[
 				{ path: "/p/src/i18n", real: outdir },
@@ -72,7 +109,9 @@ describe("the names a specifier of grai's output must write", () => {
 			],
 		);
 
-		expect(names).toEqual(new Set(["grai", keyPath, "i18n", "@app/web"]));
+		expect(names).toEqual(
+			new Set(["grai", keyPath, dotted, "i18n", "@app/web"]),
+		);
 	});
 
 	it("takes a text that writes a name, an escape in a specifier, a comment where one may be, or a load or a glob by a built path, and no load by a whole string", () => {

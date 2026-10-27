@@ -7,8 +7,9 @@
 
 import { basename, extname, isAbsolute } from "node:path";
 import {
+	barrelNames,
+	dotted,
 	type Link,
-	nameOf,
 	type Package,
 	pathNames,
 	written,
@@ -20,6 +21,8 @@ export type Holders = {
 	messages: string;
 	keys: string;
 	barrels: ReadonlySet<string>;
+	/** The folders whose package.json may name a barrel as their entry. */
+	entries: ReadonlySet<string>;
 };
 
 /**
@@ -52,9 +55,18 @@ export function keyNamesOf(
 ): Set<string> | undefined {
 	const files = [holders.messages, holders.keys, ...holders.barrels];
 	// The key's name whole: a longer name that holds it is another key's.
-	const names = new Set([`(?<![\\w$])${written(key)}(?![\\w$])`, outputModule]);
-	for (const barrel of holders.barrels) names.add(written(nameOf(barrel)));
-	const lands = (path: string) => files.some((file) => pathNames(path, file));
+	const names = new Set([
+		`(?<![\\w$])${written(key)}(?![\\w$])`,
+		outputModule,
+		dotted,
+	]);
+	for (const barrel of holders.barrels) {
+		for (const name of barrelNames(barrel, holders.entries)) {
+			names.add(written(name));
+		}
+	}
+	const lands = (path: string) =>
+		files.some((file) => pathNames(path, file, holders.entries));
 	for (const { key: mapped, targets } of mappings) {
 		const star = mapped.indexOf("*");
 		const fixed = star === -1 ? mapped : mapped.slice(0, star);
