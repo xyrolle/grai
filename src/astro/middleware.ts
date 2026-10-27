@@ -33,8 +33,8 @@ export type LocaleProject = {
 		afterUrl: readonly string[];
 	};
 	/**
-	 * Each locale's import map, a script that points the shared message chunks at its copies, in a
-	 * build; dev serves every locale from one module.
+	 * Each locale's import map, a script: in a build, it points the shared message chunks at its
+	 * copies, and in dev, keys.js at the dev module with its words alone.
 	 */
 	importMaps?: Readonly<Record<string, string>> | undefined;
 };
