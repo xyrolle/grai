@@ -13,9 +13,10 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
+import { sampleCalls, takesInputs } from "./calls.mjs";
 import { graiEntry, graiVite } from "./grai.mjs";
-import { libraryCatalogs } from "./libraries.mjs";
-import { writeProject } from "./paraglide.mjs";
+import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
+import { paraglideOutput, writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 
 const { grai } = await import(graiEntry("./vite"));
@@ -264,6 +265,28 @@ export function textPage(app, locale) {
 	return {
 		calls: keys.map((key) => ({ key })),
 		texts: keys.map((key) => app.messages[locale][key]),
+	};
+}
+
+/**
+ * The page of mixed calls: 500 in the catalog's own mix of texts, inputs, plurals and markup
+ * (calls.mjs), each with its inputs, as i18next takes them too, and each text as Paraglide's
+ * output draws it in Node.
+ */
+export async function mixedPage(app, locale) {
+	const sample = sampleCalls(app, SHOWN);
+	const { m } = await import(join(await paraglideOutput(app), "messages.js"));
+	return {
+		calls: sample.map((call) =>
+			takesInputs(call)
+				? {
+						key: call.key,
+						inputs: call.inputs,
+						i18next: i18nextValues(app, call.key, call.inputs),
+					}
+				: { key: call.key },
+		),
+		texts: sample.map(({ key, inputs }) => m[key](inputs, { locale })),
 	};
 }
 
