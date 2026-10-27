@@ -217,6 +217,15 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
 - **Import the messages as a namespace, from `keys.js`:** `import * as m from "@/i18n/keys.js"`, as the example does. `next dev` then takes each message a module calls from the shard that holds it. `import { m }` from `messages.js` gives it one namespace of every key, which it builds whole in each of Next's layers, and again after each edit. `grai migrate` writes this import in a Next app, one whose package.json depends on `next`.
 - **Server actions and route handlers name the locale:** `m.saved({}, { locale })`. React keeps no request state there.
 - **Per-key imports** (`import { title } from "#i18n/messages/title.js"`) map to the output's keys.js through package.json `imports`, as in the example.
+- **Vitest takes grai's plugin in its own config,** as a Next app has no Vite config. A key's path is then a module of that key alone in tests, so `vi.mock` of one key's path mocks that key and no other:
+
+  ```ts
+  // vitest.config.ts
+  import { grai } from "grai/vite";
+  import { defineConfig } from "vitest/config";
+
+  export default defineConfig({ plugins: [grai()] });
+  ```
 - **A markup message** renders with `grai/react`'s `Markup`, in server and client components alike. Each element's function takes what it encloses and the options and attributes the message writes on it, so `{#link href=|/terms|}terms{/link}` gives `options.href`:
 
   ```tsx
