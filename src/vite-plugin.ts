@@ -1,12 +1,12 @@
 import { basename, join, resolve } from "node:path";
-import type { Logger, Plugin, ResolvedConfig } from "vite";
+import type { Plugin, ResolvedConfig } from "vite";
 import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import { BuildReading } from "./code/build-reading.ts";
 import { FactsCache } from "./code/facts-cache.ts";
 import { parse } from "./code/parse.ts";
 import { withGroups } from "./code-splitting.ts";
 import { type Build, recompile } from "./compile.ts";
-import { readConfig } from "./config.ts";
+import { type Config, readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import {
@@ -42,7 +42,7 @@ import {
 	pathKey,
 	serveMessages,
 } from "./vite-dev.ts";
-import { pagePreloads, type Site, withPageLocale } from "./vite-html.ts";
+import { pagePreloads } from "./vite-preloads.ts";
 import { buildReads, chunkReads } from "./vite-reads.ts";
 
 /**
@@ -69,6 +69,8 @@ export type GraiOptions = {
 export type GraiPlugin = {
 	plugins: Plugin[];
 	build: () => Build | undefined;
+	/** The project's config: as the last compile read it, or as its file has it before any compile. */
+	config: () => Config;
 	/** A build environment's reading of its modules, which the adapters' transforms share. */
 	reading: (environment: string) => BuildReading | undefined;
 };
@@ -83,14 +85,10 @@ const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro|mdx)$/;
  *   build has loaded every module.
  * - `frameworkBase`: the base path the framework serves the app under, as its config writes it,
  *   which must be grai's `basePath` under the `url` strategy; undefined where it names none.
- * - `indexHtml`: whether Vite serves the app's pages, from its index.html files, which then get
- *   their locale script. A framework that draws its own pages never runs Vite's
- *   `transformIndexHtml` hook, and SvelteKit warns of a plugin that has one.
  */
 export type GraiAdapter = {
 	pageEntries?: () => Iterable<readonly string[]>;
 	frameworkBase?: (config: ResolvedConfig) => FrameworkBase | undefined;
-	indexHtml?: boolean;
 };
 
 /** Vite's own base, for an app Vite alone serves; none for a relative base, which names no path. */
@@ -152,10 +150,6 @@ export function graiPlugin(
 		return pageChunks.get(id);
 	};
 
-	let site: Site = { base: "/", preloads: true, copies: false };
-	let logger: Logger | undefined;
-	/** The hashes the build's log has named, each once. */
-	const reported = new Set<string>();
 	const building = (environment: { name: string } | undefined) =>
 		!serving && environment?.name === "client";
 	/** Whether this build writes each message chunk's copies, one per locale. */
@@ -217,12 +211,6 @@ export function graiPlugin(
 					problem,
 				);
 			}
-			site = {
-				base: resolved.base,
-				preloads: resolved.build.modulePreload !== false,
-				copies: options.localeChunks === true,
-			};
-			logger = resolved.logger;
 		},
 		outputOptions(output) {
 			// grai's groups join each output as Vite resolved it, and none that splits no code
@@ -461,31 +449,10 @@ export function graiPlugin(
 			if (every) read.computed.add(id);
 		},
 	});
-	const pageLocale: Plugin = {
-		name: "grai:page-locale",
-		transformIndexHtml: {
-			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
-			order: "post",
-			handler(html, context) {
-				const config = build?.config ?? readConfig(files.configFile);
-				const page = withPageLocale(html, context, config, site);
-				const unreported = page.hashes.filter((hash) => !reported.has(hash));
-				if (context.bundle !== undefined && unreported.length > 0) {
-					for (const hash of unreported) reported.add(hash);
-					logger?.info(
-						`grai: a Content Security Policy that allows scripts by hash needs ${unreported.join(" ")} in script-src, for the locale script and its import maps.`,
-					);
-				}
-				return page.html;
-			},
-		},
-	};
 	return {
-		plugins:
-			adapter.indexHtml === true
-				? [reads, plugin, pageLocale]
-				: [reads, plugin],
+		plugins: [reads, plugin],
 		build: () => build,
+		config: () => build?.config ?? readConfig(files.configFile),
 		reading: (environment) => readings.get(environment),
 	};
 }

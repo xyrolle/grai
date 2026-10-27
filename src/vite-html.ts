@@ -1,8 +1,4 @@
-import type {
-	IndexHtmlTransformContext,
-	ModulePreloadOptions,
-	Rolldown,
-} from "vite";
+import type { IndexHtmlTransformContext, Logger, Plugin, Rolldown } from "vite";
 import type { Config } from "./config.ts";
 import { besideDirectory, messageOnly } from "./locale-chunks.ts";
 import {
@@ -11,34 +7,50 @@ import {
 	localeScript,
 	type PageChunks,
 } from "./locale-script.ts";
-import { isMessageChunk, localeDirectory } from "./message-directories.ts";
+import { localeDirectory } from "./message-directories.ts";
+import type { GraiOptions, GraiPlugin } from "./vite-plugin.ts";
 
 /**
- * The client build's module preloads, without a page's own preloads of message chunks: those
- * hold every locale's words, and the page's locale script preloads its locale's copies instead. A
- * dynamic import's preloads keep them, as Vite resolves those through the page's import map. An
- * app's own `resolveDependencies` still decides first.
+ * The locale script's plugin, for an app whose pages Vite serves from its index.html files, as a
+ * plain Vite app's and a Svelte app's are: each page it builds or serves gets the script. A framework
+ * that draws its own pages never runs Vite's `transformIndexHtml` hook, and SvelteKit warns of a
+ * plugin that has one, so its adapter leaves this plugin out, and with it the script's code.
  */
-export function pagePreloads(
-	modulePreload: boolean | ModulePreloadOptions | undefined,
-): ModulePreloadOptions | undefined {
-	if (modulePreload === false) return undefined;
-	const resolve =
-		typeof modulePreload === "object"
-			? modulePreload.resolveDependencies
-			: undefined;
+export function pageLocale(core: GraiPlugin, options: GraiOptions): Plugin {
+	let site: Site = { base: "/", preloads: true, copies: false };
+	let logger: Logger | undefined;
+	/** The hashes the build's log has named, each once. */
+	const reported = new Set<string>();
 	return {
-		resolveDependencies(file, dependencies, context) {
-			const resolved = resolve?.(file, dependencies, context) ?? dependencies;
-			return context.hostType === "html"
-				? resolved.filter((dependency) => !isMessageChunk(dependency))
-				: resolved;
+		name: "grai:page-locale",
+		configResolved(resolved) {
+			site = {
+				base: resolved.base,
+				preloads: resolved.build.modulePreload !== false,
+				copies: options.localeChunks === true,
+			};
+			logger = resolved.logger;
+		},
+		transformIndexHtml: {
+			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
+			order: "post",
+			handler(html, context) {
+				const page = withPageLocale(html, context, core.config(), site);
+				const unreported = page.hashes.filter((hash) => !reported.has(hash));
+				if (context.bundle !== undefined && unreported.length > 0) {
+					for (const hash of unreported) reported.add(hash);
+					logger?.info(
+						`grai: a Content Security Policy that allows scripts by hash needs ${unreported.join(" ")} in script-src, for the locale script and its import maps.`,
+					);
+				}
+				return page.html;
+			},
 		},
 	};
 }
 
 /** What a page's locale script takes from Vite's config. */
-export type Site = {
+type Site = {
 	base: string;
 	/** Whether the build preloads a page's modules, `build.modulePreload`. */
 	preloads: boolean;
@@ -51,7 +63,7 @@ export type Site = {
  * and writes: itself, and in a build that copies the message chunks per locale, each locale's
  * import map. A build minifies the script; dev serves it as written.
  */
-export function withPageLocale(
+function withPageLocale(
 	html: string,
 	context: IndexHtmlTransformContext,
 	config: Config,

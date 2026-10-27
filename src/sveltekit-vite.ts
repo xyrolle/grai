@@ -1,7 +1,7 @@
 import type { Plugin, ResolvedConfig } from "vite";
 import type { FrameworkBase } from "./base-agreement.ts";
-import { sveltePlugins } from "./svelte-plugins.ts";
-import type { GraiOptions } from "./vite-plugin.ts";
+import { svelteTexts } from "./svelte-texts.ts";
+import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
 
 /** The plugin's options: `config`, the path of the project's grai.config.json, from Vite's root. */
 export type SvelteKitGraiOptions = Pick<GraiOptions, "config">;
@@ -14,10 +14,11 @@ export type SvelteKitGraiOptions = Pick<GraiOptions, "config">;
  *     plugins: [grai(), sveltekit()]
  */
 export function grai(options: SvelteKitGraiOptions = {}): Plugin[] {
-	return sveltePlugins(
+	const core = graiPlugin(
 		{ ...options, localeChunks: true },
 		{ frameworkBase: kitBase },
 	);
+	return [...core.plugins, svelteTexts(core)];
 }
 
 /**
