@@ -1,13 +1,30 @@
 {
 	"name": "grai",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Translation catalogs compiled ahead of time into plain functions, for any JavaScript framework.",
 	"keywords": [
 		"i18n",
-		"messageformat",
+		"internationalization",
+		"l10n",
+		"localization",
 		"translation",
-		"compiler"
+		"messageformat",
+		"mf2",
+		"inlang",
+		"compiler",
+		"vite-plugin",
+		"sveltekit",
+		"nextjs",
+		"astro",
+		"nuxt",
+		"vue",
+		"react",
+		"svelte"
 	],
+	"homepage": "https://github.com/xyrolle/grai#readme",
+	"bugs": {
+		"url": "https://github.com/xyrolle/grai/issues"
+	},
 	"license": "MIT",
 	"author": "Serghei",
 	"repository": {
@@ -103,8 +120,13 @@
 	},
 	"files": [
 		"dist",
-		"config.schema.json"
+		"config.schema.json",
+		"CHANGELOG.md",
+		"SECURITY.md"
 	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"packageManager": "pnpm@12.15.0",
 	"engines": {
 		"node": ">=22.18"
