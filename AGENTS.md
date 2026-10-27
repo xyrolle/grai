@@ -61,8 +61,8 @@ The code is small, readable and maintainable by a stranger. Every line earns its
 
 ### Releases
 The owner publishes; nothing else does.
-1. On a branch, write the release's section at the top of `CHANGELOG.md` from the `feat:`, `fix:` and `perf:` commits since the last tag (`git log --format=%s v<last>..HEAD`), in words for those who use grai. Run `pnpm version <version> --no-git-tag-version`, commit both as `chore: release <version>`, and merge it through a pull request.
-2. On `main` at that commit: `git tag v<version>`, `git push origin v<version>`, then `pnpm publish`, whose `prepublishOnly` runs the whole gate first.
+1. On a branch, write the release's section at the top of `CHANGELOG.md`, headed `## <version> (unreleased)`, from the `feat:`, `fix:` and `perf:` commits since the last tag (`git log --format=%s v<last>..HEAD`), in words for those who use grai. Run `pnpm version <version> --no-git-tag-version`, commit both as `chore: version <version>`, and merge it through a pull request.
+2. On the day, the owner follows `docs/releasing.md`: he dates the section in `chore: release <version>`, gates and packs that commit, tags it, and publishes the tarball.
 
 ### Docs
 - Docs record decisions and their reasons, not implementation retellings.
