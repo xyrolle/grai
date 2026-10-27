@@ -127,6 +127,20 @@ describe("grai check --fix", () => {
 		]);
 	});
 
+	it('keeps a key a type names through an inline import type, `typeof import("…/keys.js").key`', async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/types.ts":
+				'export type Label = typeof import("../out/keys.js").cart_title;\n',
+			"src/total.js":
+				'import { m } from "../out/messages.js";\nm.cart_total({ count: 1 });\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes a key only a load by a path the code computes could load, as a bundler bundles nothing for it, and lists it", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
