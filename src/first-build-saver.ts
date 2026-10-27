@@ -14,13 +14,15 @@ const quietShare = 0.1;
 
 /**
  * Saves a watcher's first build once the process is quiet, once `flush` is called, or as the
- * process exits, unless it compiled nothing: it is then the saved build as it was. The builds after
+ * process exits, unless it is the build it started from (`from`) as that was saved: it compiled no
+ * key, and placed the keys as that did (`rendered.groups`). One that placed them by groups saved
+ * since is saved, so the next start does not place them again. The builds after
  * it are not saved, since the next start compiles what they changed as edits. The save at exit is
  * for a process that ends before it is quiet: a dev server stopped by SIGTERM, which Vite closes,
  * though in an app whose own SIGTERM handler exits at once it never closes.
  */
 export function firstBuildSaver(): {
-	took: (build: Build) => void;
+	took: (build: Build, from: Build | undefined) => void;
 	flush: () => Promise<void>;
 } {
 	let taken = false;
@@ -41,10 +43,15 @@ export function firstBuildSaver(): {
 		} catch {}
 	};
 	return {
-		took: (build) => {
+		took: (build, from) => {
 			if (taken) return;
 			taken = true;
-			if (build.compilation.changed.size === 0) return;
+			// The build it started from, unchanged: its keys and their places are those it saved.
+			if (
+				build.compilation.changed.size === 0 &&
+				build.rendered.groups === from?.rendered.groups
+			)
+				return;
 			unsaved = build;
 			let since = performance.eventLoopUtilization();
 			timer = setInterval(() => {
