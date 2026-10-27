@@ -83,12 +83,12 @@ export function handleLocale({
 /**
  * Points a page `vite dev` serves at its locale's keys.js, with an import map first in its head,
  * ahead of every module the page loads, and preloads it, so the dev server makes it while the page
- * loads the modules that import it. Vite's `import.meta.env` tells whether its dev server renders
- * the page, and the base it serves modules under; a build or a server without Vite has no dev
- * keys.js, and the page is left as it is.
+ * loads the modules that import it. Vite's `import.meta.hot` is there only in a module its dev
+ * server serves, not in a build, whatever its mode, nor outside Vite, which have no dev keys.js and
+ * leave the page as it is; `import.meta.env` gives the base the dev server serves modules under.
  */
 function localeKeys(html: string, locale: string): string {
-	if (import.meta.env?.DEV !== true) return html;
+	if (import.meta.hot === undefined) return html;
 	const nonce = KIT_NONCE.exec(html)?.[1];
 	const attributes = nonce === undefined ? "" : ` nonce="${nonce}"`;
 	return html.replace(
