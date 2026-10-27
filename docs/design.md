@@ -489,7 +489,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
   - The commands measured are `check`, `check --fix`, `find` and `rename` on the synthetic project and app B (the refactor bench), together with the build's check and `test:performance`.
   - **A command parses and resolves only the sources whose text may name grai's output** (`code/candidates.ts`). Every other source reads nothing of grai's.
     - A file reads the messages only through an import, a load or a glob that names the output or a module that passes it on. So its text must write one of these:
-      - the output directory's name, or a barrel's name (its file's, or its folder's for an index);
+      - the output directory's name, or a barrel's name: its file's, its folder's too for an index, or that of a folder above it whose package.json may name it as its entry. A path whose last segment is `.` or `..` names a folder without its name, so it counts too;
       - the key of a mapping that may name one without that name: a Vite alias, a tsconfig `paths` key or a package.json `imports` key;
       - the name of a symlink or a package that holds one.
       - a key's path (`messages/` and a key's name). An import of one that nothing resolves is the output's, unresolved, which a check reports whatever names it.
