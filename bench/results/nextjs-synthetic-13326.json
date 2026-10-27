@@ -1,0 +1,632 @@
+{
+	"bench": "nextjs-synthetic-13326",
+	"date": "2026-10-27T23:05:48.254Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 14.4,
+		"end": 12.7
+	},
+	"node": "24.16.0",
+	"grai": "819fb87d",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 13,326 keys",
+	"locale": "ru",
+	"keys": {
+		"server": 400,
+		"client": 100
+	},
+	"edits": 7,
+	"chromium": "156.0.8078.4",
+	"prepared": {
+		"groups": [
+			100,
+			400
+		]
+	},
+	"rows": {
+		"bytes": {
+			"grai": {
+				"document": 9617,
+				"script": 122713,
+				"other": 0
+			},
+			"next-intl": {
+				"document": 217039,
+				"script": 127150,
+				"other": 0
+			},
+			"next-intl, client keys picked": {
+				"document": 10887,
+				"script": 127134,
+				"other": 0
+			},
+			"plain": {
+				"document": 9546,
+				"script": 116847,
+				"other": 0
+			}
+		},
+		"dev": {
+			"grai": {
+				"empty": {
+					"ready": 305.1,
+					"page": 1749.9
+				},
+				"kept": {
+					"ready": 307.1,
+					"page": 1984.6
+				},
+				"edits": {
+					"server": {
+						"shown": 161.3,
+						"written": -5.2
+					},
+					"client": {
+						"shown": 45.3,
+						"written": -10.7
+					}
+				}
+			},
+			"next-intl": {
+				"empty": {
+					"ready": 277.1,
+					"page": 1933.8
+				},
+				"kept": {
+					"ready": 264.3,
+					"page": 1830
+				},
+				"edits": {
+					"server": {
+						"shown": 221.1
+					},
+					"client": {
+						"shown": 212.5
+					}
+				}
+			}
+		},
+		"cold": {
+			"grai": {
+				"ready": 283.6,
+				"page": 1685.2,
+				"hydrated": 1992.1,
+				"cpu": 5020,
+				"runs": [
+					{
+						"round": 0,
+						"ready": 234.3,
+						"page": 1541.2,
+						"cpu": 4940,
+						"hydrated": 1983.5
+					},
+					{
+						"round": 1,
+						"ready": 343.5,
+						"page": 2321.7,
+						"cpu": 5020,
+						"hydrated": 2072.6
+					},
+					{
+						"round": 2,
+						"ready": 492.3,
+						"page": 3670.2,
+						"cpu": 4960,
+						"hydrated": 2247.5
+					},
+					{
+						"round": 3,
+						"ready": 318.2,
+						"page": 1923.9,
+						"cpu": 5140,
+						"hydrated": 2076.6
+					},
+					{
+						"round": 4,
+						"ready": 299.2,
+						"page": 1893.8,
+						"cpu": 5120,
+						"hydrated": 2009.1
+					},
+					{
+						"round": 5,
+						"ready": 254.2,
+						"page": 1598.6,
+						"cpu": 5180,
+						"hydrated": 1782.3
+					},
+					{
+						"round": 6,
+						"ready": 377.8,
+						"page": 2004.5,
+						"cpu": 5260,
+						"hydrated": 1731.7
+					},
+					{
+						"round": 7,
+						"ready": 242.9,
+						"page": 1626.1,
+						"cpu": 5130,
+						"hydrated": 1900.7
+					},
+					{
+						"round": 8,
+						"ready": 286.7,
+						"page": 1643.6,
+						"cpu": 4940,
+						"hydrated": 1693.3
+					},
+					{
+						"round": 9,
+						"ready": 255.8,
+						"page": 1650.4,
+						"cpu": 5000,
+						"hydrated": 1987.5
+					},
+					{
+						"round": 10,
+						"ready": 280.5,
+						"page": 1601.9,
+						"cpu": 4990,
+						"hydrated": 2061
+					},
+					{
+						"round": 11,
+						"ready": 258.6,
+						"page": 1720.1,
+						"cpu": 5020,
+						"hydrated": 1996.8
+					}
+				]
+			},
+			"grai, empty output": {
+				"ready": 292.8,
+				"page": 2726,
+				"hydrated": 2799.3,
+				"cpu": 7440,
+				"runs": [
+					{
+						"round": 0,
+						"ready": 264.4,
+						"page": 2517.3,
+						"cpu": 7310,
+						"hydrated": 2831.6
+					},
+					{
+						"round": 1,
+						"ready": 595.2,
+						"page": 7008.8,
+						"cpu": 7270,
+						"hydrated": 3617.6
+					},
+					{
+						"round": 2,
+						"ready": 475.3,
+						"page": 4941.1,
+						"cpu": 7340,
+						"hydrated": 3251.8
+					},
+					{
+						"round": 3,
+						"ready": 306.5,
+						"page": 3284.2,
+						"cpu": 7550,
+						"hydrated": 3065.7
+					},
+					{
+						"round": 4,
+						"ready": 275.8,
+						"page": 2877.3,
+						"cpu": 7400,
+						"hydrated": 2767
+					},
+					{
+						"round": 5,
+						"ready": 306.5,
+						"page": 2350.8,
+						"cpu": 7480,
+						"hydrated": 2751.2
+					},
+					{
+						"round": 6,
+						"ready": 279.2,
+						"page": 2630.5,
+						"cpu": 7500,
+						"hydrated": 2861
+					},
+					{
+						"round": 7,
+						"ready": 277,
+						"page": 2602.2,
+						"cpu": 7380,
+						"hydrated": 2698
+					},
+					{
+						"round": 8,
+						"ready": 271.8,
+						"page": 2704.7,
+						"cpu": 7590,
+						"hydrated": 2453.2
+					},
+					{
+						"round": 9,
+						"ready": 277.5,
+						"page": 2624.5,
+						"cpu": 7370,
+						"hydrated": 2765
+					},
+					{
+						"round": 10,
+						"ready": 320.7,
+						"page": 2747.4,
+						"cpu": 7580,
+						"hydrated": 2860.2
+					},
+					{
+						"round": 11,
+						"ready": 351.6,
+						"page": 2760.3,
+						"cpu": 7750,
+						"hydrated": 2757.2
+					}
+				]
+			},
+			"next-intl": {
+				"ready": 274.6,
+				"page": 1880.3,
+				"hydrated": 1974.2,
+				"cpu": 4580,
+				"runs": [
+					{
+						"round": 0,
+						"ready": 234.4,
+						"page": 1554.6,
+						"cpu": 4450,
+						"hydrated": 2178.5
+					},
+					{
+						"round": 1,
+						"ready": 623.4,
+						"page": 3619.2,
+						"cpu": 4690,
+						"hydrated": 1980.7
+					},
+					{
+						"round": 2,
+						"ready": 380.7,
+						"page": 3881.1,
+						"cpu": 4380,
+						"hydrated": 4797.5
+					},
+					{
+						"round": 3,
+						"ready": 305.3,
+						"page": 2423.5,
+						"cpu": 4770,
+						"hydrated": 2238.8
+					},
+					{
+						"round": 4,
+						"ready": 260.7,
+						"page": 1918.6,
+						"cpu": 4650,
+						"hydrated": 1964
+					},
+					{
+						"round": 5,
+						"ready": 248.5,
+						"page": 1634.6,
+						"cpu": 4580,
+						"hydrated": 2041.8
+					},
+					{
+						"round": 6,
+						"ready": 257.3,
+						"page": 1940.9,
+						"cpu": 4580,
+						"hydrated": 1982.7
+					},
+					{
+						"round": 7,
+						"ready": 280.1,
+						"page": 1728.8,
+						"cpu": 4530,
+						"hydrated": 1847.4
+					},
+					{
+						"round": 8,
+						"ready": 244.5,
+						"page": 1667.8,
+						"cpu": 4550,
+						"hydrated": 1622.3
+					},
+					{
+						"round": 9,
+						"ready": 269,
+						"page": 1710.1,
+						"cpu": 4450,
+						"hydrated": 1967.7
+					},
+					{
+						"round": 10,
+						"ready": 295,
+						"page": 1841.9,
+						"cpu": 4620,
+						"hydrated": 1826.4
+					},
+					{
+						"round": 11,
+						"ready": 339.1,
+						"page": 1921.3,
+						"cpu": 4670,
+						"hydrated": 1718.3
+					}
+				]
+			},
+			"next-intl, client keys picked": {
+				"ready": 305.7,
+				"page": 1747.9,
+				"hydrated": 1933.3,
+				"cpu": 4545,
+				"runs": [
+					{
+						"round": 0,
+						"ready": 233.4,
+						"page": 1608.6,
+						"cpu": 4550,
+						"hydrated": 2134.3
+					},
+					{
+						"round": 1,
+						"ready": 416.4,
+						"page": 2796.9,
+						"cpu": 4550,
+						"hydrated": 2117.2
+					},
+					{
+						"round": 2,
+						"ready": 747.6,
+						"page": 4297.2,
+						"cpu": 4420,
+						"hydrated": 2717.5
+					},
+					{
+						"round": 3,
+						"ready": 330.1,
+						"page": 2079.4,
+						"cpu": 4750,
+						"hydrated": 2204.5
+					},
+					{
+						"round": 4,
+						"ready": 319.8,
+						"page": 1831.6,
+						"cpu": 4520,
+						"hydrated": 1739.5
+					},
+					{
+						"round": 5,
+						"ready": 232.6,
+						"page": 1549.4,
+						"cpu": 4350,
+						"hydrated": 1948.2
+					},
+					{
+						"round": 6,
+						"ready": 278.5,
+						"page": 1779.4,
+						"cpu": 4570,
+						"hydrated": 1815.9
+					},
+					{
+						"round": 7,
+						"ready": 311.8,
+						"page": 1707.3,
+						"cpu": 4540,
+						"hydrated": 1758.5
+					},
+					{
+						"round": 8,
+						"ready": 258.3,
+						"page": 1707.5,
+						"cpu": 4470,
+						"hydrated": 1765.3
+					},
+					{
+						"round": 9,
+						"ready": 258.6,
+						"page": 1716.5,
+						"cpu": 4520,
+						"hydrated": 2106.6
+					},
+					{
+						"round": 10,
+						"ready": 335,
+						"page": 1828.1,
+						"cpu": 4650,
+						"hydrated": 1918.4
+					},
+					{
+						"round": 11,
+						"ready": 299.6,
+						"page": 1714.6,
+						"cpu": 4550,
+						"hydrated": 1913.2
+					}
+				]
+			}
+		},
+		"pairs": [
+			{
+				"first": "grai",
+				"second": "next-intl",
+				"page": {
+					"median": -81.2,
+					"min": -1297.5,
+					"max": 63.7,
+					"blocks": [
+						-355.2,
+						-30.4,
+						-130.4
+					],
+					"values": [
+						-13.4,
+						-1297.5,
+						-210.9,
+						-499.6,
+						-24.8,
+						-36,
+						63.7,
+						-102.8,
+						-24.2,
+						-59.7,
+						-240,
+						-201.2
+					]
+				},
+				"hydrated": {
+					"median": 32.5,
+					"min": -2550,
+					"max": 278.5,
+					"blocks": [
+						-178.6,
+						-102.9,
+						152.8
+					],
+					"values": [
+						-195,
+						91.8,
+						-2550,
+						-162.2,
+						45.1,
+						-259.4,
+						-251,
+						53.3,
+						71,
+						19.8,
+						234.6,
+						278.5
+					]
+				}
+			},
+			{
+				"first": "grai",
+				"second": "next-intl, client keys picked",
+				"page": {
+					"median": -66.7,
+					"min": -627,
+					"max": 225.2,
+					"blocks": [
+						-315.4,
+						55.7,
+						-65
+					],
+					"values": [
+						-67.4,
+						-475.2,
+						-627,
+						-155.5,
+						62.2,
+						49.3,
+						225.2,
+						-81.2,
+						-63.9,
+						-66.1,
+						-226.2,
+						5.4
+					]
+				},
+				"hydrated": {
+					"median": -78.1,
+					"min": -470,
+					"max": 269.6,
+					"blocks": [
+						-139.3,
+						29,
+						5.8
+					],
+					"values": [
+						-150.7,
+						-44.6,
+						-470,
+						-128,
+						269.6,
+						-165.9,
+						-84.2,
+						142.2,
+						-72,
+						-119.1,
+						142.7,
+						83.5
+					]
+				}
+			},
+			{
+				"first": "grai, empty output",
+				"second": "next-intl",
+				"page": {
+					"median": 909.9,
+					"min": 689.6,
+					"max": 3389.6,
+					"blocks": [
+						1011.3,
+						794.8,
+						909.9
+					],
+					"values": [
+						962.7,
+						3389.6,
+						1060,
+						860.7,
+						958.6,
+						716.2,
+						689.6,
+						873.4,
+						1036.9,
+						914.4,
+						905.5,
+						839
+					]
+				},
+				"hydrated": {
+					"median": 828.9,
+					"min": -1545.7,
+					"max": 1636.8,
+					"blocks": [
+						740,
+						826.8,
+						932.4
+					],
+					"values": [
+						653,
+						1636.8,
+						-1545.7,
+						826.9,
+						803,
+						709.4,
+						878.3,
+						850.7,
+						830.9,
+						797.3,
+						1033.8,
+						1038.9
+					]
+				}
+			}
+		]
+	}
+}
