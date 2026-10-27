@@ -230,7 +230,7 @@ for (const app of selectedApps()) {
 	console.log("|---|---|---|---|---|---|---|");
 	for (const name of ["grai", "next-intl"]) {
 		const root = apps[name];
-		const empty = await devStart(root, path, words, { empty: true });
+		const empty = await devStart(root, path, words, [".next"]);
 		const catalogFile = join(root, "messages", `${locale}.json`);
 		const outdir = name === "grai" ? join(root, "src/i18n") : undefined;
 		const edits = {};
@@ -245,7 +245,7 @@ for (const app of selectedApps()) {
 			);
 		}
 		await stopServer(empty.server.child);
-		const kept = await devStart(root, path, words, { empty: false });
+		const kept = await devStart(root, path, words);
 		await stopServer(kept.server.child);
 		const edit = ({ shown, written }) =>
 			written === undefined

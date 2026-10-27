@@ -103,11 +103,12 @@ function groupCpu(pid) {
 
 /**
  * `next dev` from its launch until it is ready, and until the page's first response is complete and
- * lists `words`, with the CPU Next's processes used until then: from an empty .next, or not. The
- * server is left running.
+ * lists `words`, with the CPU Next's processes used until then, after removing the app's
+ * directories `cleared` names, such as `.next`. The server is left running.
  */
-export async function devStart(root, path, words, { empty }) {
-	if (empty) rmSync(join(root, ".next"), { recursive: true, force: true });
+export async function devStart(root, path, words, cleared = []) {
+	for (const directory of cleared)
+		rmSync(join(root, directory), { recursive: true, force: true });
 	const server = started(root, "dev", /Ready in/);
 	const { origin, ready } = await server.listening;
 	const url = `${origin}${path}`;
