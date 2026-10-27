@@ -40,6 +40,23 @@ describe("grai check --fix", () => {
 		expect(fixed.removed).toEqual([]);
 	});
 
+	it("keeps a key a Vue template names with an HTML entity, as Vue decodes it", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.vue": [
+				"<script setup>",
+				'import { m } from "../out/messages.js";',
+				"</script>",
+				`<template><p :title="m['cart_tit&#108;e']()">{{ m.cart_total({ count: 1 }) }}</p></template>`,
+				"",
+			].join("\n"),
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
