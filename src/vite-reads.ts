@@ -32,6 +32,7 @@ export type BuildReads = {
 export function buildReads(core: BuildReads): Plugin {
 	return {
 		name: "grai:reads",
+		apply: "build",
 		enforce: "pre",
 		transform: {
 			order: "pre",
