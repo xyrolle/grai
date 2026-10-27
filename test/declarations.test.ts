@@ -279,7 +279,7 @@ console.log(texts);
 	expect(errors).toEqual(["3 TS2322"]);
 });
 
-it("types a runtime GraiError's code as one of the codes the runtime throws", async () => {
+it("types a runtime GraiError's code as one of the codes the runtime throws, a key's path no catalog has among them", async () => {
 	const { dir, compile } = project({
 		en: { cart_title: "Your cart" },
 		de: { cart_title: "Ihr Warenkorb" },
@@ -291,15 +291,17 @@ it("types a runtime GraiError's code as one of the codes the runtime throws", as
 		"use.ts",
 		`import type { GraiError } from "./out/runtime.js";
 declare const error: GraiError;
-const codes: ("locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound" | "output-changed" | "strategy-undefined")[] = [error.code];
+const codes: ("locale-unknown" | "locale-not-loaded" | "locale-unkept" | "value-unmatched" | "format-option-invalid" | "locale-unbound" | "output-changed" | "strategy-undefined" | "key-missing")[] = [error.code];
 const unbound: GraiError["code"] = "locale-unbound";
-const compiling = error.code === "key-missing";
-console.log(codes, unbound, compiling);
+const missing = error.code === "key-missing";
+const compiling = error.code === "catalog-invalid";
+console.log(codes, unbound, missing, compiling);
 `,
 	);
 
-	// Line 5: a code only the compiler reports, which the runtime never throws.
-	expect(errors).toEqual(["5 TS2367"]);
+	// Line 6: a code only the compiler reports, which the runtime never throws. Node's hook and the
+	// dev server throw key-missing for a key's path no catalog has.
+	expect(errors).toEqual(["6 TS2367"]);
 });
 
 it("types the runtime GraiError's constructor as the runtime has it: a code, then the message", async () => {
