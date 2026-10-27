@@ -274,6 +274,50 @@ describe("reading a project's facts", () => {
 		expect(cachedPaths(cache)).toEqual([join(dir, "src/b.ts")]);
 	});
 
+	it("keeps the facts of a file a reading leaves out unread, for a reading that reads it again", async () => {
+		const barrel = 'export { m } from "../out/messages.js";\n';
+		const { dir, config } = projectWith({
+			"src/lib.ts": barrel,
+			"src/b.ts": 'import { m } from "./lib.ts";\nexport const b = m;\n',
+		});
+		const cache = join(dir, "out/.grai/facts");
+		await codeOf(config, dir);
+		const empty = { modules: [] };
+		writeFileSync(
+			cache,
+			planted(cache, (path) => path.endsWith("b.ts"), empty),
+		);
+		// Without its barrel, b.ts names nothing that holds grai's, so the reading leaves it out.
+		rmSync(join(dir, "src/lib.ts"));
+		await codeOf(config, dir);
+		writeFileSync(join(dir, "src/lib.ts"), barrel);
+
+		const { sources } = await codeOf(config, dir);
+
+		expect(sources.get(join(dir, "src/b.ts"))?.facts).toEqual(empty);
+	});
+
+	it("keeps the facts of the files outside a reading's roots, for a reading under them", async () => {
+		const { dir, config } = projectWith({
+			"src/a.ts": 'import { m } from "../out/messages.js";\nm.title();\n',
+			"src/sub/b.ts":
+				'import { m } from "../../out/messages.js";\nexport const b = m;\n',
+		});
+		const cache = join(dir, "out/.grai/facts");
+		await codeOf(config, dir);
+		const empty = { modules: [] };
+		writeFileSync(
+			cache,
+			planted(cache, (path) => path.endsWith("a.ts"), empty),
+		);
+		const sub = await readProjectCode(config, [join(dir, "src/sub")]);
+		if (sub instanceof GraiError) throw sub;
+
+		const { sources } = await codeOf(config, dir);
+
+		expect(sources.get(join(dir, "src/a.ts"))?.facts).toEqual(empty);
+	});
+
 	it("keys the facts on the reader's own code, so a change to it reads every file again, released or not", () => {
 		const { dir } = projectWith({
 			"reader/facts.js": "export const facts = 1;\n",
