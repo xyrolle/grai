@@ -8,8 +8,8 @@ import type { Compilation } from "./compilation.ts";
 import { type Build, buildKey, type CompileOptions } from "./compile.ts";
 import { type Config, isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
-import { stateDirectory } from "./outdir-contents.ts";
 import { isAlive } from "./output-lock.ts";
+import { stateDirectory } from "./state-directory.ts";
 
 /**
  * A build as saved: every field of it but its key, which heads the file, and of each catalog every
