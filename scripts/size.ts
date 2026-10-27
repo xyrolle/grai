@@ -29,13 +29,14 @@ import { grai } from "../src/vite.ts";
  * 46,570 B, grai/astro 47,043 B and grai/nuxt 45,981 B. The others: grai/sveltekit 541 B
  * with its import map, grai/sveltekit/client 382 B, grai/sveltekit/navigation 210 B, grai/next
  * 516 B, grai/next/proxy 265 B, grai/react 413 B, grai/astro/middleware 1,838 B, grai/vue 426 B,
- * grai/vue/client 292 B and grai/astro/translated-paths 1,621 B, which a static Astro build loads
- * to list the pages in a locale's words.
+ * grai/vue/client 292 B, grai/astro/translated-paths 1,621 B, which a static Astro build loads
+ * to list the pages in a locale's words, and grai/register 744 B.
  */
 const budgets: Record<string, number> = {
 	runtime: 1061,
 	grai: 39_100,
 	"grai/vite": 54_400,
+	"grai/register": 900,
 	"grai/svelte": 55_900,
 	"grai/sveltekit": 650,
 	"grai/sveltekit/vite": 55_900,

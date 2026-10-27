@@ -368,6 +368,20 @@ import { withLocale } from "./src/lib/i18n/server.js";
 aroundEach((test) => withLocale("de", test));
 ```
 
+A key's own path, `#i18n/messages/<key>.js`, is a module of that key alone wherever grai resolves it, so a test that mocks one key's path mocks that key and no other: in Vite's builds and in Vitest, through grai's plugin, and in Node through `grai/register`, loaded before the app. Without them every key's path is keys.js, and a mock of one mocks them all.
+
+```sh
+node --import grai/register --experimental-test-module-mocks --test
+```
+
+```ts
+mock.module("#i18n/messages/cart_title.js", {
+	namedExports: { cart_title: () => "Cart" },
+});
+```
+
+node:test's `mock.module` resolves through the hook from Node 24.12 and 25.1 ([nodejs/node#60326](https://github.com/nodejs/node/pull/60326)); on Node 22 it resolves in a loader thread the hook does not reach, and leaves the key unmocked. The hook is built on `module.registerHooks`, which Node marks a release candidate from 24.13.1 and 25.4, and in active development on Node 22.
+
 ## Config
 
 `grai.config.json` is read by the CLI, the Vite plugin and the adapters alike. Paths in it are relative to it.
