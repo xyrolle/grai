@@ -1,5 +1,12 @@
-import { locales, type RequestLocale } from "grai/nuxt/output/internal.js";
-import { localeOf, redirectOf, vary } from "grai/nuxt/output/server.js";
+import {
+	locales,
+	type RequestLocale,
+} from "@xyrolle/grai/nuxt/output/internal.js";
+import {
+	localeOf,
+	redirectOf,
+	vary,
+} from "@xyrolle/grai/nuxt/output/server.js";
 import { defineEventHandler, type EventHandler } from "nuxt/server";
 import { requestLocaleKey } from "./request-locale.ts";
 

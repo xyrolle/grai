@@ -1,4 +1,4 @@
-import { bindLocale } from "grai/next";
+import { bindLocale } from "@xyrolle/grai/next";
 import Link from "next/link";
 // Per-key paths, which package.json maps to keys.js, work beside the m namespace.
 import { about_body } from "#i18n/messages/about_body.js";

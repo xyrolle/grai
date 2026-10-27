@@ -1,4 +1,5 @@
-// Nuxt: grai/nuxt against @nuxtjs/i18n on the same page (nuxt-apps.mjs), in a non-base locale.
+// Nuxt: @xyrolle/grai/nuxt against @nuxtjs/i18n on the same page (nuxt-apps.mjs), in a non-base
+// locale.
 //   pnpm nuxt [app]      the synthetic catalog by default; a or b with GRAI_BENCH_A or _B
 // - Page JS: each app is built by `nuxt build` and served by its Node server, and Chromium loads
 //   the page; each script it downloads is compressed with brotli at quality 11. "Beyond plain" is

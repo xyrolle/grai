@@ -14,7 +14,10 @@ import { GraiError } from "../error.ts";
 import { packageName } from "../package-name.ts";
 import { count, reportErrors } from "./errors.ts";
 
-/** The name grai/next imports the project's compiled output by, in every layer Next bundles. */
+/**
+ * The name @xyrolle/grai/next imports the project's compiled output by, in every layer Next
+ * bundles.
+ */
 const output = `${packageName}/next/output`;
 
 /** What withGrai takes besides Next's config: the grai config's file, grai.config.json by default. */
@@ -23,9 +26,9 @@ export type WithGraiOptions = { config?: string };
 /**
  * Wraps a Next config for grai, with grai.config.json in the project's directory, or the file
  * `options.config` names. `next dev` compiles the catalogs and recompiles on each change; `next
- * build` compiles them and fails on any error. Both bundlers then resolve grai/next's imports of
- * the output to the config's outdir. Any other command bundles nothing, and gets the config as it
- * is. A Next `basePath` other than grai's is refused under the `url` strategy.
+ * build` compiles them and fails on any error. Both bundlers then resolve @xyrolle/grai/next's
+ * imports of the output to the config's outdir. Any other command bundles nothing, and gets the
+ * config as it is. A Next `basePath` other than grai's is refused under the `url` strategy.
  */
 export function withGrai(
 	nextConfig: NextConfig = {},

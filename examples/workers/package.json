@@ -7,7 +7,7 @@
 		"deploy": "grai compile && wrangler deploy"
 	},
 	"devDependencies": {
-		"grai": "workspace:*",
+		"@xyrolle/grai": "workspace:*",
 		"wrangler": "4.152.0"
 	}
 }

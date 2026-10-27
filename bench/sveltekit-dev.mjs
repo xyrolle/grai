@@ -1,9 +1,10 @@
 // Dev, in SvelteKit: one message edited until the open page shows it, end to end, in the example
-// app (examples/sveltekit) under `vite dev`: the catalog written, grai/vite's watcher and patch,
-// the socket, the page, Svelte's render. "in place" is the page with grai/sveltekit/client, which
-// draws the edit again; "reload" stops that module from hearing the edit, so the page reloads, as
-// it did before it. Each edit gives the Romanian greeting new text and waits for the heading to show
-// it; the times include the browser driver's own round trip. The catalog is put back at the end.
+// app (examples/sveltekit) under `vite dev`: the catalog written, @xyrolle/grai/vite's watcher and
+// patch, the socket, the page, Svelte's render. "in place" is the page with
+// @xyrolle/grai/sveltekit/client, which draws the edit again; "reload" stops that module from
+// hearing the edit, so the page reloads, as it did before it. Each edit gives the Romanian greeting
+// new text and waits for the heading to show it; the times include the browser driver's own round
+// trip. The catalog is put back at the end.
 //   node sveltekit-dev.mjs
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -30,8 +31,8 @@ function devServer() {
 	});
 }
 
-// Registered before the page's own modules, it keeps grai/sveltekit/client from cancelling the
-// edit's event, so the dev module reloads the page.
+// Registered before the page's own modules, it keeps @xyrolle/grai/sveltekit/client from cancelling
+// the edit's event, so the dev module reloads the page.
 const reloadOnly = () =>
 	addEventListener("grai:change", (event) => event.stopImmediatePropagation());
 

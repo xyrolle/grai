@@ -40,7 +40,7 @@ export function svelteTexts(core: GraiPlugin): Plugin {
 				throw new GraiError(
 					"plugin-order",
 					{ file: basename(configFile ?? "vite.config") },
-					"list grai() from grai/svelte before sveltekit() or svelte(), so it reads each component before Svelte compiles it.",
+					"list grai() from @xyrolle/grai/svelte before sveltekit() or svelte(), so it reads each component before Svelte compiles it.",
 				);
 			}
 		},

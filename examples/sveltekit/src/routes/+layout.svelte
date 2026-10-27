@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reloadAcrossLocales } from "grai/sveltekit/navigation";
+	import { reloadAcrossLocales } from "@xyrolle/grai/sveltekit/navigation";
 	import { localizeUrl } from "#lib/i18n/runtime.js";
 
 	let { children } = $props();

@@ -6,7 +6,7 @@ import {
 	getTextDirection,
 	locales,
 	strategy,
-} from "grai/nuxt/output/internal.js";
+} from "@xyrolle/grai/nuxt/output/internal.js";
 import {
 	addRouteMiddleware,
 	defineNuxtPlugin,

@@ -7,9 +7,9 @@ import type { GraiOptions } from "./vite-plugin.ts";
 export type SvelteKitGraiOptions = Pick<GraiOptions, "config">;
 
 /**
- * grai's Vite plugin for a SvelteKit app: `grai/svelte`'s, which also writes each message chunk's
- * copy per locale, as `grai/sveltekit`'s `handleLocale` points each built page at its locale's
- * copies. List it before `sveltekit()`:
+ * grai's Vite plugin for a SvelteKit app: `@xyrolle/grai/svelte`'s, which also writes each message
+ * chunk's copy per locale, as `@xyrolle/grai/sveltekit`'s `handleLocale` points each built page at
+ * its locale's copies. List it before `sveltekit()`:
  *
  *     plugins: [grai(), sveltekit()]
  */

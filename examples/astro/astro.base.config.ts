@@ -1,8 +1,8 @@
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import svelte from "@astrojs/svelte";
+import { grai } from "@xyrolle/grai/astro";
 import { defineConfig } from "astro/config";
-import { grai } from "grai/astro";
 import site from "./astro.config.ts";
 
 // The same site under /shop, rendered on demand by the Node adapter: Astro's base, and the base

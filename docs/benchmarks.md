@@ -247,7 +247,7 @@ Next 16.4.3 with Turbopack, next-intl 4.14.9, a page of 400 messages in a server
 | i18next | 129.2 | 682 |
 | use-intl | 127.1 | 682 |
 
-One Svelte page, server-rendered and hydrated in Chromium, in `ru` (`bench/hydrate.mjs`). grai's row loads its locale's copies of the message chunks, as `grai/sveltekit` serves them.
+One Svelte page, server-rendered and hydrated in Chromium, in `ru` (`bench/hydrate.mjs`). grai's row loads its locale's copies of the message chunks, as `@xyrolle/grai/sveltekit` serves them.
 </details>
 
 ### A server render

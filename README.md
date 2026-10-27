@@ -63,7 +63,7 @@ Each row is a measure where lower is better: grai's figure, the best figure of t
 ## Quick start
 
 ```sh
-pnpm add -D grai
+pnpm add -D @xyrolle/grai
 ```
 
 Its commands and plugins need Node 22.18 or later. The output's `server.js` imports `node:async_hooks`, so a project whose type checker reads the output's JavaScript, as a SvelteKit app's reads all of `src`, needs Node's types too: `pnpm add -D @types/node`.
@@ -72,7 +72,7 @@ Catalogs are the inlang message format, one JSON file per locale, as Paraglide r
 
 ```json
 {
-  "$schema": "./node_modules/grai/config.schema.json",
+  "$schema": "./node_modules/@xyrolle/grai/config.schema.json",
   "locales": ["en", "ro"],
   "baseLocale": "en",
   "catalogs": "messages/{locale}.json",
@@ -84,13 +84,13 @@ Then add grai to the app:
 
 | Framework | What to add | Docs |
 |---|---|---|
-| SvelteKit | `grai()` from `grai/sveltekit/vite` before `sveltekit()`, and `handleLocale` in `hooks.server.ts` | [SvelteKit](docs/frameworks.md#sveltekit) |
-| Next.js | `withGrai(config)` from `grai/next/config`, the proxy from `grai/next/proxy`, and `bindLocale` in each layout and page | [Next.js](docs/frameworks.md#nextjs) |
-| Nuxt | `modules: ["grai/nuxt"]` | [Nuxt](docs/frameworks.md#nuxt) |
-| Astro | `integrations: [grai()]` from `grai/astro` | [Astro](docs/frameworks.md#astro) |
-| Vue | `grai()` from `grai/vite`, and `Markup` from `grai/vue` | [Vue](docs/frameworks.md#vue) |
-| React | `Markup` from `grai/react`, beside Next.js or Vite | [Next.js](docs/frameworks.md#nextjs) |
-| Any Vite app | `plugins: [grai()]` from `grai/vite` | [Vite](docs/frameworks.md#vite) |
+| SvelteKit | `grai()` from `@xyrolle/grai/sveltekit/vite` before `sveltekit()`, and `handleLocale` in `hooks.server.ts` | [SvelteKit](docs/frameworks.md#sveltekit) |
+| Next.js | `withGrai(config)` from `@xyrolle/grai/next/config`, the proxy from `@xyrolle/grai/next/proxy`, and `bindLocale` in each layout and page | [Next.js](docs/frameworks.md#nextjs) |
+| Nuxt | `modules: ["@xyrolle/grai/nuxt"]` | [Nuxt](docs/frameworks.md#nuxt) |
+| Astro | `integrations: [grai()]` from `@xyrolle/grai/astro` | [Astro](docs/frameworks.md#astro) |
+| Vue | `grai()` from `@xyrolle/grai/vite`, and `Markup` from `@xyrolle/grai/vue` | [Vue](docs/frameworks.md#vue) |
+| React | `Markup` from `@xyrolle/grai/react`, beside Next.js or Vite | [Next.js](docs/frameworks.md#nextjs) |
+| Any Vite app | `plugins: [grai()]` from `@xyrolle/grai/vite` | [Vite](docs/frameworks.md#vite) |
 | Workers, Bun, Deno and Node | `middleware` from the output's `server.js` | [Servers](docs/frameworks.md#workers-bun-deno-and-node) |
 
 `grai compile` writes the output, and `grai watch` writes it again on each edit; each adapter does both for you. The [guide](docs/guide.md) covers the commands, a static site's locale, tests and CI, and [docs/config.md](docs/config.md) every field of the config.
@@ -215,7 +215,7 @@ Nanoseconds a call in Node, inside a request, on the synthetic catalog (`bench/s
 | i18next | 129.2 | 682 |
 | use-intl | 127.1 | 682 |
 
-One Svelte page, server-rendered and hydrated in Chromium, in `ru` (`bench/hydrate.mjs`). grai's row loads its locale's copies of the message chunks, as `grai/sveltekit` serves them.
+One Svelte page, server-rendered and hydrated in Chromium, in `ru` (`bench/hydrate.mjs`). grai's row loads its locale's copies of the message chunks, as `@xyrolle/grai/sveltekit` serves them.
 </details>
 
 ### A server render

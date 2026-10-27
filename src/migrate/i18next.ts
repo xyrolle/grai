@@ -42,7 +42,7 @@ export const i18nextModules: Readonly<Record<string, LibraryModule>> = {
 			Trans: {
 				kind: "component",
 				element: () => ({
-					left: "<Trans> renders markup and components, which grai import keeps as text: write the message's tags as grai markup, {#b}…{/b}, in each catalog, then render its .parts() with grai/react's Markup.",
+					left: "<Trans> renders markup and components, which grai import keeps as text: write the message's tags as grai markup, {#b}…{/b}, in each catalog, then render its .parts() with @xyrolle/grai/react's Markup.",
 				}),
 			},
 		},

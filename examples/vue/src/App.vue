@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Markup } from "grai/vue";
+import { Markup } from "@xyrolle/grai/vue";
 import { h, onMounted, ref } from "vue";
 // A namespace import, which Vue's compiler takes as a constant: the template then calls each
 // message itself, and the build keeps only the messages it calls (docs/design.md).

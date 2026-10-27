@@ -28,7 +28,7 @@ describe("the module", { timeout: 30_000 }, () => {
 
 	it("refuses an app that Nuxt does not render on the server", async () => {
 		await expect(loaded({}, { ssr: false })).rejects.toThrow(
-			"grai: grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
+			"grai: @xyrolle/grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
 		);
 	});
 

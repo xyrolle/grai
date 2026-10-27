@@ -1,4 +1,4 @@
-import { handleLocale } from "grai/sveltekit";
+import { handleLocale } from "@xyrolle/grai/sveltekit";
 import { getTextDirection } from "#lib/i18n/runtime.js";
 import { localeCopies, middleware } from "#lib/i18n/server.js";
 

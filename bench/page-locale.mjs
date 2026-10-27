@@ -1,5 +1,6 @@
 // A page's locale script: its bytes, and what it costs a static page until its entry module runs.
-// A page of a hundred messages is built with grai/vite, then loaded in Chromium, in Romanian:
+// A page of a hundred messages is built with @xyrolle/grai/vite, then loaded in Chromium, in
+// Romanian:
 //   - as built, its locale script picking the locale from navigator.languages and writing the
 //     import map and preloads of its locale's copies;
 //   - with what the script writes put in the page instead, its lang, a static import map and
@@ -47,7 +48,7 @@ function scriptBytes(name, strategy) {
 	return `| ${name} | ${text.length} | ${gzipSync(text).length} | ${brotliCompressSync(text).length} |`;
 }
 
-/** A static site of one page that calls a hundred messages, built with grai/vite. */
+/** A static site of one page that calls a hundred messages, built with @xyrolle/grai/vite. */
 async function site() {
 	const dir = realpathSync(mkdtempSync(join(tmpdir(), "grai-page-locale-")));
 	mkdirSync(join(dir, "messages"));

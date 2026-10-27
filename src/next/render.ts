@@ -1,12 +1,15 @@
 // The locale of server components. Next renders a request's layouts and pages side by side, and
 // on a client navigation only some of them, so each one that renders messages binds the locale;
 // React's cache keeps it for the rest of that request's render.
-import { bindRequests, type RequestLocale } from "grai/next/output/internal.js";
+import {
+	bindRequests,
+	type RequestLocale,
+} from "@xyrolle/grai/next/output/internal.js";
 import {
 	assertIsLocale,
 	GraiError,
 	locales,
-} from "grai/next/output/runtime.js";
+} from "@xyrolle/grai/next/output/runtime.js";
 import { cache } from "react";
 
 export { LocaleProvider } from "./provider.ts";

@@ -1,5 +1,5 @@
 {
-	"name": "grai",
+	"name": "@xyrolle/grai",
 	"version": "0.1.0",
 	"description": "Translation catalogs compiled ahead of time into plain functions, for any JavaScript framework.",
 	"keywords": [

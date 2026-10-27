@@ -2,7 +2,7 @@
 
 grai 0.1's public surface. Anything this page does not list is internal, and may change in any release.
 
-## `grai`
+## `@xyrolle/grai`
 
 The compiler, for a build script or a bundler grai has no adapter for.
 
@@ -11,84 +11,84 @@ The compiler, for a build script or a bundler grai has no adapter for.
 - `class GraiError extends Error`: a compile failure, with `code: GraiErrorCode`, `file: string`, and `key` and `locale` (`string | undefined`) where they apply.
 - `type GraiErrorCode`: the failure's stable name, such as `"key-missing"` or `"catalog-invalid"`.
 
-## `grai/vite`
+## `@xyrolle/grai/vite`
 
 - `grai(options?: { config?: string; reloadOnEdit?: boolean; localeChunks?: boolean }): Plugin[]`: compiles when Vite starts, patches an edited message into the open page in dev, and in a build puts in each chunk only the keys its code uses, once per locale. A build reads each module's messages as `grai check` does, before any other plugin transforms it, and fails where code reads a key no catalog has. Each page it builds or serves gets a locale script, which picks the page's locale where no server did. `config` is the path of `grai.config.json`, from Vite's root; `reloadOnEdit` reloads the open pages after an edit rather than patch them, for a framework whose pages only the server draws, such as Astro; `localeChunks` writes a copy of each message chunk per locale, with only its words, which the locale script then points each page at.
 - `graiModules(options?: { config?: string }): (id: string) => GraiModuleKind | undefined`: for a tool that reads a client build's chunks, the kind of grai's module an id is, or `undefined` for any other. `config` is the path of `grai.config.json`, from the working directory.
 - `type GraiModuleKind = "runtime" | "config" | "plurals" | "formats" | "key" | "text"`: the first four go to the `grai-runtime` chunk, `key` and `text` to the message chunks under `grai/`.
 
-## `grai/register`
+## `@xyrolle/grai/register`
 
-- Loaded with `node --import grai/register`, it gives each key's own path, `…/messages/<key>.js` mapped to the output's keys.js, a module of that key alone in Node, as `grai/vite` does in a build and a test run. A key no catalog has fails the import with a `key-missing` GraiError. It exports nothing.
+- Loaded with `node --import @xyrolle/grai/register`, it gives each key's own path, `…/messages/<key>.js` mapped to the output's keys.js, a module of that key alone in Node, as `@xyrolle/grai/vite` does in a build and a test run. A key no catalog has fails the import with a `key-missing` GraiError. It exports nothing.
 
-## `grai/svelte`
+## `@xyrolle/grai/svelte`
 
-- `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin[]`: `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. List it before `sveltekit()` or `svelte()`. It needs `svelte` and `magic-string`.
+- `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin[]`: `@xyrolle/grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. List it before `sveltekit()` or `svelte()`. It needs `svelte` and `magic-string`.
 
-## `grai/sveltekit`
+## `@xyrolle/grai/sveltekit`
 
 - `handleLocale({ middleware, getTextDirection, localeCopies }): Handle`: the `handle` that renders each request in its locale, from the output's `server.js` and `runtime.js`. It resolves the locale by the config's `strategy`, binds it for everything the request renders and loads, and writes it and its direction into `src/app.html`'s `%grai.lang%` and `%grai.dir%`. A built page loads only its locale's copies of the message chunks, when the build wrote them (`localeCopies`).
 
-## `grai/sveltekit/vite`
+## `@xyrolle/grai/sveltekit/vite`
 
-- `grai(options?: { config?: string }): Plugin[]`: `grai/svelte`'s plugin, which also writes a copy of each message chunk per locale for `handleLocale`'s pages. List it before `sveltekit()`.
+- `grai(options?: { config?: string }): Plugin[]`: `@xyrolle/grai/svelte`'s plugin, which also writes a copy of each message chunk per locale for `handleLocale`'s pages. List it before `sveltekit()`.
 - `type SvelteKitGraiOptions`: its options.
 
-## `grai/sveltekit/client`
+## `@xyrolle/grai/sveltekit/client`
 
 It exports nothing: an app imports it once, from `src/hooks.client.ts`, for what it does in dev. A catalog edit then draws the text it changed again in place: the renders that read an edited message run again, and once the server has the edit, so do the page's loads and remote functions. A build leaves it out.
 
-## `grai/sveltekit/navigation`
+## `@xyrolle/grai/sveltekit/navigation`
 
 - `reloadAcrossLocales({ localizeUrl }): void`: called once as the root layout initializes, it loads a page of another locale as a document, which the server draws in that locale, and leaves every navigation within the page's locale to Kit. It takes the output's `runtime.js` `localizeUrl`: a URL is another locale's when putting it in the page's locale changes its path.
 - `type PageUrls`: what it takes.
 
-## `grai/next`
+## `@xyrolle/grai/next`
 
 - `bindLocale(locale: string): void`: binds the locale for the rest of the request's render. A page, a layout or `generateMetadata` calls it before any message, with the locale its params name.
 - `LocaleProvider({ locale, children }: { locale: string; children?: ReactNode }): ReactNode`: gives client components the request's locale while the server renders them. In a browser, a client navigation into another locale switches to it with `setLocale`.
 
-## `grai/next/config`
+## `@xyrolle/grai/next/config`
 
-- `withGrai(nextConfig?: NextConfig): (phase: string) => Promise<NextConfig>`: wraps the Next config. `next dev` compiles the catalogs and recompiles on each change, `next build` compiles them and fails on any error, and both bundlers resolve `grai/next`'s imports of the output to the config's `outdir`.
+- `withGrai(nextConfig?: NextConfig): (phase: string) => Promise<NextConfig>`: wraps the Next config. `next dev` compiles the catalogs and recompiles on each change, `next build` compiles them and fails on any error, and both bundlers resolve `@xyrolle/grai/next`'s imports of the output to the config's `outdir`.
 
-## `grai/next/proxy`
+## `@xyrolle/grai/next/proxy`
 
 - `proxy(request: NextRequest): Promise<Response>`: resolves the request's locale by the config's `strategy` and rewrites it to the same path under `/<locale>`, its `Vary` listing the headers the strategy reads.
 
-## `grai/react`
+## `@xyrolle/grai/react`
 
 - `Markup<Tag>({ parts, markup }: { parts: readonly MessagePart<Tag>[]; markup: Record<Tag, (children: ReactNode | undefined, details: { options; attributes }) => ReactNode> }): ReactNode`: draws a markup message's `.parts()` with the app's function for each of its tags, in server and client components alike. Each function takes what its element encloses and the options and attributes the message writes on it, and decides what they do: none reaches the page on its own. A tag the message writes and `markup` lacks is a type error, and throws, naming it.
 
-## `grai/astro`
+## `@xyrolle/grai/astro`
 
-- `grai(options?: { config?: string }): AstroIntegration`: the Astro integration. It adds `grai/vite`, compiles for `astro sync`, checks that the two configs agree on where a page's locale comes from, and adds the middleware that renders each request in its locale, ahead of the app's own. `config` is the path of `grai.config.json` from Astro's root.
+- `grai(options?: { config?: string }): AstroIntegration`: the Astro integration. It adds `@xyrolle/grai/vite`, compiles for `astro sync`, checks that the two configs agree on where a page's locale comes from, and adds the middleware that renders each request in its locale, ahead of the app's own. `config` is the path of `grai.config.json` from Astro's root.
 - `type GraiAstroOptions`: its options.
 
-## `grai/astro/middleware`
+## `@xyrolle/grai/astro/middleware`
 
 What the middleware the integration writes imports; apps never do.
 - `localeMiddleware(project: LocaleProject): (context: LocaleContext, next: () => Promise<Response>) => Promise<Response>`: Astro's middleware, from the output's `server.js` and the integration's reading of the two configs.
 - `type LocaleProject` and `type LocaleContext`: what it takes and reads.
 
-## `grai/astro/translated-paths`
+## `@xyrolle/grai/astro/translated-paths`
 
 What the routes the integration adds for `pathnames` import; apps never do.
 - `translatedStaticPaths(project: TranslatedPages): (options: { routePattern: string }) => Promise<{ params }[]>`: the `getStaticPaths()` of the route the integration adds for each path in a locale's words, which lists, from each prerendered page's own `getStaticPaths()`, the pages a static build writes there.
 - `type PageRoute` and `type TranslatedPages`: what it takes.
 
-## `grai/vue`
+## `@xyrolle/grai/vue`
 
 - `Markup<Tag>({ parts, markup }: { parts: readonly MarkupPart<Tag>[]; markup: MarkupElements<Tag> }): VNode[]`: a functional component that draws a markup message's `.parts()`, each element by the app's function in `markup`. An element the parts name and `markup` lacks is a type error, and throws, naming it.
 - `type MarkupPart<Tag>`, `type MarkupElement`, `type MarkupElements<Tag>` and `type MarkupDetails`: what it takes and calls each function with.
 
-## `grai/vue/client`
+## `@xyrolle/grai/vue/client`
 
 It exports nothing: an app imports it once, from the browser's entry, for what it does in dev. A catalog edit then renders again, in place, what called an edited message, and the page keeps its state. A build leaves it out.
 
-## `grai/nuxt`
+## `@xyrolle/grai/nuxt`
 
-- The Nuxt module, `modules: ["grai/nuxt"]`, with `grai: { config }` for a config other than `grai.config.json` in the project's root. It compiles before Nuxt builds anything and again on each edit in dev, resolves each request's locale by the config's `strategy` in a server middleware, binds it for the render and writes it with its direction to `<html>`. With the `url` strategy it routes each page under each prefixed locale's prefix, in the locale's words where `pathnames` gives them.
+- The Nuxt module, `modules: ["@xyrolle/grai/nuxt"]`, with `grai: { config }` for a config other than `grai.config.json` in the project's root. It compiles before Nuxt builds anything and again on each edit in dev, resolves each request's locale by the config's `strategy` in a server middleware, binds it for the render and writes it with its direction to `<html>`. With the `url` strategy it routes each page under each prefixed locale's prefix, in the locale's words where `pathnames` gives them.
 - `type GraiNuxtOptions`: its options.
 
 ## The `grai` command
@@ -134,7 +134,7 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `identicalToBase?: Record<string, string[]>`: per locale, the keys whose message rightly reads as the base locale's, which `grai check` and `grai export` take as translated.
 - `pseudoLocale?: string`: a locale, such as `"en-XA"`, made from the base's messages for development and tests, accented and about 35% longer; `grai watch` and the Vite dev server compile it, and no build does.
 - `descriptions?: string`: a JSON file of each key's description for translators, which `grai export` writes as each unit's note.
-- `$schema?: string`: `./node_modules/grai/config.schema.json`, which the package ships, for an editor to complete and check the config.
+- `$schema?: string`: `./node_modules/@xyrolle/grai/config.schema.json`, which the package ships, for an editor to complete and check the config.
 
 Relative paths start from the config file's directory. [Config](config.md)'s table says more about each field.
 
@@ -182,13 +182,13 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 
 ### `testing.js`
 
-- `useLocale(locale: Locale): void`: binds a locale for a test in a page or a script, as if the page had loaded in it: the messages called next render in it, and so does a call that names it, which a page in another locale refuses. In a page it also sets `<html lang>` and `dir`. `grai/vite` refuses the module in a build.
+- `useLocale(locale: Locale): void`: binds a locale for a test in a page or a script, as if the page had loaded in it: the messages called next render in it, and so does a call that names it, which a page in another locale refuses. In a page it also sets `<html lang>` and `dir`. `@xyrolle/grai/vite` refuses the module in a build.
 
 ### `server.js`
 
 - `middleware(request: Request, handler: (resolved: { request: Request; locale: Locale }) => Response | Promise<Response>): Promise<Response>`: resolves the request's locale by the config's `strategy`, binds it for the handler and everything it calls, and gives back the handler's response, its `Vary` listing the request headers the strategy reads.
 - `withLocale<Result>(locale: Locale, code: () => Result): Result`: runs `code` in `locale` as the middleware runs a request's handler, so each message it calls and each task it starts renders in it: a scheduled job's code, or a test's, under Vitest `aroundEach((test) => withLocale("de", test))`.
-- `localeCopies: boolean`: whether the build that compiled the output wrote a copy of each message chunk per locale, which `grai/sveltekit`'s `handleLocale` reads.
+- `localeCopies: boolean`: whether the build that compiled the output wrote a copy of each message chunk per locale, which `@xyrolle/grai/sveltekit`'s `handleLocale` reads.
 - ``defineServerStrategy(name: `custom-${string}`, strategy: { getLocale(request: Request): string | undefined | Promise<string | undefined>; vary?: readonly string[] }): void``: defines one of the server's own strategies, which the config's `strategy` lists by its name: the middleware asks it for a request's locale in the strategy's order, and goes on where it names none. `vary` names the request headers it reads. Define each before the first request; a name the config does not list throws `strategy-undefined`.
 - `vary: string`: the request headers the strategy reads, as the `Vary` the middleware adds, for a framework that sends its response apart from the middleware.
 - `localeOf(request: Request): Promise<Locale>`: the locale the middleware binds for a request, for a framework that renders apart from it.

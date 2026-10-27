@@ -1,5 +1,5 @@
-import { bindLocale } from "grai/next";
-import { Markup } from "grai/react";
+import { bindLocale } from "@xyrolle/grai/next";
+import { Markup } from "@xyrolle/grai/react";
 import Link from "next/link";
 import * as m from "@/i18n/keys.js";
 import { localizeHref } from "@/i18n/runtime.js";

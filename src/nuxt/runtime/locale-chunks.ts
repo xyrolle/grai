@@ -11,7 +11,7 @@ export type HeadTag = {
 };
 
 /**
- * Points a page at its locale's copies of the message chunks, which grai/vite writes to
+ * Points a page at its locale's copies of the message chunks, which @xyrolle/grai/vite writes to
  * `grai-<locale>/` beside the shared `grai/`, in the directory of Nuxt's chunks. One entry,
  * merged into the import map Nuxt writes for its entry, maps the shared directory to the
  * locale's, for every message chunk the page and its later navigations import. The links that

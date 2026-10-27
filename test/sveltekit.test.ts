@@ -13,8 +13,8 @@ import {
 } from "vitest";
 import { stopped } from "./stopped.ts";
 
-// The SvelteKit example (examples/sveltekit), built as an app builds it, with grai/sveltekit/vite's
-// plugin, served by adapter-node, and its pages in a real browser.
+// The SvelteKit example (examples/sveltekit), built as an app builds it, with
+// @xyrolle/grai/sveltekit/vite's plugin, served by adapter-node, and its pages in a real browser.
 const example = fileURLToPath(
 	new URL("../examples/sveltekit/", import.meta.url),
 );
@@ -217,7 +217,7 @@ describe("handleLocale, in a build without the locale copies", {
 	let origin = "";
 	let app: Served | undefined;
 	beforeAll(async () => {
-		// The same app, built with grai/svelte's plugin, which writes no copies.
+		// The same app, built with @xyrolle/grai/svelte's plugin, which writes no copies.
 		app = await served("svelte");
 		origin = app.origin;
 	}, 60_000);
@@ -316,7 +316,9 @@ describe("handleLocale, by the cookie and Accept-Language", {
 	});
 });
 
-describe("grai/sveltekit/client under vite dev", { timeout: 30_000 }, () => {
+describe("@xyrolle/grai/sveltekit/client under vite dev", {
+	timeout: 30_000,
+}, () => {
 	let origin = "";
 	let app: Served | undefined;
 	beforeAll(async () => {

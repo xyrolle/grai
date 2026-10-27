@@ -53,8 +53,8 @@ import { buildReads, chunkReads } from "./vite-reads.ts";
  *   no client code could draw again, such as Astro's.
  * - `localeChunks`: in the client build, write a copy of each message chunk per locale, beside
  *   it, with only that locale's words. For an adapter that points each page at its locale's
- *   copies, as `grai/sveltekit`'s `handleLocale` does, or for the pages grai/vite builds, whose
- *   locale script then points each at its locale's copies. Off by default.
+ *   copies, as `@xyrolle/grai/sveltekit`'s `handleLocale` does, or for the pages @xyrolle/grai/vite
+ *   builds, whose locale script then points each at its locale's copies. Off by default.
  */
 export type GraiOptions = {
 	config?: string;

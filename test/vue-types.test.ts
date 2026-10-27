@@ -33,7 +33,7 @@ import { m } from "./out/messages.js";
 </template>
 `,
 	"Terms.vue": `<script setup lang="ts">
-import { Markup } from "grai/vue";
+import { Markup } from "@xyrolle/grai/vue";
 import { h } from "vue";
 import { m } from "./out/messages.js";
 </script>

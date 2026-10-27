@@ -654,7 +654,7 @@ describe("the Vite plugin's message chunks", () => {
 	});
 });
 
-describe("grai/vite's module kinds", () => {
+describe("@xyrolle/grai/vite's module kinds", () => {
 	it("names each module of grai's in a client build by its kind, as the chunk it went to", async () => {
 		const catalog = {
 			title: "Title",

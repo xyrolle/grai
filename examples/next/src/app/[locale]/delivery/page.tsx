@@ -1,4 +1,4 @@
-import { bindLocale } from "grai/next";
+import { bindLocale } from "@xyrolle/grai/next";
 import { connection } from "next/server";
 import * as m from "@/i18n/keys.js";
 import { Cart } from "../cart.tsx";

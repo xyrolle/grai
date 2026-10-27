@@ -391,7 +391,8 @@ function withVary(response) {
  * reached: `en-au` reaches neither `en-GB` nor `en-US`.
  *
  * A page's locale script matches the browser's languages with this same function, whose source
- * grai/vite writes into the script (`locale-script.ts`), so it refers to nothing outside its body.
+ * `@xyrolle/grai/vite` writes into the script (`locale-script.ts`), so it refers to nothing outside
+ * its body.
  *
  * @param {readonly string[]} locales
  * @returns {(range: string) => string[]}

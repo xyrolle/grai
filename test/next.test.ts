@@ -102,7 +102,7 @@ describe("withGrai", () => {
 		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
 		expect(config.turbopack?.resolveAlias).toEqual({
 			"@app": "./app",
-			"grai/next/output/*": "./out/*",
+			"@xyrolle/grai/next/output/*": "./out/*",
 		});
 	});
 
@@ -230,7 +230,7 @@ setTimeout(() => {
 		)(PHASE_PRODUCTION_BUILD);
 
 		expect(config.turbopack?.resolveAlias).toEqual({
-			"grai/next/output/*": "./out/*",
+			"@xyrolle/grai/next/output/*": "./out/*",
 		});
 	});
 
@@ -246,8 +246,8 @@ setTimeout(() => {
 });
 
 /**
- * grai/next's proxy for a project's output, bundled as Next bundles it: its imports of the
- * output resolved to the project's outdir, and Next's own modules left to Node.
+ * `@xyrolle/grai/next`'s proxy for a project's output, bundled as Next bundles it: its imports of
+ * the output resolved to the project's outdir, and Next's own modules left to Node.
  */
 async function proxyFor(dir: string) {
 	const outDir = join(dir, "proxy");

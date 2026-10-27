@@ -8,7 +8,7 @@
 import { cpSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { compile } from "grai";
+import { compile } from "@xyrolle/grai";
 import { cacheDir } from "./apps.mjs";
 import {
 	categoriesOf,
@@ -51,7 +51,7 @@ function writeGrai(app, page) {
 		}),
 		"index.html": indexHtml,
 		"vite.config.js": `import vue from "@vitejs/plugin-vue";
-import { grai } from "grai/vite";
+import { grai } from "@xyrolle/grai/vite";
 
 export default { plugins: [vue(), grai({ localeChunks: true })] };
 `,
@@ -60,7 +60,7 @@ import * as m from "./i18n/keys.js";
 </script>
 
 ${template(app, page, (key, inputs) => shown(`m.${key}(${Object.keys(inputs).length === 0 ? "" : literal(inputs)})`))}`,
-		"src/entry-client.js": `import "grai/vue/client";
+		"src/entry-client.js": `import "@xyrolle/grai/vue/client";
 import { createApp, createSSRApp } from "vue";
 import Page from "./Page.vue";
 

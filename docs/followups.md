@@ -2,11 +2,11 @@
 
 Open work that `docs/design.md` leaves to measurement or to a later change.
 
-## grai/sveltekit names each page's entries
+## @xyrolle/grai/sveltekit names each page's entries
 
-grai/vite chunks keys by the pages that load them when an adapter passes `pageEntries` (`docs/design.md`); without it each Kit node is a page of its own, 19 message chunks a page on app B against 13 with the pages. SvelteKit's adapter has to pass each route's leaf and layout nodes and the client entries.
+@xyrolle/grai/vite chunks keys by the pages that load them when an adapter passes `pageEntries` (`docs/design.md`); without it each Kit node is a page of its own, 19 message chunks a page on app B against 13 with the pages. SvelteKit's adapter has to pass each route's leaf and layout nodes and the client entries.
 
-Done when: grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
+Done when: @xyrolle/grai/sveltekit's plugin passes them, and the SvelteKit example's build puts a key a layout and one of its pages use in the layout's chunk.
 
 ## Patch a server render whose Vite is another copy
 
@@ -34,9 +34,9 @@ Done when: a page's locale copies take no more than Paraglide's per-locale build
 
 ## Nuxt dev under the Vite Environment API
 
-With `experimental.viteEnvironmentApi`, Nuxt's one Vite server holds the browser's environment and the server's, and grai/vite, scoped to the browser's, still patches the server's environment in place after an edit, as if Vite's module runner ran it. Nuxt runs the server's modules in vite-node instead, so its next render keeps the old words.
+With `experimental.viteEnvironmentApi`, Nuxt's one Vite server holds the browser's environment and the server's, and @xyrolle/grai/vite, scoped to the browser's, still patches the server's environment in place after an edit, as if Vite's module runner ran it. Nuxt runs the server's modules in vite-node instead, so its next render keeps the old words.
 
-Done when: grai/vite takes the messages again in an environment whose runner did not evaluate them, and a test of the Nuxt example under `experimental.viteEnvironmentApi` shows an edit in the server's next render.
+Done when: @xyrolle/grai/vite takes the messages again in an environment whose runner did not evaluate them, and a test of the Nuxt example under `experimental.viteEnvironmentApi` shows an edit in the server's next render.
 
 ## A Nuxt navigation's preloads
 
@@ -52,7 +52,7 @@ Done when: a copy's redirect to a path names its locale, with a test.
 
 ## Switch locale in place: `"switch": "live"`
 
-No page switches in place yet, so the config refuses `"live"`, for which `grai/svelte` keeps every message a call. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
+No page switches in place yet, so the config refuses `"live"`, for which `@xyrolle/grai/svelte` keeps every message a call. `docs/design.md` has the design: `setLocale(locale, { reload: false })` loads the target locale's message chunks, switches, and the app re-renders. Switching in place costs the target locale's chunks and one mount of the page, 2.3 ms for 2,000 messages (10.2 ms at a 4× CPU slowdown, `hydrate`); a reload costs a server render, the page's data and a hydration.
 
 Done when: under `"live"`, a page re-renders in the locale it switches to, and a browser test shows that a production build and dev switch the same way.
 
@@ -99,7 +99,7 @@ Done when: a server action and a route handler render messages in the request's 
 
 ## Vary Next's responses by the headers the strategy reads
 
-With the `cookie` or `preferredLanguage` strategy, grai/next's proxy answers one URL in several locales, and a page Next renders ahead of time is sent as cacheable. A shared cache keyed by the URL alone then serves the first reader's locale to everyone. The proxy's rewrite lists the headers it read in `Vary`, as grai's middleware writes it, but Next writes its own `Vary` for its RSC requests, and whether the page's response keeps the proxy's is not measured.
+With the `cookie` or `preferredLanguage` strategy, @xyrolle/grai/next's proxy answers one URL in several locales, and a page Next renders ahead of time is sent as cacheable. A shared cache keyed by the URL alone then serves the first reader's locale to everyone. The proxy's rewrite lists the headers it read in `Vary`, as grai's middleware writes it, but Next writes its own `Vary` for its RSC requests, and whether the page's response keeps the proxy's is not measured.
 
 Done when: a page served through a shared cache renders in each reader's locale under those strategies, with a test.
 
@@ -130,9 +130,9 @@ Done when: `next dev` reads `m.key` through `export * as m` as it reads `import 
 
 ## Next on a loopback address
 
-Next 16.4 started on `127.0.0.1` or `[::1]` (`--hostname`, or `HOSTNAME` behind a reverse proxy) takes every proxy rewrite for an external one. Next's `NextURL` renames a loopback host `localhost`, so the rewrite the proxy returns names `localhost`, while Next's router knows itself by the address it was started on. It proxies the request to itself, where grai/next's proxy rewrites it again, under another `/<locale>`, and the page never answers. A Next app without grai, whose proxy only rewrites `/` to `/en`, answers, but runs its proxy twice for the page. Once its proxy rewrites every path, as an unprefixed base locale's does, it never answers either: 259 runs of the proxy in 10 s. On Next's default host, `0.0.0.0`, `localhost` and the machine's address, the rewrites stay internal. It is Next's bug, reported as [vercel/next.js#94745](https://github.com/vercel/next.js/issues/94745), with a fix in review, [vercel/next.js#95917](https://github.com/vercel/next.js/pull/95917): `NextURL` and the router name a loopback host differently. grai does not work around it.
+Next 16.4 started on `127.0.0.1` or `[::1]` (`--hostname`, or `HOSTNAME` behind a reverse proxy) takes every proxy rewrite for an external one. Next's `NextURL` renames a loopback host `localhost`, so the rewrite the proxy returns names `localhost`, while Next's router knows itself by the address it was started on. It proxies the request to itself, where @xyrolle/grai/next's proxy rewrites it again, under another `/<locale>`, and the page never answers. A Next app without grai, whose proxy only rewrites `/` to `/en`, answers, but runs its proxy twice for the page. Once its proxy rewrites every path, as an unprefixed base locale's does, it never answers either: 259 runs of the proxy in 10 s. On Next's default host, `0.0.0.0`, `localhost` and the machine's address, the rewrites stay internal. It is Next's bug, reported as [vercel/next.js#94745](https://github.com/vercel/next.js/issues/94745), with a fix in review, [vercel/next.js#95917](https://github.com/vercel/next.js/pull/95917): `NextURL` and the router name a loopback host differently. grai does not work around it.
 
-Done when: a Next release keeps a loopback host's rewrites internal, and grai/next's `next` peer range starts at it, with a test that serves the example on `127.0.0.1`.
+Done when: a Next release keeps a loopback host's rewrites internal, and @xyrolle/grai/next's `next` peer range starts at it, with a test that serves the example on `127.0.0.1`.
 
 ## Report markup elements the base locale does not have
 
@@ -184,7 +184,7 @@ Done when: `grai migrate` writes the messages of each key a `<Trans>` renders, i
 
 ## Calls that render markup, in `grai migrate`
 
-`<Trans>`, next-intl's `t.rich` and `t.markup`, and a react-intl message with markup are listed for a person, who renders the message's `.parts()`. A framework's markup component, such as `grai/react`'s `Markup`, would take the tags' renderers the call passes.
+`<Trans>`, next-intl's `t.rich` and `t.markup`, and a react-intl message with markup are listed for a person, who renders the message's `.parts()`. A framework's markup component, such as `@xyrolle/grai/react`'s `Markup`, would take the tags' renderers the call passes.
 
 Done when: `grai migrate` rewrites a call whose tags each render one element of the call's own as that component's call, and a test renders it as the library did.
 
@@ -214,9 +214,9 @@ Done when: the map's hash joins the page's `script-src`, in the `Content-Securit
 
 ## A dev edit while a SvelteKit page is still starting
 
-`grai/sveltekit/client` runs a page's loads again with Kit's `refreshAll()` once the server has an edit (`grai:patched`). Kit drops a `refreshAll()` called before its client has started, as it reads the page's URL from state the start sets, so an edit that lands while the page is still starting shows only after the next edit, or a navigation. The server-rendered page is already on screen by then, so the window is the page's own start.
+`@xyrolle/grai/sveltekit/client` runs a page's loads again with Kit's `refreshAll()` once the server has an edit (`grai:patched`). Kit drops a `refreshAll()` called before its client has started, as it reads the page's URL from state the start sets, so an edit that lands while the page is still starting shows only after the next edit, or a navigation. The server-rendered page is already on screen by then, so the window is the page's own start.
 
-Done when: `grai/sveltekit/client` defers that refresh until Kit has started, with a test of the example that edits a load's text as soon as the page's markup is on screen and sees the edit.
+Done when: `@xyrolle/grai/sveltekit/client` defers that refresh until Kit has started, with a test of the example that edits a load's text as soon as the page's markup is on screen and sees the edit.
 
 ## The locale script outside Vite's pages
 

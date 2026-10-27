@@ -8,7 +8,7 @@
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { compile } from "grai";
+import { compile } from "@xyrolle/grai";
 import { cacheDir } from "./apps.mjs";
 import { libraryCatalogs, portable } from "./libraries.mjs";
 
@@ -120,11 +120,11 @@ function writeGrai(app, keys) {
 			strategy: ["url"],
 		}),
 		"next.config.mjs": nextConfig({
-			imports: 'import { withGrai } from "grai/next/config";',
+			imports: 'import { withGrai } from "@xyrolle/grai/next/config";',
 			call: "withGrai",
 		}),
-		"src/proxy.js": `export { proxy } from "grai/next/proxy";\n${proxyConfig}`,
-		"src/app/[locale]/layout.jsx": `import { bindLocale, LocaleProvider } from "grai/next";
+		"src/proxy.js": `export { proxy } from "@xyrolle/grai/next/proxy";\n${proxyConfig}`,
+		"src/app/[locale]/layout.jsx": `import { bindLocale, LocaleProvider } from "@xyrolle/grai/next";
 
 export default async function Layout({ children, params }) {
 	const { locale } = await params;
@@ -132,7 +132,7 @@ export default async function Layout({ children, params }) {
 	return <html lang={locale}><body><LocaleProvider locale={locale}>{children}</LocaleProvider></body></html>;
 }
 `,
-		"src/app/[locale]/page.jsx": `import { bindLocale } from "grai/next";
+		"src/app/[locale]/page.jsx": `import { bindLocale } from "@xyrolle/grai/next";
 import * as m from "../../i18n/keys.js";
 import { Client } from "./client.jsx";
 import { Observer } from "../observer.jsx";

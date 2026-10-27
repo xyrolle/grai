@@ -1,7 +1,8 @@
-// The project's compiled output, as grai/next reads it. withGrai points `grai/next/output/*` at
-// the config's outdir in both bundlers, so these are the app's own modules, one per layer.
+// The project's compiled output, as @xyrolle/grai/next reads it. withGrai points
+// `@xyrolle/grai/next/output/*` at the config's outdir in both bundlers, so these are the app's own
+// modules, one per layer.
 
-declare module "grai/next/output/runtime.js" {
+declare module "@xyrolle/grai/next/output/runtime.js" {
 	export const locales: readonly string[];
 	export function getLocale(): string;
 	export function setLocale(locale: string): void;
@@ -13,7 +14,7 @@ declare module "grai/next/output/runtime.js" {
 	}
 }
 
-declare module "grai/next/output/internal.js" {
+declare module "@xyrolle/grai/next/output/internal.js" {
 	/** A request's locale, by its position in `locales`; `setLocale` in the request changes it in place. */
 	export type RequestLocale = { index: number };
 	export function bindRequests(storage: {
@@ -28,7 +29,7 @@ declare module "grai/next/output/internal.js" {
 	)[];
 }
 
-declare module "grai/next/output/server.js" {
+declare module "@xyrolle/grai/next/output/server.js" {
 	export function middleware(
 		request: Request,
 		handler: (resolved: {

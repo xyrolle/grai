@@ -27,7 +27,9 @@ const { compileCatalogs } = await import(join(graiSource, "compilation.ts"));
 const { keyModulePrefix, textModulePrefix } = await import(
 	join(graiSource, "locale-chunks.ts")
 );
-/** The key a message module holds: a key's module, or grai/svelte's string of a text key. */
+/**
+ * The key a message module holds: a key's module, or @xyrolle/grai/svelte's string of a text key.
+ */
 function keyOf(id) {
 	for (const prefix of [keyModulePrefix, textModulePrefix])
 		if (id.startsWith(prefix)) return id.slice(prefix.length);

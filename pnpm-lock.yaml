@@ -284,12 +284,12 @@ importers:
       '@types/react-dom':
         specifier: 19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@xyrolle/grai':
+        specifier: workspace:*
+        version: link:../..
       astro:
         specifier: 7.4.2
         version: 7.4.2(@types/node@24.19.2)(db0@0.3.4)(esbuild@0.28.2)(ioredis@5.11.1(supports-color@10.2.2))(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
-      grai:
-        specifier: workspace:*
-        version: link:../..
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -314,7 +314,7 @@ importers:
       '@types/react-dom':
         specifier: 19.3.0
         version: 19.3.0(@types/react@19.3.0)
-      grai:
+      '@xyrolle/grai':
         specifier: workspace:*
         version: link:../..
       next:
@@ -332,7 +332,7 @@ importers:
 
   examples/nuxt:
     devDependencies:
-      grai:
+      '@xyrolle/grai':
         specifier: workspace:*
         version: link:../..
       nuxt:
@@ -368,7 +368,7 @@ importers:
       '@typescript/native':
         specifier: npm:typescript@7.0.2
         version: typescript@7.0.2
-      grai:
+      '@xyrolle/grai':
         specifier: workspace:*
         version: link:../..
       magic-string:
@@ -395,7 +395,7 @@ importers:
       '@vitejs/plugin-vue':
         specifier: 6.0.10
         version: 6.0.10(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))(vue@3.5.44(typescript@6.0.3))
-      grai:
+      '@xyrolle/grai':
         specifier: workspace:*
         version: link:../..
       typescript:
@@ -413,7 +413,7 @@ importers:
 
   examples/workers:
     devDependencies:
-      grai:
+      '@xyrolle/grai':
         specifier: workspace:*
         version: link:../..
       wrangler:

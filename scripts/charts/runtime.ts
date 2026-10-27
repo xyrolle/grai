@@ -339,7 +339,7 @@ export function pageSection(): Section {
 				];
 			}),
 		],
-		note: `One Svelte page, server-rendered and hydrated in Chromium, in \`${locale}\` (\`bench/hydrate.mjs\`). grai's row loads its locale's copies of the message chunks, as \`grai/sveltekit\` serves them.`,
+		note: `One Svelte page, server-rendered and hydrated in Chromium, in \`${locale}\` (\`bench/hydrate.mjs\`). grai's row loads its locale's copies of the message chunks, as \`@xyrolle/grai/sveltekit\` serves them.`,
 		glance: [
 			glanceOf(`Page JS, ${whole(calls)} messages, brotli`, entries, kilobytes),
 		],

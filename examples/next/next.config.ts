@@ -1,4 +1,4 @@
-import { withGrai } from "grai/next/config";
+import { withGrai } from "@xyrolle/grai/next/config";
 
 // With EXAMPLE_BASE_PATH=/shop, Next serves the app under /shop, the base path grai.base.json names
 // too.
