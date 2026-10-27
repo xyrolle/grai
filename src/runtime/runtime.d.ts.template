@@ -33,10 +33,12 @@ type GraiErrorCode =
 	| "format-option-invalid"
 	| "locale-unbound"
 	| "output-changed"
-	| "strategy-undefined";
+	| "strategy-undefined"
+	| "key-missing";
 /**
  * A message called in a locale it cannot render in, with a value its variants do not take, or on a
- * server outside every request the middleware binds (`locale-unbound`).
+ * server outside every request the middleware binds (`locale-unbound`); or a key's path no catalog
+ * has, imported in dev or in Node with `grai/register` (`key-missing`).
  */
 export declare class GraiError extends Error {
 	constructor(code: GraiErrorCode, message: string);
