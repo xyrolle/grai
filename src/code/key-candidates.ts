@@ -38,8 +38,8 @@ const outputModule = "[\\\\/](?:messages|keys)(?![\\w$/\\\\-])";
 
 /**
  * Every name a file must write to read or reach one key, or undefined when a mapping may name a
- * holder from any specifier. That is the key's own name, which every read of it by name and its own
- * path write; or a name that may name a module that holds it: `messages.js` or `keys.js` by a path
+ * holder from any specifier. That is the key's own name, whole, which every read of it by name and
+ * its own path write; or a name that may name a module that holds it: `messages.js` or `keys.js` by a path
  * segment that ends the path, never `messages/` on the way to another key's own path; a barrel that
  * holds it; or a mapping, symlink or package that leads to one of them, as for the whole output.
  */
@@ -51,7 +51,8 @@ export function keyNamesOf(
 	packages: readonly Package[],
 ): Set<string> | undefined {
 	const files = [holders.messages, holders.keys, ...holders.barrels];
-	const names = new Set([written(key), outputModule]);
+	// The key's name whole: a longer name that holds it is another key's.
+	const names = new Set([`(?<![\\w$])${written(key)}(?![\\w$])`, outputModule]);
 	for (const barrel of holders.barrels) names.add(written(nameOf(barrel)));
 	const lands = (path: string) => files.some((file) => pathNames(path, file));
 	for (const { key: mapped, targets } of mappings) {
