@@ -3,8 +3,10 @@
  * command reads again only the files that changed since the last. An entry is a file's facts, never
  * its tree, by the hash of its text, under the code that read it: grai's reader, by its contents,
  * and the versions of the parsers it loads, so any change to them reads every file again. The cache
- * is written whole and atomically after a command that read a file again or found one gone, with the
- * files that command read, so an entry for a file gone or changed is dropped. Each file's facts are
+ * is written whole and atomically after a command that read a file again or found one gone. It keeps
+ * the files that command read, and the entries of the files it left out unread or did not list,
+ * outside its roots, so an entry for a file gone is dropped, and one for a file changed is replaced
+ * when a command reads it. Each file's facts are
  * kept as text (`keptText`): JSON, which V8 reads back in about half the time its own serializer
  * takes for the same facts (75 MB of them, for 9,000 files), its modules' uses apart, so that a
  * reading parses only the uses it needs (`usesFrom`). A save writes each entry it kept as it was
@@ -71,8 +73,20 @@ export class FactsCache {
 	}
 
 	/**
-	 * Writes the facts of the files read this time, and only those, unless they are the cache's
-	 * already: no file was read again, and every file it has was read. An entry is written as it
+	 * Keeps the entry of each file this command did not read: one it listed and left out, or one
+	 * outside the roots it listed under. A file under them that it did not list is gone.
+	 */
+	keepUnread(roots: readonly string[], listed: ReadonlySet<string>): void {
+		for (const [path, entry] of this.read) {
+			if (this.kept.has(path)) continue;
+			const under = roots.some((root) => path.startsWith(`${root}/`));
+			if (!under || listed.has(path)) this.kept.set(path, entry);
+		}
+	}
+
+	/**
+	 * Writes the facts of the files read this time and those kept unread, unless they are the cache's
+	 * already: no file was read again, and it keeps every entry it has. An entry is written as it
 	 * was read or made, never made again.
 	 */
 	save(): void {
