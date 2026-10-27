@@ -22,10 +22,10 @@ export async function bindingConflicts(
 	binding: Binding,
 	to: string,
 ): Promise<Conflict[]> {
-	// A file that never writes the new name as a whole name, plainly or with an escape, declares and
+	// A file that never writes the new name as a whole name, plainly or with escapes, declares and
 	// reads nothing by it, so its scopes need no reading. A longer name that holds it is another.
 	const whole = new RegExp(`(?<![\\w$])${written(to)}(?![\\w$])`);
-	if (!whole.test(text) && !text.includes("\\u")) return [];
+	if (!whole.test(unescaped(text))) return [];
 	const modules = await readCode(path, text);
 	if (!Array.isArray(modules)) return [];
 	for (const { program, source } of modules) {
@@ -61,4 +61,19 @@ export async function bindingConflicts(
 		return [...conflicts.values()];
 	}
 	return [];
+}
+
+/**
+ * A text with each `\u` escape written as the character it stands for, as an identifier may spell
+ * a name with them; one that stands for no character stays as it is.
+ */
+function unescaped(text: string): string {
+	if (!text.includes("\\u")) return text;
+	return text.replace(
+		/\\u(?:\{([0-9a-fA-F]+)\}|([0-9a-fA-F]{4}))/g,
+		(escape, braced: string | undefined, plain: string | undefined) => {
+			const point = Number.parseInt(braced ?? plain ?? "", 16);
+			return point <= 0x10ffff ? String.fromCodePoint(point) : escape;
+		},
+	);
 }
