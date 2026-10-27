@@ -531,6 +531,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
       - A fresh checkout gives every file a new stat, so CI reads each file's text and takes its facts by its hash, from the facts it keeps.
     - A cold run costs what reading every file exactly costs, and the pool keeps that as low as it can.
     - In memory, the facts are also kept across a watch, between `check --fix`'s fix and its check, and across a build's rebuilds.
+    - **A build keeps its modules' facts with the CLI's, by their code's hash** (`code/build-reading.ts`). A module whose code is the file's, as a source's is before other plugins, shares its entry with `check`, so a build after a check, or a second build, parses no unchanged module. A build lists no files, so it keeps every entry it found and drops none; a command that lists them drops a file gone. On the build bench's project, a build with its facts kept takes 0.80 s against main's 0.83 s, and one without them 1.05 s against 0.95 s.
   - The bench's projects have to resolve as real ones do. The synthetic project gets a package.json `imports` and an `i18n` module that re-exports `m`, and app B's copy keeps its package.json and tsconfig, since a guessed import is no longer read.
 
 ## CLI
