@@ -351,6 +351,23 @@ export const promo = (season: string) => m[\`promo_\${season}\`]();
 		expect(fixed.removed).toEqual([]);
 	});
 
+	it("keeps a key a Vue template names with an HTML entity, as Vue decodes it", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/Cart.vue": [
+				"<script setup>",
+				'import { m } from "../out/messages.js";',
+				"</script>",
+				`<template><p :title="m['cart_tit&#108;e']()">{{ m.cart_total({ count: 1 }) }}</p></template>`,
+				"",
+			].join("\n"),
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("keeps a key that only an Astro page or an MDX document names", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {

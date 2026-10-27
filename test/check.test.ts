@@ -70,6 +70,28 @@ describe("grai check's inputs", () => {
 });
 
 describe("grai check's reads of components", () => {
+	it("reads a Vue template's expressions as Vue decodes their HTML entities, each place where the file writes it", async () => {
+		const { dir, config } = project({
+			en: { title: "Title" },
+			de: { title: "Titel" },
+		});
+		writeSources(dir, {
+			"src/Page.vue": [
+				"<script setup>",
+				'import { m } from "../out/messages.js";',
+				"</script>",
+				`<template><p :title="m['tit&#108;e']()">{{ m.title() &amp;&amp; m.absent() }}</p></template>`,
+				"",
+			].join("\n"),
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([
+			'src/Page.vue:4:67: "absent": m.absent names a key no catalog has. Add it with grai add absent --en "…" --de "…", or fix the name.',
+		]);
+	});
+
 	it("reads a Nuxt app's pages and a Vue component through the aliases Nuxt generates", async () => {
 		const { dir, config } = project(
 			{
