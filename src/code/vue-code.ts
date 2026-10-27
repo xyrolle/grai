@@ -1,7 +1,7 @@
 /**
  * A Vue single-file component's code, read through Vue's own parser: its `<script>` and
- * `<script setup>` as they are, then its template's expressions, each where Vue found it, in code
- * that opens the scopes the template opens. A `v-for`'s alias, key and index, and a `v-slot`'s
+ * `<script setup>` as they are, then its template's expressions, each where Vue found it and as Vue
+ * decoded its HTML entities (`&amp;&amp;` is `&&`), in code that opens the scopes the template opens. A `v-for`'s alias, key and index, and a `v-slot`'s
  * props, are parameters of a function around what they are visible in; a `v-on` handler's
  * statements run in a function of `$event`, as Vue compiles them.
  */
@@ -17,8 +17,11 @@ type Child = Root["children"][number];
 type Element = Extract<Child, { tag: string }>;
 type Prop = Element["props"][number];
 type Directive = Extract<Prop, { exp?: unknown }>;
-/** A part of the template Vue parsed as an expression, with its place in the component. */
+/** An expression node of Vue's template parse. */
+type ExpressionNode = NonNullable<Directive["exp"]>;
+/** A part of the template Vue parsed as an expression, its HTML entities decoded, with its place. */
 type Expression = {
+	content: string;
 	loc: { start: { offset: number }; end: { offset: number } };
 };
 
@@ -98,31 +101,37 @@ class Template {
 			this.expression(node.arg);
 		if (node.exp === undefined) return;
 		// A handler that is a function is called with the event; any other runs as statements.
-		const { start, end } = spanOf(node.exp);
-		const handler = this.writer.source.slice(start, end).trimStart();
+		const exp = expressionOf(node.exp);
+		const { start, end } = spanOf(exp);
+		const handler = exp.content.trimStart();
 		if (node.name !== "on" || /^(?:async\s+)?function\b/.test(handler)) {
-			this.expression(node.exp);
+			this.writer.decodedExpression(start, end, exp.content);
 		} else {
-			this.writer.write("(($event) => {\n").piece(start, end).write("\n});\n");
+			this.writer
+				.write("(($event) => {\n")
+				.decoded(start, end, exp.content)
+				.write("\n});\n");
 		}
 	}
 
 	/** A function of the names the patterns bind, around what follows until it is closed. */
-	private open(patterns: readonly (Expression | undefined)[]): void {
+	private open(patterns: readonly (ExpressionNode | undefined)[]): void {
 		this.writer.write("((");
 		// `v-for`'s key and index are optional: the parameters are those it writes.
 		patterns.forEach((pattern, index) => {
 			if (pattern === undefined) return;
 			if (index > 0) this.writer.write(",");
-			const { start, end } = spanOf(pattern);
-			this.writer.piece(start, end);
+			const { content, ...placed } = expressionOf(pattern);
+			const { start, end } = spanOf(placed);
+			this.writer.decoded(start, end, content);
 		});
 		this.writer.write("\n) => {\n");
 	}
 
-	private expression(node: Expression): void {
-		const { start, end } = spanOf(node);
-		this.writer.expression(start, end);
+	private expression(node: ExpressionNode): void {
+		const { content, ...placed } = expressionOf(node);
+		const { start, end } = spanOf(placed);
+		this.writer.decodedExpression(start, end, content);
 	}
 }
 
@@ -130,6 +139,20 @@ function isStatic(node: object): boolean {
 	return "isStatic" in node && node.isStatic === true;
 }
 
-function spanOf({ loc }: Expression): { start: number; end: number } {
+/**
+ * A template expression as Vue's parse gives every one: a simple expression, its text decoded.
+ * Only Vue's transforms, which grai does not run, make a compound one.
+ */
+function expressionOf(node: ExpressionNode): Expression {
+	if (!("content" in node)) {
+		throw new TypeError("Vue's template parse gave a compound expression");
+	}
+	return node;
+}
+
+function spanOf({ loc }: Pick<Expression, "loc">): {
+	start: number;
+	end: number;
+} {
 	return { start: loc.start.offset, end: loc.end.offset };
 }
