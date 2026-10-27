@@ -3,6 +3,7 @@ import type { Plugin } from "vite";
 import { readConfig } from "./config.ts";
 import { realPath } from "./real-path.ts";
 import { type GraiModuleKind, moduleKindIn } from "./vite-build.ts";
+import { pageLocale } from "./vite-html.ts";
 import { type GraiOptions, graiPlugin, viteBase } from "./vite-plugin.ts";
 
 export type { GraiModuleKind };
@@ -23,8 +24,8 @@ export type { GraiModuleKind };
  * (`vite-reads.ts`), and the locale script is a plugin of its own, so it is three plugins.
  */
 export function grai(options: GraiOptions = {}): Plugin[] {
-	return graiPlugin(options, { frameworkBase: viteBase, indexHtml: true })
-		.plugins;
+	const core = graiPlugin(options, { frameworkBase: viteBase });
+	return [...core.plugins, pageLocale(core, options)];
 }
 
 /**
