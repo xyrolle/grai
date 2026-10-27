@@ -13,6 +13,8 @@ import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { packageName } from "../package-name.ts";
 import { count, reportErrors } from "./errors.ts";
+import { defaultPageExtensions } from "./routes.ts";
+import type { WatchData } from "./watch-worker.ts";
 
 /**
  * The name @xyrolle/grai/next imports the project's compiled output by, in every layer Next
@@ -41,8 +43,12 @@ export function withGrai(
 		const config = readConfig(configFile);
 		checkBasePath(nextConfig, config, configFile);
 		const { outdir } = config;
-		if (dev) await watching(configFile);
-		else built(await compile(configFile));
+		if (dev) {
+			await watching({
+				configFile,
+				pageExtensions: nextConfig.pageExtensions ?? [...defaultPageExtensions],
+			});
+		} else built(await compile(configFile));
 		return resolvingOutput(nextConfig, outdir);
 	};
 }
@@ -50,8 +56,8 @@ export function withGrai(
 /** The watch of this process: Next asks for its config more than once, and it starts once. */
 let watched: Promise<void> | undefined;
 
-function watching(configFile: string): Promise<void> {
-	watched ??= startWatching(configFile);
+function watching(data: WatchData): Promise<void> {
+	watched ??= startWatching(data);
 	return watched;
 }
 
@@ -67,14 +73,11 @@ const watchWorker = new URL(
  * edit after it starts from, and else once that compile has written it. Either way the catalogs
  * compile once. The check comes first: started beside it, the watch's compile would hold it back.
  */
-async function startWatching(configFile: string): Promise<void> {
-	const compiled = await isCompiled(configFile);
+async function startWatching(data: WatchData): Promise<void> {
+	const compiled = await isCompiled(data.configFile);
 	// The watch runs grai's own modules, which take none of the process's flags, and a worker refuses
 	// some of them, such as `--input-type`.
-	const worker = new Worker(watchWorker, {
-		workerData: configFile,
-		execArgv: [],
-	});
+	const worker = new Worker(watchWorker, { workerData: data, execArgv: [] });
 	// Next's server holds its process. Other processes read the config for `next dev` too, as
 	// Next's telemetry flush does when the server stops, and must be free to exit.
 	worker.unref();
