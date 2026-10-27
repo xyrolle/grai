@@ -63,6 +63,7 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"keys/0.js",
 		"keys/0.d.ts",
 		".gitignore",
+		"package.json",
 		"keys/0.d.ts.map",
 		"internal.js",
 		"internal.d.ts",
