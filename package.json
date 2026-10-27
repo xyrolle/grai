@@ -16,7 +16,12 @@
 	},
 	"type": "module",
 	"sideEffects": [
-		"./dist/sveltekit-client.js"
+		"./dist/register.js",
+		"./dist/next/provider.js",
+		"./dist/next/render.js",
+		"./dist/nuxt/runtime/plugin.js",
+		"./dist/sveltekit-client.js",
+		"./dist/vue/client.js"
 	],
 	"exports": {
 		".": {
