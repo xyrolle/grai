@@ -29,7 +29,6 @@
 	"rows": [
 		{
 			"design": "grai's plugin",
-			"startToPage": 296,
 			"pageLoad": 107.5,
 			"editToPage": 15.2,
 			"editToServer": 13.1,
@@ -40,7 +39,6 @@
 		},
 		{
 			"design": "whole",
-			"startToPage": 228.8,
 			"pageLoad": 178.9,
 			"editToPage": 204.4,
 			"heap": {
@@ -50,7 +48,6 @@
 		},
 		{
 			"design": "patch",
-			"startToPage": 219.4,
 			"pageLoad": 164.2,
 			"editToPage": 88.7,
 			"heap": {
@@ -60,7 +57,6 @@
 		},
 		{
 			"design": "patch, fs.watch",
-			"startToPage": 208.8,
 			"pageLoad": 161.1,
 			"editToPage": 11,
 			"heap": {
@@ -70,7 +66,6 @@
 		},
 		{
 			"design": "paraglide",
-			"startToPage": 3782.1,
 			"pageLoad": 577.1,
 			"editToPage": 3073.5,
 			"heap": {
@@ -80,7 +75,6 @@
 		},
 		{
 			"design": "i18next",
-			"startToPage": 167.7,
 			"pageLoad": 112.8,
 			"editToPage": 74.3,
 			"heap": {
@@ -90,7 +84,6 @@
 		},
 		{
 			"design": "use-intl",
-			"startToPage": 182.7,
 			"pageLoad": 145.7,
 			"editToPage": 71.7,
 			"heap": {
@@ -100,7 +93,6 @@
 		},
 		{
 			"design": "no messages",
-			"startToPage": 82,
 			"pageLoad": 25.8,
 			"heap": {
 				"load": 1458040,

@@ -5,25 +5,23 @@
 <text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>
 <line x1="99" y1="82" x2="99" y2="214" stroke="#c3c2b7" stroke-width="1"/>
 <text x="99" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="171.3" y1="82" x2="171.3" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="171.3" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
-<line x1="243.5" y1="82" x2="243.5" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="243.5" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
-<line x1="315.8" y1="82" x2="315.8" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="315.8" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">3,000</text>
+<line x1="195.3" y1="82" x2="195.3" y2="214" stroke="#e1e0d9" stroke-width="1"/>
+<text x="195.3" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
+<line x1="291.7" y1="82" x2="291.7" y2="214" stroke="#e1e0d9" stroke-width="1"/>
+<text x="291.7" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
 <line x1="388" y1="82" x2="388" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
+<text x="388" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">6,000</text>
 <text x="89" y="103" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
-<path d="M99,91H107.1A4,4 0 0 1 111.1,95V101A4,4 0 0 1 107.1,105H99Z" fill="#898781"/>
-<text x="117.1" y="103" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">168 ms</text>
+<path d="M99,91H104.7A4,4 0 0 1 108.7,95V101A4,4 0 0 1 104.7,105H99Z" fill="#898781"/>
+<text x="114.7" y="103" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">201 ms</text>
 <text x="89" y="135" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
-<path d="M99,123H108.2A4,4 0 0 1 112.2,127V133A4,4 0 0 1 108.2,137H99Z" fill="#898781"/>
-<text x="118.2" y="135" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">183 ms</text>
+<path d="M99,123H104.9A4,4 0 0 1 108.9,127V133A4,4 0 0 1 104.9,137H99Z" fill="#898781"/>
+<text x="114.9" y="135" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">205 ms</text>
 <text x="89" y="167" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M99,155H116.4A4,4 0 0 1 120.4,159V165A4,4 0 0 1 116.4,169H99Z" fill="#2a78d6"/>
-<text x="126.4" y="167" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">296 ms</text>
+<path d="M99,155H109.3A4,4 0 0 1 113.3,159V165A4,4 0 0 1 109.3,169H99Z" fill="#2a78d6"/>
+<text x="119.3" y="167" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">297 ms</text>
 <text x="89" y="199" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M99,187H368.3A4,4 0 0 1 372.3,191V197A4,4 0 0 1 368.3,201H99Z" fill="#898781"/>
-<text x="378.3" y="199" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">3.78 s</text>
+<path d="M99,187H342.5A4,4 0 0 1 346.5,191V197A4,4 0 0 1 342.5,201H99Z" fill="#898781"/>
+<text x="352.5" y="199" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">5.14 s</text>
 <text x="388" y="251" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>

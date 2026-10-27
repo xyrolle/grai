@@ -30,9 +30,9 @@ Each row is a measure where lower is better: grai's figure, the best figure of t
 <!-- glance -->
 | Measure | grai | Best of the others | Ratio |
 | --- | --- | --- | --- |
-| [Compile after one edit, 13,326 keys](docs/benchmarks.md#compiling-after-one-edit) | 16 ms | 11.3 s (Paraglide) | 718× |
-| [Full compile, 13,326 keys, both typed](#compiling-the-catalogs) | 290 ms | 25.1 s (Paraglide, with declarations) | 87× |
-| [Full compile, 13,326 keys, Paraglide untyped](#compiling-the-catalogs) | 290 ms | 11.3 s (Paraglide) | 39× |
+| [Compile after one edit, 13,326 keys](docs/benchmarks.md#compiling-after-one-edit) | 12 ms | 6.32 s (Paraglide) | 531× |
+| [Full compile, 13,326 keys, both typed](#compiling-the-catalogs) | 147 ms | 13.2 s (Paraglide, with declarations) | 90× |
+| [Full compile, 13,326 keys, Paraglide untyped](#compiling-the-catalogs) | 147 ms | 6.32 s (Paraglide) | 43× |
 | [Ordinal form chosen, `ru`](docs/benchmarks.md#choosing-an-ordinal) | 4.4 ns | 141 ns (Intl.PluralRules, cached) | 32× |
 | [Editor: first key completion, 13,326 keys](docs/benchmarks.md#completing-a-key-in-the-editor) | 231 ms | 3.23 s (Paraglide) | 14× |
 | [Plural form chosen, `ru`](docs/benchmarks.md#choosing-a-plural) | 15 ns | 206 ns (Intl.PluralRules, cached) | 14× |
@@ -47,7 +47,7 @@ Each row is a measure where lower is better: grai's figure, the best figure of t
 | [Hydration, 2,000 messages](docs/benchmarks.md#hydrating-a-page) | 5.9 ms | 8.7 ms (Paraglide) | 1.5× |
 | [Next.js dev: an edit in a server component, until shown](docs/benchmarks.md#nextjs-an-edit-in-development) | 142 ms | 146 ms (next-intl) | 1.0× |
 | [Next.js dev: a cold start's first page](#nextjs-a-cold-dev-servers-first-page) | 1.41 s | 1.20 s (next-intl) | 0.85×, behind |
-| [Vite dev: a cold start, until shown](docs/benchmarks.md#starting-the-dev-server) | 296 ms | 168 ms (i18next) | 0.57×, behind |
+| [Vite dev: a cold start, until shown](docs/benchmarks.md#starting-the-dev-server) | 297 ms | 201 ms (i18next) | 0.68×, behind |
 | [Editor: next key completion, 13,326 keys](docs/benchmarks.md#completing-a-key-in-the-editor) | 64 ms | 5 ms (use-intl) | 0.08×, behind |
 <!-- /glance -->
 
@@ -97,7 +97,7 @@ Then add grai to the app:
 
 ## Performance
 
-Every number here comes from a bench in [`bench/`](bench), run in one window on <!-- value:bench-date -->27 Oct 2026<!-- /value --> on <!-- value:bench-machine -->an Apple M5 Pro with 18 cores<!-- /value -->, beside other work: its one-minute load was <!-- value:bench-load -->7 to 23<!-- /value --> through the window. The catalog is `bench/synthetic.mjs`'s, 6,366 keys in three locales with a production app's shares of plurals, inputs and markup, and the same shares at 13,326 keys where a chart groups by size, so anyone can run them. `bench/results/` holds what each run recorded, with its versions and load, and `node scripts/charts.ts` draws the charts and the table above from it.
+Every number here comes from a bench in [`bench/`](bench), run in one window on <!-- value:bench-date -->27 Oct 2026<!-- /value --> on <!-- value:bench-machine -->an Apple M5 Pro with 18 cores<!-- /value -->, beside other work: its one-minute load was <!-- value:bench-load -->7 to 23<!-- /value --> through the window.<!-- value:bench-after --> The dev server's cold start (15:08 UTC, its load from 16 to 32) and the compile times (15:14 UTC, its load from 32 to 11) were measured on their own afterwards, on the same code.<!-- /value --> The catalog is `bench/synthetic.mjs`'s, 6,366 keys in three locales with a production app's shares of plurals, inputs and markup, and the same shares at 13,326 keys where a chart groups by size, so anyone can run them. `bench/results/` holds what each run recorded, with its versions and load, and `node scripts/charts.ts` draws the charts and the table above from it.
 
 <!-- charts:readme -->
 ### Compiling the catalogs
@@ -106,7 +106,7 @@ grai's output is typed: it writes each message's declarations as it compiles. Pa
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/compile-dark.svg">
-  <img alt="Compiling the catalogs: 6,366 keys, grai 95 ms, Paraglide 3.50 s and Paraglide, with declarations 9.16 s; 13,326 keys, grai 290 ms, Paraglide 11.3 s and Paraglide, with declarations 25.1 s." src="docs/assets/compile-light.svg" width="480">
+  <img alt="Compiling the catalogs: 6,366 keys, grai 124 ms, Paraglide 4.45 s and Paraglide, with declarations 9.49 s; 13,326 keys, grai 147 ms, Paraglide 6.32 s and Paraglide, with declarations 13.2 s." src="docs/assets/compile-light.svg" width="480">
 </picture>
 
 <details>
@@ -114,16 +114,16 @@ grai's output is typed: it writes each message's declarations as it compiles. Pa
 
 |  | keys | full compile | nothing changed | one message edited |
 | --- | --- | --- | --- | --- |
-| grai | 6,366 | 95 ms | 1 ms | 7 ms |
-| Paraglide, message modules, without declarations | 6,366 | 3.50 s | the same | the same |
-| Paraglide, message modules, with declarations | 6,366 | 9.16 s | the same | the same |
-| Paraglide, locale modules, with declarations | 6,366 | 92.9 s | the same | the same |
-| grai | 13,326 | 290 ms | 4 ms | 16 ms |
-| Paraglide, message modules, without declarations | 13,326 | 11.3 s | the same | the same |
-| Paraglide, message modules, with declarations | 13,326 | 25.1 s | the same | the same |
-| Paraglide, locale modules, with declarations | 13,326 | 287.8 s | the same | the same |
+| grai | 6,366 | 124 ms | 2 ms | 11 ms |
+| Paraglide, message modules, without declarations | 6,366 | 4.45 s | the same | the same |
+| Paraglide, message modules, with declarations | 6,366 | 9.49 s | the same | the same |
+| Paraglide, locale modules, with declarations | 6,366 | 55.6 s | the same | the same |
+| grai | 13,326 | 147 ms | 2 ms | 12 ms |
+| Paraglide, message modules, without declarations | 13,326 | 6.32 s | the same | the same |
+| Paraglide, message modules, with declarations | 13,326 | 13.2 s | the same | the same |
+| Paraglide, locale modules, with declarations | 13,326 | 225.5 s | the same | the same |
 
-Each compile in a new Node process, timed once its modules have loaded, from no output (`bench/compile-time.mjs`). grai's times are medians of 3, Paraglide 2.29.1's without declarations too, and its compiles with declarations, which go through TypeScript 6, one run each. Paraglide compiles everything again on any change.
+Each compile in a new Node process, timed once its modules have loaded, from no output (`bench/compile-time.mjs`). grai's times are medians of 3, and so are Paraglide 2.29.1's in its message-module layout, without declarations and with them, which go through TypeScript 6. Its locale-module layout with declarations, minutes a compile, is one run each. Paraglide compiles everything again on any change.
 </details>
 
 ### A production build
@@ -279,6 +279,7 @@ Sources: each project's own documentation ([Paraglide JS](https://inlang.com/m/g
 ## Limitations
 
 - **Next.js development reaches its first page no sooner** than next-intl's, as above.
+- **A cold Vite dev server shows its first page later** than one serving i18next's or use-intl's catalog, which nothing compiles: grai compiles the catalogs as the server starts. On 6,366 keys that is <!-- value:start-grai -->297 ms<!-- /value --> against <!-- value:start-best -->201 ms on i18next<!-- /value --> ([the chart](docs/benchmarks.md#starting-the-dev-server)).
 - **A new server process loads the messages more slowly** than i18next or use-intl, though it renders its first page sooner, and with Node's compile cache loads first ([docs/limitations.md](docs/limitations.md)).
 - **A cold check costs seconds on a large project,** the price of reading code exactly; CI's cache keeps it to the files that changed ([the commands' chart](docs/benchmarks.md#the-refactoring-commands)).
 - **Not supported yet:** `:unit`'s `usage`, and an option's value taken from an input other than a currency, a unit and a time zone. Each is a compile error that names the construct, never an approximation.
