@@ -17,6 +17,7 @@ import { libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 const brotli = (code) =>
 	brotliCompressSync(Buffer.from(code), {
@@ -141,4 +142,17 @@ for (const app of selectedApps()) {
 		console.log(
 			`| ${name} | ${runtime ? size(runtime) : "the same"} | ${size(messages)} |`,
 		);
+	const bytes = (code) =>
+		code === undefined
+			? undefined
+			: { brotli: brotli(code), raw: Buffer.byteLength(code) };
+	recordResults(
+		`library-bytes-${app.id}`,
+		rows.map(([name, runtime, messages]) => ({
+			library: name,
+			runtime: bytes(runtime),
+			messages: bytes(messages),
+		})),
+		{ app: app.name, locale },
+	);
 }

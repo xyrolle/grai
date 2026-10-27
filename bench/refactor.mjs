@@ -22,6 +22,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { graiSource } from "./grai.mjs";
+import { recordResults } from "./results.mjs";
 
 const RUNS = 3;
 const UNUSED = 50;
@@ -66,7 +67,7 @@ async function child(command, config, ...args) {
 
 /**
  * The median of the runs, each after its own setup and then its check of the run's result, in
- * milliseconds, or `refused` when the command refused a run.
+ * milliseconds, or "refused" when the command refused a run.
  */
 function median(setup, args, after = () => {}) {
 	const runs = Array.from({ length: RUNS }, (_, run) => {
@@ -84,7 +85,7 @@ function median(setup, args, after = () => {}) {
 	});
 	if (runs.some((run) => run.refused)) return "refused";
 	const ms = runs.map((run) => run.ms).toSorted((a, b) => a - b);
-	return `${ms[Math.floor(RUNS / 2)]?.toFixed(0)} ms`;
+	return ms[Math.floor(RUNS / 2)] ?? 0;
 }
 
 /**
@@ -286,7 +287,7 @@ if (process.argv[2] === "--child") {
 					args,
 					after,
 				);
-				return `${coldly} (warm ${median(setup, args, after)})`;
+				return { cold: coldly, warm: median(setup, args, after) };
 			};
 			const ms = {
 				check: timed(none, () => ["check", config]),
@@ -298,10 +299,14 @@ if (process.argv[2] === "--child") {
 					(result) => fixedAndChecked(dir, catalogs, locales, result),
 				),
 			};
+			const shown = (value) =>
+				typeof value === "number" ? `${value.toFixed(0)} ms` : value;
 			const times = Object.entries(ms).map(
-				([name, value]) => `${name} ${value}`,
+				([name, { cold, warm }]) =>
+					`${name} ${shown(cold)} (warm ${shown(warm)})`,
 			);
 			console.log(`${app}: ${times.join(", ")}`);
+			recordResults(`refactor-${app}`, ms, { runs: RUNS });
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

@@ -27,6 +27,7 @@ import {
 	withValues,
 } from "./render-calls.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 /** The libraries' variants, then the floor of Paraglide's calls and the shapes grai did not adopt. */
 async function variants(app, locale) {
@@ -52,6 +53,7 @@ async function variants(app, locale) {
 	};
 }
 
+/** Times the calls in a locale, and returns each variant's nanoseconds a call, by kind. */
 async function benchLocale(app, locale) {
 	const rows = new Map();
 	const all = Object.entries(await variants(app, locale));
@@ -81,6 +83,7 @@ async function benchLocale(app, locale) {
 		}
 	}
 	for (const [name, ns] of rows) console.log(tableRow(name, locale, ns));
+	return [...rows].map(([name, ns]) => ({ variant: name, locale, ns }));
 }
 
 const apps = selectedApps();
@@ -99,6 +102,12 @@ if (apps.length > 1) {
 		`\n### ${app.name}: Paraglide ${paraglideVersion}, Node ${process.versions.node}, page of ${CALLS} calls ${JSON.stringify(mix)}\n`,
 	);
 	console.log(TABLE_HEAD);
+	const recorded = [];
 	for (const locale of [app.baseLocale, otherLocale(app)])
-		await benchLocale(app, locale);
+		recorded.push(...(await benchLocale(app, locale)));
+	recordResults(`server-${app.id}`, recorded, {
+		app: app.name,
+		calls: CALLS,
+		mix,
+	});
 }
