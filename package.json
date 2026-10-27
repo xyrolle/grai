@@ -116,7 +116,7 @@
 		}
 	},
 	"bin": {
-		"grai": "./dist/cli.js"
+		"grai": "dist/cli.js"
 	},
 	"files": [
 		"dist",

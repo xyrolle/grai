@@ -144,11 +144,12 @@ it("packs the runtime's modules and the declarations' templates as they are writ
 it("packs every file the package's exports and bin name", () => {
 	const manifest: Manifest = JSON.parse(text(root, "package.json"));
 	const targets = [
-		...Object.values(manifest.exports).flatMap((conditions) =>
-			Object.values(conditions),
-		),
+		...Object.values(manifest.exports)
+			.flatMap((conditions) => Object.values(conditions))
+			.map((target) => target.replace(/^\.\//, "")),
+		// As npm writes a bin's path: it corrects one written with "./" as it publishes, with a warning.
 		...Object.values(manifest.bin),
-	].map((target) => target.replace(/^\.\//, ""));
+	];
 	const files = new Set(packed.files);
 
 	expect(targets.filter((target) => !files.has(target))).toEqual([]);
