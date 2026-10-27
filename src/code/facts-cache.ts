@@ -86,6 +86,16 @@ export class FactsCache {
 	}
 
 	/**
+	 * Keeps every entry it was read with, as a build does, which lists no files and so cannot tell a
+	 * file gone: a command that lists them drops its entry.
+	 */
+	keepAll(): void {
+		for (const [path, entry] of this.read) {
+			if (!this.kept.has(path)) this.kept.set(path, entry);
+		}
+	}
+
+	/**
 	 * Writes the facts of the files read this time and those kept unread, unless they are the cache's
 	 * already: no file was read again, and it keeps every entry it has. An entry is written as it
 	 * was read or made, never made again.
@@ -100,6 +110,8 @@ export class FactsCache {
 		}
 		writeFileSync(temporary, `${lines.join("\n")}\n`);
 		renameSync(temporary, this.file);
+		// A watching build saves again only what it reads anew.
+		this.added = false;
 	}
 }
 
