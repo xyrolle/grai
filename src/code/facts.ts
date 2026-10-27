@@ -159,7 +159,7 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 				source: fact.source,
 				path: fact.at,
 				names: [],
-				typeOnly: false,
+				typeOnly: node.type === "TSImportType",
 			});
 		}
 	}
