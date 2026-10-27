@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 196" width="480" height="196" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Next.js: the first page of a cold next dev</title>
+<rect x="0.5" y="0.5" width="479" height="195" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Next.js: the first page of a cold next dev</text>
 <text x="16" y="44" font-size="13" fill="#52514e">Milliseconds until the page's first response, from an empty .next;</text>
 <text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>

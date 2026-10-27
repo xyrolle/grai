@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 299" width="480" height="299" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Time i18n adds to a production build</title>
+<rect x="0.5" y="0.5" width="479" height="298" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Time i18n adds to a production build</text>
 <text x="16" y="44" font-size="13" fill="#52514e">Seconds beyond the same app's build without i18n; lower is better</text>
 <line x1="99" y1="65" x2="99" y2="253" stroke="#c3c2b7" stroke-width="1"/>

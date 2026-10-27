@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>A page of 2,000 messages: its JS</title>
+<rect x="0.5" y="0.5" width="479" height="259" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">A page of 2,000 messages: its JS</text>
 <text x="16" y="44" font-size="13" fill="#c3c2b7">KB brotli, the page's own code and its messages included;</text>
 <text x="16" y="61" font-size="13" fill="#c3c2b7">lower is better</text>

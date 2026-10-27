@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 380" width="480" height="380" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Compiling the catalogs</title>
+<rect x="0.5" y="0.5" width="479" height="379" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Compiling the catalogs</text>
 <text x="16" y="44" font-size="13" fill="#52514e">Seconds for a full compile of three locales, in a new process;</text>
 <text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>

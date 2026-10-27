@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 500" width="480" height="500" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>grai's commands on 13,000 keys and 9,000 files</title>
+<rect x="0.5" y="0.5" width="479" height="499" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">grai's commands on 13,000 keys and 9,000 files</text>
 <text x="16" y="44" font-size="13" fill="#52514e">Seconds, with no facts kept and with the last run's;</text>
 <text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>

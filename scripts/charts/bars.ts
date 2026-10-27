@@ -22,8 +22,13 @@ export type BarChart = {
 	groups: Group[];
 };
 
-/** The colours of a theme: GitHub's own surface is the chart's, so the SVG draws no background. */
+/**
+ * The colours of a theme. The chart draws its own surface, GitHub's for the mode: `<picture>` picks
+ * the SVG by the system's colour scheme, which need not be the page's, and a chart drawn on the page
+ * would then put one mode's ink on the other's surface.
+ */
 export type Theme = {
+	surface: string;
 	primary: string;
 	secondary: string;
 	grid: string;
@@ -35,6 +40,7 @@ export type Theme = {
 /** The dataviz reference palette's ink and chrome, its slot-1 accent, and its muted gray. */
 export const themes: Record<"light" | "dark", Theme> = {
 	light: {
+		surface: "#ffffff",
 		primary: "#0b0b0b",
 		secondary: "#52514e",
 		grid: "#e1e0d9",
@@ -43,6 +49,7 @@ export const themes: Record<"light" | "dark", Theme> = {
 		neutral: "#898781",
 	},
 	dark: {
+		surface: "#0d1117",
 		primary: "#f0efec",
 		secondary: "#c3c2b7",
 		grid: "#2c2c2a",
@@ -159,6 +166,7 @@ export function barChart(chart: BarChart, theme: Theme): string {
 	const height = plotBottom + 46;
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" ${font}>
 <title>${xmlText(chart.title)}</title>
+<rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="6" fill="${theme.surface}" stroke="${theme.grid}"/>
 <text x="${side}" y="24" font-size="16" font-weight="600" fill="${theme.primary}">${xmlText(chart.title)}</text>
 ${subtitle.map((line, index) => `<text x="${side}" y="${44 + index * 17}" font-size="13" fill="${theme.secondary}">${xmlText(line)}</text>`).join("\n")}
 ${grid.join("\n")}
