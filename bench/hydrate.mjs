@@ -11,9 +11,12 @@
 // that sum: it imports what the page's entry gives, then times `hydrate`, from when every module
 // has been evaluated until it returns, with Svelte's recovery off, so that a page that fails to
 // hydrate fails the bench rather than mounting anew. The page then mounts itself again, the client
-// work of a locale switch that does not reload. Both texts are checked against the server's. Runs
-// alternate between variants, each in a fresh context.
-//   node hydrate.mjs [app...]
+// work of a locale switch that does not reload. Both texts are checked against the server's.
+//
+// Each variant loads in a browser of its own, once a round, in an order that rotates from round to
+// round (rounds.mjs), each load in a fresh context; its figure is the median of its rounds, every
+// load kept, with each round's ratio to grai's.
+//   ROUNDS=16 node hydrate.mjs [app...]
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
@@ -33,8 +36,14 @@ import { paraglideForVite, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
 import { recordResults } from "./results.mjs";
+import {
+	inRounds,
+	pairedRatio,
+	ratioText,
+	roundCount,
+	roundsRecord,
+} from "./rounds.mjs";
 
-const RUNS = 15;
 const THROTTLING = [1, 4];
 const GRAI = "grai, the locale's copies";
 
@@ -146,81 +155,134 @@ function checkTexts(name, locale, document, { bench }) {
 		);
 }
 
+const pathsOf = (scripts) => scripts.map(({ path }) => path).join("\n");
+
 /** The JS a page loads: each script it asked for and each it holds inline, compressed on its own. */
 const bytesOf = (scripts) => ({
 	raw: scripts.reduce((sum, script) => sum + script.raw, 0),
 	brotli: scripts.reduce((sum, script) => sum + script.brotli, 0),
 });
 
-/** Benches the page in a locale, and returns each variant's bytes and times, as the run measured them. */
-async function benchLocale(browser, app, locale) {
-	const recorded = [];
-	const documents = [];
-	for (const [index, [name, variant]] of Object.entries(
-		await variants(app, locale),
-	).entries())
-		documents.push({
-			name,
-			...(await documentFor(app, locale, index, variant)),
-		});
-	if (new Set(documents.map(({ text }) => text)).size !== 1)
-		throw new Error(`The variants' servers drew other texts in ${locale}`);
-	for (const rate of THROTTLING) {
-		const samples = documents.map(() => []);
-		for (let run = 0; run < RUNS; run++) {
-			for (const [index, document] of documents.entries()) {
-				const load = await benchPage(browser, app, locale, document.page, rate);
-				checkTexts(document.name, locale, document, load);
-				document.scripts ??= load.scripts;
-				samples[index].push(load.bench);
-			}
-		}
-		for (const [index, document] of documents.entries()) {
-			const runs = samples[index];
-			const ms = (pick) => median(runs.map(pick));
-			const bytes = bytesOf(document.scripts);
-			const row = {
-				variant: document.name,
-				locale,
-				slowdown: rate,
-				bytes,
-				resources: document.scripts,
-				ms: {
-					starts: ms((r) => r.loaded),
-					evaluates: ms((r) => r.evaluated - r.loaded),
-					hydrates: ms((r) => r.hydrated - r.evaluated),
-					hydratedAt: ms((r) => r.hydrated),
-					mounts: ms((r) => r.mounted),
-				},
-			};
-			recorded.push(row);
-			const cell = (value) => value.toFixed(1);
-			console.log(
-				`| ${document.name} | ${locale} | ${rate}× | ${(bytes.brotli / 1024).toFixed(1)} (${(bytes.raw / 1024).toFixed(0)}) | ${cell(row.ms.starts)} | ${cell(row.ms.evaluates)} | ${cell(row.ms.hydrates)} | ${cell(row.ms.hydratedAt)} | ${cell(row.ms.mounts)} |`,
-			);
-		}
+/** Each variant's page in each locale, by locale and then by variant, every server's text checked alike. */
+async function documentsOf(app, locales) {
+	const documents = new Map();
+	for (const locale of locales) {
+		const inLocale = new Map();
+		for (const [index, [name, variant]] of Object.entries(
+			await variants(app, locale),
+		).entries())
+			inLocale.set(name, await documentFor(app, locale, index, variant));
+		const drawn = new Set([...inLocale.values()].map(({ text }) => text));
+		if (drawn.size !== 1)
+			throw new Error(`The variants' servers drew other texts in ${locale}`);
+		documents.set(locale, inLocale);
 	}
-	return recorded;
+	return documents;
 }
 
-const browser = await chromium.launch();
-for (const app of selectedApps()) {
+/** Loads each variant's pages, in every locale and at every CPU slowdown, once a round. */
+async function bench(app) {
+	const locales = [app.baseLocale, otherLocale(app)];
+	const documents = await documentsOf(app, locales);
+	const names = [...documents.get(app.baseLocale).keys()];
+	let chromiumVersion;
+	const kept = await inRounds(
+		names,
+		roundCount(names.length, 2),
+		async (name) => {
+			const browser = await chromium.launch();
+			chromiumVersion = browser.version();
+			try {
+				const loads = {};
+				for (const locale of locales)
+					for (const rate of THROTTLING) {
+						const document = documents.get(locale).get(name);
+						const load = await benchPage(
+							browser,
+							app,
+							locale,
+							document.page,
+							rate,
+						);
+						checkTexts(name, locale, document, load);
+						loads[`${locale}-${rate}`] = load;
+					}
+				return loads;
+			} finally {
+				await browser.close();
+			}
+		},
+	);
+	return { locales, names, kept, chromium: chromiumVersion };
+}
+
+function report(app, { locales, names, kept, chromium }) {
 	console.log(
-		`\n### ${app.name}: a page with ${PAGE_CALLS} message calls of ${pageKeys(app).length} keys in Chromium ${browser.version()} (Paraglide ${paraglideVersion}), median of ${RUNS} loads, ms\n`,
+		`\n### ${app.name}: a page with ${PAGE_CALLS} message calls of ${pageKeys(app).length} keys in Chromium ${chromium} (Paraglide ${paraglideVersion}), medians of ${kept.length} rounds at a load of ${kept.map(({ load }) => load.toFixed(0)).join(", ")}, ms\n`,
 	);
 	console.log(
-		"| variant | locale | CPU slowdown | JS KB brotli (raw) | scripts loaded | evaluated | hydrates | hydrated at | mounts again |",
+		"| variant | locale | CPU slowdown | JS KB brotli (raw) | scripts loaded | evaluated | hydrates | hydrated at | mounts again | hydrates, × grai's (interval) |",
 	);
-	console.log("|---|---|---|---|---|---|---|---|---|");
+	console.log("|---|---|---|---|---|---|---|---|---|---|");
 	const recorded = [];
-	for (const locale of [app.baseLocale, otherLocale(app)])
-		recorded.push(...(await benchLocale(browser, app, locale)));
+	for (const locale of locales)
+		for (const rate of THROTTLING)
+			for (const name of names) {
+				const cell = `${locale}-${rate}`;
+				const loads = kept.map(({ measured }) => measured.get(name)[cell]);
+				const [first] = loads;
+				if (
+					loads.some(
+						({ scripts }) => pathsOf(scripts) !== pathsOf(first.scripts),
+					)
+				)
+					throw new Error(
+						`${name} loaded other scripts from one load to the next in ${locale}`,
+					);
+				const resources = first.scripts;
+				const bytes = bytesOf(resources);
+				const byRound = (variant, figure) =>
+					kept.map(({ measured }) => figure(measured.get(variant)[cell].bench));
+				const hydrates = (bench) => bench.hydrated - bench.evaluated;
+				const ms = (figure) => median(byRound(name, figure));
+				const row = {
+					variant: name,
+					locale,
+					slowdown: rate,
+					bytes,
+					resources,
+					ms: {
+						starts: ms((bench) => bench.loaded),
+						evaluates: ms((bench) => bench.evaluated - bench.loaded),
+						hydrates: ms(hydrates),
+						hydratedAt: ms((bench) => bench.hydrated),
+						mounts: ms((bench) => bench.mounted),
+					},
+					against: GRAI,
+					ratio: {
+						hydrates: pairedRatio(
+							byRound(name, hydrates),
+							byRound(GRAI, hydrates),
+						),
+					},
+					loads: loads.map(
+						({ bench: { text, remounted, ...timing } }) => timing,
+					),
+				};
+				recorded.push(row);
+				const cellText = (value) => value.toFixed(1);
+				console.log(
+					`| ${name} | ${locale} | ${rate}× | ${(bytes.brotli / 1024).toFixed(1)} (${(bytes.raw / 1024).toFixed(0)}) | ${cellText(row.ms.starts)} | ${cellText(row.ms.evaluates)} | ${cellText(row.ms.hydrates)} | ${cellText(row.ms.hydratedAt)} | ${cellText(row.ms.mounts)} | ${ratioText(row.ratio.hydrates)} |`,
+				);
+			}
 	recordResults(`hydrate-${app.id}`, recorded, {
 		app: app.name,
 		calls: PAGE_CALLS,
 		keys: pageKeys(app).length,
-		runs: RUNS,
-		chromium: browser.version(),
+		runs: kept.length,
+		chromium,
+		rounds: roundsRecord(kept),
 	});
 }
-await browser.close();
+
+for (const app of selectedApps()) report(app, await bench(app));
