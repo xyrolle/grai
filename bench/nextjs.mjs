@@ -12,8 +12,8 @@
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
 // - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
-//   is complete, COLD_ROUNDS times for each app, the apps taking turns, so the load from other work
-//   weighs on both alike.
+//   is complete, and the CPU of Next's processes until then, COLD_ROUNDS times for each app, the apps
+//   taking turns, so the load from other work weighs on both alike.
 // Every first response is checked to list each of the page's messages.
 import { spawnSync } from "node:child_process";
 import {
@@ -258,8 +258,8 @@ for (const app of selectedApps()) {
 	console.log(
 		`\n\`next dev\` from an empty .next, from its launch until the page's first response, the apps taking turns, median of ${COLD_ROUNDS}, ms\n`,
 	);
-	console.log("| app | ready | page |");
-	console.log("|---|---|---|");
+	console.log("| app | ready | page | CPU until the page |");
+	console.log("|---|---|---|---|");
 	const runs = { grai: [], "next-intl": [] };
 	for (let round = 0; round < COLD_ROUNDS; round++) {
 		const order =
@@ -267,14 +267,17 @@ for (const app of selectedApps()) {
 		for (const name of order) {
 			const run = await devStart(apps[name], path, words, { empty: true });
 			await stopServer(run.server.child);
-			runs[name].push({ ready: run.ready, page: run.page });
+			runs[name].push({ ready: run.ready, page: run.page, cpu: run.cpu });
 		}
 	}
 	for (const [name, samples] of Object.entries(runs)) {
 		const ready = median(samples.map((run) => run.ready));
 		const page = median(samples.map((run) => run.page));
-		console.log(`| ${name} | ${ready.toFixed(0)} | ${page.toFixed(0)} |`);
-		recorded.cold[name] = { ready, page, runs: samples };
+		const cpu = median(samples.map((run) => run.cpu));
+		console.log(
+			`| ${name} | ${ready.toFixed(0)} | ${page.toFixed(0)} | ${cpu.toFixed(0)} |`,
+		);
+		recorded.cold[name] = { ready, page, cpu, runs: samples };
 	}
 	recordResults(`nextjs-${app.id}`, recorded, {
 		app: app.name,

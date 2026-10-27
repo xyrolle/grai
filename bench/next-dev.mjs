@@ -2,6 +2,7 @@
 // process's launch: until Next says it is ready, and until the page's first response is complete.
 // The response is checked to list every message the page renders, in order, so that a page
 // answering sooner with an error or with fewer words never counts as faster.
+import { spawnSync } from "node:child_process";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { startServer } from "./servers.mjs";
@@ -85,9 +86,25 @@ function check(texts, words, where) {
 	);
 }
 
+/** The CPU every process of a server's group has used, user and system, ms. */
+function groupCpu(pid) {
+	const run = (command, args) =>
+		spawnSync(command, args, { encoding: "utf8" }).stdout.trim();
+	const pids = run("pgrep", ["-g", String(pid)])
+		.split("\n")
+		.join(",");
+	return run("ps", ["-o", "time=", "-p", pids])
+		.split("\n")
+		.reduce((sum, time) => {
+			const [minutes, seconds] = time.trim().split(":").map(Number);
+			return sum + (minutes * 60 + seconds) * 1000;
+		}, 0);
+}
+
 /**
  * `next dev` from its launch until it is ready, and until the page's first response is complete and
- * lists `words`: from an empty .next, or not. The server is left running.
+ * lists `words`, with the CPU Next's processes used until then: from an empty .next, or not. The
+ * server is left running.
  */
 export async function devStart(root, path, words, { empty }) {
 	if (empty) rmSync(join(root, ".next"), { recursive: true, force: true });
@@ -97,5 +114,5 @@ export async function devStart(root, path, words, { empty }) {
 	const html = await firstResponse(url);
 	const page = now() - server.launched;
 	check(listed(html), words, `${url}'s first response`);
-	return { server, url, ready, page };
+	return { server, url, ready, page, cpu: groupCpu(server.child.pid) };
 }
