@@ -51,6 +51,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   testing.js    testing.d.ts     the locale a test renders in; a build refuses it
 
   keys/<n>-<hash>.js  .d.ts      a shard: about 512 keys
+  keys/g<n>-<hash>.js .d.ts      a group of keys an adapter saved (Next's routes), when there is one
   keys/<n>.d.ts.map              its declarations' map to the keys in the base catalog
   runtime-<hash>.js   .d.ts      the runtime, the same for every project, but for its config's name
   config-<hash>.js               the project's locales and strategy, which the runtime reads
@@ -60,6 +61,7 @@ The reference workloads are two production SvelteKit apps: app A with 6,379 keys
   package.json                   its modules are ES modules, and only server.js has effects
   .grai/manifest.json            what the output was compiled from, and its files
   .grai/build                    the build a watcher saved, which the next one starts from
+  .grai/groups.json              the groups of keys the output holds each in a module of its own
   .gitignore                     `*`: the output is compiled, never committed
 ```
 
@@ -72,6 +74,7 @@ The first five are the entries, which apps import by name. Every other file is n
   - Every module of the output imports only modules of the output, by relative paths, and Node's builtins, so nothing in it resolves against the package.json (`test/outdir-package.test.ts`).
 - **On disk, a few modules hold every message.** Node, scripts and tests load them as they are, and the output is a few dozen files whatever the key count. Per-key files would cost every install, editor index and file watcher, two files a key: 26.7k for app B.
 - **The keys are split into shards by a hash of their name**, a power of two of them so that a key moves only when the key count doubles. An edit then writes one shard of about 512 keys, under its new name, not the whole catalog's output. TypeScript and editors read that shard alone.
+- **Saved groups of keys come first, each in a module of its own; the other keys are in their shards.** `.grai/groups.json` lists groups of keys that are read together, which an adapter saves from the app's code (only Next's does, below). Every compile, a build's and a watcher's alike, places a key in its group when one holds it, so `next dev` and `next build` write the same output for the same state. With no groups saved, as after a clone, the output is the shards alone, as before. Groups out of date cost speed, never a key: a key no group holds, as one added since, is in its shard, and keys.js exports every key whatever the groups. A group's declarations are beside its module under the same name, as a shard's are, since TypeScript takes a module without them into a project that checks JavaScript.
 - **Per-key import paths map to keys.js with one line, never a file per key.** An app that imports `import { key } from "…/messages/key.js"` maps the pattern in its package.json `imports` (`"#i18n/messages/*": "./src/lib/i18n/keys.js"`). Node and TypeScript resolve every key's path to keys.js and its declarations, and a key that does not exist is a type error at the import. The Vite adapter resolves the same paths itself.
   - **A key's path names its key by its last segment, case and all, and imports that key:** `…/messages/Title.js` is the key `Title`, never `title`. Each of grai's resolvers reads the key there, and so can a tool that walks an app's imports, such as one that finds the keys a route reaches: outside them every key's path resolves to keys.js, which names none. Keys are unique ignoring case (above), so no two keys' paths differ only in case; and as no file stands for a key, a path in another case than its key's names a key no catalog has on every file system alike.
   - **A file per key was measured and rejected.** A `.js` and a `.d.ts` per key, each re-exporting the key from keys.js, made app B's output 26,762 files instead of 109. Its compile went from 194 ms to 2,758 ms cold, from 2.9 to 37.9 ms with nothing to do, and from 38.6 to 102.9 ms for one edited message (medians of three, load 13–21).
