@@ -257,7 +257,7 @@ async function proxyFor(dir: string) {
 		resolve: {
 			alias: [
 				{
-					find: /^grai\/next\/output\/(.*)$/,
+					find: /^@xyrolle\/grai\/next\/output\/(.*)$/,
 					replacement: join(dir, "out", "$1"),
 				},
 			],
