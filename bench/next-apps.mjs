@@ -69,14 +69,17 @@ function items(keys, app, render, component) {
 		.join("\n");
 }
 
-/** A client component that records when a target's text changes, for the edit bench. */
+/**
+ * A client component that stamps when React has hydrated the page, for the cold start bench, and
+ * records when a target's text changes, for the edit bench.
+ */
 const observer = `"use client";
 import { useEffect } from "react";
 
 export function Observer() {
 	useEffect(() => {
 		const changes = {};
-		Object.assign(window, { changes });
+		Object.assign(window, { changes, hydratedAt: performance.timeOrigin + performance.now() });
 		new MutationObserver(() => {
 			for (const id of ["server-target", "client-target"]) {
 				const text = document.getElementById(id)?.textContent;
