@@ -144,6 +144,7 @@ export async function readProjectCode(
 				reached = await installed.passing(rest, holds);
 			}
 		}
+		cache.keepUnread(listedRoots, listed);
 		saveQuietly(cache);
 	} finally {
 		await pool.close();
