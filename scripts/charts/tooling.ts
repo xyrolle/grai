@@ -87,7 +87,7 @@ export function compileSection(): Section {
 				),
 			]),
 		],
-		note: `Each compile in a new Node process, timed once its modules have loaded, from no output (\`bench/compile-time.mjs\`). grai's times are medians of ${runs}, Paraglide ${versions["@inlang/paraglide-js"]}'s without declarations too, and its compiles with declarations, which go through TypeScript 6, one run each. Paraglide compiles everything again on any change.`,
+		note: `Each compile in a new Node process, timed once its modules have loaded, from no output (\`bench/compile-time.mjs\`). grai's times are medians of ${runs}, and so are Paraglide ${versions["@inlang/paraglide-js"]}'s in its message-module layout, without declarations and with them, which go through TypeScript 6. Its locale-module layout with declarations, minutes a compile, is one run each. Paraglide compiles everything again on any change.`,
 		glance: [
 			glanceOf(
 				`Full compile, ${whole(largest.keys)} keys, both typed`,
@@ -242,7 +242,7 @@ export function buildSection(): Section {
 	};
 }
 
-type HmrRow = { design: string; editToPage?: number; startToPage?: number };
+type HmrRow = { design: string; editToPage?: number };
 
 const designs: [string, string][] = [
 	["grai", "grai's plugin"],
@@ -251,25 +251,24 @@ const designs: [string, string][] = [
 	["use-intl", "use-intl"],
 ];
 
-/** The dev bench's figure of each library, by the field it recorded. */
-function devEntries(field: "editToPage" | "startToPage") {
+/** The dev bench's time from an edit to the page, by library. */
+function devEntries() {
 	const recorded = read("hmr-synthetic");
 	const of = (design: string): HmrRow =>
 		recorded.rows.find((row: HmrRow) => row.design === design);
 	const entries = designs.map(([label, design]): [string, number] => [
 		label,
-		of(design)[field] ?? 0,
+		of(design).editToPage ?? 0,
 	]);
 	return {
 		chromium: recorded.chromium as string,
 		edits: recorded.edits as number,
 		entries,
-		of,
 	};
 }
 
 export function devSection(): Section {
-	const { chromium, edits, entries } = devEntries("editToPage");
+	const { chromium, edits, entries } = devEntries();
 	const groups = [{ bars: barsOf(entries, (ms) => ms, duration) }];
 	const title = "One message edited, until the page shows it";
 	return {
@@ -297,8 +296,19 @@ export function devSection(): Section {
 	};
 }
 
+type StartRow = { design: string; ms: number; runs: number[] };
+
 export function devStartSection(): Section {
-	const { entries, of } = devEntries("startToPage");
+	const { rows, rounds, chromium } = read("dev-start-synthetic");
+	const of = (design: string): StartRow =>
+		rows.find((row: StartRow) => row.design === design);
+	const entries = designs.map(([label, design]): [string, number] => [
+		label,
+		of(design).ms,
+	]);
+	const noMessages: [string, string] = ["no messages", "no messages"];
+	const range = ({ runs }: StartRow) =>
+		`${whole(Math.min(...runs))}–${whole(Math.max(...runs))}`;
 	const groups = [{ bars: barsOf(entries, (ms) => ms, duration) }];
 	const title = "A cold Vite dev server, until its page shows";
 	return {
@@ -319,11 +329,13 @@ export function devStartSection(): Section {
 			},
 		],
 		table: [
-			["", "start to page, ms"],
-			...entries.map(([label, ms]) => [label, whole(ms)]),
-			["no messages", whole(of("no messages").startToPage ?? 0)],
+			["", "start to page, ms", "range, ms"],
+			...[...designs, noMessages].map(([label, design]) => {
+				const row = of(design);
+				return [label, whole(row.ms), range(row)];
+			}),
 		],
-		note: "Each library's dev server is made in a new directory, with no output and no cache, and timed until its page of messages shows (`bench/hmr.mjs`). grai's plugin and Paraglide's compile the catalogs as the server starts; i18next and use-intl load the locale's catalog in the page. One start each, in one process, grai's first; the last row is the same page with no messages.",
+		note: `Each start is a new Node process, its dev server made in a new directory with no output and no cache, timed from the server's creation, once Vite, the plugins and Chromium ${chromium} have loaded, until its page of 500 messages shows (\`bench/dev-start.mjs\`). grai's plugin and Paraglide's compile the catalogs as the server starts; i18next and use-intl load the locale's catalog in the page. The libraries take turns in an order that rotates each round, the page with no messages among them, its last row; medians of ${rounds}.`,
 		glance: [
 			glanceOf("Vite dev: a cold start, until shown", entries, duration),
 		],
