@@ -55,6 +55,21 @@ describe("grai check --fix", () => {
 		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
 	});
 
+	it("keeps a key read through a module that re-exports another in a cycle, as the cycle answers it only for the module that started it", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/a.js":
+				'export * from "./b.js";\nexport * from "../out/messages.js";\n',
+			"src/b.js": 'export * from "./a.js";\n',
+			"src/page.js":
+				'import * as first from "./a.js";\nimport * as second from "./b.js";\nfirst.m.cart_total({ count: 1 });\nsecond.m.cart_title();\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
