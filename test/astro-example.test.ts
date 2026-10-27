@@ -1,10 +1,18 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	onTestFinished,
+} from "vitest";
 import { stopped } from "./stopped.ts";
 
 // The Astro example (examples/astro), built by `astro build` as an app builds it: as a static site
@@ -375,21 +383,26 @@ describe("the Astro example, rendered on demand by the Node adapter", {
 	});
 });
 
+/**
+ * Starts `astro dev` on the example. --ignore-lock: in the foreground, as `astro preview` above.
+ * Astro's dev server leaves requests to Vite's alone inside Vitest, by the VITEST that the suite's
+ * runner sets. No update check: in a project without a recent one, as a fresh clone is, the server
+ * asks the registry and writes .astro/settings.json once it listens. Astro skips one change of that
+ * file, but macOS can report the write as two, and the second restarts the server under the test's
+ * request.
+ */
+const astroDev = () =>
+	listening(
+		astro,
+		["dev", "--port", "0", "--host", "127.0.0.1", "--ignore-lock"],
+		{ VITEST: "", ASTRO_DISABLE_UPDATE_CHECK: "true" },
+	);
+
 describe("the Astro example in dev", { timeout: 30_000 }, () => {
 	let origin = "";
 	let served: Served | undefined;
 	beforeAll(async () => {
-		// --ignore-lock: in the foreground, as `astro preview` above. Astro's dev server leaves
-		// requests to Vite's alone inside Vitest, by the VITEST that the suite's runner sets.
-		// No update check: in a project without a recent one, as a fresh clone is, the server asks
-		// the registry and writes .astro/settings.json once it listens. Astro skips one change of that
-		// file, but macOS can report the write as two, and the second restarts the server under the
-		// test's request.
-		served = await listening(
-			astro,
-			["dev", "--port", "0", "--host", "127.0.0.1", "--ignore-lock"],
-			{ VITEST: "", ASTRO_DISABLE_UPDATE_CHECK: "true" },
-		);
+		served = await astroDev();
 		origin = served.origin;
 	}, 60_000);
 	afterAll(() => served && stopped(served.server));
@@ -411,5 +424,41 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 			"<h1>Despre acest exemplu</h1>",
 		]);
 		expect((await pageAt(origin, "/en/despre/"))[0]).toBe("404");
+	});
+
+	it("loads each page's locale's words alone in its islands, the locale the server drew it in", async () => {
+		const loaded = scripts();
+		await page.goto(`${origin}/ro/`);
+		await page.locator("#svelte").waitFor();
+		await page.locator("#react").waitFor();
+		await page.waitForLoadState("networkidle");
+		const keys = [...loaded.keys()].filter((path) =>
+			path.includes("grai:keys"),
+		);
+
+		expect(await html("lang")).toBe("ro");
+		expect(await text("#react")).toBe("Desenat de React în browser");
+		expect(keys).toEqual(["/@id/__x00__grai:keys/ro"]);
+		expect(errors).toEqual([]);
+	});
+});
+
+describe("the Astro example in dev, a message invalid in a locale no page loads", {
+	timeout: 60_000,
+}, () => {
+	it("serves no page's words, the page's locale's neither", async () => {
+		const file = join(example, "messages", "ar.json");
+		const catalog = readFileSync(file, "utf8");
+		onTestFinished(() => writeFileSync(file, catalog));
+		writeFileSync(
+			file,
+			`${JSON.stringify({ ...JSON.parse(catalog), greeting: "{$count :weekday}" }, null, "\t")}\n`,
+		);
+		const served = await astroDev();
+		onTestFinished(() => stopped(served.server));
+		const response = await fetch(`${served.origin}/@id/__x00__grai:keys/ro`);
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toContain("ar.json");
 	});
 });

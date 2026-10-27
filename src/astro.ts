@@ -22,6 +22,7 @@ import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { packageName } from "./package-name.ts";
+import { pageKeysImports, pageKeysUrl } from "./page-keys.ts";
 import { graiPlugin } from "./vite-plugin.ts";
 
 /** The integration's options. `config` is the path of the project's grai.config.json, from Astro's root. */
@@ -41,12 +42,13 @@ const middlewareId = "grai:astro/middleware";
  *   of the app's own;
  * - it adds a prerendered route for each path in a locale's words that `pathnames` gives, so a
  *   static build writes each page there too (`astro/translated-routes.ts`);
- * - in a build, it lists each locale's import map by its hash in Astro's CSP, where the app has one.
+ * - in a build, it lists each locale's import map by its hash in Astro's CSP, where the app has one;
+ *   in dev, each page's import map points keys.js at its locale's, which has its words alone.
  */
 export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 	let configFile = "";
 	let building = false;
-	let middleware: string | undefined;
+	let middleware: ((dev: ViteDevServer | undefined) => string) | undefined;
 	let astro: AstroConfig | undefined;
 	let translatable: IntegrationResolvedRoute[] = [];
 	// The project's grai config, read when a hook first needs it, after the first has named it.
@@ -56,7 +58,7 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 		return read;
 	};
 	const modules = virtualModules({
-		[middlewareId]: () => middleware,
+		[middlewareId]: (dev) => middleware?.(dev),
 		[translatedPathsId]: () =>
 			astro && translatedPathsModule(translatable, graiConfig(), astro),
 	});
@@ -144,18 +146,14 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 					);
 				}
 				const maps = importMaps(grai.locales, chunks);
-				middleware = middlewareCode(grai, {
-					configName: basename(configFile),
-					requestStrategies: requestStrategies(grai.strategy),
-					importMaps: building
-						? Object.fromEntries(
-								Object.entries(maps).map(([locale, map]) => [
-									locale,
-									`<script type="importmap">${map}</script>`,
-								]),
-							)
-						: undefined,
-				});
+				middleware = (dev) =>
+					middlewareCode(grai, {
+						configName: basename(configFile),
+						requestStrategies: requestStrategies(grai.strategy),
+						importMaps: building
+							? scripts(maps)
+							: dev && devKeys(grai.locales, dev.config.base),
+					});
 			},
 			"astro:routes:resolved": ({ routes }) => {
 				translatable = translatablePages(routes, graiConfig());
@@ -201,10 +199,13 @@ function requestStrategies(
 
 /**
  * The Vite plugin that serves the modules the integration writes, once Astro's config is done:
- * the project's middleware, and the paths of the pages in a locale's words. In dev, a module whose
- * code changes, as Astro's routes do, is loaded again.
+ * the project's middleware, and the paths of the pages in a locale's words, each written for the
+ * dev server that serves it, if one does. In dev, a module whose code changes, as Astro's routes
+ * do, is loaded again.
  */
-function virtualModules(code: Record<string, () => string | undefined>): {
+function virtualModules(
+	code: Record<string, (dev: ViteDevServer | undefined) => string | undefined>,
+): {
 	plugin: Plugin;
 	changed(id: string): void;
 } {
@@ -217,7 +218,7 @@ function virtualModules(code: Record<string, () => string | undefined>): {
 			},
 			resolveId: (id) => (id in code ? `\0${id}` : null),
 			load: (id) =>
-				id.startsWith("\0") ? (code[id.slice(1)]?.() ?? null) : null,
+				id.startsWith("\0") ? (code[id.slice(1)]?.(server) ?? null) : null,
 		},
 		changed(id) {
 			for (const environment of Object.values(server?.environments ?? {})) {
@@ -262,6 +263,33 @@ function importMaps(
 					[`${chunks}${messageDirectory}/`]: `${chunks}${localeDirectory(locale)}/`,
 				},
 			}),
+		]),
+	);
+}
+
+/**
+ * What each locale's page gets first in its head in dev: the import map from keys.js's dev module,
+ * every locale's words, to that locale's, under the dev server's `base`, and its preload, so the
+ * dev server makes it while the page loads the modules that import it.
+ */
+function devKeys(
+	locales: readonly string[],
+	base: string,
+): Record<string, string> {
+	return Object.fromEntries(
+		locales.map((locale) => [
+			locale,
+			`<script type="importmap">${JSON.stringify({ imports: pageKeysImports(base, locale) })}</script><link rel="modulepreload" href="${pageKeysUrl(base, locale)}">`,
+		]),
+	);
+}
+
+/** Each locale's import map as the script that writes it. */
+function scripts(maps: Record<string, string>): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(maps).map(([locale, map]) => [
+			locale,
+			`<script type="importmap">${map}</script>`,
 		]),
 	);
 }
