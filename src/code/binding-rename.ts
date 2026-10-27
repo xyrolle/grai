@@ -71,9 +71,9 @@ function unescaped(text: string): string {
 	if (!text.includes("\\u")) return text;
 	return text.replace(
 		/\\u(?:\{([0-9a-fA-F]+)\}|([0-9a-fA-F]{4}))/g,
-		(escape, braced: string | undefined, plain: string | undefined) => {
+		(sequence, braced: string | undefined, plain: string | undefined) => {
 			const point = Number.parseInt(braced ?? plain ?? "", 16);
-			return point <= 0x10ffff ? String.fromCodePoint(point) : escape;
+			return point <= 0x10ffff ? String.fromCodePoint(point) : sequence;
 		},
 	);
 }
