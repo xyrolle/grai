@@ -42,13 +42,18 @@ export type ProjectCode = {
 };
 
 /**
- * A project's code under the roots, or the error that keeps its imports from resolving. With a key,
- * only what may read or reach that key is read (`keyNamesOf`), for a command about it alone.
+ * Which files a reading parses: those whose text may name grai's output, or with a key only what
+ * may read or reach that key (`keyNamesOf`), for a command about it alone; or, `every`, each source
+ * under the roots with every import resolved, for a reading that follows the app's module graph
+ * from its entries, through modules that hold nothing of grai's.
  */
+export type ReadingScope = { key?: string | undefined; every?: boolean };
+
+/** A project's code under the roots, or the error that keeps its imports from resolving. */
 export async function readProjectCode(
 	given: Config,
 	roots: readonly string[],
-	key?: string,
+	{ key, every = false }: ReadingScope = {},
 ): Promise<ProjectCode | GraiError> {
 	// Each module named by its real path, as the bundler names it and the resolver resolves it, so a
 	// project reached through a symlink, as macOS reaches its temporary directory, finds its sources
@@ -139,12 +144,12 @@ export async function readProjectCode(
 			resolveFile,
 		);
 		const wanted = (source: string, importer: string) =>
-			test.leads(source, importer) || installed.imports(source);
+			every || test.leads(source, importer) || installed.imports(source);
 		let barrels = new Set<string>();
 		let reached = new Set<string>();
 		for (let round = 0; ; round += 1) {
 			const left = files.filter(({ path }) => !sources.has(path));
-			const taken = test.taken(left, barrels, reached);
+			const taken = every ? left : test.taken(left, barrels, reached);
 			// The imports of the files read that the names found since may name.
 			const again = round > 0 && (await resolutions.again(wanted));
 			// The first round goes on with no file to read, to find the packages the files may import.

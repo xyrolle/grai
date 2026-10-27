@@ -274,6 +274,32 @@ describe("reading a project's facts", () => {
 		expect(cachedPaths(cache)).toEqual([join(dir, "src/b.ts")]);
 	});
 
+	it("reads every source, with every import resolved, when asked to follow the whole module graph", async () => {
+		const { dir, config } = projectWith({
+			"src/page.jsx":
+				'import { Header } from "./header.jsx";\nexport const Page = () => Header();\n',
+			"src/header.jsx":
+				'import { m } from "../out/messages.js";\nexport const Header = () => m.title();\n',
+		});
+
+		const names = await readProjectCode(config, [join(dir, "src")]);
+		const every = await readProjectCode(config, [join(dir, "src")], {
+			every: true,
+		});
+		if (names instanceof GraiError || every instanceof GraiError)
+			throw new Error("unresolved");
+
+		// A file that names nothing of grai's is left out unless every file is asked for.
+		expect([...names.sources.keys()]).toEqual([join(dir, "src/header.jsx")]);
+		expect([...every.sources.keys()].sort()).toEqual([
+			join(dir, "src/header.jsx"),
+			join(dir, "src/page.jsx"),
+		]);
+		expect(
+			await every.graph.resolve("./header.jsx", join(dir, "src/page.jsx")),
+		).toBe(join(dir, "src/header.jsx"));
+	});
+
 	it("keeps the facts of a file a reading leaves out unread, for a reading that reads it again", async () => {
 		const barrel = 'export { m } from "../out/messages.js";\n';
 		const { dir, config } = projectWith({
