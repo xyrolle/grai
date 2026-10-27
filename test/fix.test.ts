@@ -40,6 +40,21 @@ describe("grai check --fix", () => {
 		expect(fixed.removed).toEqual([]);
 	});
 
+	it("keeps a key read through a module's export of a member of a namespace it imports, `export const m = messages.m`", async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/i18n.js":
+				'import * as messages from "../out/messages.js";\nexport const m = messages.m;\n',
+			"src/page.js": 'import { m } from "./i18n.js";\nm.cart_title();\n',
+			"src/total.js":
+				'import { m } from "../out/messages.js";\nm.cart_total({ count: 1 });\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
