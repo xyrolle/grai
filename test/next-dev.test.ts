@@ -324,3 +324,36 @@ export default function About() {
 	).toEqual([["key7"], ["key900", "key901"]]);
 	await stopped(fifth.server);
 });
+
+it("places the keys by the groups saved in the running server at its next catalog edit, and renders the edit", {
+	timeout: 180_000,
+}, async () => {
+	const dir = nextProject(1200, homePage(["key7"], ["key900"]), {
+		withGrai: true,
+	});
+	const { origin } = await started(dir);
+	expect(await requested(origin, "/")).toContain("de key7");
+	await savedGroups(dir, (groups) => groups.length > 0);
+	// Saved, not applied: the running server's output is still shards.
+	expect(moduleOf(dir, "de key7")).toMatch(/^keys\/\d+-/);
+
+	const catalog = join(dir, "messages/de.json");
+	writeFileSync(
+		catalog,
+		JSON.stringify({
+			...JSON.parse(readFileSync(catalog, "utf8")),
+			key7: "de key7, edited",
+		}),
+	);
+
+	const deadline = performance.now() + 60_000;
+	let html = "";
+	while (!html.includes("de key7, edited") && performance.now() < deadline) {
+		html = await (await fetch(`${origin}/`)).text();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	expect(html).toContain("de key7, edited");
+	expect(html).toContain("de key900");
+	expect(moduleOf(dir, "de key7, edited")).toMatch(/^keys\/g0-/);
+	expect(moduleOf(dir, "de key900")).toMatch(/^keys\/g1-/);
+});
