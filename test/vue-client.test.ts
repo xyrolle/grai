@@ -5,7 +5,7 @@ import { chromium } from "playwright-core";
 import { createServer } from "vite";
 import { expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
-import { project } from "./project.ts";
+import { fixtures, project } from "./project.ts";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 
@@ -67,8 +67,7 @@ it("renders again in place, after an edit, the Vue components that called an edi
 		server: {
 			port: 0,
 			fs: { allow: [dir, repository] },
-			// macOS reports files written just before the watcher starts as changed (vite.test.ts).
-			watch: { ignored: ["**/index.html", "**/main.js"] },
+			watch: fixtures,
 		},
 		plugins: [grai()],
 	});

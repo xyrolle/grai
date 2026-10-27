@@ -59,6 +59,25 @@ export type Runtime = {
 	getTextDirection(locale?: string): "ltr" | "rtl";
 };
 
+/**
+ * What a test's dev server leaves Vite's watcher off: the files written just before the server
+ * starts, a project's package.json and tsconfig.json, and a test's page, entry and render module.
+ * macOS reports files written that late as changed once the watcher runs (14 of 20 trials, about
+ * 110 ms after the start). Vite then reloads the page, or keeps the reload for the page that
+ * connects next; for tsconfig.json it also drops every module it evaluated, so a server's program
+ * runs again. Tests edit catalogs and the config only, which Vite still watches, so a test still
+ * sees a reload the plugin would let through.
+ */
+export const fixtures: { ignored: string[] } = {
+	ignored: [
+		"**/index.html",
+		"**/main.js",
+		"**/package.json",
+		"**/render.js",
+		"**/tsconfig.json",
+	],
+};
+
 export function project(
 	catalogs: Record<string, unknown>,
 	config: Record<string, unknown> = {},

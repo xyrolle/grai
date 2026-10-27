@@ -26,18 +26,7 @@ import { withoutContentHash } from "../src/content-names.ts";
 import { requestBytes } from "../src/key-sets.ts";
 import { localeCopies } from "../src/locale-chunks.ts";
 import { grai, graiModules } from "../src/vite.ts";
-import { type Messages, outputFile, project } from "./project.ts";
-
-/**
- * What a test's dev server leaves Vite's watcher off: the page, package and render files the test
- * writes just before the server starts. macOS reports files written that late as changed once the
- * watcher runs (14 of 20 trials, about 110 ms after the start), and Vite reloads the page for
- * them, or keeps the reload for the page that connects next. Tests edit catalogs only, which Vite
- * still watches, so a test still sees a reload the plugin would let through.
- */
-const fixtures = {
-	ignored: ["**/index.html", "**/main.js", "**/package.json", "**/render.js"],
-};
+import { fixtures, type Messages, outputFile, project } from "./project.ts";
 
 /**
  * Where a test's dev server listens: 127.0.0.1 alone, at a port the system picks. On `localhost`

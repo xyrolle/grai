@@ -5,7 +5,7 @@ import { build, createLogger, createServer, type InlineConfig } from "vite";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { grai } from "../src/vite.ts";
 import type { GraiOptions } from "../src/vite-plugin.ts";
-import { project } from "./project.ts";
+import { fixtures, project } from "./project.ts";
 
 const catalogs = {
 	en: { title: "Your cart", checkout: "Checkout" },
@@ -311,7 +311,7 @@ describe("a page's locale, when no server picks it", () => {
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
-			server: { port: 0, watch: { ignored: ["**/index.html", "**/main.js"] } },
+			server: { port: 0, watch: fixtures },
 			plugins: [grai()],
 		});
 		await server.listen();
