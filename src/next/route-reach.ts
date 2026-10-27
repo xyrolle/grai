@@ -59,8 +59,13 @@ export function routeReach(
 					const target = await code.graph.resolve(link.source, next.path);
 					if (target === undefined || !code.sources.has(target)) continue;
 					// An `export *` passes on a name only when its source exports it, and never
-					// `default` or a name the module re-exports by name.
-					const theirs = link.exports === "*" ? await exported(target) : "*";
+					// `default` or a name the module re-exports by name. A client component's module,
+					// crossed into from the server's side, is a client reference there, whose names
+					// Next's bundler does not know: it keeps every such branch (measured in `next dev`).
+					const theirs =
+						link.exports === "*" && (client || !isClientModule(code, target))
+							? await exported(target)
+							: "*";
 					const passed =
 						link.exports === undefined
 							? reexportsOnly
@@ -81,6 +86,16 @@ export function routeReach(
 		}
 		return reached;
 	};
+}
+
+/** Whether a module of the sources opens with "use client". */
+function isClientModule(code: ProjectCode, path: string): boolean {
+	const facts = code.sources.get(path)?.facts;
+	return (
+		facts !== undefined &&
+		!("error" in facts) &&
+		facts.modules.some(({ directives }) => directives.includes("use client"))
+	);
 }
 
 /** The names a module's links re-export by name, which no `export *` beside them passes on. */
