@@ -9,7 +9,7 @@ Every chart here, and the README's, comes from benches anyone can run, on `bench
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/edit-compile-dark.svg">
-  <img alt="One message edited, compiled again: 6,366 keys, grai 7 ms and Paraglide 3.50 s; 13,326 keys, grai 16 ms and Paraglide 11.3 s." src="assets/edit-compile-light.svg" width="480">
+  <img alt="One message edited, compiled again: 6,366 keys, grai 11 ms and Paraglide 4.45 s; 13,326 keys, grai 12 ms and Paraglide 6.32 s." src="assets/edit-compile-light.svg" width="480">
 </picture>
 
 <details>
@@ -17,10 +17,10 @@ Every chart here, and the README's, comes from benches anyone can run, on `bench
 
 |  | keys | one message edited |
 | --- | --- | --- |
-| grai | 6,366 | 7 ms |
-| Paraglide | 6,366 | 3.50 s |
-| grai | 13,326 | 16 ms |
-| Paraglide | 13,326 | 11.3 s |
+| grai | 6,366 | 11 ms |
+| Paraglide | 6,366 | 4.45 s |
+| grai | 13,326 | 12 ms |
+| Paraglide | 13,326 | 6.32 s |
 
 grai compiles again only what the edit changed, from the build it kept; Paraglide compiles everything again, without declarations, as its Vite plugin does on an edit (`bench/compile-time.mjs`).
 </details>
@@ -31,7 +31,7 @@ grai's output is typed: it writes each message's declarations as it compiles. Pa
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/compile-dark.svg">
-  <img alt="Compiling the catalogs: 6,366 keys, grai 95 ms, Paraglide 3.50 s and Paraglide, with declarations 9.16 s; 13,326 keys, grai 290 ms, Paraglide 11.3 s and Paraglide, with declarations 25.1 s." src="assets/compile-light.svg" width="480">
+  <img alt="Compiling the catalogs: 6,366 keys, grai 124 ms, Paraglide 4.45 s and Paraglide, with declarations 9.49 s; 13,326 keys, grai 147 ms, Paraglide 6.32 s and Paraglide, with declarations 13.2 s." src="assets/compile-light.svg" width="480">
 </picture>
 
 <details>
@@ -39,16 +39,16 @@ grai's output is typed: it writes each message's declarations as it compiles. Pa
 
 |  | keys | full compile | nothing changed | one message edited |
 | --- | --- | --- | --- | --- |
-| grai | 6,366 | 95 ms | 1 ms | 7 ms |
-| Paraglide, message modules, without declarations | 6,366 | 3.50 s | the same | the same |
-| Paraglide, message modules, with declarations | 6,366 | 9.16 s | the same | the same |
-| Paraglide, locale modules, with declarations | 6,366 | 92.9 s | the same | the same |
-| grai | 13,326 | 290 ms | 4 ms | 16 ms |
-| Paraglide, message modules, without declarations | 13,326 | 11.3 s | the same | the same |
-| Paraglide, message modules, with declarations | 13,326 | 25.1 s | the same | the same |
-| Paraglide, locale modules, with declarations | 13,326 | 287.8 s | the same | the same |
+| grai | 6,366 | 124 ms | 2 ms | 11 ms |
+| Paraglide, message modules, without declarations | 6,366 | 4.45 s | the same | the same |
+| Paraglide, message modules, with declarations | 6,366 | 9.49 s | the same | the same |
+| Paraglide, locale modules, with declarations | 6,366 | 55.6 s | the same | the same |
+| grai | 13,326 | 147 ms | 2 ms | 12 ms |
+| Paraglide, message modules, without declarations | 13,326 | 6.32 s | the same | the same |
+| Paraglide, message modules, with declarations | 13,326 | 13.2 s | the same | the same |
+| Paraglide, locale modules, with declarations | 13,326 | 225.5 s | the same | the same |
 
-Each compile in a new Node process, timed once its modules have loaded, from no output (`bench/compile-time.mjs`). grai's times are medians of 3, Paraglide 2.29.1's without declarations too, and its compiles with declarations, which go through TypeScript 6, one run each. Paraglide compiles everything again on any change.
+Each compile in a new Node process, timed once its modules have loaded, from no output (`bench/compile-time.mjs`). grai's times are medians of 3, and so are Paraglide 2.29.1's in its message-module layout, without declarations and with them, which go through TypeScript 6. Its locale-module layout with declarations, minutes a compile, is one run each. Paraglide compiles everything again on any change.
 </details>
 
 ### Choosing an ordinal
@@ -316,21 +316,21 @@ Next 16.4.3 with Turbopack, next-intl 4.14.9, a page of 400 messages in a server
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/dev-start-dark.svg">
-  <img alt="A cold Vite dev server, until its page shows: i18next 168 ms, use-intl 183 ms, grai 296 ms and Paraglide 3.78 s." src="assets/dev-start-light.svg" width="480">
+  <img alt="A cold Vite dev server, until its page shows: i18next 201 ms, use-intl 205 ms, grai 297 ms and Paraglide 5.14 s." src="assets/dev-start-light.svg" width="480">
 </picture>
 
 <details>
 <summary>The numbers</summary>
 
-|  | start to page, ms |
-| --- | --- |
-| grai | 296 |
-| Paraglide | 3,782 |
-| i18next | 168 |
-| use-intl | 183 |
-| no messages | 82 |
+|  | start to page, ms | range, ms |
+| --- | --- | --- |
+| grai | 297 | 231–428 |
+| Paraglide | 5,139 | 3,883–12,454 |
+| i18next | 201 | 171–232 |
+| use-intl | 205 | 192–214 |
+| no messages | 93 | 83–202 |
 
-Each library's dev server is made in a new directory, with no output and no cache, and timed until its page of messages shows (`bench/hmr.mjs`). grai's plugin and Paraglide's compile the catalogs as the server starts; i18next and use-intl load the locale's catalog in the page. One start each, in one process, grai's first; the last row is the same page with no messages.
+Each start is a new Node process, its dev server made in a new directory with no output and no cache, timed from the server's creation, once Vite, the plugins and Chromium 156.0.8078.4 have loaded, until its page of 500 messages shows (`bench/dev-start.mjs`). grai's plugin and Paraglide's compile the catalogs as the server starts; i18next and use-intl load the locale's catalog in the page. The libraries take turns in an order that rotates each round, the page with no messages among them, its last row; medians of 7.
 </details>
 
 ### The refactoring commands

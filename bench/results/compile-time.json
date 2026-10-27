@@ -1,6 +1,6 @@
 {
 	"bench": "compile-time",
-	"date": "2026-10-27T14:11:54.937Z",
+	"date": "2026-10-27T15:14:59.822Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,8 +8,8 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 10.8,
-		"end": 23
+		"start": 31.8,
+		"end": 10.5
 	},
 	"node": "24.16.0",
 	"grai": "cee60fe2",
@@ -29,31 +29,31 @@
 			"app": "synthetic, 6,366 keys",
 			"keys": 6366,
 			"grai": {
-				"cold": 94.7,
-				"noop": 1.3,
-				"edit": 7.4
+				"cold": 123.7,
+				"noop": 2,
+				"edit": 11.1
 			},
 			"paraglide": {
-				"message modules, without declarations": 3496.8,
-				"message modules, with declarations": 9157.6,
-				"locale modules, with declarations": 92906.1
+				"message modules, without declarations": 4449.9,
+				"message modules, with declarations": 9490.9,
+				"locale modules, with declarations": 55638.4
 			},
-			"formatjs": 102.5
+			"formatjs": 62.7
 		},
 		{
 			"app": "synthetic, 13,326 keys",
 			"keys": 13326,
 			"grai": {
-				"cold": 289.8,
-				"noop": 4.1,
-				"edit": 15.7
+				"cold": 147.4,
+				"noop": 2,
+				"edit": 11.9
 			},
 			"paraglide": {
-				"message modules, without declarations": 11279.9,
-				"message modules, with declarations": 25077.5,
-				"locale modules, with declarations": 287842.1
+				"message modules, without declarations": 6324.1,
+				"message modules, with declarations": 13211.2,
+				"locale modules, with declarations": 225494
 			},
-			"formatjs": 110
+			"formatjs": 86.7
 		}
 	]
 }
