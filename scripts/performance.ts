@@ -1,6 +1,7 @@
 // A performance smoke check for CI: compiles a synthetic catalog of 20,001 messages (6,667 keys in
 // three locales), then compiles it again unchanged, then edits one message at a time, then runs the
-// built CLI's compile from a fresh process on an empty outdir. It fails when a step takes more than
+// built CLI's compile from a fresh process on an empty outdir, then starts a Vite dev server with
+// grai's plugin in a fresh process on an empty outdir. It fails when a step takes more than
 // twice its baseline, the median of CI's runs, so it catches a regression and not the noise of a
 // shared runner.
 //
@@ -20,13 +21,35 @@ const started = performance.now();
 await compile(process.argv[1]);
 console.log(performance.now() - started);
 `;
+/**
+ * A script that times a dev server's start in a process of its own, from the server's creation, once
+ * Vite and the plugin have loaded, until it has keys.js, every message, for a page to load: the first
+ * compile, and the module the server makes of it. Its root is the project's directory.
+ */
+const devStart = `
+const { createServer } = await import(${JSON.stringify(import.meta.resolve("vite"))});
+const { grai } = await import(${JSON.stringify(new URL("../src/vite.ts", import.meta.url).href)});
+const started = performance.now();
+const server = await createServer({
+	root: process.argv[1],
+	configFile: false,
+	logLevel: "silent",
+	server: { middlewareMode: true, watch: null },
+	plugins: [grai()],
+});
+await server.environments.client.transformRequest("/out/keys.js");
+console.log(performance.now() - started);
+await server.close();
+`;
 
 /**
  * Each step's median time over ten runs on CI's runners, rounded up; the budget is twice it. The
  * runners differ by up to half: a first compile in a fresh process took 145 to 249 ms, a no-op 1.5 to
- * 2.5 ms, an edit 3.7 to 6.1 ms and the CLI 177 to 273 ms.
+ * 2.5 ms, an edit 3.7 to 6.1 ms and the CLI 177 to 273 ms. The dev server's start has no runs on CI
+ * yet: its baseline is its median on an M5 Pro, 119 ms, times the ratio of CI's first compile to
+ * that machine's, 200 to 81 ms.
  */
-const baselines = { cold: 200, noop: 2, edit: 4, process: 240 };
+const baselines = { cold: 200, noop: 2, edit: 4, process: 240, dev: 300 };
 const keys = 6667;
 /** Runs made before the timed ones of a step, while the engine still optimizes it. */
 const warmupRuns = 10;
@@ -37,6 +60,7 @@ const warmupRuns = 10;
 const timedEdits = 31;
 const timedNoops = 31;
 const timedProcesses = 3;
+const timedDevStarts = 3;
 /** A first compile is timed in fresh processes, each compile then the first in its process. */
 const timedColds = 3;
 
@@ -150,11 +174,23 @@ try {
 		);
 	});
 
+	const dev = await median(timedDevStarts, async () => {
+		rmSync(join(dir, "out"), { recursive: true, force: true });
+		return Number(
+			execFileSync(
+				process.execPath,
+				["--input-type=module", "-e", devStart, dir],
+				{ encoding: "utf8" },
+			),
+		);
+	});
+
 	const steps: [string, number, number][] = [
 		["cold", cold, baselines.cold],
 		["noop", noop, baselines.noop],
 		["edit", edit, baselines.edit],
 		["process", fresh, baselines.process],
+		["dev", dev, baselines.dev],
 	];
 	let failed = false;
 	for (const [step, measured, baseline] of steps) {
