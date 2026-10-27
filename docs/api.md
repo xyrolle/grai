@@ -17,6 +17,10 @@ The compiler, for a build script or a bundler grai has no adapter for.
 - `graiModules(options?: { config?: string }): (id: string) => GraiModuleKind | undefined`: for a tool that reads a client build's chunks, the kind of grai's module an id is, or `undefined` for any other. `config` is the path of `grai.config.json`, from the working directory.
 - `type GraiModuleKind = "runtime" | "config" | "plurals" | "formats" | "key" | "text"`: the first four go to the `grai-runtime` chunk, `key` and `text` to the message chunks under `grai/`.
 
+## `grai/register`
+
+- Loaded with `node --import grai/register`, it gives each key's own path, `…/messages/<key>.js` mapped to the output's keys.js, a module of that key alone in Node, as `grai/vite` does in a build and a test run. A key no catalog has fails the import with a `key-missing` GraiError. It exports nothing.
+
 ## `grai/svelte`
 
 - `grai(options?: { config?: string; reloadOnEdit?: boolean }): Plugin[]`: `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. List it before `sveltekit()` or `svelte()`. It needs `svelte` and `magic-string`.
