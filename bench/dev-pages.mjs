@@ -182,7 +182,10 @@ function timingPlugin(catalogFile, timings) {
 
 /**
  * The page's module per design: it draws its calls' texts, the first into the target an edit
- * changes, and draws them again on an update.
+ * changes, and draws them again on an update. Once they are in the DOM, it sets `window.ready`,
+ * and the time of that and of the frame drawn after it as `window.shown`, by the page's clock:
+ * `ready`, then `painted` once a task queued from that frame's animation callback runs, after the
+ * frame's style, layout and paint.
  */
 function pageModule(design, locale, page) {
 	const lang = JSON.stringify(locale);
@@ -237,6 +240,12 @@ ${accept(`./messages/${locale}.json`, `t = createTranslator({ locale: ${lang}, m
 new MutationObserver(() => { window.changed = { at: performance.timeOrigin + performance.now(), text: document.getElementById("target").textContent }; })
 	.observe(document.getElementById("target"), { childList: true, characterData: true, subtree: true });
 window.ready = true;
+const ready = performance.timeOrigin + performance.now();
+requestAnimationFrame(() => {
+	const after = new MessageChannel();
+	after.port1.onmessage = () => { window.shown = { ready, painted: performance.timeOrigin + performance.now() }; };
+	after.port2.postMessage(null);
+});
 `;
 }
 
