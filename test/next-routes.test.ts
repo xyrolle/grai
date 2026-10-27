@@ -48,4 +48,28 @@ describe("a Next app's routes", () => {
 			["proxy.ts"],
 		]);
 	});
+
+	it("takes a route's files by the app's page extensions, a multi-part one too", () => {
+		const dir = realpathSync(mkdtempSync(join(tmpdir(), "grai-routes-")));
+		onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+		for (const file of [
+			"app/layout.page.tsx",
+			"app/page.page.tsx",
+			"app/page.tsx",
+			"app/about/page.page.ts",
+			"app/about/parts.page.tsx",
+		]) {
+			mkdirSync(dirname(join(dir, file)), { recursive: true });
+			writeFileSync(join(dir, file), "");
+		}
+
+		const routes = nextRoutes(dir, ["page.tsx", "page.ts"]).map(({ files }) =>
+			files.map((file) => relative(dir, file)),
+		);
+
+		expect(routes).toEqual([
+			["app/page.page.tsx", "app/layout.page.tsx"],
+			["app/about/page.page.ts", "app/layout.page.tsx"],
+		]);
+	});
 });
