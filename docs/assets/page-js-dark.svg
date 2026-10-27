@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>A page of 2,000 messages: its JS</title>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">A page of 2,000 messages: its JS</text>
+<text x="16" y="44" font-size="13" fill="#c3c2b7">KB brotli, the page's own code and its messages included;</text>
+<text x="16" y="61" font-size="13" fill="#c3c2b7">lower is better</text>
+<line x1="99" y1="82" x2="99" y2="214" stroke="#383835" stroke-width="1"/>
+<text x="99" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="195.3" y1="82" x2="195.3" y2="214" stroke="#2c2c2a" stroke-width="1"/>
+<text x="195.3" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">50</text>
+<line x1="291.7" y1="82" x2="291.7" y2="214" stroke="#2c2c2a" stroke-width="1"/>
+<text x="291.7" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">100</text>
+<line x1="388" y1="82" x2="388" y2="214" stroke="#2c2c2a" stroke-width="1"/>
+<text x="388" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">150</text>
+<text x="89" y="103" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M99,91H138.5A4,4 0 0 1 142.5,95V101A4,4 0 0 1 138.5,105H99Z" fill="#3987e5"/>
+<text x="148.5" y="103" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">22.6 KB</text>
+<text x="89" y="135" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
+<path d="M99,123H165.7A4,4 0 0 1 169.7,127V133A4,4 0 0 1 165.7,137H99Z" fill="#898781"/>
+<text x="175.7" y="135" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">36.7 KB</text>
+<text x="89" y="167" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
+<path d="M99,155H339.9A4,4 0 0 1 343.9,159V165A4,4 0 0 1 339.9,169H99Z" fill="#898781"/>
+<text x="349.9" y="167" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">127.1 KB</text>
+<text x="89" y="199" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
+<path d="M99,187H344A4,4 0 0 1 348,191V197A4,4 0 0 1 344,201H99Z" fill="#898781"/>
+<text x="354" y="199" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">129.2 KB</text>
+<text x="388" y="251" font-size="12" text-anchor="end" fill="#c3c2b7">KB, brotli</text>
+</svg>

@@ -1,0 +1,45 @@
+{
+	"bench": "refactor-synthetic",
+	"date": "2026-10-27T13:09:19.440Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 14,
+		"end": 12.7
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"runs": 3,
+	"rows": {
+		"check": {
+			"cold": 2493.2,
+			"warm": 512.7
+		},
+		"find": {
+			"cold": 2753.2,
+			"warm": 384.9
+		},
+		"rename": {
+			"cold": 2589.1,
+			"warm": 493.5
+		},
+		"check --fix": {
+			"cold": 2386.4,
+			"warm": 486.6
+		}
+	}
+}

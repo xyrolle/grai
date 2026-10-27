@@ -1,0 +1,245 @@
+{
+	"bench": "build-added",
+	"date": "2026-10-27T13:20:42.285Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 18.6,
+		"end": 15.4
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"runs": 5,
+	"rows": [
+		{
+			"app": "synthetic, 6,366 keys",
+			"keys": 6366,
+			"calls": 6366,
+			"stub": {
+				"build": 29.9,
+				"runs": [
+					27.5,
+					28.7,
+					29.9,
+					34.2,
+					38.5
+				]
+			},
+			"grai": {
+				"build": 594,
+				"added": 564.1,
+				"compile": 136.9,
+				"rest": 427.2,
+				"hooks": [
+					[],
+					[],
+					[],
+					[],
+					[]
+				],
+				"runs": {
+					"builds": [
+						525.5,
+						500.4,
+						687.6,
+						594,
+						761.2
+					],
+					"compiles": [
+						104,
+						122.2,
+						136.9,
+						213.6,
+						156
+					]
+				}
+			},
+			"paraglide": {
+				"build": 5594.8,
+				"added": 5564.9,
+				"compile": 5623.2,
+				"rest": -58.3,
+				"hooks": [
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 4300,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 5400,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 4900,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 5500,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 5700,
+							"calls": 1
+						}
+					]
+				],
+				"runs": {
+					"builds": [
+						4496.1,
+						5594.8,
+						5068.8,
+						5701.2,
+						6055.5
+					],
+					"compiles": [
+						4075.8,
+						5060.4,
+						5623.2,
+						5633.3,
+						5958.1
+					]
+				}
+			}
+		},
+		{
+			"app": "synthetic, 13,326 keys",
+			"keys": 13326,
+			"calls": 13326,
+			"stub": {
+				"build": 28.1,
+				"runs": [
+					59.8,
+					28.1,
+					30.2,
+					22.5,
+					19
+				]
+			},
+			"grai": {
+				"build": 1148.9,
+				"added": 1120.8,
+				"compile": 191,
+				"rest": 929.7,
+				"hooks": [
+					[],
+					[],
+					[],
+					[],
+					[]
+				],
+				"runs": {
+					"builds": [
+						1126,
+						2910.6,
+						1847.7,
+						1021,
+						1148.9
+					],
+					"compiles": [
+						267.6,
+						184.8,
+						262.4,
+						191,
+						153.4
+					]
+				}
+			},
+			"paraglide": {
+				"build": 9815.8,
+				"added": 9787.7,
+				"compile": 9109.7,
+				"rest": 677.9,
+				"hooks": [
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 10800,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 14000,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 9400,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 8300,
+							"calls": 1
+						}
+					],
+					[
+						{
+							"plugin": "unplugin-paraglide-js",
+							"hook": "buildStart",
+							"ms": 8900,
+							"calls": 1
+						}
+					]
+				],
+				"runs": {
+					"builds": [
+						11379.3,
+						14569.4,
+						9815.8,
+						8709.5,
+						9324.7
+					],
+					"compiles": [
+						16768.6,
+						9249.9,
+						9109.7,
+						7863.5,
+						8095
+					]
+				}
+			}
+		}
+	]
+}

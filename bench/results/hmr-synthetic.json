@@ -1,0 +1,103 @@
+{
+	"bench": "hmr-synthetic",
+	"date": "2026-10-27T13:17:05.321Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 9.8,
+		"end": 20.4
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 6,366 keys",
+	"edits": 20,
+	"chromium": "156.0.8078.4",
+	"rows": [
+		{
+			"design": "grai's plugin",
+			"pageLoad": 127.5,
+			"editToPage": 14.9,
+			"editToServer": 13,
+			"heap": {
+				"load": 8204732,
+				"edits": 8326516
+			}
+		},
+		{
+			"design": "whole",
+			"pageLoad": 196.4,
+			"editToPage": 255.7,
+			"heap": {
+				"load": 15661592,
+				"edits": 336952340
+			}
+		},
+		{
+			"design": "patch",
+			"pageLoad": 178,
+			"editToPage": 34.1,
+			"heap": {
+				"load": 15733396,
+				"edits": 16178736
+			}
+		},
+		{
+			"design": "patch, fs.watch",
+			"pageLoad": 204.8,
+			"editToPage": 14.9,
+			"heap": {
+				"load": 15733396,
+				"edits": 16183260
+			}
+		},
+		{
+			"design": "paraglide",
+			"pageLoad": 901.1,
+			"editToPage": 4575.8,
+			"heap": {
+				"load": 57982868,
+				"edits": 1029185216
+			}
+		},
+		{
+			"design": "i18next",
+			"pageLoad": 93.1,
+			"editToPage": 86.6,
+			"heap": {
+				"load": 7134476,
+				"edits": 116186936
+			}
+		},
+		{
+			"design": "use-intl",
+			"pageLoad": 155.5,
+			"editToPage": 75.7,
+			"heap": {
+				"load": 6943884,
+				"edits": 113215916
+			}
+		},
+		{
+			"design": "no messages",
+			"pageLoad": 69.9,
+			"heap": {
+				"load": 1458040,
+				"edits": 1458040
+			}
+		}
+	]
+}

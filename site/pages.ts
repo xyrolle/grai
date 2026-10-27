@@ -20,8 +20,10 @@ type Page = {
 };
 
 const pages: readonly Page[] = [
-	{ route: "", title: "grai", from: ["", "Install", "Usage"] },
-	{ route: "config", title: "Config", from: ["Config"] },
+	{ route: "", title: "grai", from: ["", "Why grai", "Quick start"] },
+	{ route: "guide", title: "Guide", from: "docs/guide.md" },
+	{ route: "frameworks", title: "Frameworks", from: "docs/frameworks.md" },
+	{ route: "config", title: "Config", from: "docs/config.md" },
 	{ route: "api", title: "API", from: "docs/api.md" },
 	{
 		route: "migrating",
@@ -38,8 +40,8 @@ const pages: readonly Page[] = [
 		title: "From i18next, next-intl or FormatJS",
 		from: "docs/migrating.md",
 	},
-	{ route: "measured", title: "Measured", from: ["Measured"] },
-	{ route: "limitations", title: "Limitations", from: ["Limitations"] },
+	{ route: "measured", title: "Measured", from: "docs/benchmarks.md" },
+	{ route: "limitations", title: "Limitations", from: "docs/limitations.md" },
 ];
 
 function read(file: string): string {

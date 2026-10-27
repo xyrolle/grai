@@ -2,7 +2,7 @@ import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightLinksValidator from "starlight-links-validator";
 
-// grai's docs site: the README's sections and the docs they point to, as pages.ts writes them.
+// grai's docs site: the README's first sections and the docs they point to, as pages.ts writes them.
 // The links validator fails the build on a link to a page or a heading that is not there.
 export default defineConfig({
 	integrations: [
@@ -18,6 +18,8 @@ export default defineConfig({
 			plugins: [starlightLinksValidator()],
 			sidebar: [
 				{ label: "Getting started", link: "/" },
+				"guide",
+				"frameworks",
 				"config",
 				"api",
 				{

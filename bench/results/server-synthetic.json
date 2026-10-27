@@ -1,0 +1,228 @@
+{
+	"bench": "server-synthetic",
+	"date": "2026-10-27T13:11:43.389Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 12.7,
+		"end": 12.9
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 6,366 keys",
+	"calls": 2000,
+	"mix": {
+		"text": 1318,
+		"inputs": 493,
+		"plural": 104,
+		"markup": 85
+	},
+	"rows": [
+		{
+			"variant": "Paraglide `m.key()`",
+			"locale": "ro",
+			"ns": {
+				"text": 22,
+				"inputs": 55,
+				"plural": 598.2,
+				"markup": 74.5,
+				"page": 103
+			}
+		},
+		{
+			"variant": "Paraglide `m.key(i, { locale })`",
+			"locale": "ro",
+			"ns": {
+				"text": 11.4,
+				"inputs": 19.3,
+				"plural": 535.9,
+				"markup": 51.7,
+				"page": 47
+			}
+		},
+		{
+			"variant": "grai `m.key()`",
+			"locale": "ro",
+			"ns": {
+				"text": 14.6,
+				"inputs": 25.4,
+				"plural": 39.8,
+				"markup": 98.5,
+				"page": 20.7
+			}
+		},
+		{
+			"variant": "grai `m.key(i, { locale })`",
+			"locale": "ro",
+			"ns": {
+				"text": 11.2,
+				"inputs": 17.7,
+				"plural": 17.4,
+				"markup": 66.1,
+				"page": 26.3
+			}
+		},
+		{
+			"variant": "i18next `t(key, values)`",
+			"locale": "ro",
+			"ns": {
+				"text": 1232.2,
+				"inputs": 1580.3,
+				"plural": 2571.3,
+				"page": 1500.8
+			}
+		},
+		{
+			"variant": "use-intl `t(key, values)`, `t.markup`",
+			"locale": "ro",
+			"ns": {
+				"text": 2316.2,
+				"inputs": 3725.9,
+				"plural": 3402.6,
+				"markup": 2573.8,
+				"page": 2987.3
+			}
+		},
+		{
+			"variant": "Paraglide `getLocale()` alone",
+			"locale": "ro",
+			"ns": {
+				"text": 16.6,
+				"inputs": 18.7,
+				"plural": 17,
+				"markup": 16,
+				"page": 16.6
+			}
+		},
+		{
+			"variant": "prototype, dispatcher per key, ALS",
+			"locale": "ro",
+			"ns": {
+				"text": 56.8,
+				"inputs": 49.7,
+				"plural": 97.2,
+				"page": 45.3
+			}
+		},
+		{
+			"variant": "prototype, dispatcher per key, module variable",
+			"locale": "ro",
+			"ns": {
+				"text": 5.6,
+				"inputs": 12.6,
+				"plural": 57.2,
+				"page": 8.7
+			}
+		},
+		{
+			"variant": "Paraglide `m.key()`",
+			"locale": "ru",
+			"ns": {
+				"text": 31.7,
+				"inputs": 44,
+				"plural": 484,
+				"markup": 75.1,
+				"page": 123.3
+			}
+		},
+		{
+			"variant": "Paraglide `m.key(i, { locale })`",
+			"locale": "ru",
+			"ns": {
+				"text": 14.3,
+				"inputs": 22.1,
+				"plural": 465.2,
+				"markup": 53.7,
+				"page": 49.6
+			}
+		},
+		{
+			"variant": "grai `m.key()`",
+			"locale": "ru",
+			"ns": {
+				"text": 15.9,
+				"inputs": 24.4,
+				"plural": 42.3,
+				"markup": 72.8,
+				"page": 41.5
+			}
+		},
+		{
+			"variant": "grai `m.key(i, { locale })`",
+			"locale": "ru",
+			"ns": {
+				"text": 10.1,
+				"inputs": 17.3,
+				"plural": 20.2,
+				"markup": 88.7,
+				"page": 43.9
+			}
+		},
+		{
+			"variant": "i18next `t(key, values)`",
+			"locale": "ru",
+			"ns": {
+				"text": 1317.6,
+				"inputs": 1665.8,
+				"plural": 2488.4,
+				"page": 2785.9
+			}
+		},
+		{
+			"variant": "use-intl `t(key, values)`, `t.markup`",
+			"locale": "ru",
+			"ns": {
+				"text": 3114.3,
+				"inputs": 2913.8,
+				"plural": 4546.6,
+				"markup": 2801.7,
+				"page": 4649.7
+			}
+		},
+		{
+			"variant": "Paraglide `getLocale()` alone",
+			"locale": "ru",
+			"ns": {
+				"text": 17.4,
+				"inputs": 18,
+				"plural": 18.7,
+				"markup": 18.1,
+				"page": 27.6
+			}
+		},
+		{
+			"variant": "prototype, dispatcher per key, ALS",
+			"locale": "ru",
+			"ns": {
+				"text": 43.8,
+				"inputs": 74.8,
+				"plural": 134.6,
+				"page": 183.6
+			}
+		},
+		{
+			"variant": "prototype, dispatcher per key, module variable",
+			"locale": "ru",
+			"ns": {
+				"text": 5.4,
+				"inputs": 28.9,
+				"plural": 89.9,
+				"page": 26.7
+			}
+		}
+	]
+}
