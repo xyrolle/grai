@@ -1,15 +1,14 @@
-import { randomUUID } from "node:crypto";
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { deserialize, serialize } from "node:v8";
 import type { Catalog } from "./catalog.ts";
 import type { Compilation } from "./compilation.ts";
 import { type Build, buildKey, type CompileOptions } from "./compile.ts";
-import { type Config, isMissing, readConfig } from "./config.ts";
+import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
-import { isAlive } from "./output-lock.ts";
 import { stateDirectory } from "./state-directory.ts";
+import { ignoreMissing, saveState, savingFile } from "./state-saves.ts";
 
 /**
  * A build as saved: every field of it but its key, which heads the file, and of each catalog every
@@ -34,37 +33,15 @@ type SavedCatalog = Omit<Catalog, "revision" | "edit">;
 const savedName = "build";
 
 /**
- * The file one save writes to before it renames it into place, created for that save alone. Not a
- * `.tmp` file: a compile under the output's lock removes those as left by a compile that stopped
- * halfway, and a save does not take the lock, which would hold up an edit's compile while 22 MB are
- * written. Its own file for each save, not for each process: two watchers of an outdir in one
- * process saved through one file at once, and the build renamed into place could be part of each,
- * whole enough to read and to render the old words. The pid in its name lets the next save remove
- * one that a crash left, once its process is gone (`removeStaleSaves`).
- */
-export function savingFile(state: string, pid: number = process.pid): string {
-	return join(state, `${savedName}.${pid}.${randomUUID()}.saving`);
-}
-const savingName = new RegExp(
-	`^${savedName}\\.(\\d+)\\.[0-9a-f-]{36}\\.saving$`,
-);
-
-/**
  * Saves a build for the next process's first compile, as V8 serializes it, in a file beside the
- * manifest. The file is written whole to a `savingFile` of this save's own, which it creates and
- * no other save opens, and then renamed into place, so a reader sees one build or another, never
- * part of one, whichever save renamed last.
+ * manifest, through a file of this save's own (`saveState`).
  */
 export async function saveBuild(build: Build): Promise<void> {
-	const { temporary, file, bytes } = savedFile(build);
-	await removeStaleSaves(dirname(file));
-	try {
-		await writeFile(temporary, bytes, { flag: "wx" });
-		await rename(temporary, file);
-	} catch (error) {
-		await unlink(temporary).catch(ignoreMissing);
-		throw error;
-	}
+	await saveState(
+		join(build.config.outdir, stateDirectory),
+		savedName,
+		savedBytes(build),
+	);
 }
 
 /**
@@ -72,10 +49,11 @@ export async function saveBuild(build: Build): Promise<void> {
  * promise. It leaves any stale save to the next `saveBuild`.
  */
 export function saveBuildNow(build: Build): void {
-	const { temporary, file, bytes } = savedFile(build);
+	const state = join(build.config.outdir, stateDirectory);
+	const temporary = savingFile(state, savedName);
 	try {
-		writeFileSync(temporary, bytes, { flag: "wx" });
-		renameSync(temporary, file);
+		writeFileSync(temporary, savedBytes(build), { flag: "wx" });
+		renameSync(temporary, join(state, savedName));
 	} catch (error) {
 		try {
 			unlinkSync(temporary);
@@ -86,27 +64,8 @@ export function saveBuildNow(build: Build): void {
 	}
 }
 
-/** Removes the saves that processes no longer running left halfway, as when one crashed. */
-async function removeStaleSaves(state: string): Promise<void> {
-	const names = await readdir(state).catch((error: unknown) => {
-		if (isMissing(error)) return [];
-		throw error;
-	});
-	await Promise.all(
-		names.map(async (name) => {
-			const pid = Number(savingName.exec(name)?.[1]);
-			if (!Number.isInteger(pid) || pid === process.pid || isAlive(pid)) return;
-			await unlink(join(state, name)).catch(ignoreMissing);
-		}),
-	);
-}
-
-/** A build's saved file: its bytes, its path, and the path it is written to first. */
-function savedFile(build: Build): {
-	temporary: string;
-	file: string;
-	bytes: Buffer;
-} {
+/** A build's bytes as saved: its key, the length of the rest, and the rest as V8 serializes it. */
+function savedBytes(build: Build): Buffer {
 	const { key, parts, catalogs, compilation, ...rest } = build;
 	const savedOf = new Map<Catalog, SavedCatalog>();
 	const save = (catalog: Catalog) => {
@@ -120,13 +79,8 @@ function savedFile(build: Build): {
 		catalogs: catalogs.map(save),
 		compilation: { ...compilation, catalogs: compilation.catalogs.map(save) },
 	};
-	const state = join(build.config.outdir, stateDirectory);
 	const payload = serialize(saved);
-	return {
-		temporary: savingFile(state),
-		file: join(state, savedName),
-		bytes: Buffer.concat([Buffer.from(`${key}\n${payload.length}\n`), payload]),
-	};
+	return Buffer.concat([Buffer.from(`${key}\n${payload.length}\n`), payload]);
 }
 
 /**
@@ -204,8 +158,4 @@ function withoutRevision({
 	...catalog
 }: Catalog): SavedCatalog {
 	return catalog;
-}
-
-function ignoreMissing(error: unknown): void {
-	if (!isMissing(error)) throw error;
 }
