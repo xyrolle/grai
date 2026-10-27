@@ -1,7 +1,8 @@
 // Browser: the message-heavy page (page.mjs) server-rendered, then loaded and hydrated in Chromium,
 // with its messages from Paraglide's client runtime; from grai's client build, its locale's copies
-// or every locale's chunks (browser-bundle.mjs); from i18next or use-intl with the locale's whole
-// catalog in the bundle; or inlined into the template by the prototype. Each run is a fresh page
+// or every locale's chunks (browser-bundle.mjs); from i18next or use-intl with the page's own keys
+// in the bundle, as both advise, or with the locale's whole catalog; or inlined into the template
+// by the prototype. Each run is a fresh page
 // with the whole bundle inline, so nothing but parsing, evaluating and hydrating is timed; runs
 // alternate between variants. After hydrating, the page mounts itself again, the client work of a
 // locale switch that does not reload.
@@ -16,7 +17,13 @@ import { browserBundle } from "./browser-bundle.mjs";
 import { benchDocument, benchPage } from "./chromium.mjs";
 import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
-import { PAGE_CALLS, pageProps, pageSource, writePage } from "./page.mjs";
+import {
+	PAGE_CALLS,
+	pageKeys,
+	pageProps,
+	pageSource,
+	writePage,
+} from "./page.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
@@ -42,7 +49,19 @@ window.bench = { started, evaluated, hydrated, mounted: performance.now() - unmo
 
 async function variants(app, locale) {
 	const grai = join((await graiOutput(app)).outdir, "keys.js");
-	const { directory: libraries } = writeLibraryModules(app, locale);
+	const translators = (options) =>
+		writeLibraryModules(app, locale, options).directory;
+	const page = translators({ keys: pageKeys(app), set: "page" });
+	const whole = translators();
+	const i18next = (directory) => ({
+		from: join(directory, `${locale}.i18next.js`),
+		translate: true,
+		values: (call) => i18nextValues(app, call.key, call.inputs),
+	});
+	const intl = (directory) => ({
+		from: join(directory, `${locale}.use-intl.js`),
+		translate: true,
+	});
 	return {
 		Paraglide: { from: join(await paraglideOutput(app), "messages/_index.js") },
 		"grai, the locale's copies": { from: grai, grai: { app, locale } },
@@ -51,15 +70,10 @@ async function variants(app, locale) {
 			from: join(writePrototype(app), `${locale}.js`),
 			inline: app.messages[locale],
 		},
-		i18next: {
-			from: join(libraries, `${locale}.i18next.js`),
-			translate: true,
-			values: (call) => i18nextValues(app, call.key, call.inputs),
-		},
-		"use-intl": {
-			from: join(libraries, `${locale}.use-intl.js`),
-			translate: true,
-		},
+		i18next: i18next(page),
+		"use-intl": intl(page),
+		"i18next, the locale's whole catalog": i18next(whole),
+		"use-intl, the locale's whole catalog": intl(whole),
 	};
 }
 
