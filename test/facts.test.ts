@@ -74,7 +74,7 @@ describe("a file's facts", () => {
 			"m export",
 			"m typed@typed<m.typed> value type",
 		]);
-		expect(module.aliases).toEqual({ t: "m" });
+		expect(module.aliases).toEqual({ t: { local: "m", members: [] } });
 	});
 
 	it("reads imports, exports, and loads by a literal path, a template or a glob", async () => {
@@ -133,7 +133,7 @@ describe("a file's facts", () => {
 			"#i18n/messages/*.js",
 			"./five",
 		]);
-		expect(module.aliases).toEqual({ e: "a" });
+		expect(module.aliases).toEqual({ e: { local: "a", members: [] } });
 	});
 
 	it("reads a component's facts at the places in its file", async () => {

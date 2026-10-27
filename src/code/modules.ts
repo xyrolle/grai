@@ -59,9 +59,17 @@ export class ModuleGraph {
 	}
 
 	/** What a value read by `name` from another is: a module object's export, or a namespace's key. */
-	async member(value: Value, name: string): Promise<Value | undefined> {
-		if (value.kind === "module")
-			return this.exported(value.path, name, new Set());
+	member(value: Value, name: string): Promise<Value | undefined> {
+		return this.memberOf(value, name, new Set());
+	}
+
+	/** `member`, within a resolution that follows the names in `seen`. */
+	private async memberOf(
+		value: Value,
+		name: string,
+		seen: ReadonlySet<string>,
+	): Promise<Value | undefined> {
+		if (value.kind === "module") return this.exported(value.path, name, seen);
 		return value.kind === "namespace" ? { kind: "key", key: name } : undefined;
 	}
 
@@ -194,14 +202,23 @@ export class ModuleGraph {
 					? undefined
 					: this.exported(target, fact.imported, seen);
 			}
-			const local = module.aliases[fact.local] ?? fact.local;
+			const { local, members } = module.aliases[fact.local] ?? {
+				local: fact.local,
+				members: [],
+			};
 			for (const { source, names } of module.imports) {
 				const imported = names.find((each) => each.local === local);
 				if (imported === undefined) continue;
 				const target = await this.resolve(source, path);
-				return target === undefined
-					? undefined
-					: this.exported(target, imported.imported, seen);
+				let value =
+					target === undefined
+						? undefined
+						: await this.exported(target, imported.imported, seen);
+				for (const member of members) {
+					if (value === undefined) break;
+					value = await this.memberOf(value, member, seen);
+				}
+				return value;
 			}
 			return undefined;
 		}
