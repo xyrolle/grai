@@ -2,7 +2,7 @@ import { messageEntries } from "./catalog-entries.ts";
 import { keyOf } from "./catalog-keys.ts";
 import { readProjectCode } from "./code/project.ts";
 import { readingOf } from "./code/reads.ts";
-import { codeProblems, mayReach, unknownReads } from "./code-problems.ts";
+import { mayReach, readErrors } from "./code-problems.ts";
 import { parseCatalogs, readProject } from "./compile.ts";
 import { GraiError } from "./error.ts";
 import { compileOutputIfMissing } from "./output-present.ts";
@@ -45,7 +45,7 @@ export async function find(
 	};
 	const read = await readProject(configFile);
 	if ("errors" in read) return { ...found, errors: read.errors };
-	const { catalogs, errors } = parseCatalogs(read.sources);
+	const { errors } = parseCatalogs(read.sources);
 	if (errors.length > 0) return { ...found, errors };
 	for (const { file, bytes } of read.sources) {
 		const text = bytes.toString("utf8");
@@ -60,10 +60,7 @@ export async function find(
 	const code = await readProjectCode(config, roots ?? [config.root], key);
 	if (code instanceof GraiError) return { ...found, errors: [code] };
 	const reading = await readingOf(code);
-	const keys = new Set(
-		catalogs.flatMap(({ messages }) => [...messages.keys()]),
-	);
-	found.errors.push(...unknownReads(codeProblems(reading, keys, config)));
+	found.errors.push(...readErrors(reading));
 	const sites = new Map<string, FoundLine & { at: number }>();
 	const site = ({ file, text }: { file: string; text: string }, at: number) =>
 		sites.set(`${file}\0${at}`, { ...foundLine(file, text, at), at });
