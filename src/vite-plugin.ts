@@ -83,10 +83,14 @@ const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro|mdx)$/;
  *   build has loaded every module.
  * - `frameworkBase`: the base path the framework serves the app under, as its config writes it,
  *   which must be grai's `basePath` under the `url` strategy; undefined where it names none.
+ * - `indexHtml`: whether Vite serves the app's pages, from its index.html files, which then get
+ *   their locale script. A framework that draws its own pages never runs Vite's
+ *   `transformIndexHtml` hook, and SvelteKit warns of a plugin that has one.
  */
 export type GraiAdapter = {
 	pageEntries?: () => Iterable<readonly string[]>;
 	frameworkBase?: (config: ResolvedConfig) => FrameworkBase | undefined;
+	indexHtml?: boolean;
 };
 
 /** Vite's own base, for an app Vite alone serves; none for a relative base, which names no path. */
@@ -219,22 +223,6 @@ export function graiPlugin(
 				copies: options.localeChunks === true,
 			};
 			logger = resolved.logger;
-		},
-		transformIndexHtml: {
-			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
-			order: "post",
-			handler(html, context) {
-				const config = build?.config ?? readConfig(files.configFile);
-				const page = withPageLocale(html, context, config, site);
-				const unreported = page.hashes.filter((hash) => !reported.has(hash));
-				if (context.bundle !== undefined && unreported.length > 0) {
-					for (const hash of unreported) reported.add(hash);
-					logger?.info(
-						`grai: a Content Security Policy that allows scripts by hash needs ${unreported.join(" ")} in script-src, for the locale script and its import maps.`,
-					);
-				}
-				return page.html;
-			},
 		},
 		outputOptions(output) {
 			// grai's groups join each output as Vite resolved it, and none that splits no code
@@ -473,8 +461,30 @@ export function graiPlugin(
 			if (every) read.computed.add(id);
 		},
 	});
+	const pageLocale: Plugin = {
+		name: "grai:page-locale",
+		transformIndexHtml: {
+			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
+			order: "post",
+			handler(html, context) {
+				const config = build?.config ?? readConfig(files.configFile);
+				const page = withPageLocale(html, context, config, site);
+				const unreported = page.hashes.filter((hash) => !reported.has(hash));
+				if (context.bundle !== undefined && unreported.length > 0) {
+					for (const hash of unreported) reported.add(hash);
+					logger?.info(
+						`grai: a Content Security Policy that allows scripts by hash needs ${unreported.join(" ")} in script-src, for the locale script and its import maps.`,
+					);
+				}
+				return page.html;
+			},
+		},
+	};
 	return {
-		plugins: [reads, plugin],
+		plugins:
+			adapter.indexHtml === true
+				? [reads, plugin, pageLocale]
+				: [reads, plugin],
 		build: () => build,
 		reading: (environment) => readings.get(environment),
 	};

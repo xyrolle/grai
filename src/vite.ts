@@ -20,10 +20,11 @@ export type { GraiModuleKind };
  * locale's copies (`vite-html.ts`, `runtime/page-locale.js`). A server build puts the keys that
  * entries share in one chunk, since a server loads each chunk as a module of its own
  * (`server-chunks.ts`). A build reads each module's messages before any other plugin transforms it
- * (`vite-reads.ts`), so it is two plugins.
+ * (`vite-reads.ts`), and the locale script is a plugin of its own, so it is three plugins.
  */
 export function grai(options: GraiOptions = {}): Plugin[] {
-	return graiPlugin(options, { frameworkBase: viteBase }).plugins;
+	return graiPlugin(options, { frameworkBase: viteBase, indexHtml: true })
+		.plugins;
 }
 
 /**
