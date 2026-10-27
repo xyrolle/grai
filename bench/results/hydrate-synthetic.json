@@ -1,6 +1,6 @@
 {
 	"bench": "hydrate-synthetic",
-	"date": "2026-10-27T13:13:08.128Z",
+	"date": "2026-10-27T14:46:03.082Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,8 +8,8 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 12.9,
-		"end": 9.8
+		"start": 11.3,
+		"end": 8.7
 	},
 	"node": "24.16.0",
 	"grai": "cee60fe2",
@@ -37,11 +37,11 @@
 				"brotli": 37554
 			},
 			"ms": {
-				"starts": 13.7,
-				"evaluates": 2.6,
-				"hydrates": 9.4,
-				"hydratedAt": 25.8,
-				"mounts": 3.6
+				"starts": 11.3,
+				"evaluates": 2.1,
+				"hydrates": 7.9,
+				"hydratedAt": 21.6,
+				"mounts": 3
 			}
 		},
 		{
@@ -53,11 +53,11 @@
 				"brotli": 22392
 			},
 			"ms": {
-				"starts": 10.2,
-				"evaluates": 1.7,
-				"hydrates": 6.4,
-				"hydratedAt": 18.2,
-				"mounts": 2.9
+				"starts": 8.9,
+				"evaluates": 1.4,
+				"hydrates": 5.2,
+				"hydratedAt": 15.5,
+				"mounts": 2.2
 			}
 		},
 		{
@@ -69,11 +69,11 @@
 				"brotli": 34719
 			},
 			"ms": {
-				"starts": 11.7,
-				"evaluates": 2.1,
-				"hydrates": 6.4,
-				"hydratedAt": 20.4,
-				"mounts": 2.8
+				"starts": 9.9,
+				"evaluates": 1.8,
+				"hydrates": 5.4,
+				"hydratedAt": 17.2,
+				"mounts": 2.3
 			}
 		},
 		{
@@ -85,11 +85,11 @@
 				"brotli": 19746
 			},
 			"ms": {
-				"starts": 9.4,
-				"evaluates": 0.9,
-				"hydrates": 3.1,
-				"hydratedAt": 13.4,
-				"mounts": 1.4
+				"starts": 7.8,
+				"evaluates": 0.8,
+				"hydrates": 2.6,
+				"hydratedAt": 11.2,
+				"mounts": 1.1
 			}
 		},
 		{
@@ -101,11 +101,11 @@
 				"brotli": 126630
 			},
 			"ms": {
-				"starts": 22.7,
-				"evaluates": 6.1,
-				"hydrates": 14.1,
-				"hydratedAt": 42.7,
-				"mounts": 6.2
+				"starts": 18.7,
+				"evaluates": 5,
+				"hydrates": 11.5,
+				"hydratedAt": 35.4,
+				"mounts": 5.4
 			}
 		},
 		{
@@ -117,11 +117,11 @@
 				"brotli": 125390
 			},
 			"ms": {
-				"starts": 22.7,
-				"evaluates": 5.2,
-				"hydrates": 19.9,
-				"hydratedAt": 48.2,
-				"mounts": 6.6
+				"starts": 18.7,
+				"evaluates": 4.4,
+				"hydrates": 16.6,
+				"hydratedAt": 39.5,
+				"mounts": 5.5
 			}
 		},
 		{
@@ -133,11 +133,11 @@
 				"brotli": 37554
 			},
 			"ms": {
-				"starts": 43.8,
-				"evaluates": 11.3,
-				"hydrates": 38.7,
-				"hydratedAt": 94.2,
-				"mounts": 14.4
+				"starts": 39.1,
+				"evaluates": 9.9,
+				"hydrates": 34.2,
+				"hydratedAt": 83.4,
+				"mounts": 12.8
 			}
 		},
 		{
@@ -149,11 +149,11 @@
 				"brotli": 22392
 			},
 			"ms": {
-				"starts": 31.9,
-				"evaluates": 7.9,
-				"hydrates": 25.4,
-				"hydratedAt": 65.2,
-				"mounts": 11.4
+				"starts": 28.4,
+				"evaluates": 6.3,
+				"hydrates": 22.8,
+				"hydratedAt": 58.3,
+				"mounts": 10.1
 			}
 		},
 		{
@@ -165,11 +165,11 @@
 				"brotli": 34719
 			},
 			"ms": {
-				"starts": 36.2,
-				"evaluates": 9.6,
-				"hydrates": 26.2,
-				"hydratedAt": 72,
-				"mounts": 11.4
+				"starts": 32.7,
+				"evaluates": 8.7,
+				"hydrates": 22.8,
+				"hydratedAt": 63.9,
+				"mounts": 10.1
 			}
 		},
 		{
@@ -181,11 +181,11 @@
 				"brotli": 19746
 			},
 			"ms": {
-				"starts": 28.8,
-				"evaluates": 4,
-				"hydrates": 13.1,
-				"hydratedAt": 45.6,
-				"mounts": 5.9
+				"starts": 25.6,
+				"evaluates": 3.5,
+				"hydrates": 11.9,
+				"hydratedAt": 41.2,
+				"mounts": 5.2
 			}
 		},
 		{
@@ -197,11 +197,11 @@
 				"brotli": 126630
 			},
 			"ms": {
-				"starts": 66.8,
-				"evaluates": 26.7,
-				"hydrates": 56.7,
-				"hydratedAt": 152.2,
-				"mounts": 26.1
+				"starts": 58.2,
+				"evaluates": 23.3,
+				"hydrates": 50.3,
+				"hydratedAt": 132.6,
+				"mounts": 24
 			}
 		},
 		{
@@ -213,11 +213,11 @@
 				"brotli": 125390
 			},
 			"ms": {
-				"starts": 64.9,
-				"evaluates": 22.1,
-				"hydrates": 78.7,
-				"hydratedAt": 162.3,
-				"mounts": 25.9
+				"starts": 60.1,
+				"evaluates": 19.5,
+				"hydrates": 72.7,
+				"hydratedAt": 152.1,
+				"mounts": 24.4
 			}
 		},
 		{
@@ -229,10 +229,10 @@
 				"brotli": 37554
 			},
 			"ms": {
-				"starts": 12.6,
+				"starts": 12.5,
 				"evaluates": 2.3,
 				"hydrates": 8.7,
-				"hydratedAt": 23.9,
+				"hydratedAt": 23.4,
 				"mounts": 3.2
 			}
 		},
@@ -245,10 +245,10 @@
 				"brotli": 23117
 			},
 			"ms": {
-				"starts": 9.4,
+				"starts": 9.7,
 				"evaluates": 1.5,
-				"hydrates": 6,
-				"hydratedAt": 16.7,
+				"hydrates": 5.9,
+				"hydratedAt": 17,
 				"mounts": 2.5
 			}
 		},
@@ -261,11 +261,11 @@
 				"brotli": 34719
 			},
 			"ms": {
-				"starts": 10.8,
-				"evaluates": 2,
-				"hydrates": 6,
-				"hydratedAt": 19,
-				"mounts": 2.6
+				"starts": 10.5,
+				"evaluates": 1.9,
+				"hydrates": 5.9,
+				"hydratedAt": 18.2,
+				"mounts": 2.4
 			}
 		},
 		{
@@ -277,8 +277,8 @@
 				"brotli": 20356
 			},
 			"ms": {
-				"starts": 8.9,
-				"evaluates": 0.9,
+				"starts": 9.1,
+				"evaluates": 0.8,
 				"hydrates": 2.8,
 				"hydratedAt": 12.6,
 				"mounts": 1.2
@@ -293,11 +293,11 @@
 				"brotli": 132338
 			},
 			"ms": {
-				"starts": 22.9,
-				"evaluates": 5.5,
-				"hydrates": 12.9,
-				"hydratedAt": 41.4,
-				"mounts": 5.9
+				"starts": 22.7,
+				"evaluates": 5.4,
+				"hydrates": 12.5,
+				"hydratedAt": 40.9,
+				"mounts": 5.8
 			}
 		},
 		{
@@ -309,11 +309,11 @@
 				"brotli": 130173
 			},
 			"ms": {
-				"starts": 22.8,
+				"starts": 22.5,
 				"evaluates": 4.6,
-				"hydrates": 18.5,
-				"hydratedAt": 46.1,
-				"mounts": 6.1
+				"hydrates": 18.4,
+				"hydratedAt": 45.9,
+				"mounts": 6
 			}
 		},
 		{
@@ -325,11 +325,11 @@
 				"brotli": 37554
 			},
 			"ms": {
-				"starts": 40.3,
-				"evaluates": 10.4,
-				"hydrates": 36,
-				"hydratedAt": 87,
-				"mounts": 13.6
+				"starts": 40,
+				"evaluates": 10.3,
+				"hydrates": 34.7,
+				"hydratedAt": 85.7,
+				"mounts": 13.1
 			}
 		},
 		{
@@ -341,11 +341,11 @@
 				"brotli": 23117
 			},
 			"ms": {
-				"starts": 29.7,
-				"evaluates": 7.1,
-				"hydrates": 23.7,
-				"hydratedAt": 60.8,
-				"mounts": 10.3
+				"starts": 30.1,
+				"evaluates": 6.9,
+				"hydrates": 22.8,
+				"hydratedAt": 59.6,
+				"mounts": 10
 			}
 		},
 		{
@@ -357,11 +357,11 @@
 				"brotli": 34719
 			},
 			"ms": {
-				"starts": 34.8,
-				"evaluates": 9.2,
-				"hydrates": 24.8,
-				"hydratedAt": 69.4,
-				"mounts": 10.1
+				"starts": 34,
+				"evaluates": 8.9,
+				"hydrates": 23,
+				"hydratedAt": 67.6,
+				"mounts": 10.3
 			}
 		},
 		{
@@ -373,11 +373,11 @@
 				"brotli": 20356
 			},
 			"ms": {
-				"starts": 27.6,
-				"evaluates": 3.8,
+				"starts": 26.6,
+				"evaluates": 4.1,
 				"hydrates": 12.1,
-				"hydratedAt": 43.1,
-				"mounts": 5.4
+				"hydratedAt": 43,
+				"mounts": 5.5
 			}
 		},
 		{
@@ -389,10 +389,10 @@
 				"brotli": 132338
 			},
 			"ms": {
-				"starts": 67.3,
-				"evaluates": 24,
-				"hydrates": 52.1,
-				"hydratedAt": 142.8,
+				"starts": 64.3,
+				"evaluates": 23.4,
+				"hydrates": 51.8,
+				"hydratedAt": 136.1,
 				"mounts": 24.4
 			}
 		},
@@ -405,11 +405,11 @@
 				"brotli": 130173
 			},
 			"ms": {
-				"starts": 67.5,
-				"evaluates": 20.4,
-				"hydrates": 77.5,
-				"hydratedAt": 165,
-				"mounts": 24.5
+				"starts": 63.9,
+				"evaluates": 19.9,
+				"hydrates": 72.5,
+				"hydratedAt": 156.8,
+				"mounts": 23.5
 			}
 		}
 	]

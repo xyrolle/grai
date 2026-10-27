@@ -1,6 +1,6 @@
 {
 	"bench": "server-synthetic",
-	"date": "2026-10-27T13:11:43.389Z",
+	"date": "2026-10-27T14:14:25.054Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,8 +8,8 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 12.7,
-		"end": 12.9
+		"start": 23,
+		"end": 21.2
 	},
 	"node": "24.16.0",
 	"grai": "cee60fe2",
@@ -36,192 +36,192 @@
 			"variant": "Paraglide `m.key()`",
 			"locale": "ro",
 			"ns": {
-				"text": 22,
-				"inputs": 55,
-				"plural": 598.2,
-				"markup": 74.5,
-				"page": 103
+				"text": 116.3,
+				"inputs": 96.1,
+				"plural": 1074.8,
+				"markup": 114.2,
+				"page": 372.8
 			}
 		},
 		{
 			"variant": "Paraglide `m.key(i, { locale })`",
 			"locale": "ro",
 			"ns": {
-				"text": 11.4,
-				"inputs": 19.3,
-				"plural": 535.9,
-				"markup": 51.7,
-				"page": 47
+				"text": 22.1,
+				"inputs": 35.1,
+				"plural": 1061.2,
+				"markup": 98.3,
+				"page": 179.1
 			}
 		},
 		{
 			"variant": "grai `m.key()`",
 			"locale": "ro",
 			"ns": {
-				"text": 14.6,
-				"inputs": 25.4,
-				"plural": 39.8,
-				"markup": 98.5,
-				"page": 20.7
+				"text": 34,
+				"inputs": 42.2,
+				"plural": 61,
+				"markup": 160.1,
+				"page": 66
 			}
 		},
 		{
 			"variant": "grai `m.key(i, { locale })`",
 			"locale": "ro",
 			"ns": {
-				"text": 11.2,
-				"inputs": 17.7,
-				"plural": 17.4,
-				"markup": 66.1,
-				"page": 26.3
+				"text": 26.1,
+				"inputs": 39.5,
+				"plural": 43.5,
+				"markup": 159.3,
+				"page": 35.8
 			}
 		},
 		{
 			"variant": "i18next `t(key, values)`",
 			"locale": "ro",
 			"ns": {
-				"text": 1232.2,
-				"inputs": 1580.3,
-				"plural": 2571.3,
-				"page": 1500.8
+				"text": 2026.1,
+				"inputs": 2778,
+				"plural": 4569.9,
+				"page": 2612.4
 			}
 		},
 		{
 			"variant": "use-intl `t(key, values)`, `t.markup`",
 			"locale": "ro",
 			"ns": {
-				"text": 2316.2,
-				"inputs": 3725.9,
-				"plural": 3402.6,
-				"markup": 2573.8,
-				"page": 2987.3
+				"text": 4583,
+				"inputs": 4808.8,
+				"plural": 6506.9,
+				"markup": 3910.5,
+				"page": 4977.6
 			}
 		},
 		{
 			"variant": "Paraglide `getLocale()` alone",
 			"locale": "ro",
 			"ns": {
-				"text": 16.6,
-				"inputs": 18.7,
-				"plural": 17,
-				"markup": 16,
-				"page": 16.6
+				"text": 35.4,
+				"inputs": 31.4,
+				"plural": 35.9,
+				"markup": 35.1,
+				"page": 42.5
 			}
 		},
 		{
 			"variant": "prototype, dispatcher per key, ALS",
 			"locale": "ro",
 			"ns": {
-				"text": 56.8,
-				"inputs": 49.7,
-				"plural": 97.2,
-				"page": 45.3
+				"text": 60.6,
+				"inputs": 107.8,
+				"plural": 144.4,
+				"page": 130.5
 			}
 		},
 		{
 			"variant": "prototype, dispatcher per key, module variable",
 			"locale": "ro",
 			"ns": {
-				"text": 5.6,
-				"inputs": 12.6,
-				"plural": 57.2,
-				"page": 8.7
+				"text": 10.6,
+				"inputs": 12.9,
+				"plural": 80.6,
+				"page": 18.4
 			}
 		},
 		{
 			"variant": "Paraglide `m.key()`",
 			"locale": "ru",
 			"ns": {
-				"text": 31.7,
-				"inputs": 44,
-				"plural": 484,
-				"markup": 75.1,
-				"page": 123.3
+				"text": 151,
+				"inputs": 282.9,
+				"plural": 885.4,
+				"markup": 156.2,
+				"page": 125.8
 			}
 		},
 		{
 			"variant": "Paraglide `m.key(i, { locale })`",
 			"locale": "ru",
 			"ns": {
-				"text": 14.3,
-				"inputs": 22.1,
-				"plural": 465.2,
-				"markup": 53.7,
-				"page": 49.6
+				"text": 19.7,
+				"inputs": 95.8,
+				"plural": 793.8,
+				"markup": 126,
+				"page": 152.4
 			}
 		},
 		{
 			"variant": "grai `m.key()`",
 			"locale": "ru",
 			"ns": {
-				"text": 15.9,
-				"inputs": 24.4,
-				"plural": 42.3,
-				"markup": 72.8,
-				"page": 41.5
+				"text": 37.5,
+				"inputs": 78.4,
+				"plural": 64,
+				"markup": 137.1,
+				"page": 56.7
 			}
 		},
 		{
 			"variant": "grai `m.key(i, { locale })`",
 			"locale": "ru",
 			"ns": {
-				"text": 10.1,
-				"inputs": 17.3,
-				"plural": 20.2,
-				"markup": 88.7,
-				"page": 43.9
+				"text": 29.3,
+				"inputs": 90.8,
+				"plural": 51.1,
+				"markup": 136,
+				"page": 33.3
 			}
 		},
 		{
 			"variant": "i18next `t(key, values)`",
 			"locale": "ru",
 			"ns": {
-				"text": 1317.6,
-				"inputs": 1665.8,
-				"plural": 2488.4,
-				"page": 2785.9
+				"text": 2161.6,
+				"inputs": 2999.9,
+				"plural": 4617.3,
+				"page": 2584.3
 			}
 		},
 		{
 			"variant": "use-intl `t(key, values)`, `t.markup`",
 			"locale": "ru",
 			"ns": {
-				"text": 3114.3,
-				"inputs": 2913.8,
-				"plural": 4546.6,
-				"markup": 2801.7,
-				"page": 4649.7
+				"text": 3892.4,
+				"inputs": 4902.8,
+				"plural": 6834.5,
+				"markup": 4099.8,
+				"page": 4627
 			}
 		},
 		{
 			"variant": "Paraglide `getLocale()` alone",
 			"locale": "ru",
 			"ns": {
-				"text": 17.4,
-				"inputs": 18,
-				"plural": 18.7,
-				"markup": 18.1,
-				"page": 27.6
+				"text": 35.1,
+				"inputs": 37.4,
+				"plural": 37.9,
+				"markup": 35.5,
+				"page": 34.6
 			}
 		},
 		{
 			"variant": "prototype, dispatcher per key, ALS",
 			"locale": "ru",
 			"ns": {
-				"text": 43.8,
-				"inputs": 74.8,
-				"plural": 134.6,
-				"page": 183.6
+				"text": 102.5,
+				"inputs": 192.4,
+				"plural": 264.2,
+				"page": 131.4
 			}
 		},
 		{
 			"variant": "prototype, dispatcher per key, module variable",
 			"locale": "ru",
 			"ns": {
-				"text": 5.4,
-				"inputs": 28.9,
-				"plural": 89.9,
-				"page": 26.7
+				"text": 11,
+				"inputs": 65.5,
+				"plural": 170.5,
+				"page": 24.5
 			}
 		}
 	]

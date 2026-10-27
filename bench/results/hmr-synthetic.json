@@ -1,6 +1,6 @@
 {
 	"bench": "hmr-synthetic",
-	"date": "2026-10-27T13:17:05.321Z",
+	"date": "2026-10-27T14:49:11.062Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,8 +8,8 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 9.8,
-		"end": 20.4
+		"start": 8.7,
+		"end": 7.4
 	},
 	"node": "24.16.0",
 	"grai": "cee60fe2",
@@ -29,71 +29,79 @@
 	"rows": [
 		{
 			"design": "grai's plugin",
-			"pageLoad": 127.5,
-			"editToPage": 14.9,
-			"editToServer": 13,
+			"startToPage": 296,
+			"pageLoad": 107.5,
+			"editToPage": 15.2,
+			"editToServer": 13.1,
 			"heap": {
-				"load": 8204732,
-				"edits": 8326516
+				"load": 8204772,
+				"edits": 8328296
 			}
 		},
 		{
 			"design": "whole",
-			"pageLoad": 196.4,
-			"editToPage": 255.7,
+			"startToPage": 228.8,
+			"pageLoad": 178.9,
+			"editToPage": 204.4,
 			"heap": {
-				"load": 15661592,
-				"edits": 336952340
+				"load": 15661604,
+				"edits": 336952344
 			}
 		},
 		{
 			"design": "patch",
-			"pageLoad": 178,
-			"editToPage": 34.1,
+			"startToPage": 219.4,
+			"pageLoad": 164.2,
+			"editToPage": 88.7,
 			"heap": {
 				"load": 15733396,
-				"edits": 16178736
+				"edits": 16178748
 			}
 		},
 		{
 			"design": "patch, fs.watch",
-			"pageLoad": 204.8,
-			"editToPage": 14.9,
+			"startToPage": 208.8,
+			"pageLoad": 161.1,
+			"editToPage": 11,
 			"heap": {
 				"load": 15733396,
-				"edits": 16183260
+				"edits": 16180288
 			}
 		},
 		{
 			"design": "paraglide",
-			"pageLoad": 901.1,
-			"editToPage": 4575.8,
+			"startToPage": 3782.1,
+			"pageLoad": 577.1,
+			"editToPage": 3073.5,
 			"heap": {
 				"load": 57982868,
-				"edits": 1029185216
+				"edits": 996136660
 			}
 		},
 		{
 			"design": "i18next",
-			"pageLoad": 93.1,
-			"editToPage": 86.6,
+			"startToPage": 167.7,
+			"pageLoad": 112.8,
+			"editToPage": 74.3,
 			"heap": {
-				"load": 7134476,
-				"edits": 116186936
+				"load": 7134488,
+				"edits": 116186960
 			}
 		},
 		{
 			"design": "use-intl",
-			"pageLoad": 155.5,
-			"editToPage": 75.7,
+			"startToPage": 182.7,
+			"pageLoad": 145.7,
+			"editToPage": 71.7,
 			"heap": {
-				"load": 6943884,
-				"edits": 113215916
+				"load": 6943896,
+				"edits": 114464196
 			}
 		},
 		{
 			"design": "no messages",
-			"pageLoad": 69.9,
+			"startToPage": 82,
+			"pageLoad": 25.8,
 			"heap": {
 				"load": 1458040,
 				"edits": 1458040

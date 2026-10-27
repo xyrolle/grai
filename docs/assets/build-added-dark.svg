@@ -16,17 +16,17 @@
 <text x="388" y="270" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">10</text>
 <text x="16" y="83" font-size="13" font-weight="600" fill="#c3c2b7">6,366 keys</text>
 <text x="89" y="114" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,102H111.3A4,4 0 0 1 115.3,106V112A4,4 0 0 1 111.3,116H99Z" fill="#3987e5"/>
-<text x="121.3" y="114" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.56 s</text>
+<path d="M99,102H108.1A4,4 0 0 1 112.1,106V112A4,4 0 0 1 108.1,116H99Z" fill="#3987e5"/>
+<text x="118.1" y="114" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.45 s</text>
 <text x="89" y="146" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,134H255.8A4,4 0 0 1 259.8,138V144A4,4 0 0 1 255.8,148H99Z" fill="#898781"/>
-<text x="265.8" y="146" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">5.56 s</text>
+<path d="M99,134H216.9A4,4 0 0 1 220.9,138V144A4,4 0 0 1 216.9,148H99Z" fill="#898781"/>
+<text x="226.9" y="146" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">4.22 s</text>
 <text x="16" y="175" font-size="13" font-weight="600" fill="#c3c2b7">13,326 keys</text>
 <text x="89" y="206" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,194H127.4A4,4 0 0 1 131.4,198V204A4,4 0 0 1 127.4,208H99Z" fill="#3987e5"/>
-<text x="137.4" y="206" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">1.12 s</text>
+<path d="M99,194H121.6A4,4 0 0 1 125.6,198V204A4,4 0 0 1 121.6,208H99Z" fill="#3987e5"/>
+<text x="131.6" y="206" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">0.92 s</text>
 <text x="89" y="238" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,226H377.9A4,4 0 0 1 381.9,230V236A4,4 0 0 1 377.9,240H99Z" fill="#898781"/>
-<text x="387.9" y="238" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">9.79 s</text>
+<path d="M99,226H337.9A4,4 0 0 1 341.9,230V236A4,4 0 0 1 337.9,240H99Z" fill="#898781"/>
+<text x="347.9" y="238" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">8.40 s</text>
 <text x="388" y="290" font-size="12" text-anchor="end" fill="#c3c2b7">seconds</text>
 </svg>

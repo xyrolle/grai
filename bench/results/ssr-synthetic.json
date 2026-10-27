@@ -1,0 +1,80 @@
+{
+	"bench": "ssr-synthetic",
+	"date": "2026-10-27T14:14:47.297Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 21.2,
+		"end": 21.5
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 6,366 keys",
+	"calls": 2000,
+	"rows": [
+		{
+			"variant": "Paraglide",
+			"locale": "ro",
+			"ns": 275430.3
+		},
+		{
+			"variant": "grai",
+			"locale": "ro",
+			"ns": 193047.5
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ro",
+			"ns": 52043.6
+		},
+		{
+			"variant": "i18next",
+			"locale": "ro",
+			"ns": 4672854.3
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ro",
+			"ns": 7303760.5
+		},
+		{
+			"variant": "Paraglide",
+			"locale": "ru",
+			"ns": 315566.4
+		},
+		{
+			"variant": "grai",
+			"locale": "ru",
+			"ns": 205906.2
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ru",
+			"ns": 56091.2
+		},
+		{
+			"variant": "i18next",
+			"locale": "ru",
+			"ns": 5033948
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ru",
+			"ns": 7440333.2
+		}
+	]
+}

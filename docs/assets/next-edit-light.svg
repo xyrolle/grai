@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 299" width="480" height="299" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>Next.js: one message edited, until the page shows it</title>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Next.js: one message edited, until the page shows it</text>
+<text x="16" y="44" font-size="13" fill="#52514e">Milliseconds in next dev; lower is better</text>
+<line x1="99" y1="65" x2="99" y2="253" stroke="#c3c2b7" stroke-width="1"/>
+<text x="99" y="270" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="195.3" y1="65" x2="195.3" y2="253" stroke="#e1e0d9" stroke-width="1"/>
+<text x="195.3" y="270" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">50</text>
+<line x1="291.7" y1="65" x2="291.7" y2="253" stroke="#e1e0d9" stroke-width="1"/>
+<text x="291.7" y="270" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">100</text>
+<line x1="388" y1="65" x2="388" y2="253" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="270" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">150</text>
+<text x="16" y="83" font-size="13" font-weight="600" fill="#52514e">A server component</text>
+<text x="89" y="114" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,102H367.8A4,4 0 0 1 371.8,106V112A4,4 0 0 1 367.8,116H99Z" fill="#2a78d6"/>
+<text x="377.8" y="114" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">142 ms</text>
+<text x="89" y="146" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl</text>
+<path d="M99,134H377.1A4,4 0 0 1 381.1,138V144A4,4 0 0 1 377.1,148H99Z" fill="#898781"/>
+<text x="387.1" y="146" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">146 ms</text>
+<text x="16" y="175" font-size="13" font-weight="600" fill="#52514e">A client component</text>
+<text x="89" y="206" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,194H235.3A4,4 0 0 1 239.3,198V204A4,4 0 0 1 235.3,208H99Z" fill="#2a78d6"/>
+<text x="245.3" y="206" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">73 ms</text>
+<text x="89" y="238" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl</text>
+<path d="M99,226H383.8A4,4 0 0 1 387.8,230V236A4,4 0 0 1 383.8,240H99Z" fill="#898781"/>
+<text x="393.8" y="238" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">150 ms</text>
+<text x="388" y="290" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
+</svg>

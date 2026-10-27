@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 461" width="480" height="461" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>An editor's first completion of a key</title>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">An editor's first completion of a key</text>
+<text x="16" y="44" font-size="13" fill="#52514e">Milliseconds for TypeScript's language service, the program</text>
+<text x="16" y="61" font-size="13" fill="#52514e">checked;</text>
+<text x="16" y="78" font-size="13" fill="#52514e">lower is better</text>
+<line x1="99" y1="99" x2="99" y2="415" stroke="#c3c2b7" stroke-width="1"/>
+<text x="99" y="432" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="171.3" y1="99" x2="171.3" y2="415" stroke="#e1e0d9" stroke-width="1"/>
+<text x="171.3" y="432" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">100,000</text>
+<line x1="243.5" y1="99" x2="243.5" y2="415" stroke="#e1e0d9" stroke-width="1"/>
+<text x="243.5" y="432" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">200,000</text>
+<line x1="315.8" y1="99" x2="315.8" y2="415" stroke="#e1e0d9" stroke-width="1"/>
+<text x="315.8" y="432" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">300,000</text>
+<line x1="388" y1="99" x2="388" y2="415" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="432" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">400,000</text>
+<text x="16" y="117" font-size="13" font-weight="600" fill="#52514e">6,366 keys</text>
+<text x="89" y="148" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,136H99A1,1 0 0 1 100,137V149A1,1 0 0 1 99,150H99Z" fill="#2a78d6"/>
+<text x="106" y="148" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">233 ms</text>
+<text x="89" y="180" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M99,168H99A1,1 0 0 1 100,169V181A1,1 0 0 1 99,182H99Z" fill="#898781"/>
+<text x="106" y="180" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">1.33 s</text>
+<text x="89" y="212" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
+<path d="M99,200H114.6A4,4 0 0 1 118.6,204V210A4,4 0 0 1 114.6,214H99Z" fill="#898781"/>
+<text x="124.6" y="212" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">27.1 s</text>
+<text x="89" y="244" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
+<path d="M99,232H147.7A4,4 0 0 1 151.7,236V242A4,4 0 0 1 147.7,246H99Z" fill="#898781"/>
+<text x="157.7" y="244" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">72.9 s</text>
+<text x="16" y="273" font-size="13" font-weight="600" fill="#52514e">13,326 keys</text>
+<text x="89" y="304" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,292H99A1,1 0 0 1 100,293V305A1,1 0 0 1 99,306H99Z" fill="#2a78d6"/>
+<text x="106" y="304" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">231 ms</text>
+<text x="89" y="336" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M99,324H99A2.3,2.3 0 0 1 101.3,326.3V335.7A2.3,2.3 0 0 1 99,338H99Z" fill="#898781"/>
+<text x="107.3" y="336" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">3.23 s</text>
+<text x="89" y="368" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
+<path d="M99,356H199.4A4,4 0 0 1 203.4,360V366A4,4 0 0 1 199.4,370H99Z" fill="#898781"/>
+<text x="209.4" y="368" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">144.6 s</text>
+<text x="89" y="400" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
+<path d="M99,388H328.3A4,4 0 0 1 332.3,392V398A4,4 0 0 1 328.3,402H99Z" fill="#898781"/>
+<text x="338.3" y="400" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">322.9 s</text>
+<text x="388" y="452" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
+</svg>

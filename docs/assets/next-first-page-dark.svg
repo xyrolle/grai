@@ -5,19 +5,17 @@
 <text x="16" y="61" font-size="13" fill="#c3c2b7">lower is better</text>
 <line x1="99" y1="82" x2="99" y2="150" stroke="#383835" stroke-width="1"/>
 <text x="99" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="171.3" y1="82" x2="171.3" y2="150" stroke="#2c2c2a" stroke-width="1"/>
-<text x="171.3" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">500</text>
-<line x1="243.5" y1="82" x2="243.5" y2="150" stroke="#2c2c2a" stroke-width="1"/>
-<text x="243.5" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1,000</text>
-<line x1="315.8" y1="82" x2="315.8" y2="150" stroke="#2c2c2a" stroke-width="1"/>
-<text x="315.8" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1,500</text>
+<line x1="195.3" y1="82" x2="195.3" y2="150" stroke="#2c2c2a" stroke-width="1"/>
+<text x="195.3" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">500</text>
+<line x1="291.7" y1="82" x2="291.7" y2="150" stroke="#2c2c2a" stroke-width="1"/>
+<text x="291.7" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1,000</text>
 <line x1="388" y1="82" x2="388" y2="150" stroke="#2c2c2a" stroke-width="1"/>
-<text x="388" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2,000</text>
+<text x="388" y="167" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1,500</text>
 <text x="89" y="103" font-size="14" text-anchor="end" fill="#f0efec">next-intl</text>
-<path d="M99,91H360.2A4,4 0 0 1 364.2,95V101A4,4 0 0 1 360.2,105H99Z" fill="#898781"/>
-<text x="370.2" y="103" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">1,835 ms</text>
+<path d="M99,91H326.3A4,4 0 0 1 330.3,95V101A4,4 0 0 1 326.3,105H99Z" fill="#898781"/>
+<text x="336.3" y="103" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">1.20 s</text>
 <text x="89" y="135" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,123H365.6A4,4 0 0 1 369.6,127V133A4,4 0 0 1 365.6,137H99Z" fill="#3987e5"/>
-<text x="375.6" y="135" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">1,873 ms</text>
+<path d="M99,123H367.5A4,4 0 0 1 371.5,127V133A4,4 0 0 1 367.5,137H99Z" fill="#3987e5"/>
+<text x="377.5" y="135" font-size="14" fill="#f0efec" style="font-variant-numeric: tabular-nums">1.41 s</text>
 <text x="388" y="187" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
 </svg>
