@@ -2,9 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join, posix, relative, sep } from "node:path";
 import { isMissing } from "./config.ts";
 import { GraiError } from "./error.ts";
-
-/** grai's own directory in the outdir: the manifest, the writer's lock and files being written. */
-export const stateDirectory = ".grai";
+import { stateDirectory } from "./state-directory.ts";
 
 /**
  * What an outdir holds: its files, by their paths from it with `/`, the directories they are in,
