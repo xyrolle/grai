@@ -14,7 +14,7 @@ import { extname } from "node:path";
 import type { Plugin } from "vite";
 import type { BuildReading } from "./code/build-reading.ts";
 import type { Reading } from "./code/reads.ts";
-import { codeProblems } from "./code-problems.ts";
+import { keysMissing, readErrors } from "./code-problems.ts";
 import type { Build } from "./compile.ts";
 import { messagesOf } from "./error.ts";
 import { sourceExtensions } from "./sources.ts";
@@ -43,8 +43,10 @@ export function buildReads(core: BuildReads): Plugin {
 				if (id.startsWith(core.outdir()) || !sourceExtensions.has(extname(id)))
 					return null;
 				const read = await reading.reading(id, code);
-				const keys = new Set(build.compilation.keys.keys());
-				const { errors } = codeProblems(read, keys, build.config);
+				const errors = [
+					...readErrors(read),
+					...keysMissing(read, build.compilation.keys, build.config),
+				];
 				if (errors.length > 0) this.error(messagesOf(errors));
 				core.read(this.environment.name, id, read);
 				return null;
