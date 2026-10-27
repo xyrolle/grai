@@ -368,6 +368,22 @@ import { withLocale } from "./src/lib/i18n/server.js";
 aroundEach((test) => withLocale("de", test));
 ```
 
+### CI
+
+`grai check` reads code exactly. It parses each file whose text may read messages and resolves that file's imports. It keeps each file's facts in the outdir's `.grai/facts`, so a later check parses only the files that changed. Keep that file in CI's cache between runs. On GitHub Actions, add this step before the check:
+
+```yaml
+- uses: actions/cache@v6
+  with:
+    path: src/lib/i18n/.grai/facts
+    key: grai-facts-${{ hashFiles('pnpm-lock.yaml', 'grai.config.json') }}-${{ github.sha }}
+    restore-keys: grai-facts-${{ hashFiles('pnpm-lock.yaml', 'grai.config.json') }}-
+```
+
+The key changes with the lockfile, which pins the parsers, and with the config. While both stay the same, each run restores the latest facts and saves its own. The facts are kept by each file's path, and a runner checks out to the same path every run.
+
+Take app B: 8,971 source files, of which 2,664 may read messages. There a check takes 3.1 s without the facts and 1.6 s with them.
+
 ## Config
 
 `grai.config.json` is read by the CLI, the Vite plugin and the adapters alike. Paths in it are relative to it.
@@ -438,6 +454,7 @@ At runtime, on app A's catalogs, compared with Paraglide, i18next 26.4 and use-i
 - **A Next app started on a loopback address, `127.0.0.1` or `[::1]`, never answers a page:** there Next 16.4 sends each of the proxy's rewrites back to itself, and grai/next's proxy rewrites each one again. Start Next on its default host, `0.0.0.0` or the machine's address, as behind a reverse proxy, until Next ships the fix to [vercel/next.js#94745](https://github.com/vercel/next.js/issues/94745) (`docs/followups.md`).
 - **Under a CSP of hashes, a built SvelteKit page downloads its locale's message chunks and the shared ones.** The browser refuses the import map, which carries Kit's nonce but no hash yet. A CSP of nonces works, as Kit's `auto` mode gives a page it renders on request.
 - **A Vite build refuses a text that holds `!~{…}~`, such as `!~{000}~`:** that is Rolldown's placeholder for a chunk's hash, which it replaces with the hash wherever it is in a chunk's code. No way of writing it survives: Rolldown prints a string by its value, and folds an escaped template, a concatenation or a join back into one string, before the hashes go in (`docs/followups.md`).
+- **A check with no facts kept takes longer than matching text would:** 3.1 s on app B, against 1.6 s with its facts kept (see CI above). It parses each file that may read messages and resolves its imports, which is what makes its reads exact. Matching text cannot tell a read from a mention, and follows no import.
 - **Not supported yet:**
   - `:unit`'s `usage`, which converts to the locale's units;
   - an option's value taken from an input, other than a currency, a unit and a time zone (`currency=$code` and `:relativetime`'s `unit=$unit` work), such as `style=$style`.
