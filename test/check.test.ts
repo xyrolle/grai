@@ -70,6 +70,27 @@ describe("grai check's inputs", () => {
 });
 
 describe("grai check's reads of components", () => {
+	it("reads an MDX document whose expressions hold only a comment, as MDX compiles them to nothing", async () => {
+		const { dir, config } = project({
+			en: { title: "Title" },
+			de: { title: "Titel" },
+		});
+		writeSources(dir, {
+			"src/page.mdx": [
+				'import { m } from "../out/messages.js"',
+				"",
+				"{/* A translator note */}",
+				"",
+				"# {m.title()} {/* inline */}",
+				"",
+			].join("\n"),
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([]);
+	});
+
 	it("reads a Nuxt app's pages and a Vue component through the aliases Nuxt generates", async () => {
 		const { dir, config } = project(
 			{
