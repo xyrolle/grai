@@ -182,6 +182,23 @@ describe("grai check's loads", () => {
 });
 
 describe("grai check's modules, named as the bundler names them", () => {
+	it("reads a namespace imported as `__proto__` alike with its facts read again and from the cache", async () => {
+		const { dir, config } = project({
+			en: { title: "Title" },
+			de: { title: "Titel" },
+		});
+		writeSources(dir, {
+			"src/page.js":
+				'import * as __proto__ from "../out/messages.js";\n__proto__.m.title();\n',
+		});
+
+		const cold = await check(config);
+		const warm = await check(config);
+
+		expect(cold.problems).toEqual([]);
+		expect(warm.problems).toEqual([]);
+	});
+
 	it("reads a project reached through a symlink, its modules named by their real paths, so its imports of the output are reads", async () => {
 		const { dir } = project({ en: { title: "Title", unused: "Unused" } });
 		writeSources(dir, {
