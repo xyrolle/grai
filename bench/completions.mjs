@@ -1,11 +1,13 @@
 // What one sample of the editor's completions does, whichever language server answers it. It opens
 // a project's texts.ts with the marker after its calls and asks for the completions at its end;
-// asks again with nothing changed; types two letters of a key and asks; finishes that call and
-// starts another on the next line, and asks; and, after the library's tool has written the catalog
-// with a key added, asks once more. Each time covers the editor telling the server of the change
-// and the request. Every list must hold exactly the keys the library's types give at that point.
-// An engine opens a file, takes its edits and the files its catalog changed, and lists the names
-// it completes at an offset.
+// asks again with nothing changed; asks for the details of the list's first entry, which an editor
+// shows beside it; types two letters of a key and asks; finishes that call and starts another on
+// the next line, and asks; and, after the library's tool has written the catalog with a key added,
+// asks once more. Each time covers the editor telling the server of the change and the request.
+// Every list must hold exactly the keys the library's types give at that point. An engine opens a
+// file, takes its edits and the files its catalog changed, lists the names it completes at an
+// offset, after the character that triggered it if one did, and describes the last list's first
+// entry.
 import {
 	existsSync,
 	mkdirSync,
@@ -23,32 +25,38 @@ export async function sample(description, engine) {
 	const before = new Set(project.keys.before);
 	const path = join(project.directory, project.file);
 	const calls = readFileSync(path, "utf8");
+	const typed = project.marker.at(-1);
 	const times = {};
-	const timed = async (step, keys, request) => {
+	const timed = async (step, request) => {
 		const start = performance.now();
-		const names = await request();
+		const result = await request();
 		times[step] = performance.now() - start;
-		assertKeys(project.title, keys, names);
+		return result;
 	};
+	const listed = async (step, keys, request) =>
+		assertKeys(project.title, keys, await timed(step, request));
 	let text = `${calls}${project.marker}`;
-	const edited = (next) => async () => {
+	const edited = (next, trigger) => async () => {
 		text = next;
 		await engine.change(text);
-		return engine.complete(text.length);
+		return engine.complete(text.length, trigger);
 	};
-	await timed("first", before, async () => {
+	await listed("first", before, async () => {
 		await engine.open(path, text);
-		return engine.complete(text.length);
+		return engine.complete(text.length, typed);
 	});
-	await timed("next", before, () => engine.complete(text.length));
-	await timed("prefix", before, edited(`${text}${project.prefix}`));
-	await timed(
+	await listed("next", before, () => engine.complete(text.length));
+	const details = await timed("details", () => engine.details(text.length));
+	if (!details)
+		throw new Error(`${project.title}: the first entry has no details`);
+	await listed("prefix", before, edited(`${text}${project.prefix}`));
+	await listed(
 		"callSite",
 		before,
-		edited(`${calls}\n${project.call}${project.marker}`),
+		edited(`${calls}\n${project.call}${project.marker}`, typed),
 	);
 	const changes = writeState(project, "after");
-	await timed("catalog", new Set(project.keys.after), async () => {
+	await listed("catalog", new Set(project.keys.after), async () => {
 		await engine.changed(changes);
 		return engine.complete(text.length);
 	});

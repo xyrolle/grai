@@ -3,8 +3,9 @@
 // the locale's JSON (`CustomTypeOptions`), and use-intl's, inferred from the messages it is
 // given. `tsc --noEmit` with TypeScript 7, and the editor's completions after `m.` or inside `t("`
 // (completions.mjs), from TypeScript 6's language service, which tsserver runs: the first request,
-// which checks what it needs of the program; the next one, the file unchanged; and one after each
-// edit an editor's user makes: a typed prefix, a new call site, and a key added to the catalog.
+// which checks what it needs of the program; the next one, the file unchanged; the details of the
+// list's first entry, asked apart; and one after each edit an editor's user makes: a typed prefix,
+// a new call site, and a key added to the catalog.
 // Each sample is a new process, its project's catalog written as the app has it; every library
 // takes one each round, in an order that rotates, so the load from other work weighs on each
 // alike. Medians of ROUNDS, with every sample kept.
@@ -40,6 +41,7 @@ function typeCheck(project) {
 const steps = {
 	first: "first completion",
 	next: "next completion, unchanged",
+	details: "the first entry's details",
 	prefix: "after a typed prefix",
 	callSite: "at a new call site",
 	catalog: "after a catalog change",
