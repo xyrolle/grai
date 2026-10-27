@@ -1,8 +1,10 @@
 // A cold `next dev`'s first page: each app started from an empty .next, ROUNDS times, timed from the
-// process's launch until its first response is complete. The apps take turns in an order that
-// rotates each round, so each takes each place in a round alike and the machine's load weighs on
-// all alike; a block is one turn of the rotation. Each round pairs grai with the others: the
-// median of those differences, their range and each block's median say how far apart the apps are.
+// process's launch until its first response is complete. next-intl starts twice: with its provider
+// passing the client component every message, as by default, and only its keys, as its docs
+// advise. The apps take turns in an order that rotates each round, so each takes each place in a
+// round alike and the machine's load weighs on all alike; a block is one turn of the rotation.
+// Each round pairs grai with the others: the median of those differences, their range and each
+// block's median say how far apart the apps are.
 import { devStart } from "./next-dev.mjs";
 import { stopServer } from "./servers.mjs";
 
@@ -13,11 +15,18 @@ export function coldApps(apps) {
 	return [
 		{ name: "grai", root: apps.grai },
 		{ name: "next-intl", root: apps["next-intl"] },
+		{
+			name: "next-intl, client keys picked",
+			root: apps["next-intl, client keys picked"],
+		},
 	];
 }
 
 /** The pairs whose differences the rounds report: the first app's time less the second's. */
-const coldPairs = [["grai", "next-intl"]];
+const coldPairs = [
+	["grai", "next-intl"],
+	["grai", "next-intl, client keys picked"],
+];
 
 const median = (values) => {
 	const sorted = [...values].sort((a, b) => a - b);
