@@ -22,8 +22,10 @@ import { join } from "node:path";
 import { brotliCompressSync, gzipSync } from "node:zlib";
 import { chromium } from "playwright-core";
 import { build } from "vite";
-import { localeScript } from "../src/locale-script.ts";
-import { grai } from "../src/vite.ts";
+import { graiEntry, graiModule } from "./grai.mjs";
+
+const { localeScript } = await import(graiModule("locale-script.ts"));
+const { grai } = await import(graiEntry("./vite"));
 
 const RUNS = 31;
 const THROTTLING = [1, 4];

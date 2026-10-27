@@ -12,7 +12,7 @@ import { brotliCompressSync, constants } from "node:zlib";
 import { rolldown } from "rolldown";
 import { build } from "vite";
 import { selectedApps } from "./apps.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, graiModule, writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
@@ -44,10 +44,8 @@ async function bundle(source, external = () => false) {
 	return output[0].code;
 }
 
-const { grai } = await import(join(graiSource, "vite.ts"));
-const { localeDirectory } = await import(
-	join(graiSource, "message-directories.ts")
-);
+const { grai } = await import(graiEntry("./vite"));
+const { localeDirectory } = await import(graiModule("message-directories.ts"));
 
 /** The locale's copies of the message chunks a client build writes for a page naming every key. */
 async function graiBuiltMessages(config, locale) {
@@ -86,7 +84,7 @@ for (const app of selectedApps()) {
 		),
 	);
 	const paraglide = await paraglideOutput(app);
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	const config = writeGraiProject(app, "library-bytes");
 	await compile(config);
 	const graiOut = join(config, "..", "out", "runtime.js");

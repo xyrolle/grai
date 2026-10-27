@@ -1,5 +1,5 @@
 // A catalog that formats in every message: 13,000 keys in ro, ru and en, every other one a
-// currency and the rest a date, each run in a new Node process, from this repository's source.
+// currency and the rest a date, each run in a new Node process, from this repository's build.
 // It times a compile from an empty output, `check`, an XLIFF export of ru, one edited message
 // recompiled as the watcher does, and a recompile with nothing changed. Medians.
 //   node formatted.mjs
@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "./apps.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiModule } from "./grai.mjs";
 
 const KEYS = 13_000;
 const self = new URL(import.meta.url).pathname;
@@ -75,7 +75,7 @@ async function timed(count, run, prepare = () => {}) {
 async function child(measure, config) {
 	const out = join(config, "..", "out");
 	const ru = join(config, "..", "messages", "ru.json");
-	const { compile, recompile } = await import(join(graiSource, "compile.ts"));
+	const { compile, recompile } = await import(graiModule("compile.ts"));
 	if (measure === "cold") {
 		const ms = await timed(
 			5,
@@ -85,13 +85,13 @@ async function child(measure, config) {
 		return console.log(JSON.stringify({ ms }));
 	}
 	if (measure === "check") {
-		const { check } = await import(join(graiSource, "check.ts"));
+		const { check } = await import(graiModule("check.ts"));
 		return console.log(
 			JSON.stringify({ ms: await timed(3, () => check(config)) }),
 		);
 	}
 	if (measure === "export") {
-		const { exportLocale } = await import(join(graiSource, "translations.ts"));
+		const { exportLocale } = await import(graiModule("translations.ts"));
 		const ms = await timed(3, () =>
 			exportLocale(config, "ru", { json: false, untranslated: false }),
 		);
