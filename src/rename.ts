@@ -7,7 +7,7 @@ import { layoutOf, tabbedLayout } from "./catalog-layout.ts";
 import { withKeyRenamed, withMessages, withoutKeys } from "./catalog-text.ts";
 import { readProjectCode } from "./code/project.ts";
 import { readingOf } from "./code/reads.ts";
-import { codeProblems, unknownReads } from "./code-problems.ts";
+import { readErrors } from "./code-problems.ts";
 import {
 	type CompileResult,
 	compile,
@@ -58,10 +58,7 @@ export async function rename(
 	const code = await readProjectCode(config, roots ?? [config.root], from);
 	if (code instanceof GraiError) return unchanged([code]);
 	const reading = await readingOf(code);
-	const keys = new Set(
-		catalogs.flatMap(({ messages }) => [...messages.keys()]),
-	);
-	const unknown = unknownReads(codeProblems(reading, keys, config));
+	const unknown = readErrors(reading);
 	if (unknown.length > 0) return unchanged(unknown);
 	const { files, problems } = await codeEdits(reading, from, to);
 	if (problems.length > 0) return unchanged(sortErrors(problems));

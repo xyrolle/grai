@@ -32,22 +32,7 @@ export function codeProblems(
 		isTest(source.file.replaceAll(sep, "/"));
 	const texts = config.locales.map((locale) => `--${locale} "…"`).join(" ");
 	const errors = [
-		...reading.unresolved.map(
-			({ source, at, specifier }) =>
-				new GraiError(
-					"import-unresolved",
-					{ file: placeOf(source, at.start) },
-					`${specifier} is a path to grai's output, but nothing the project declares resolves it, so grai cannot tell what it reads. Declare it as the bundler resolves it: a Vite alias, a tsconfig path or a package.json "imports" entry.`,
-				),
-		),
-		...reading.unreadable.map(
-			({ source, at, message }) =>
-				new GraiError(
-					"source-invalid",
-					{ file: placeOf(source, at.start) },
-					`${message}, so grai cannot read its code. Fix it, as the bundler would fail it too.`,
-				),
-		),
+		...readErrors(reading),
 		// A read off a key's own module is reported where its path is.
 		...reading.reads
 			.filter(({ key, via }) => !keys.has(key) && via !== "module")
@@ -80,6 +65,31 @@ export function codeProblems(
 		reached,
 		tests: [...tests].map(([file, names]) => ({ file, names })),
 	};
+}
+
+/**
+ * The errors that leave a reading's reads unknown: an import of the output that does not resolve,
+ * and a file that does not parse. A command that changes the project acts on none while one stands.
+ */
+export function readErrors(reading: Reading): GraiError[] {
+	return [
+		...reading.unresolved.map(
+			({ source, at, specifier }) =>
+				new GraiError(
+					"import-unresolved",
+					{ file: placeOf(source, at.start) },
+					`${specifier} is a path to grai's output, but nothing the project declares resolves it, so grai cannot tell what it reads. Declare it as the bundler resolves it: a Vite alias, a tsconfig path or a package.json "imports" entry.`,
+				),
+		),
+		...reading.unreadable.map(
+			({ source, at, message }) =>
+				new GraiError(
+					"source-invalid",
+					{ file: placeOf(source, at.start) },
+					`${message}, so grai cannot read its code. Fix it, as the bundler would fail it too.`,
+				),
+		),
+	];
 }
 
 /**
