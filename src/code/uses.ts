@@ -5,6 +5,7 @@
  */
 
 import {
+	type Alias,
 	type Binding,
 	originOf,
 	type Span,
@@ -32,9 +33,9 @@ export function usesOf(
 	scopes: Scopes,
 	loads: readonly Node[],
 	span: (node: Span) => Span,
-): { uses: Uses; aliases: Record<string, string> } {
+): { uses: Uses; aliases: Record<string, Alias> } {
 	const uses: Uses = {};
-	const aliases: Record<string, string> = {};
+	const aliases: Record<string, Alias> = {};
 	const add = (use: UseFact) => {
 		const origin = originOf(use.from);
 		const list = uses[origin];
@@ -57,7 +58,12 @@ export function usesOf(
 		const topLevel =
 			binding.scope.start === program.start &&
 			binding.scope.end === program.end;
-		if ("local" in from && topLevel) aliases[binding.name] = from.local;
+		if ("local" in from && topLevel) {
+			aliases[binding.name] = {
+				local: from.local,
+				members: read.map(({ name }) => name),
+			};
+		}
 		for (const use of scopes.usesOf(binding)) {
 			follow(use, from, read, type || scopes.isTypeUse(use));
 		}

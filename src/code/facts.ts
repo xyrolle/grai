@@ -119,9 +119,15 @@ export type ModuleFacts = {
 	exports: ExportFact[];
 	loads: LoadFact[];
 	uses: Uses;
-	/** Each top-level `const` that holds an import (`const t = m`), by its name: the import's. */
-	aliases: Record<string, string>;
+	/** Each top-level `const` that holds an import or a member of one, by its name (`aliasOf`). */
+	aliases: Record<string, Alias>;
 };
+
+/**
+ * What a top-level `const` holds: an import, by its local name, or the members read from it on the
+ * way, as `const m = messages.m` holds `messages`'s `m`.
+ */
+export type Alias = { local: string; members: string[] };
 
 /** A file's facts: its modules', or its error. */
 export type FileFacts = { modules: ModuleFacts[] } | { error: CodeError };
