@@ -10,6 +10,8 @@
 // - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
+// - Cold first page: `next dev` from an empty .next until the page's first response, COLD_ROUNDS
+//   times for each app, the apps taking turns, so the load from other work weighs on both alike.
 import { spawnSync } from "node:child_process";
 import {
 	readdirSync,
@@ -23,9 +25,11 @@ import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeNextApps } from "./next-apps.mjs";
+import { recordResults } from "./results.mjs";
 import { startServer, stopServer } from "./servers.mjs";
 
 const EDITS = 7;
+const COLD_ROUNDS = 7;
 const SAVE_INTERVAL_MS = 1500;
 const next = new URL("node_modules/.bin/next", import.meta.url).pathname;
 const nextVersion = JSON.parse(
@@ -257,6 +261,7 @@ for (const app of selectedApps()) {
 		bytes[name] = await pageBytes(browser, root, path);
 	}
 	const total = ({ document, script, other }) => document + script + other;
+	const recorded = { bytes, dev: {}, cold: {} };
 	for (const [name, sizes] of Object.entries(bytes)) {
 		console.log(
 			`| ${name} | ${kb(sizes.document)} | ${kb(sizes.script)} | ${kb(sizes.other)} | ${kb(total(sizes))} | ${name === "plain" ? "" : kb(total(sizes) - total(bytes.plain))} |`,
@@ -301,6 +306,39 @@ for (const app of selectedApps()) {
 		console.log(
 			`| ${name} | ${empty.ready.toFixed(0)} | ${empty.page.toFixed(0)} | ${kept.ready.toFixed(0)} | ${kept.page.toFixed(0)} | ${edit(edits.server)} | ${edit(edits.client)} |`,
 		);
+		recorded.dev[name] = {
+			empty: { ready: empty.ready, page: empty.page },
+			kept: { ready: kept.ready, page: kept.page },
+			edits,
+		};
 	}
+
+	console.log(
+		`\n\`next dev\` from an empty .next until the page's first response, the apps taking turns, median of ${COLD_ROUNDS}, ms\n`,
+	);
+	console.log("| app | ready | page |");
+	console.log("|---|---|---|");
+	const runs = { grai: [], "next-intl": [] };
+	for (let round = 0; round < COLD_ROUNDS; round++) {
+		const order =
+			round % 2 === 0 ? ["grai", "next-intl"] : ["next-intl", "grai"];
+		for (const name of order) {
+			const run = await devStart(apps[name], path, { empty: true });
+			await stopServer(run.server.child);
+			runs[name].push({ ready: run.ready, page: run.page });
+		}
+	}
+	for (const [name, samples] of Object.entries(runs)) {
+		const ready = median(samples.map((run) => run.ready));
+		const page = median(samples.map((run) => run.page));
+		console.log(`| ${name} | ${ready.toFixed(0)} | ${page.toFixed(0)} |`);
+		recorded.cold[name] = { ready, page, runs: samples };
+	}
+	recordResults(`nextjs-${app.id}`, recorded, {
+		app: app.name,
+		locale,
+		keys: { server: keys.server.length, client: keys.client.length },
+		chromium: browser.version(),
+	});
 }
 await browser.close();
