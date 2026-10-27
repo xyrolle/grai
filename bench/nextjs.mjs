@@ -135,7 +135,7 @@ setTimeout(() => {
 /**
  * grai's app started until its watch has saved the groups of the keys its routes read
  * (`.grai/groups.json`), which it does once the server is quiet, as a developer's earlier session
- * leaves them; at most two minutes.
+ * leaves them; at most two minutes. Gives how many keys each group holds.
  */
 async function prepared(root, path, words) {
 	const groups = join(root, "src/i18n/.grai/groups.json");
@@ -150,6 +150,7 @@ async function prepared(root, path, words) {
 			`grai's watch saved no groups of keys in two minutes in ${root}`,
 		);
 	}
+	return JSON.parse(readFileSync(groups, "utf8")).map((group) => group.length);
 }
 
 /** A message's text in its catalog, as the page shows it, edited and saved; returns when saved. */
@@ -283,7 +284,7 @@ for (const app of selectedApps()) {
 		};
 	}
 
-	await prepared(apps.grai, path, words);
+	const groups = await prepared(apps.grai, path, words);
 	const cold = coldApps(apps, emptyOutputCopy(apps.grai));
 	const runs = await coldRounds(browser, cold, path, words, COLD_ROUNDS);
 	const summary = coldSummary(runs, cold.length);
@@ -302,6 +303,8 @@ for (const app of selectedApps()) {
 		keys: { server: keys.server.length, client: keys.client.length },
 		edits: EDITS,
 		chromium: browser.version(),
+		// The output grai's cold rounds start from: the groups its watch saved, by their keys.
+		prepared: { groups },
 	});
 }
 await browser.close();
