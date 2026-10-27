@@ -1,7 +1,5 @@
-import { createHash, hash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { hash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { serialize } from "node:v8";
 import { basePositions, basePositionsMoved } from "./base-positions.ts";
 import {
@@ -13,6 +11,7 @@ import {
 } from "./catalog.ts";
 import { localeCatalogs, type ParsedCatalogs } from "./catalog-parts.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
+import { compilerIdentity } from "./compiler-identity.ts";
 import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
@@ -64,31 +63,24 @@ const runtime: RuntimeSources = {
 };
 
 /**
- * The compiler's own modules, the runtime's among them, and the templates of the output's
- * declarations, hashed: what decides the output besides the config and the catalogs. A new version
- * of grai changes them, and so does a local build, which keeps its version, so the output is
- * written again after either. Taken on the first compile.
+ * The compiler's identity (`compilerIdentity`): what decides the output besides the config and the
+ * catalogs. A new version of grai changes it, and so does a local build, which keeps its version,
+ * so the output is written again after either. Taken on the first compile.
  */
 let compilerHash: string | undefined;
 
 function hashOfCompiler(): string {
-	compilerHash ??= hashOfModules(fileURLToPath(new URL(".", import.meta.url)));
+	compilerHash ??= compilerIdentity([
+		runtime.runtime,
+		runtime.server,
+		runtime.testing,
+		runtime.declarations.runtime,
+		runtime.declarations.server,
+		runtime.declarations.testing,
+		runtime.declarations.setLocale.live,
+		runtime.declarations.setLocale.reload,
+	]);
 	return compilerHash;
-}
-
-function hashOfModules(directory: string): string {
-	const modules = readdirSync(directory, { recursive: true, encoding: "utf8" })
-		.filter(
-			(file) =>
-				(/\.(js|ts)$/.test(file) && !file.endsWith(".d.ts")) ||
-				file.endsWith(".d.ts.template"),
-		)
-		.sort();
-	const digest = createHash("sha1");
-	for (const file of modules) {
-		digest.update(file).update(readFileSync(join(directory, file)));
-	}
-	return digest.digest("hex");
 }
 
 /**
