@@ -25,16 +25,13 @@ import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeNextApps } from "./next-apps.mjs";
+import { devStart, next, nextEnv, nextVersion, started } from "./next-dev.mjs";
 import { recordResults } from "./results.mjs";
-import { startServer, stopServer } from "./servers.mjs";
+import { stopServer } from "./servers.mjs";
 
 const EDITS = 7;
 const COLD_ROUNDS = 7;
 const SAVE_INTERVAL_MS = 1500;
-const next = new URL("node_modules/.bin/next", import.meta.url).pathname;
-const nextVersion = JSON.parse(
-	readFileSync(new URL("node_modules/next/package.json", import.meta.url)),
-).version;
 
 const brotli = (bytes) =>
 	brotliCompressSync(bytes, {
@@ -44,59 +41,12 @@ const kb = (bytes) => (bytes / 1024).toFixed(1);
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const now = () => performance.timeOrigin + performance.now();
-/** Next's environment: no telemetry, which would phone home and outlive the run in a process of its own. */
-const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
-
-/**
- * Starts `next <command>` in an app on a port the system picks, so that runs side by side never
- * meet, and resolves with the URL it serves once it prints a line matching `ready`.
- */
-function started(root, command, ready) {
-	const child = startServer(next, [command, "--port", "0"], {
-		cwd: root,
-		env,
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-	let output = "";
-	const listening = new Promise((resolve, reject) => {
-		const deadline = setTimeout(
-			() =>
-				reject(new Error(`next ${command} was not ready in 120 s:\n${output}`)),
-			120_000,
-		);
-		const read = (chunk) => {
-			output += chunk;
-			const origin = /- Local:\s+(http:\/\/\S+)/.exec(output)?.[1];
-			if (origin !== undefined && ready.test(output)) {
-				clearTimeout(deadline);
-				resolve(origin);
-			}
-		};
-		child.stdout.on("data", read);
-		child.stderr.on("data", read);
-	});
-	return { child, listening, output: () => output };
-}
-
-/** Requests a URL until it answers 200, for at most two minutes; resolves with the time it took. */
-async function firstResponse(url) {
-	const start = performance.now();
-	while (performance.now() - start < 120_000) {
-		const response = await fetch(url).catch(() => undefined);
-		if (response?.ok) {
-			await response.text();
-			return performance.now() - start;
-		}
-		await new Promise((resolve) => setTimeout(resolve, 100));
-	}
-	throw new Error(`${url} did not answer in 120 s`);
-}
 
 /** The page's downloads in a built app, brotli-compressed: its document, its scripts, the rest. */
 async function pageBytes(browser, root, path) {
 	const build = spawnSync(next, ["build"], {
 		cwd: root,
-		env,
+		env: nextEnv,
 		encoding: "utf8",
 	});
 	if (build.status !== 0) throw new Error(build.stdout + build.stderr);
@@ -169,17 +119,6 @@ setTimeout(() => {
 			cpu: median(warm.map(({ cpu }) => cpu)),
 		},
 	};
-}
-
-/** `next dev` until it is ready, then until the page's first response: from an empty .next, or not. */
-async function devStart(root, path, { empty }) {
-	if (empty) rmSync(join(root, ".next"), { recursive: true, force: true });
-	const start = performance.now();
-	const server = started(root, "dev", /Ready in/);
-	const origin = await server.listening;
-	const ready = performance.now() - start;
-	const page = await firstResponse(`${origin}${path}`);
-	return { server, url: `${origin}${path}`, ready, page };
 }
 
 /** A message's text in its catalog, as the page shows it, edited and saved; returns when saved. */
