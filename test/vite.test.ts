@@ -382,6 +382,22 @@ describe("the Vite plugin's build", () => {
 		);
 	});
 
+	it("fails a server build where a const that holds the namespace reads a key no catalog has, as grai check does", async () => {
+		const { dir } = project(catalogs);
+
+		await expect(
+			built(
+				dir,
+				{
+					a: `import { m } from "./out/messages.js";\nconst t = m;\nexport const render = () => t.missing();\n`,
+				},
+				{ ssr: true },
+			),
+		).rejects.toThrow(
+			'a.js:3:31: "missing": t.missing names a key no catalog has. Add it with grai add missing --en "…" --de "…", or fix the name.',
+		);
+	});
+
 	it("takes a static block for a scope, and reads keys taken apart from the namespace", async () => {
 		const { dir } = project(catalogs);
 		const shadowed = [
