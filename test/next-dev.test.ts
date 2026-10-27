@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -13,8 +14,9 @@ import { expect, it, onTestFinished } from "vitest";
 import { compile } from "../src/index.ts";
 import { stopped } from "./stopped.ts";
 
-// `next dev` on a project of the package's own install, from an empty .next: which of the output's
-// modules of keys Turbopack compiles in each of its layers for a page.
+// `next dev` on a project of the package's own install: which of the output's modules of keys
+// Turbopack compiles in each of its layers for a page, and the groups of keys withGrai's watch saves
+// from the app's routes for the next start.
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const next = join(repository, "node_modules/.bin/next");
@@ -22,9 +24,14 @@ const next = join(repository, "node_modules/.bin/next");
 /**
  * A Next project under the repository, so that it resolves next and react from the package's own
  * install, removed after the test. Its catalogs have `count` keys in two locales, each key's words
- * its own; its output is in `i18n/`.
+ * its own; its output is in `i18n/`. With `withGrai`, its config takes withGrai from the package's
+ * source, which compiles and watches the catalogs for `next dev`.
  */
-function nextProject(count: number, files: Record<string, string>): string {
+function nextProject(
+	count: number,
+	files: Record<string, string>,
+	{ withGrai = false }: { withGrai?: boolean } = {},
+): string {
 	const cache = join(repository, "test/.cache");
 	mkdirSync(cache, { recursive: true });
 	const dir = mkdtempSync(join(cache, "next-dev-"));
@@ -44,7 +51,9 @@ function nextProject(count: number, files: Record<string, string>): string {
 			catalogs: "messages/{locale}.json",
 			outdir: "i18n",
 		}),
-		"next.config.mjs": `export default { turbopack: { root: ${JSON.stringify(repository)} } };\n`,
+		"next.config.mjs": withGrai
+			? `import { withGrai } from ${JSON.stringify(join(repository, "src/next/config.ts"))};\nexport default withGrai({ turbopack: { root: ${JSON.stringify(repository)} } });\n`
+			: `export default { turbopack: { root: ${JSON.stringify(repository)} } };\n`,
 		"app/layout.jsx":
 			"export default function Layout({ children }) {\n\treturn <html><body>{children}</body></html>;\n}\n",
 		...files,
@@ -126,16 +135,72 @@ function compiledKeys(dir: string): Record<string, string[]> {
 	);
 }
 
-/** The output's module of keys that holds a key's words. */
+/** The output's module of keys that holds a key's words, among those keys.js re-exports. */
 function moduleOf(dir: string, words: string): string {
-	const keys = join(dir, "i18n/keys");
-	const name = readdirSync(keys).find(
-		(file) =>
-			file.endsWith(".js") &&
-			readFileSync(join(keys, file), "utf8").includes(JSON.stringify(words)),
+	const out = join(dir, "i18n");
+	const modules = [
+		...readFileSync(join(out, "keys.js"), "utf8").matchAll(
+			/"\.\/(keys\/[^"]+)"/g,
+		),
+	].map(([, module]) => module ?? "");
+	const module = modules.find((each) =>
+		readFileSync(join(out, each), "utf8").includes(JSON.stringify(words)),
 	);
-	if (name === undefined) throw new Error(`no module of keys holds ${words}`);
-	return `keys/${name}`;
+	if (module === undefined) throw new Error(`no module of keys holds ${words}`);
+	return module;
+}
+
+/** `next dev` started in a project, once it serves. */
+async function started(
+	dir: string,
+): Promise<{ server: ChildProcess; origin: string }> {
+	const server = nextDev(dir);
+	return { server, origin: await servedAt(server) };
+}
+
+/** The groups withGrai's watch saved, once `saved` takes them, polled for at most a minute. */
+async function savedGroups(
+	dir: string,
+	saved: (groups: string[][]) => boolean,
+): Promise<string[][]> {
+	const file = join(dir, "i18n/.grai/groups.json");
+	const deadline = performance.now() + 60_000;
+	while (performance.now() < deadline) {
+		const groups: string[][] | undefined = existsSync(file)
+			? JSON.parse(readFileSync(file, "utf8"))
+			: undefined;
+		if (groups !== undefined && saved(groups)) return groups;
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	throw new Error(
+		`the watch saved no such groups in a minute: ${existsSync(file) ? readFileSync(file, "utf8") : "none"}`,
+	);
+}
+
+/** A home page that reads `server` keys in its server component and `client` keys in a client one. */
+const homePage = (server: readonly string[], client: readonly string[]) => ({
+	"app/page.jsx": `import * as m from "../i18n/keys.js";
+import { Client } from "./client.jsx";
+
+export default function Page() {
+	return <main>${server.map((key) => `<p>{m.${key}({}, { locale: "de" })}</p>`).join("")}<Client /></main>;
+}
+`,
+	"app/client.jsx": `"use client";
+import * as m from "../i18n/keys.js";
+
+export function Client() {
+	return <div>${client.map((key) => `<p>{m.${key}({}, { locale: "de" })}</p>`).join("")}</div>;
+}
+`,
+});
+
+/** Writes a project's files again, as an edit saves them. */
+function edited(dir: string, files: Record<string, string>): void {
+	for (const [path, text] of Object.entries(files)) {
+		mkdirSync(join(dir, path, ".."), { recursive: true });
+		writeFileSync(join(dir, path), text);
+	}
 }
 
 it("compiles, in each layer, only the modules of the keys that layer's components read", {
@@ -171,4 +236,91 @@ export function Client() {
 		"app-ssr": [client],
 		"app-client": [client],
 	});
+});
+
+it("saves the groups each route's side reads once next dev is quiet, and the next start compiles each layer's group alone", {
+	timeout: 180_000,
+}, async () => {
+	const dir = nextProject(1200, homePage(["key7"], ["key900"]), {
+		withGrai: true,
+	});
+	const first = await started(dir);
+	await requested(first.origin, "/");
+
+	expect(await savedGroups(dir, (groups) => groups.length > 0)).toEqual([
+		["key7"],
+		["key900"],
+	]);
+	await stopped(first.server);
+
+	rmSync(join(dir, ".next"), { recursive: true, force: true });
+	const html = await requested((await started(dir)).origin, "/");
+
+	expect(html).toContain("de key7");
+	expect(html).toContain("de key900");
+	const server = moduleOf(dir, "de key7");
+	const client = moduleOf(dir, "de key900");
+	expect([server, client]).toEqual([
+		expect.stringMatching(/^keys\/g0-/),
+		expect.stringMatching(/^keys\/g1-/),
+	]);
+	expect(compiledKeys(dir)).toEqual({
+		"app-rsc": [server],
+		"app-ssr": [client],
+		"app-client": [client],
+	});
+});
+
+it("renders a key a component reads after the groups were saved, groups it at the next start, and groups again as routes come and go", {
+	timeout: 300_000,
+}, async () => {
+	const dir = nextProject(1200, homePage(["key7"], ["key900"]), {
+		withGrai: true,
+	});
+	const first = await started(dir);
+	await requested(first.origin, "/");
+	await savedGroups(dir, (groups) => groups.length > 0);
+	await stopped(first.server);
+
+	// A key the client component reads now, which its group does not hold: its shard serves it.
+	edited(dir, homePage(["key7"], ["key900", "key901"]));
+	const second = await started(dir);
+	expect(await requested(second.origin, "/")).toContain("de key901");
+	expect(
+		await savedGroups(dir, (groups) => groups.flat().includes("key901")),
+	).toEqual([["key7"], ["key900", "key901"]]);
+	await stopped(second.server);
+
+	rmSync(join(dir, ".next"), { recursive: true, force: true });
+	const third = await started(dir);
+	expect(await requested(third.origin, "/")).toContain("de key901");
+	const client = moduleOf(dir, "de key901");
+	expect(client).toBe(moduleOf(dir, "de key900"));
+	expect(compiledKeys(dir)["app-ssr"]).toEqual([client]);
+	await stopped(third.server);
+
+	// A route added: its keys are grouped at the start after the one that served it.
+	edited(dir, {
+		"app/about/page.jsx": `import * as m from "../../i18n/keys.js";
+
+export default function About() {
+	return <main>{m.key55({}, { locale: "de" })}</main>;
+}
+`,
+	});
+	const fourth = await started(dir);
+	expect(await requested(fourth.origin, "/about")).toContain("de key55");
+	expect(
+		await savedGroups(dir, (groups) => groups.flat().includes("key55")),
+	).toEqual([["key55"], ["key7"], ["key900", "key901"]]);
+	await stopped(fourth.server);
+
+	// The route removed: its keys leave the groups, for their shards.
+	rmSync(join(dir, "app/about"), { recursive: true, force: true });
+	const fifth = await started(dir);
+	expect(await requested(fifth.origin, "/")).toContain("de key7");
+	expect(
+		await savedGroups(dir, (groups) => !groups.flat().includes("key55")),
+	).toEqual([["key7"], ["key900", "key901"]]);
+	await stopped(fifth.server);
 });
