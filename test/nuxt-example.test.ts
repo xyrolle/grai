@@ -280,11 +280,15 @@ describe("the Nuxt example, built, by every locale's prefix, then the cookie and
 	});
 });
 
+/** Starts `nuxt dev` on the example, on a port the system picks. */
+const nuxtDev = () =>
+	listening(nuxt, ["dev", "--port", "0", "--host", "127.0.0.1"]);
+
 describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
 	let origin = "";
 	let app: Served | undefined;
 	beforeAll(async () => {
-		app = await listening(nuxt, ["dev", "--port", "0", "--host", "127.0.0.1"]);
+		app = await nuxtDev();
 		origin = app.origin;
 	}, 120_000);
 	afterAll(() => app && stopped(app.server));
@@ -299,6 +303,16 @@ describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
 			JSON.stringify({ ...JSON.parse(catalog), title }, null, "\t"),
 		);
 	}
+
+	it("loads each page's locale's words alone, the locale the server drew it in", async () => {
+		await page.goto(`${origin}/ro/`);
+		await page.locator("#hydrated").waitFor();
+
+		expect(await html("lang")).toBe("ro");
+		expect(scripts.filter((path) => path.includes("grai:keys"))).toEqual([
+			"/_nuxt/@id/__x00__grai:keys/ro",
+		]);
+	});
 
 	it("renders an edited message again in place, keeping the page's state, and the server's renders take it too", async () => {
 		await page.goto(`${origin}/ro/`);
@@ -320,5 +334,34 @@ describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
 				timeout: 10_000,
 			})
 			.toContain("Un magazin pe limba ta");
+	});
+});
+
+describe("the Nuxt example under nuxt dev, a message invalid in a locale no page loads", {
+	timeout: 120_000,
+}, () => {
+	it("serves no page's words, the page's locale's neither", async () => {
+		// Nuxt's server renders from the output on disk, which a compile that failed leaves as it was.
+		const file = join(example, "messages", "ar.json");
+		const catalog = readFileSync(file, "utf8");
+		onTestFinished(() => writeFileSync(file, catalog));
+		writeFileSync(
+			file,
+			JSON.stringify(
+				{ ...JSON.parse(catalog), title: "{$count :weekday}" },
+				null,
+				"\t",
+			),
+		);
+		const app = await nuxtDev();
+		onTestFinished(() => stopped(app.server));
+		const keys = () => fetch(`${app.origin}/_nuxt/@id/__x00__grai:keys/ro`);
+		// nuxi answers 503 until its first build of the app is done.
+		await expect
+			.poll(async () => (await keys()).status, { timeout: 60_000 })
+			.not.toBe(503);
+		const every = await fetch(`${app.origin}/_nuxt/@id/__x00__grai:keys`);
+
+		expect([(await keys()).ok, every.ok]).toEqual([false, false]);
 	});
 });
