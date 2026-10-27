@@ -69,7 +69,27 @@ It exports nothing: an app imports it once, from `src/hooks.client.ts`, for what
 
 What the middleware the integration writes imports; apps never do.
 - `localeMiddleware(project: LocaleProject): (context: LocaleContext, next: () => Promise<Response>) => Promise<Response>`: Astro's middleware, from the output's `server.js` and the integration's reading of the two configs.
-- `type LocaleProject`, `type LocaleContext` and `type ImportMap`: what it takes and reads.
+- `type LocaleProject` and `type LocaleContext`: what it takes and reads.
+
+## `grai/astro/translated-paths`
+
+What the routes the integration adds for `pathnames` import; apps never do.
+- `translatedStaticPaths(project: TranslatedPages): (options: { routePattern: string }) => Promise<{ params }[]>`: the `getStaticPaths()` of the route the integration adds for each path in a locale's words, which lists, from each prerendered page's own `getStaticPaths()`, the pages a static build writes there.
+- `type PageRoute` and `type TranslatedPages`: what it takes.
+
+## `grai/vue`
+
+- `Markup<Tag>({ parts, markup }: { parts: readonly MarkupPart<Tag>[]; markup: MarkupElements<Tag> }): VNode[]`: a functional component that draws a markup message's `.parts()`, each element by the app's function in `markup`. An element the parts name and `markup` lacks is a type error, and throws, naming it.
+- `type MarkupPart<Tag>`, `type MarkupElement`, `type MarkupElements<Tag>` and `type MarkupDetails`: what it takes and calls each function with.
+
+## `grai/vue/client`
+
+It exports nothing: an app imports it once, from the browser's entry, for what it does in dev. A catalog edit then renders again, in place, what called an edited message, and the page keeps its state. A build leaves it out.
+
+## `grai/nuxt`
+
+- The Nuxt module, `modules: ["grai/nuxt"]`, with `grai: { config }` for a config other than `grai.config.json` in the project's root. It compiles before Nuxt builds anything and again on each edit in dev, resolves each request's locale by the config's `strategy` in a server middleware, binds it for the render and writes it with its direction to `<html>`. With the `url` strategy it routes each page under each prefixed locale's prefix, in the locale's words where `pathnames` gives them.
+- `type GraiNuxtOptions`: its options.
 
 ## The `grai` command
 
@@ -85,16 +105,17 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `grai seed <locale>`: gives the locale's catalog the base text of each key it lacks, then compiles.
 - `grai export <locale> [--untranslated] [--json]`: prints the locale's messages as XLIFF 2.0. `--json` prints `{ srcLang, trgLang, units: [{ id, key, variant?, note?, source, target? }] }`.
 - `grai merge <file>`: writes an exported file's translations into its locale's catalog, then compiles.
-- `grai import --from i18next|icu <file or dir>...`: converts another library's catalogs into new grai catalogs.
+- `grai import --from i18next|icu <file or dir>...`: converts another library's catalogs into new grai catalogs, writes `grai.import.json`, which maps each source key to its grai key, and reports each message it leaves out or renders differently.
+- `grai migrate [--source <dir>]... [--default-namespace <ns>]`: rewrites each call of the imported library that names its message plainly as a call of the grai message `grai.import.json` maps it to, and reports every other call, for a person to migrate ([docs/migrating.md](migrating.md)).
 - `grai help`: lists the commands.
 
 ## `grai.config.json`
 
 - `locales: string[]`: the project's locales, as BCP 47 tags in their canonical form.
 - `baseLocale: string`: one of `locales`; the locale a call renders in when nothing binds another.
-- `catalogs: string`: each locale's catalog, as a path with `{locale}` in it, such as `"messages/{locale}.json"`. A catalog may nest keys in objects; a nested key is called by its names joined by `_`.
+- `catalogs: string | string[]`: each locale's catalog, as a path with `{locale}` in it, such as `"messages/{locale}.json"`, or a list of such paths where a locale's messages are split across files: a key is in one of them, and a new key goes in the first. A catalog may nest keys in objects; a nested key is called by its names joined by `_`.
 - `outdir: string`: the directory the output goes to.
-- `strategy?: ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url")[]`: where the server and a page no server draws look for the locale, in order, before the base locale. Each reads the places it can see: the server no `localStorage`.
+- ``strategy?: ("cookie" | "localStorage" | "preferredLanguage" | "query" | "url" | `custom-${string}`)[]``: where the server and a page no server draws look for the locale, in order, before the base locale. Each reads the places it can see: the server no `localStorage`. A `custom-` name, such as `"custom-session"`, is a strategy the server defines with `server.js`'s `defineServerStrategy`, which a page does not read.
 - `cookieName?: string`: the cookie the `cookie` strategy reads and `setLocale` writes, a name RFC 6265 allows; required with it, refused without it.
 - `cookieMaxAge?: number`: the seconds a browser keeps the cookie, 400 days by default.
 - `cookieDomain?: string`: a host whose subdomains share the cookie, such as `example.com`.
@@ -105,6 +126,9 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `localePrefix?: "as-needed" | "always"`: with the `url` strategy, whether the base locale's paths have a prefix too; `"as-needed"`, the default, leaves them without one.
 - `localePrefixes?: Record<string, string>`: with the `url` strategy, a locale's own prefix, one path segment, such as `{ "en-US": "us" }`.
 - `unlocalizedPaths?: string[]`: with the `url` strategy, globs of the paths it leaves alone, such as `["/api/**"]`, whose locale the strategies after it find.
+- `pathnames?: Record<string, Record<string, string>>`: with the `url` strategy, a route's path in each locale's words, such as `{ "/about": { "de": "/ueber-uns" }, "/products/[id]": { "de": "/produkte/[id]" } }`, which `localizeHref` writes and `deLocalizeUrl` reads back as the route. A segment written `[name]` is carried across, and each locale's path names the route's segments.
+- `basePath?: string`: with the `url` strategy, the path the app is served under, such as `"/shop"`, which the locale's prefix follows. The framework's base path must be the same: Vite's `base`, SvelteKit's `paths.base`, Next's `basePath`, Astro's `base` or Nuxt's `app.baseURL`.
+- `domains?: Record<string, string>`: with the `url` strategy, every locale's own host, such as `{ "en": "example.com", "de": "example.de" }`. There a request's host names its locale, paths have no prefix, and a link to another locale is a whole URL. On any other host, such as `localhost` in development, the prefix names the locale.
 - `tests?: string[]`: globs of the source files that are tests, which `grai check` does not count as using a key; `[]` makes no file a test.
 - `fallbacks?: Record<string, string>`: each locale that takes the messages it lacks from another locale of its language, such as `{ "en-GB": "en" }`.
 - `identicalToBase?: Record<string, string[]>`: per locale, the keys whose message rightly reads as the base locale's, which `grai check` and `grai export` take as translated.
@@ -152,7 +176,9 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
   - `"locale-unkept"`: `setLocale` in a page whose `strategy` keeps a choice nowhere;
   - `"value-unmatched"`: a value a closed select does not list;
   - `"format-option-invalid"`: an input that gives a formatter an option Intl refuses, such as an unknown currency;
-  - `"locale-unbound"`: on a server, a message rendered outside every request the middleware binds, such as in a stream's `pull()` once the middleware has returned; in Next.js, a server component that renders a message before its page or layout bound the locale.
+  - `"locale-unbound"`: on a server, a message rendered outside every request the middleware binds, such as in a stream's `pull()` once the middleware has returned; in Next.js, a server component that renders a message before its page or layout bound the locale;
+  - `"output-changed"`: a process that loaded the keys of one compile and the runtime of another, as when a compile changed the locales while it ran;
+  - `"strategy-undefined"`: `server.js`'s `defineServerStrategy` called with a name the config's `strategy` does not list.
 
 ### `testing.js`
 
@@ -163,5 +189,9 @@ The four URL helpers follow the `url` strategy. Without it no URL names a locale
 - `middleware(request: Request, handler: (resolved: { request: Request; locale: Locale }) => Response | Promise<Response>): Promise<Response>`: resolves the request's locale by the config's `strategy`, binds it for the handler and everything it calls, and gives back the handler's response, its `Vary` listing the request headers the strategy reads.
 - `withLocale<Result>(locale: Locale, code: () => Result): Result`: runs `code` in `locale` as the middleware runs a request's handler, so each message it calls and each task it starts renders in it: a scheduled job's code, or a test's, under Vitest `aroundEach((test) => withLocale("de", test))`.
 - `localeCopies: boolean`: whether the build that compiled the output wrote a copy of each message chunk per locale, which `grai/sveltekit`'s `handleLocale` reads.
+- ``defineServerStrategy(name: `custom-${string}`, strategy: { getLocale(request: Request): string | undefined | Promise<string | undefined>; vary?: readonly string[] }): void``: defines one of the server's own strategies, which the config's `strategy` lists by its name: the middleware asks it for a request's locale in the strategy's order, and goes on where it names none. `vary` names the request headers it reads. Define each before the first request; a name the config does not list throws `strategy-undefined`.
+- `vary: string`: the request headers the strategy reads, as the `Vary` the middleware adds, for a framework that sends its response apart from the middleware.
+- `localeOf(request: Request): Promise<Locale>`: the locale the middleware binds for a request, for a framework that renders apart from it.
+- `redirectOf(request: Request): Promise<Response | undefined>`: the redirect the middleware answers a request with, its `Vary` included, else `undefined`: with every locale's paths prefixed, a page asked for without a prefix is sent to its locale's path.
 
 Everything else in `outdir` is internal: `internal.js`, the modules named by their content (`runtime-<hash>.js`, `config-<hash>.js`, `plurals-<hash>.js`, `formats-<hash>.js`), the shards under `keys/`, and `.grai/`.
