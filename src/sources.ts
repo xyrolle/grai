@@ -44,7 +44,20 @@ export function sourceFiles(
 	outdir: string,
 	seen?: Seen,
 ): SourceFile[] {
-	const files: SourceFile[] = [];
+	return sourcePaths(roots, outdir, seen).map((path) => ({
+		path,
+		file: relative(projectRoot, path),
+		text: readFileSync(path, "utf8"),
+	}));
+}
+
+/** The paths of the source files under the roots that `sourceFiles` reads, in its order. */
+export function sourcePaths(
+	roots: readonly string[],
+	outdir: string,
+	seen?: Seen,
+): string[] {
+	const paths: string[] = [];
 	const visit = (directory: string) => {
 		for (const entry of readdirSync(directory, { withFileTypes: true })) {
 			const path = join(directory, entry.name);
@@ -58,13 +71,12 @@ export function sourceFiles(
 				if (!skipped) visit(path);
 				else if (path !== outdir) seen?.skipped.push(path);
 			} else if (sourceExtensions.has(extname(entry.name))) {
-				const text = readFileSync(path, "utf8");
-				files.push({ path, file: relative(projectRoot, path), text });
+				paths.push(path);
 			}
 		}
 	};
 	for (const root of roots) visit(root);
-	return files;
+	return paths;
 }
 
 /** A test file, by the path the project shows, and the keys it reads. */
