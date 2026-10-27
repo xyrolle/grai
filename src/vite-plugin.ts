@@ -460,7 +460,7 @@ export function graiPlugin(
 		},
 	};
 	const reads = buildReads({
-		build: () => (serving ? undefined : build),
+		build: () => build,
 		outdir: () => files.outdir,
 		reading: (environment) => readings.get(environment),
 		read: (environment, id, reading) => {
