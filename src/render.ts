@@ -64,6 +64,14 @@ const keysPerShard = 512;
 const messagesModule = `export * as m from "./keys.js";\n`;
 
 /**
+ * The outdir's package.json. Its modules are ES modules whatever the project's package.json says,
+ * and only server.js, which binds the request's store as it loads, has effects of its own: a bundler
+ * that reads `sideEffects` then leaves out each module of keys no code reads, as `next dev` does in
+ * each of its layers, and keeps a module whose keys are read whole, its check among them.
+ */
+const outdirPackage = `${JSON.stringify({ type: "module", sideEffects: ["./server.js"] }, null, "\t")}\n`;
+
+/**
  * Renders the output. The keys are split into shards by a hash of their name, so a key stays in
  * its shard while others come and go; only the shards whose keys changed are rendered again, and
  * those that import a module renamed: every shard for the runtime, and for the plural rules or the
@@ -140,6 +148,7 @@ export function renderOutput(
 		],
 		mutable: [
 			[".gitignore", gitignore],
+			["package.json", outdirPackage],
 			...[...shardFiles].map(
 				([index, { map }]): OutputFile => [`keys/${index}.d.ts.map`, map],
 			),
