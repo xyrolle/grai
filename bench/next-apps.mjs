@@ -258,19 +258,26 @@ ${items(keys.client, app, (key, inputs) => call("t", key, inputs), "client")}
 	return root;
 }
 
-/** The page with one locale's words written in, from grai's output for that locale. */
-async function writePlain(app, keys, locale, graiRoot) {
-	const root = join(nextDir, "plain");
+/**
+ * The words of the page's messages in one locale, in the order it lists them, from grai's output:
+ * the server component's, then the client component's.
+ */
+async function pageWords(app, keys, locale, graiRoot) {
 	const { m } = await import(
 		pathToFileURL(join(graiRoot, "src/i18n/messages.js")).href
 	);
 	const words = (list) =>
-		list
-			.map((key) => {
-				const inputs = inputsOf(app.messages[app.baseLocale][key]);
-				return `\t\t\t<li>{${JSON.stringify(m[key](inputs, { locale }))}}</li>`;
-			})
-			.join("\n");
+		list.map((key) =>
+			m[key](inputsOf(app.messages[app.baseLocale][key]), { locale }),
+		);
+	return { server: words(keys.server), client: words(keys.client) };
+}
+
+/** The page with one locale's words written in. */
+function writePlain(words, locale) {
+	const root = join(nextDir, "plain");
+	const items = (list) =>
+		list.map((word) => `\t\t\t<li>{${JSON.stringify(word)}}</li>`).join("\n");
 	writeFiles(root, {
 		"next.config.mjs": nextConfig({ imports: "", call: "" }),
 		[`src/app/${locale}/layout.jsx`]: `export default function Layout({ children }) {
@@ -283,7 +290,7 @@ export default function Page() {
 	return (
 		<main>
 			<ul>
-${words(keys.server)}
+${items(words.server)}
 			</ul>
 			<Client />
 		</main>
@@ -295,7 +302,7 @@ ${words(keys.server)}
 export function Client() {
 	return (
 		<ul>
-${words(keys.client)}
+${items(words.client)}
 		</ul>
 	);
 }
@@ -304,21 +311,26 @@ ${words(keys.client)}
 	return root;
 }
 
-/** Writes the four apps for one catalog, and compiles grai's catalogs for the plain page's words. */
+/**
+ * Writes the four apps for one catalog, after compiling grai's catalogs for the page's words: the
+ * words of the page's messages, in its order, which every app's page lists.
+ */
 export async function writeNextApps(app, locale) {
 	const keys = pageKeys(app);
 	const grai = writeGrai(app, keys);
 	const result = await compile(join(grai, "grai.config.json"));
 	if (result.errors.length > 0) throw result.errors[0];
+	const words = await pageWords(app, keys, locale, grai);
 	return {
 		keys,
+		words: [...words.server, ...words.client],
 		apps: {
 			grai,
 			"next-intl": writeNextIntl(app, keys, { picked: false }),
 			"next-intl, client keys picked": writeNextIntl(app, keys, {
 				picked: true,
 			}),
-			plain: await writePlain(app, keys, locale, grai),
+			plain: writePlain(words, locale),
 		},
 	};
 }

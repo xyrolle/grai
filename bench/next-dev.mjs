@@ -1,5 +1,7 @@
 // Starting `next` in one of the bench's apps (next-apps.mjs), and timing `next dev` from the
 // process's launch: until Next says it is ready, and until the page's first response is complete.
+// The response is checked to list every message the page renders, in order, so that a page
+// answering sooner with an error or with fewer words never counts as faster.
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { startServer } from "./servers.mjs";
@@ -56,15 +58,44 @@ async function firstResponse(url) {
 	throw new Error(`${url} did not answer in 120 s`);
 }
 
+/** The few entities React writes in a text, and any numeric one. */
+const entities = { amp: "&", lt: "<", gt: ">", quot: '"' };
+const decoded = (html) =>
+	html.replace(/&(?:(\w+)|#(\d+)|#x([\da-f]+));/gi, (entity, name, dec, hex) =>
+		name !== undefined
+			? (entities[name] ?? entity)
+			: String.fromCodePoint(
+					dec !== undefined ? Number(dec) : Number.parseInt(hex, 16),
+				),
+	);
+
+/** The texts of a document's list items, in order: each item of the bench's page holds one message. */
+const listed = (html) =>
+	[...html.matchAll(/<li(?: id="[^"]*")?>([^<]*)<\/li>/g)].map(([, text]) =>
+		decoded(text),
+	);
+
+/** Throws unless `texts` are the page's `words`, in order, naming the first that differs. */
+function check(texts, words, where) {
+	const index = words.findIndex((word, at) => texts[at] !== word);
+	if (index === -1 && texts.length === words.length) return;
+	const at = index === -1 ? words.length : index;
+	throw new Error(
+		`${where} lists ${texts.length} messages for ${words.length}; item ${at} is ${JSON.stringify(texts[at])}, not ${JSON.stringify(words[at])}.`,
+	);
+}
+
 /**
- * `next dev` from its launch until it is ready, and until the page's first response is complete:
- * from an empty .next, or not. The server is left running.
+ * `next dev` from its launch until it is ready, and until the page's first response is complete and
+ * lists `words`: from an empty .next, or not. The server is left running.
  */
-export async function devStart(root, path, { empty }) {
+export async function devStart(root, path, words, { empty }) {
 	if (empty) rmSync(join(root, ".next"), { recursive: true, force: true });
 	const server = started(root, "dev", /Ready in/);
 	const { origin, ready } = await server.listening;
 	const url = `${origin}${path}`;
-	await firstResponse(url);
-	return { server, url, ready, page: now() - server.launched };
+	const html = await firstResponse(url);
+	const page = now() - server.launched;
+	check(listed(html), words, `${url}'s first response`);
+	return { server, url, ready, page };
 }
