@@ -10,8 +10,8 @@
 
 import { readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { SourceFile } from "../sources.ts";
-import { specifiersIn, written } from "./candidates.ts";
+import { written } from "./candidates.ts";
+import type { Listed } from "./listing.ts";
 import type { Mapping } from "./mappings.ts";
 
 /** The packages installed for a project, and the specifiers of them that the sources write. */
@@ -22,7 +22,6 @@ export class Installed {
 		source: string,
 		importer: string,
 	) => string | undefined;
-	private readonly written = new Map<string, Set<string>>();
 	private readonly resolved = new Map<string, string | undefined>();
 
 	/**
@@ -62,18 +61,14 @@ export class Installed {
 	 * on, by `holds`, each as a pattern of the text that writes it.
 	 */
 	async passing(
-		sources: readonly SourceFile[],
+		sources: readonly Listed[],
 		holds: (path: string) => Promise<boolean>,
 	): Promise<Set<string>> {
 		const held = new Map<string, Promise<boolean>>();
 		const passing = new Set<string>();
-		for (const { path, text } of sources) {
-			let specifiers = this.written.get(path);
-			if (specifiers === undefined) {
-				specifiers = this.specifiers(text);
-				this.written.set(path, specifiers);
-			}
+		for (const { path, specifiers } of sources) {
 			for (const specifier of specifiers) {
+				if (!this.imports(specifier)) continue;
 				if (passing.has(specifier)) continue;
 				const module = this.resolvedFrom(specifier, path);
 				if (module === undefined) continue;
@@ -118,16 +113,6 @@ export class Installed {
 			? segments.slice(0, 2).join("/")
 			: segments[0];
 		return name !== undefined && this.names.has(name);
-	}
-
-	/** The specifiers in a text that may name an installed package's module. */
-	private specifiers(text: string): Set<string> {
-		const found = new Set<string>();
-		if (this.names.size === 0) return found;
-		for (const specifier of specifiersIn(text)) {
-			if (this.imports(specifier)) found.add(specifier);
-		}
-		return found;
 	}
 }
 

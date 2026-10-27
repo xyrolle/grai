@@ -12,13 +12,14 @@ import { GraiError } from "../error.ts";
 import { keyModulePrefix } from "../locale-chunks.ts";
 import { moduleOf } from "../output-paths.ts";
 import { realPath } from "../real-path.ts";
-import { type Seen, sourceExtensions, sourceFiles } from "../sources.ts";
+import { type Seen, sourceExtensions } from "../sources.ts";
 import { stateDirectory } from "../state-directory.ts";
 import { type FileFacts, factsOf } from "./facts.ts";
 import { FactsCache } from "./facts-cache.ts";
 import { factsOfSources } from "./facts-pool.ts";
 import { barrelsOf, holding } from "./holders.ts";
 import { Installed } from "./installed.ts";
+import { FileListing } from "./listing.ts";
 import { keyPathPatterns, projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Pool } from "./pool.ts";
@@ -68,10 +69,12 @@ export async function readProjectCode(
 	const resolution = await projectResolution(config.root);
 	if (resolution instanceof GraiError) return resolution;
 	const resolveFile = resolverFor(resolution);
-	const cache = new FactsCache(join(config.outdir, stateDirectory));
+	const state = join(config.outdir, stateDirectory);
+	const cache = new FactsCache(state);
 	const seen: Seen = { links: [], manifests: [], skipped: [] };
 	const listedRoots = roots.map(realPath);
-	const files = sourceFiles(listedRoots, config.root, config.outdir, seen);
+	const listing = new FileListing(state, cache.version);
+	const files = listing.list(listedRoots, config.root, config.outdir, seen);
 	const listed = new Set(files.map(({ path }) => path));
 	const sources = new Map<string, SourceCode>();
 	const pool = new Pool();
@@ -145,9 +148,17 @@ export async function readProjectCode(
 			if (taken.length === 0 && !again && round > 0) break;
 			const read = await factsOfSources(taken, cache, pool);
 			const added = new Map<string, SourceCode>();
-			taken.forEach(({ path, file, text }, index) => {
+			taken.forEach((each, index) => {
 				const facts = read[index];
-				if (facts !== undefined) added.set(path, { file, text, facts });
+				if (facts === undefined) return;
+				// The text is read when the reading asks for it, as the listing keeps its hash.
+				added.set(each.path, {
+					file: each.file,
+					facts,
+					get text() {
+						return each.text;
+					},
+				});
 			});
 			for (const [path, source] of added) sources.set(path, source);
 			await resolutions.add(added, wanted);
@@ -160,7 +171,8 @@ export async function readProjectCode(
 			}
 		}
 		cache.keepUnread(listedRoots, listed);
-		saveQuietly(cache);
+		saveQuietly(() => cache.save());
+		saveQuietly(() => listing.save());
 	} finally {
 		await pool.close();
 	}
@@ -174,10 +186,10 @@ export async function readProjectCode(
 /** The facts of a source the reading leaves out: none, as it holds nothing of grai's. */
 const holdsNothing: FileFacts = { modules: [] };
 
-/** Writes the cache; a cache that cannot be written only costs the next command its reading. */
-function saveQuietly(cache: FactsCache): void {
+/** Writes what a command keeps; what cannot be written only costs the next command its reading. */
+function saveQuietly(save: () => void): void {
 	try {
-		cache.save();
+		save();
 	} catch {
 		// A read-only checkout keeps no cache.
 	}

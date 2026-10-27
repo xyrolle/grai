@@ -4,17 +4,15 @@
  * is read when its text may name grai's output or a module that passes it on (`candidates.ts`), or
  * a module outside the listed sources (`outside.ts`), through a workspace package that passes it on
  * (`workspace.ts`) or an installed one (`installed.ts`). The test is necessary, never sufficient.
+ *
+ * A file names a module only by a specifier, a string right after a load's word, unless its text
+ * may spell one otherwise (`unwritten`), which reads it. So the test takes each file's specifiers,
+ * as the listing keeps them (`listing.ts`), and its text only through them.
  */
 
-import type { SourceFile } from "../sources.ts";
-import {
-	type Link,
-	namesOf,
-	type Package,
-	textTest,
-	written,
-} from "./candidates.ts";
+import { type Link, namesOf, type Package, written } from "./candidates.ts";
 import { keyNamesOf } from "./key-candidates.ts";
+import type { Listed } from "./listing.ts";
 import type { Mapping } from "./mappings.ts";
 import type { Output } from "./modules.ts";
 import { type Listing, Outside, outsideNames } from "./outside.ts";
@@ -59,10 +57,10 @@ export class TextTest {
 	 * left out, which failed the names then, so it tests them by the names found since alone.
 	 */
 	taken(
-		files: readonly SourceFile[],
+		files: readonly Listed[],
 		barrels: ReadonlySet<string>,
 		reached: ReadonlySet<string>,
-	): SourceFile[] {
+	): Listed[] {
 		const { listing, mappings, links, packages, output, key } = this.naming;
 		const names =
 			mappings &&
@@ -82,29 +80,45 @@ export class TextTest {
 		for (const name of this.passers.passing(names)) names.add(written(name));
 		const tested = this.tested;
 		this.tested = names;
-		this.leading = new RegExp([...names].join("|"));
+		const leading = new RegExp([...names].join("|"));
+		this.leading = leading;
 		if (tested === undefined) {
-			const test = textTest(names);
 			return files.filter(
-				({ path, text }) => test.test(text) || this.beyond.test(path, text),
+				({ path, unwritten, specifiers }) =>
+					unwritten ||
+					specifiers.some((source) => this.named(source, path, leading)),
 			);
 		}
 		const found = [...names].filter((name) => !tested.has(name));
 		if (found.length === 0) return [];
-		const test = new RegExp(found.join("|"));
-		return files.filter(({ text }) => test.test(text));
+		const fresh = new RegExp(found.join("|"));
+		return files.filter(({ specifiers }) =>
+			specifiers.some((source) => endless(source) || fresh.test(`"${source}"`)),
+		);
 	}
 
 	/**
 	 * Whether an import of a file read may name what holds grai's or a module outside the listed
-	 * sources, by its path and the names the last call of `taken` tested by, as a file's text may.
-	 * A path that holds a quote or a line break, which would end it there, is taken.
+	 * sources, by its path and the names the last call of `taken` tested by.
 	 */
 	leads(source: string, importer: string): boolean {
-		if (this.leading === undefined || /['"`\n\r\u2028\u2029]/.test(source)) {
-			return true;
-		}
-		const written = `"${source}"`;
-		return this.leading.test(written) || this.beyond.test(importer, written);
+		return (
+			this.leading === undefined || this.named(source, importer, this.leading)
+		);
 	}
+
+	/** Whether a specifier may name what holds grai's, by these names, or lead outside the sources. */
+	private named(source: string, importer: string, names: RegExp): boolean {
+		if (endless(source)) return true;
+		const quoted = `"${source}"`;
+		return names.test(quoted) || this.beyond.test(importer, quoted);
+	}
+}
+
+/**
+ * Whether a specifier holds a quote or a line break, which would end it within the test's quotes,
+ * so that it is taken as one that may name anything.
+ */
+function endless(source: string): boolean {
+	return /['"`\n\r\u2028\u2029]/.test(source);
 }
