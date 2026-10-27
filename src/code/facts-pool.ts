@@ -12,7 +12,6 @@ import {
 	type FactsRead,
 	keptFacts,
 	keptText,
-	textHash,
 } from "./facts-cache.ts";
 import type { Pool } from "./pool.ts";
 
@@ -66,19 +65,23 @@ export async function factsOfFiles(
 	return read.flat();
 }
 
-/** Each file's facts, from the cache or read in the pool, which the cache keeps then. */
+/**
+ * Each file's facts, from the cache by its text's hash or read in the pool, which the cache keeps
+ * then. A file's text is read only for a file the cache does not have.
+ */
 export async function factsOfSources(
-	files: readonly { path: string; text: string }[],
+	files: readonly { path: string; hash: string; text: string }[],
 	cache: FactsCache,
 	pool: Pool,
 ): Promise<(FileFacts | undefined)[]> {
 	const cached: (FileFacts | undefined)[] = [];
 	const unread: { path: string; text: string; hash: string }[] = [];
-	for (const { path, text } of files) {
-		const hash = textHash(text);
-		const facts = cache.get(path, hash);
+	for (const file of files) {
+		const facts = cache.get(file.path, file.hash);
 		cached.push(facts);
-		if (facts === undefined) unread.push({ path, text, hash });
+		if (facts === undefined) {
+			unread.push({ path: file.path, text: file.text, hash: file.hash });
+		}
 	}
 	const read = await factsOfFiles(unread, pool);
 	unread.forEach(({ path, hash }, index) => {

@@ -38,6 +38,11 @@ export type Package = { name: string; directory: string };
 const unwritten =
 	/\\u|\b(?:from|import|require)\s*(?:\(\s*)?(?:\/[*/]|'[^'\n\\]*\\|"[^"\n\\]*\\)|\b(?:import|require)\s*\((?!\s*(?:'[^'\n]*'|"[^"\n]*")\s*\))|\bglob\s*(?:\(|<|\/[*/])/;
 
+/** Whether a text may spell a specifier otherwise than as it writes it (`unwritten`). */
+export function spellsOtherwise(text: string): boolean {
+	return unwritten.test(text);
+}
+
 /** A specifier where `unwritten` finds none spelled otherwise: a string right after a load's word. */
 const specifier =
 	/\b(?:from|import|require)\s*(?:\(\s*)?(?:'([^'\n\\]*)'|"([^"\n\\]*)")/g;

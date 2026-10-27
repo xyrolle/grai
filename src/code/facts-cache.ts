@@ -46,7 +46,8 @@ const require = createRequire(import.meta.url);
 
 export class FactsCache {
 	private readonly file: string;
-	private readonly version = readerVersion(
+	/** What the facts are read with (`readerVersion`), which every kept fact of a file's is keyed on. */
+	readonly version: string = readerVersion(
 		dirname(fileURLToPath(import.meta.url)),
 	);
 	private readonly read: ReadonlyMap<string, Entry>;
