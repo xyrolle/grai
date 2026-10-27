@@ -2,6 +2,7 @@ import { basename, join, resolve } from "node:path";
 import type { Logger, Plugin, ResolvedConfig } from "vite";
 import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import { BuildReading } from "./code/build-reading.ts";
+import { FactsCache } from "./code/facts-cache.ts";
 import { parse } from "./code/parse.ts";
 import { withGroups } from "./code-splitting.ts";
 import { type Build, recompile } from "./compile.ts";
@@ -20,6 +21,7 @@ import { type ModuleLinks, moduleLinks, seenThrough } from "./module-links.ts";
 import { moduleOf } from "./output-paths.ts";
 import { realPath } from "./real-path.ts";
 import { sharedKeys } from "./server-chunks.ts";
+import { stateDirectory } from "./state-directory.ts";
 import {
 	type ChunkingGraph,
 	chunkFileName,
@@ -114,6 +116,8 @@ export function graiPlugin(
 	let patchesMade = () => 0;
 	/** Each build environment's reading of its modules, from its start. */
 	const readings = new Map<string, BuildReading>();
+	// The facts of the modules the build reads, kept with the CLI's by their code's hash.
+	let facts: FactsCache | undefined;
 	let closeMessages = async () => {};
 	const copies = messageChunkCopies();
 	/**
@@ -300,6 +304,7 @@ export function graiPlugin(
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
 			const held = placeholderTexts(compiled);
 			if (held.length > 0) this.error(messagesOf(held));
+			facts ??= new FactsCache(join(files.outdir, stateDirectory));
 			readings.set(
 				this.environment.name,
 				new BuildReading(
@@ -313,6 +318,7 @@ export function graiPlugin(
 							// none of grai's, as the bundler reports what it cannot resolve itself.
 							() => undefined,
 						),
+					facts,
 				),
 			);
 		},
@@ -358,6 +364,14 @@ export function graiPlugin(
 		async buildEnd() {
 			await closeMessages();
 			if (!building(this.environment)) return;
+			if (facts !== undefined) {
+				facts.keepAll();
+				try {
+					facts.save();
+				} catch {
+					// A cache that cannot be written only costs the next build its parse.
+				}
+			}
 			seen = await seenThrough(
 				read.modules,
 				(id) => this.getModuleInfo(id),
