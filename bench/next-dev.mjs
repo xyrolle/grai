@@ -1,7 +1,7 @@
-// Starting `next` in one of the bench's apps (next-apps.mjs), and timing `next dev` from the
-// process's launch: until Next says it is ready, and until the page's first response is complete.
-// The response is checked to list every message the page renders, in order, so that a page
-// answering sooner with an error or with fewer words never counts as faster.
+// Starting `next` in one of the bench's apps (next-apps.mjs), each clock from the process's launch:
+// until Next says it is ready, until the page's first response is complete, and until Chromium has
+// hydrated the page. Each checks that the page lists every message it renders, in order, so that a
+// page answering sooner with an error or with fewer words never counts as faster.
 import { spawnSync } from "node:child_process";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -101,14 +101,19 @@ function groupCpu(pid) {
 		}, 0);
 }
 
+/** Removes the app's directories a start should begin without, such as `.next`. */
+function clear(root, directories) {
+	for (const directory of directories)
+		rmSync(join(root, directory), { recursive: true, force: true });
+}
+
 /**
  * `next dev` from its launch until it is ready, and until the page's first response is complete and
  * lists `words`, with the CPU Next's processes used until then, after removing the app's
- * directories `cleared` names, such as `.next`. The server is left running.
+ * directories `cleared` names. The server is left running.
  */
 export async function devStart(root, path, words, cleared = []) {
-	for (const directory of cleared)
-		rmSync(join(root, directory), { recursive: true, force: true });
+	clear(root, cleared);
 	const server = started(root, "dev", /Ready in/);
 	const { origin, ready } = await server.listening;
 	const url = `${origin}${path}`;
@@ -116,4 +121,37 @@ export async function devStart(root, path, words, cleared = []) {
 	const page = now() - server.launched;
 	check(listed(html), words, `${url}'s first response`);
 	return { server, url, ready, page, cpu: groupCpu(server.child.pid) };
+}
+
+/**
+ * `next dev` from its launch until Chromium, in a context of its own, has hydrated the page and it
+ * lists `words`, after removing the app's directories `cleared` names: the page's Observer stamps
+ * `hydratedAt` in its effect, which runs once React has hydrated the page. A hydration error fails
+ * the run. The server is left running.
+ */
+export async function hydratedStart(browser, root, path, words, cleared = []) {
+	clear(root, cleared);
+	const server = started(root, "dev", /Ready in/);
+	const { origin } = await server.listening;
+	const url = `${origin}${path}`;
+	const context = await browser.newContext();
+	const page = await context.newPage();
+	const errors = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	page.on("console", (message) => {
+		if (message.type() === "error" && /hydrat/i.test(message.text()))
+			errors.push(message.text());
+	});
+	await page.goto(url, { waitUntil: "commit", timeout: 120_000 });
+	const hydratedAt = await page
+		.waitForFunction(() => window.hydratedAt, null, { timeout: 120_000 })
+		.then((handle) => handle.jsonValue());
+	const texts = await page.$$eval("li", (items) =>
+		items.map((item) => item.textContent),
+	);
+	await context.close();
+	if (errors.length > 0)
+		throw new Error(`${url} failed to hydrate:\n${errors.join("\n")}`);
+	check(texts, words, `${url} once hydrated`);
+	return { server, hydrated: hydratedAt - server.launched };
 }

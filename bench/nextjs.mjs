@@ -12,9 +12,10 @@
 //   message in the server component and one in the client component; the median of EDITS saves.
 //   For grai, also until it wrote the edited shard: the rest is Next's.
 // - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
-//   is complete, and the CPU of Next's processes until then, COLD_ROUNDS times for each app in
-//   rotating order, with each round's paired differences (next-cold.mjs).
-// Every first response is checked to list each of the page's messages.
+//   is complete, with the CPU of Next's processes until then, and until the page is hydrated,
+//   COLD_ROUNDS times for each app in rotating order, with each round's paired differences
+//   (next-cold.mjs).
+// Every first response and hydrated page is checked to list each of the page's messages.
 import { spawnSync } from "node:child_process";
 import {
 	readdirSync,
@@ -262,7 +263,7 @@ for (const app of selectedApps()) {
 	}
 
 	const cold = coldApps(apps);
-	const runs = await coldRounds(cold, path, words, COLD_ROUNDS);
+	const runs = await coldRounds(browser, cold, path, words, COLD_ROUNDS);
 	const summary = coldSummary(runs, cold.length);
 	printCold(summary, COLD_ROUNDS);
 	for (const [name, measures] of Object.entries(summary.apps)) {
