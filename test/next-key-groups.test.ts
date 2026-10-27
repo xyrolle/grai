@@ -256,21 +256,36 @@ const pathAndStarBarrels = {
 	"app/paths.js":
 		'export { heading_a } from "#i18n/messages/heading_a.js";\nexport { heading_b } from "#i18n/messages/heading_b.js";\n',
 	"app/star.js": 'export * from "./hello.jsx";\nexport * from "./bye.jsx";\n',
+	"app/servers.js": 'export * from "./sa.jsx";\nexport * from "./sb.jsx";\n',
+	"app/sa.jsx": `import * as m from "../out/keys.js";
+
+export function SA() {
+	return <p>{m.sa_text()}</p>;
+}
+`,
+	"app/sb.jsx": `import * as m from "../out/keys.js";
+
+export function SB() {
+	return <p>{m.sb_text()}</p>;
+}
+`,
 	"app/hello.jsx": barrels["app/hello.jsx"],
 	"app/bye.jsx": barrels["app/bye.jsx"],
 	"app/layout.jsx": barrels["app/layout.jsx"],
 	"app/a/page.jsx": `import { heading_a } from "../paths.js";
 import { Hello } from "../star.js";
+import { SA } from "../servers.js";
 
 export default function A() {
-	return <main>{heading_a()}<Hello /></main>;
+	return <main>{heading_a()}<SA /><Hello /></main>;
 }
 `,
 	"app/b/page.jsx": `import { heading_b } from "../paths.js";
 import { Bye } from "../star.js";
+import { SB } from "../servers.js";
 
 export default function B() {
-	return <main>{heading_b()}<Bye /></main>;
+	return <main>{heading_b()}<SB /><Bye /></main>;
 }
 `,
 };
@@ -291,24 +306,29 @@ describe("the contexts that read a key through a barrel of paths or of `export *
 		]);
 	});
 
-	it("are those of the routes that take a component an `export *` passes on, when its module exports it", async () => {
+	it("are those of the routes that take a server component an `export *` passes on, when its module exports it, and of every route for a client component's, which the server cannot see into", async () => {
 		const { dir, config, compilation } = await compiledApp(
 			[],
 			pathAndStarBarrels,
-			barrelWords,
+			{ ...barrelWords, sa_text: "SA", sb_text: "SB" },
 		);
 
 		const contexts = await contextsIn(dir, config, compilation);
 
+		expect([contexts.sa_text, contexts.sb_text]).toEqual([
+			["a/page.jsx server"],
+			["b/page.jsx server"],
+		]);
+		// From the server's side a client component's module is a reference whose names Next's
+		// bundler does not know, so it keeps every branch of the `export *`, as `next dev` does.
 		expect([contexts.hello_text, contexts.bye_text]).toEqual([
-			["a/page.jsx client"],
-			["b/page.jsx client"],
+			["a/page.jsx client", "b/page.jsx client"],
+			["a/page.jsx client", "b/page.jsx client"],
 		]);
 		expect(await nextKeyGroups(config, compilation)).toEqual([
-			["bye_text"],
-			["heading_a"],
-			["heading_b"],
-			["hello_text"],
+			["bye_text", "hello_text"],
+			["heading_a", "sa_text"],
+			["heading_b", "sb_text"],
 		]);
 	});
 });
