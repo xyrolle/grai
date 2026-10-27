@@ -6,11 +6,11 @@ Translations compiled ahead of time into plain, typed functions, for any JavaScr
 
 ## Install
 
-grai is not on npm yet. Once it is:
-
 ```sh
 pnpm add -D grai
 ```
+
+Its commands and plugins need Node 22.18 or later.
 
 ## Usage
 
