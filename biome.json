@@ -6,7 +6,13 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!**/pnpm-lock.yaml", "!**/*.md", "!**/src/app.html"]
+		"includes": [
+			"**",
+			"!**/pnpm-lock.yaml",
+			"!**/*.md",
+			"!**/src/app.html",
+			"!bench/results"
+		]
 	},
 	"html": {
 		"experimentalFullSupportEnabled": true

@@ -20,6 +20,7 @@ import { PAGE_CALLS, pageProps, pageSource, writePage } from "./page.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 const RUNS = 15;
 const THROTTLING = [1, 4];
@@ -96,7 +97,9 @@ async function documentFor(app, locale, file, variant, props) {
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
+/** Benches the page in a locale, and returns each variant's bytes and times, as the run measured them. */
 async function benchLocale(browser, app, locale) {
+	const recorded = [];
 	const documents = [];
 	for (const [name, variant] of Object.entries(await variants(app, locale))) {
 		const props = pageProps(app, variant.values);
@@ -128,12 +131,26 @@ async function benchLocale(browser, app, locale) {
 		for (const [index, document] of documents.entries()) {
 			const runs = samples[index];
 			const cell = (pick) => median(runs.map(pick)).toFixed(1);
+			recorded.push({
+				variant: document.name,
+				locale,
+				slowdown: rate,
+				bytes: document.bytes,
+				ms: {
+					starts: median(runs.map((r) => r.started)),
+					evaluates: median(runs.map((r) => r.evaluated - r.started)),
+					hydrates: median(runs.map((r) => r.hydrated - r.evaluated)),
+					hydratedAt: median(runs.map((r) => r.hydrated)),
+					mounts: median(runs.map((r) => r.mounted)),
+				},
+			});
 			const kb = `${(document.bytes.brotli / 1024).toFixed(1)} (${(document.bytes.raw / 1024).toFixed(0)})`;
 			console.log(
 				`| ${document.name} | ${locale} | ${rate}× | ${kb} | ${cell((r) => r.started)} | ${cell((r) => r.evaluated - r.started)} | ${cell((r) => r.hydrated - r.evaluated)} | ${cell((r) => r.hydrated)} | ${cell((r) => r.mounted)} |`,
 			);
 		}
 	}
+	return recorded;
 }
 
 const browser = await chromium.launch();
@@ -145,7 +162,14 @@ for (const app of selectedApps()) {
 		"| variant | locale | CPU slowdown | JS KB brotli (raw) | script starts | evaluates | hydrates | hydrated at | mounts again |",
 	);
 	console.log("|---|---|---|---|---|---|---|---|---|");
+	const recorded = [];
 	for (const locale of [app.baseLocale, otherLocale(app)])
-		await benchLocale(browser, app, locale);
+		recorded.push(...(await benchLocale(browser, app, locale)));
+	recordResults(`hydrate-${app.id}`, recorded, {
+		app: app.name,
+		calls: PAGE_CALLS,
+		runs: RUNS,
+		chromium: browser.version(),
+	});
 }
 await browser.close();

@@ -29,6 +29,7 @@ import { libraryCatalogs } from "./libraries.mjs";
 import { writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 import { otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 const { grai } = await import(join(graiSource, "vite.ts"));
 // The dev server comes from the Vite grai's source imports, as an app has one Vite: grai's plugin
@@ -427,9 +428,20 @@ async function measure(browser, app, design) {
 		latencies[0]?.[field] === undefined
 			? "—"
 			: median(latencies.map((latency) => latency[field])).toFixed(1);
+	const ms = (field) =>
+		latencies[0]?.[field] === undefined
+			? undefined
+			: median(latencies.map((latency) => latency[field]));
 	return {
 		design,
 		heap,
+		measured: {
+			design,
+			pageLoad: load,
+			editToPage: ms("total"),
+			editToServer: ms("server"),
+			heap,
+		},
 		row: `| ${design} | ${served} | ${load.toFixed(0)} | ${cell("total")} | ${cell("server")} | ${cell("watcher")} | ${cell("plugin")} | ${cell("browser")} | ${megabytes(heap.load)} | ${megabytes(heap.edits)} |`,
 	};
 }
@@ -458,6 +470,11 @@ for (const app of selectedApps()) {
 	);
 	console.log("|---|---|---|---|---|---|---|---|---|---|");
 	for (const { row } of results) console.log(row);
+	recordResults(
+		`hmr-${app.id}`,
+		results.map(({ measured }) => measured),
+		{ app: app.name, edits: EDITS, chromium: browser.version() },
+	);
 	const heapOf = (design) =>
 		results.find((result) => result.design === design).heap;
 	const grai = heapOf("grai's plugin");
