@@ -1,13 +1,16 @@
 /**
  * A Svelte component's code, read through Svelte's own parser: its scripts as they are, then its
  * template's expressions, each where Svelte found it, in code that opens the scopes the template
- * opens. An `{#each}` item, an `{:then}` value, a snippet's parameters and a `let:` directive's
+ * opens. Beside a module script, the instance script and the template are a block of their own, as
+ * Svelte scopes them inside the module's: the instance's imports and re-exports go to the top, and
+ * its own exports are its declarations, or reads of the names they export. An `{#each}` item, an `{:then}` value, a snippet's parameters and a `let:` directive's
  * names are parameters of a function around what they are visible in, `{@const}` a `const` in the
  * block it is in, and a snippet a function of the component, as Svelte scopes them.
  */
 
 import type { AST } from "svelte/compiler";
-import { CodeWriter, type SourceCode } from "./source.ts";
+import { type ESTree, parse } from "./parse.ts";
+import { CodeWriter, type Lang, type SourceCode } from "./source.ts";
 
 /** A component's code, from Svelte's parse of it (`frameworks.ts`) and its text. */
 export function svelteCode(text: string, root: AST.Root): SourceCode {
@@ -16,15 +19,77 @@ export function svelteCode(text: string, root: AST.Root): SourceCode {
 	for (const script of [root.module, root.instance]) {
 		if (script) scripts.push(script);
 	}
+	const typescript = scripts.some(({ attributes }) =>
+		attributes.some(({ name, value }) => name === "lang" && isTs(value)),
+	);
+	const lang: Lang = typescript ? "ts" : "js";
+	const instance =
+		root.module && root.instance
+			? statementsOf(text, root.instance, lang)
+			: undefined;
+	if (root.module && instance) {
+		const { start, end } = spanOf(root.module.content);
+		writer.piece(start, end).write("\n;\n");
+		instanceInBlock(writer, instance, () =>
+			new Template(writer).fragment(root.fragment),
+		);
+		return writer.code(lang);
+	}
 	for (const { content } of scripts) {
 		const { start, end } = spanOf(content);
 		writer.piece(start, end).write("\n;\n");
 	}
 	new Template(writer).fragment(root.fragment);
-	const typescript = scripts.some(({ attributes }) =>
-		attributes.some(({ name, value }) => name === "lang" && isTs(value)),
-	);
-	return writer.code(typescript ? "ts" : "js");
+	return writer.code(lang);
+}
+
+/** A script's top-level statements, at offsets in the script from `offset` in the component. */
+type Statements = { body: readonly ESTree.Statement[]; offset: number };
+
+/** A script's top-level statements, or none when it does not parse. */
+function statementsOf(
+	text: string,
+	{ content }: AST.Script,
+	lang: Lang,
+): Statements | undefined {
+	const { start, end } = spanOf(content);
+	const { program, errors } = parse("instance", text.slice(start, end), {
+		lang,
+	});
+	// A script that does not parse is read whole, so the component's read reports its error.
+	return errors.length > 0 ? undefined : { body: program.body, offset: start };
+}
+
+/**
+ * The instance script's statements and then the template in a block, its imports and re-exports
+ * first at the top, as only the top may hold them. An export of its own is its declaration, or a
+ * read of each name it exports, as the component's exports are no module's.
+ */
+function instanceInBlock(
+	writer: CodeWriter,
+	{ body, offset }: Statements,
+	template: () => void,
+): void {
+	const statement = ({ start, end }: { start: number; end: number }) =>
+		writer.piece(offset + start, offset + end).write("\n;\n");
+	const top = (node: ESTree.Statement) =>
+		node.type === "ImportDeclaration" ||
+		node.type === "ExportAllDeclaration" ||
+		(node.type === "ExportNamedDeclaration" && node.source !== null);
+	for (const node of body.filter(top)) statement(node);
+	writer.write("{\n");
+	for (const node of body) {
+		if (top(node)) continue;
+		if (node.type !== "ExportNamedDeclaration") statement(node);
+		else if (node.declaration !== null) statement(node.declaration);
+		else {
+			for (const { local } of node.specifiers) {
+				writer.expression(offset + local.start, offset + local.end);
+			}
+		}
+	}
+	template();
+	writer.write("}\n");
 }
 
 function isTs(value: AST.Attribute["value"]): boolean {
