@@ -42,3 +42,17 @@ export function pageKeysImports(
 ): Record<string, string> {
 	return { [keysUrl(base)]: pageKeysUrl(base, locale) };
 }
+
+/**
+ * What a dev page's head starts with, as a server writes it: the import map that points keys.js at
+ * the page's locale's, and the preload of it, so the dev server makes it while the page loads the
+ * modules that import it. `attributes` go on the map, a nonce for a policy that wants one.
+ */
+export function pageKeysHead(
+	base: string,
+	locale: string,
+	attributes = "",
+): string {
+	const map = JSON.stringify({ imports: pageKeysImports(base, locale) });
+	return `<script type="importmap"${attributes}>${map}</script><link rel="modulepreload" href="${pageKeysUrl(base, locale)}">`;
+}

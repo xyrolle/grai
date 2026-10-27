@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import type { Handle } from "@sveltejs/kit/hooks";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
-import { pageKeysImports, pageKeysUrl } from "./page-keys.ts";
+import { pageKeysHead } from "./page-keys.ts";
 
 /** Where `src/app.html` takes the page's locale and its text direction. */
 const LANG = "%grai.lang%";
@@ -89,15 +89,12 @@ export function handleLocale({
  */
 function localeKeys(html: string, locale: string): string {
 	if (import.meta.env?.DEV !== true) return html;
-	const head = HEAD.exec(html);
-	if (head === null) return html;
-	const base = import.meta.env.BASE_URL;
-	const map = JSON.stringify({ imports: pageKeysImports(base, locale) });
 	const nonce = KIT_NONCE.exec(html)?.[1];
 	const attributes = nonce === undefined ? "" : ` nonce="${nonce}"`;
-	const at = head.index + head[0].length;
-	const tags = `<script type="importmap"${attributes}>${map}</script><link rel="modulepreload" href="${pageKeysUrl(base, locale)}">`;
-	return html.slice(0, at) + tags + html.slice(at);
+	return html.replace(
+		HEAD,
+		(head) => head + pageKeysHead(import.meta.env.BASE_URL, locale, attributes),
+	);
 }
 
 /**
