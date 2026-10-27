@@ -52,7 +52,8 @@ const loadAtStart = loadavg()[0];
 
 /**
  * Writes a bench's results, `results/<name>.json`: `rows` as the bench measured them, and what
- * they were measured on. `extra` adds what only that bench knows, such as Chromium's version.
+ * they were measured on. `extra` adds what only that bench knows, such as Chromium's version, or
+ * its rounds, each with the load it started at and its order (rounds.mjs).
  */
 export function recordResults(name, rows, extra = {}) {
 	mkdirSync(directory, { recursive: true });
