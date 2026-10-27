@@ -381,10 +381,14 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 	beforeAll(async () => {
 		// --ignore-lock: in the foreground, as `astro preview` above. Astro's dev server leaves
 		// requests to Vite's alone inside Vitest, by the VITEST that the suite's runner sets.
+		// No update check: in a project without a recent one, as a fresh clone is, the server asks
+		// the registry and writes .astro/settings.json once it listens. Astro skips one change of that
+		// file, but macOS can report the write as two, and the second restarts the server under the
+		// test's request.
 		served = await listening(
 			astro,
 			["dev", "--port", "0", "--host", "127.0.0.1", "--ignore-lock"],
-			{ VITEST: "" },
+			{ VITEST: "", ASTRO_DISABLE_UPDATE_CHECK: "true" },
 		);
 		origin = served.origin;
 	}, 60_000);
