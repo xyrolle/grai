@@ -2,7 +2,7 @@
 // the runtime reads and setLocale changes. Nuxt bundles its server and its app apart, each with a
 // copy of the output of its own, and both are given the event, so the server middleware
 // (locale.ts) puts the record there and the app's plugin (plugin.ts) reads it.
-import type { RequestLocale } from "grai/nuxt/output/internal.js";
+import type { RequestLocale } from "@xyrolle/grai/nuxt/output/internal.js";
 
 export const requestLocaleKey = "grai:locale";
 

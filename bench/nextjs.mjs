@@ -145,7 +145,7 @@ function graiShare(root) {
 				"-e",
 				`const start = performance.now();
 const before = process.cpuUsage();
-const { withGrai } = await import("grai/next/config");
+const { withGrai } = await import("@xyrolle/grai/next/config");
 await withGrai({})("phase-development-server");
 const call = performance.now() - start;
 setTimeout(() => {

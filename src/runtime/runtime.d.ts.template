@@ -38,7 +38,7 @@ type GraiErrorCode =
 /**
  * A message called in a locale it cannot render in, with a value its variants do not take, or on a
  * server outside every request the middleware binds (`locale-unbound`); or a key's path no catalog
- * has, imported in dev or in Node with `grai/register` (`key-missing`).
+ * has, imported in dev or in Node with `@xyrolle/grai/register` (`key-missing`).
  */
 export declare class GraiError extends Error {
 	constructor(code: GraiErrorCode, message: string);

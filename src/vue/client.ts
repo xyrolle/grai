@@ -8,11 +8,11 @@ declare global {
 }
 
 // In dev, a catalog edit renders again, in place, what called an edited message, and the page
-// keeps its state. grai/vite's dev module names each message call's key to `grai.read`; here that
-// is a read of the key's Vue ref, so a render, computed or watcher that calls a message depends on
-// its key, and an edit's `grai:change` changes the edited keys' refs instead of reloading the page.
-// Import this once, from the browser's entry. A build defines `import.meta.hot` as undefined, so
-// none of it ships.
+// keeps its state. @xyrolle/grai/vite's dev module names each message call's key to `grai.read`;
+// here that is a read of the key's Vue ref, so a render, computed or watcher that calls a message
+// depends on its key, and an edit's `grai:change` changes the edited keys' refs instead of
+// reloading the page. Import this once, from the browser's entry. A build defines `import.meta.hot`
+// as undefined, so none of it ships.
 if (import.meta.hot && typeof window !== "undefined") {
 	const edits = new Map<string, ShallowRef<number>>();
 	const editsOf = (key: string): ShallowRef<number> => {

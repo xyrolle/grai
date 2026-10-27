@@ -6,7 +6,7 @@ export const keyModulePrefix: string = `\0${keyPrefix}`;
 
 /**
  * How a client build's component imports a message without inputs as the page's string
- * (`grai/svelte`), and that string's module id.
+ * (`@xyrolle/grai/svelte`), and that string's module id.
  */
 export const textPrefix = "grai:text/";
 export const textModulePrefix: string = `\0${textPrefix}`;

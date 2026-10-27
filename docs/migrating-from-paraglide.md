@@ -5,7 +5,7 @@ Paraglide's catalogs compile unchanged, and so do its calls, `m.key(inputs, { lo
 ## Steps
 
 1. **The config.** Write `grai.config.json` from `project.inlang/settings.json`: its `locales` and `baseLocale`, its `pathPattern` as `catalogs`, Paraglide's output directory as `outdir`, and the server's `strategy` without `baseLocale`, which grai always falls back to. With the `cookie` strategy, `cookieName` is Paraglide's cookie, `PARAGLIDE_LOCALE` unless the app named another. grai refuses a strategy it does not have, such as `localStorage` or `custom-…`: the app chooses that locale itself, in the middleware's handler with `setLocale`.
-2. **The plugin.** `paraglideVitePlugin(…)` becomes `grai()` from `grai/vite`, or from `grai/svelte` in a Svelte app.
+2. **The plugin.** `paraglideVitePlugin(…)` becomes `grai()` from `@xyrolle/grai/vite`, or from `@xyrolle/grai/svelte` in a Svelte app.
 3. **The imports.** `…/paraglide/messages.js` and `…/paraglide/runtime.js` become the outdir's `messages.js` and `runtime.js`, whose names are Paraglide's. A per-key import, `…/paraglide/messages/key.js`, maps to `keys.js` with one line in `package.json`'s `imports`, and the same in `tsconfig.json`'s `paths`, so TypeScript resolves it too:
 
    ```json
@@ -13,7 +13,7 @@ Paraglide's catalogs compile unchanged, and so do its calls, `m.key(inputs, { lo
    ```
 
 4. **The server.** `paraglideMiddleware` becomes `middleware` from the outdir's `server.js`, with the same handler. It hands the handler the request as it came, not one with the locale's prefix taken off, so the framework routes through its own hook with `deLocalizeUrl`, such as SvelteKit's `reroute`: `({ url }) => deLocalizeUrl(url).pathname`.
-5. **Tools that named Paraglide's modules** take grai's from `grai/vite`'s `graiModules`, which gives the kind of each of grai's modules in a build.
+5. **Tools that named Paraglide's modules** take grai's from `@xyrolle/grai/vite`'s `graiModules`, which gives the kind of each of grai's modules in a build.
 6. **Not there yet:** Paraglide's `effectiveRequestUrl`, for a remote call to render in its page's locale under the `url` strategy.
 
 ## Call sites grai refuses

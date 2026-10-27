@@ -1,8 +1,8 @@
-// The project's compiled output, as grai/nuxt's runtime reads it. The module points
-// `grai/nuxt/output/*` at the config's outdir, in the app's build and in the server's alike, so
-// these are the app's own modules.
+// The project's compiled output, as @xyrolle/grai/nuxt's runtime reads it. The module points
+// `@xyrolle/grai/nuxt/output/*` at the config's outdir, in the app's build and in the server's
+// alike, so these are the app's own modules.
 
-declare module "grai/nuxt/output/internal.js" {
+declare module "@xyrolle/grai/nuxt/output/internal.js" {
 	export const locales: readonly string[];
 	export const strategy: readonly (
 		| "cookie"
@@ -22,7 +22,7 @@ declare module "grai/nuxt/output/internal.js" {
 	}): void;
 }
 
-declare module "grai/nuxt/output/server.js" {
+declare module "@xyrolle/grai/nuxt/output/server.js" {
 	export function localeOf(request: Request): Promise<string>;
 	export function redirectOf(request: Request): Promise<Response | undefined>;
 	export const vary: string;

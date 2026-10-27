@@ -65,7 +65,8 @@ test("one key mocked", () => {
 
 	it("mocks one key in a Next app, whose Vitest config lists grai's plugin as it has no Vite config", async () => {
 		// The Next example as an app has it, its packages installed, with a Vitest config and a test of
-		// its own: grai/vite from the package, as the app imports it, which the build put in dist.
+		// its own: @xyrolle/grai/vite from the package, as the app imports it, which the build put in
+		// dist.
 		const example = fileURLToPath(
 			new URL("../examples/next/", import.meta.url),
 		);
@@ -79,7 +80,7 @@ test("one key mocked", () => {
 		symlinkSync(join(example, "node_modules"), join(dir, "node_modules"));
 		writeFileSync(
 			join(dir, "vitest.config.ts"),
-			`import { grai } from "grai/vite";\nimport { defineConfig } from "vitest/config";\n\nexport default defineConfig({ plugins: [grai()] });\n`,
+			`import { grai } from "@xyrolle/grai/vite";\nimport { defineConfig } from "vitest/config";\n\nexport default defineConfig({ plugins: [grai()] });\n`,
 		);
 		writeFileSync(
 			join(dir, "about.test.ts"),

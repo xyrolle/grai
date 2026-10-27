@@ -34,7 +34,10 @@ const catalogs = {
 const nodeModules = fileURLToPath(new URL("../node_modules", import.meta.url));
 const withTexts = (): PluginOption[] => [grai(), svelte()];
 const withCalls = (): PluginOption[] => [graiVite(), svelte()];
-/** grai/svelte's plugin writing each message chunk's copies per locale, for an import map. */
+/**
+ * `@xyrolle/grai/svelte`'s plugin writing each message chunk's copies per locale, for an import
+ * map.
+ */
 const withCopies = (): PluginOption[] => [
 	grai({ localeChunks: true }),
 	svelte(),
@@ -160,7 +163,7 @@ async function hydratedPages(
 	return pages;
 }
 
-describe("grai/svelte's client build", () => {
+describe("@xyrolle/grai/svelte's client build", () => {
 	it("reads a text message without inputs as its string, and keeps every other call", async () => {
 		const dir = svelteApp({
 			"App.svelte": `<script>import { m } from "./out/messages.js";</script>
@@ -363,7 +366,7 @@ const greeting = m.greeting({ name });</script>
 		const dir = svelteApp({ "App.svelte": "<h1>Title</h1>" });
 
 		await expect(built(dir, [svelte(), grai()], "client")).rejects.toThrow(
-			"list grai() from grai/svelte before sveltekit() or svelte()",
+			"list grai() from @xyrolle/grai/svelte before sveltekit() or svelte()",
 		);
 	});
 });

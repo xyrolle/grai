@@ -1,9 +1,9 @@
 // The request's locale, resolved before Next renders anything. Next runs the proxy apart from the
 // render, so it hands the locale over the way Next routes: as the first segment of the path the
 // app's pages live under, app/[locale]/…, whatever the URL shows.
-import { strategy } from "grai/next/output/internal.js";
-import { deLocalizeUrl } from "grai/next/output/runtime.js";
-import { middleware } from "grai/next/output/server.js";
+import { strategy } from "@xyrolle/grai/next/output/internal.js";
+import { deLocalizeUrl } from "@xyrolle/grai/next/output/runtime.js";
+import { middleware } from "@xyrolle/grai/next/output/server.js";
 import { type NextRequest, NextResponse } from "next/server.js";
 
 /**

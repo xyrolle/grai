@@ -49,8 +49,8 @@ export type LocaleContext = Pick<
 >;
 
 /**
- * The middleware `grai/astro` adds before the app's own: it resolves each request's locale by the
- * config's strategy and binds it while the page renders, its islands included. It writes the
+ * The middleware `@xyrolle/grai/astro` adds before the app's own: it resolves each request's locale
+ * by the config's strategy and binds it while the page renders, its islands included. It writes the
  * locale and its text direction to the page's `<html lang>` and `dir`, where the browser's runtime
  * reads the locale, and in a build an import map first in the head, so the page's islands load
  * only that locale's copies of the message chunks. Anything but a page passes through as it is.

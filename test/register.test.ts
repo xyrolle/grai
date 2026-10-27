@@ -30,7 +30,9 @@ async function app(files: Record<string, string>) {
 	return dir;
 }
 
-/** Runs Node in `dir` with grai/register loaded first, or without: its exit and its output. */
+/**
+ * Runs Node in `dir` with @xyrolle/grai/register loaded first, or without: its exit and its output.
+ */
 function node(dir: string, args: string[], { hooked = true } = {}) {
 	const { status, stdout, stderr } = spawnSync(
 		process.execPath,
@@ -48,7 +50,7 @@ const [major = 0, minor = 0] = process.versions.node.split(".").map(Number);
 const mocksThroughHooks =
 	major > 25 || (major === 25 && minor >= 1) || (major === 24 && minor >= 12);
 
-describe("grai/register", () => {
+describe("@xyrolle/grai/register", () => {
 	it("gives each key's path a module of that key alone, and leaves keys.js and the app's own modules as they are", async () => {
 		const dir = await app({
 			"src/messages/own.js": `export const own = "the app's own";\n`,

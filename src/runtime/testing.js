@@ -1,5 +1,5 @@
 // The locale a test renders in. The compiler copies this file into the output with its imports
-// naming the output's modules, and grai/vite refuses it in a build, so it never ships.
+// naming the output's modules, and @xyrolle/grai/vite refuses it in a build, so it never ships.
 import { locales } from "./config.js";
 import { assertIsLocale, bindLocale, getTextDirection } from "./runtime.js";
 

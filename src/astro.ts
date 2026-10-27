@@ -32,8 +32,8 @@ const middlewareId = "grai:astro/middleware";
 
 /**
  * grai's Astro integration:
- * - it adds `grai/vite`, so `astro dev` compiles the catalogs and reloads the open pages after
- *   each edit, and `astro build` compiles them and fails on any error; `astro sync`, which
+ * - it adds `@xyrolle/grai/vite`, so `astro dev` compiles the catalogs and reloads the open pages
+ *   after each edit, and `astro build` compiles them and fails on any error; `astro sync`, which
  *   `astro check` runs, compiles them for their types;
  * - it checks, once Astro's config is done, that the two configs agree on where a page's locale
  *   comes from (`astro/agreement.ts`);
@@ -165,7 +165,10 @@ export function grai(options: GraiAstroOptions = {}): AstroIntegration {
 	};
 }
 
-/** The project's middleware: grai/astro's, given the output's functions and the configs' facts. */
+/**
+ * The project's middleware: @xyrolle/grai/astro's, given the output's functions and the configs'
+ * facts.
+ */
 function middlewareCode(
 	grai: Config,
 	project: Omit<
@@ -235,8 +238,8 @@ function written(file: URL, text: string): void {
 
 /**
  * Where the client build's chunks are served from: Astro's `build.assets` under the scripts'
- * assets prefix, or else under the base. grai/vite puts the message chunks in `grai/` there, and
- * each locale's copies in `grai-<locale>/`.
+ * assets prefix, or else under the base. @xyrolle/grai/vite puts the message chunks in `grai/`
+ * there, and each locale's copies in `grai-<locale>/`.
  */
 function chunksUrl({ base, build }: AstroConfig): string {
 	const prefix =

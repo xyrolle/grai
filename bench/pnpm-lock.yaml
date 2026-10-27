@@ -196,12 +196,12 @@ importers:
       '@vitejs/plugin-vue':
         specifier: 6.0.10
         version: 6.0.10(vite@8.3.5(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))(vue@3.5.44(typescript@7.0.2))
+      '@xyrolle/grai':
+        specifier: file:..
+        version: file:..(9d86b592f67751487ce03150651056bd)
       astro:
         specifier: 7.4.2
         version: 7.4.2(db0@0.3.4)(esbuild@0.28.2)(ioredis@5.11.1(supports-color@10.2.2))(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
-      grai:
-        specifier: file:..
-        version: file:..(9d86b592f67751487ce03150651056bd)
       i18next:
         specifier: 26.4.7
         version: 26.4.7(typescript@7.0.2)
@@ -3160,6 +3160,43 @@ packages:
   '@vue/shared@3.5.44':
     resolution: {integrity: sha512-H82XLH0DjmSOdbEwO15x3QTo1f5PWEtv237eLpYKc0mqLu+B8hnq16lFWmuBmNurkeiG3wr+oM1FhOll/YVFRg==}
 
+  '@xyrolle/grai@file:..':
+    resolution: {directory: .., type: directory}
+    engines: {node: '>=22.18'}
+    hasBin: true
+    peerDependencies:
+      '@mdx-js/mdx': '>=3'
+      '@sveltejs/kit': ^3.1.0
+      astro: '>=7'
+      magic-string: '>=1'
+      next: '>=16.3'
+      nuxt: '>=4.6'
+      react: '>=19'
+      svelte: '>=5'
+      vite: '>=8'
+      vue: '>=3.5'
+    peerDependenciesMeta:
+      '@mdx-js/mdx':
+        optional: true
+      '@sveltejs/kit':
+        optional: true
+      astro:
+        optional: true
+      magic-string:
+        optional: true
+      next:
+        optional: true
+      nuxt:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vite:
+        optional: true
+      vue:
+        optional: true
+
   abbrev@3.0.1:
     resolution: {integrity: sha512-AO2ac6pjRB3SJmGJo+v5/aK6Omggp6fsLrs6wN9bd35ulu4cCwaAU9+7ZhXjeqHVkaHThLuzH0nZr0YpCDhygg==}
     engines: {node: ^18.17.0 || >=20.5.0}
@@ -3978,43 +4015,6 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
-
-  grai@file:..:
-    resolution: {directory: .., type: directory}
-    engines: {node: '>=22.18'}
-    hasBin: true
-    peerDependencies:
-      '@mdx-js/mdx': '>=3'
-      '@sveltejs/kit': ^3.1.0
-      astro: '>=7'
-      magic-string: '>=1'
-      next: '>=16.3'
-      nuxt: '>=4.6'
-      react: '>=19'
-      svelte: '>=5'
-      vite: '>=8'
-      vue: '>=3.5'
-    peerDependenciesMeta:
-      '@mdx-js/mdx':
-        optional: true
-      '@sveltejs/kit':
-        optional: true
-      astro:
-        optional: true
-      magic-string:
-        optional: true
-      next:
-        optional: true
-      nuxt:
-        optional: true
-      react:
-        optional: true
-      svelte:
-        optional: true
-      vite:
-        optional: true
-      vue:
-        optional: true
 
   gzip-size@7.0.0:
     resolution: {integrity: sha512-O1Ld7Dr+nqPnmGpdhzLmMTQ4vAsD+rHwMm1NLUmoUFFymBOMKxCCrtDxqdBRYXdeEPEi3SyoR4TizJLQrnKBNA==}
@@ -8460,6 +8460,20 @@ snapshots:
 
   '@vue/shared@3.5.44': {}
 
+  '@xyrolle/grai@file:..(9d86b592f67751487ce03150651056bd)':
+    dependencies:
+      oxc-parser: 0.155.0
+      oxc-resolver: 11.24.2
+    optionalDependencies:
+      astro: 7.4.2(db0@0.3.4)(esbuild@0.28.2)(ioredis@5.11.1(supports-color@10.2.2))(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
+      magic-string: 0.30.21
+      next: 16.4.3(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      nuxt: 4.6.2(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@oxc-project/types@0.155.0)(@parcel/watcher@2.6.0)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.2.4)(db0@0.3.4)(dotenv@17.4.2)(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.15)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.15)(rollup@4.65.0))(rollup@4.65.0)(srvx@1.0.7)(supports-color@10.2.2)(terser@5.51.2)(typescript@7.0.2)(vite@8.3.5(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))(yaml@2.9.1)
+      react: 19.3.1
+      svelte: 5.57.2(@typescript-eslint/types@8.72.0)
+      vite: 8.3.5(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
+      vue: 3.5.44(typescript@7.0.2)
+
   abbrev@3.0.1: {}
 
   abort-controller@3.0.0:
@@ -9266,20 +9280,6 @@ snapshots:
       unicorn-magic: 0.4.1
 
   graceful-fs@4.2.11: {}
-
-  grai@file:..(9d86b592f67751487ce03150651056bd):
-    dependencies:
-      oxc-parser: 0.155.0
-      oxc-resolver: 11.24.2
-    optionalDependencies:
-      astro: 7.4.2(db0@0.3.4)(esbuild@0.28.2)(ioredis@5.11.1(supports-color@10.2.2))(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
-      magic-string: 0.30.21
-      next: 16.4.3(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      nuxt: 4.6.2(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@oxc-project/types@0.155.0)(@parcel/watcher@2.6.0)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.2.4)(db0@0.3.4)(dotenv@17.4.2)(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.15)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.15)(rollup@4.65.0))(rollup@4.65.0)(srvx@1.0.7)(supports-color@10.2.2)(terser@5.51.2)(typescript@7.0.2)(vite@8.3.5(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))(yaml@2.9.1)
-      react: 19.3.1
-      svelte: 5.57.2(@typescript-eslint/types@8.72.0)
-      vite: 8.3.5(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
-      vue: 3.5.44(typescript@7.0.2)
 
   gzip-size@7.0.0:
     dependencies:

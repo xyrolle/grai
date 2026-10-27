@@ -8,7 +8,10 @@ const DIR = "%grai.dir%";
 /** Kit's preload of its client entry, in the directory of the build's immutable files. */
 const ENTRY_PRELOAD =
 	/<link href="([^"]*\/immutable\/)entry\/start\.[^"]*" rel="modulepreload">/;
-/** Where Kit's build puts its chunks, within that directory, grai/vite's message chunks among them. */
+/**
+ * Where Kit's build puts its chunks, within that directory, @xyrolle/grai/vite's message chunks
+ * among them.
+ */
 const CHUNKS = "chunks/";
 /** The nonce Kit gives its own inline script, under a `csp` whose scripts need one. */
 const KIT_NONCE = /<script nonce="([^"]+)">/;
@@ -35,7 +38,8 @@ type CompiledLocale = {
 	getTextDirection(locale?: string): "ltr" | "rtl";
 	/**
 	 * `localeCopies` from the output's `server.js`: whether its build wrote a copy of each message
-	 * chunk per locale, as `grai/sveltekit/vite`'s does. Without them a page gets no import map.
+	 * chunk per locale, as `@xyrolle/grai/sveltekit/vite`'s does. Without them a page gets no import
+	 * map.
 	 */
 	localeCopies: boolean;
 };
@@ -49,7 +53,7 @@ type CompiledLocale = {
  *
  * The browser then takes the page's `<html lang>` as its locale, so it hydrates in the words the
  * server drew. A built page loads only its locale's copies of the message chunks, which
- * `grai/sveltekit/vite`'s plugin writes.
+ * `@xyrolle/grai/sveltekit/vite`'s plugin writes.
  */
 export function handleLocale({
 	middleware,

@@ -1,9 +1,10 @@
 /**
  * In Node, a module of its own for each key's path, `…/messages/<key>.js`, which an app's
- * package.json maps to the output's keys.js. Loaded before the app, `node --import grai/register`.
- * Without it Node resolves every key's path to keys.js, one module for every key: a test that mocks
- * one key's path (node:test's `mock.module`) mocks them all. Grai's Vite plugin gives a build and
- * a test run the same modules, so Node, Vite and Vitest each see a key's path as that key alone.
+ * package.json maps to the output's keys.js. Loaded before the app,
+ * `node --import @xyrolle/grai/register`. Without it Node resolves every key's path to keys.js, one
+ * module for every key: a test that mocks one key's path (node:test's `mock.module`) mocks them
+ * all. Grai's Vite plugin gives a build and a test run the same modules, so Node, Vite and Vitest
+ * each see a key's path as that key alone.
  *
  * The hooks are Node's synchronous ones, `module.registerHooks`: a release candidate from Node
  * 24.13.1 and 25.4.0, in active development on Node 22.

@@ -4,7 +4,7 @@ What changes for those who use grai, release by release, newest first. Until 1.0
 
 ## 0.1.0 (2026-10-27)
 
-The first release.
+The first release, published as `@xyrolle/grai`.
 
 ### The compiler
 - `grai compile` and `grai watch` compile inlang message-format catalogs into a typed function per message: plurals and ordinals, selects, markup with its options and attributes, and Intl formatting with `:number`, `:percent`, `:currency`, `:unit`, `:datetime`, `:relativetime` and `:list`. An edit recompiles only the messages it changes, and no reader sees a half-written output.
@@ -16,12 +16,12 @@ The first release.
 - `grai add` adds a key to every catalog. `seed`, `export` and `merge` take messages to translators as XLIFF 2.0 and back, refusing a stale or invalid translation. `import` converts i18next and ICU catalogs, and `migrate` rewrites the calls of i18next, react-i18next, next-intl and react-intl that name their message plainly.
 
 ### The adapters
-- `grai/vite` compiles when Vite starts and patches an edited message into the open page. In a build it gives each chunk only the keys its code uses, and fails where code reads a key no catalog has.
-- `grai/svelte`, `grai/sveltekit` and `grai/sveltekit/vite` fit grai to Svelte and SvelteKit. In dev, `grai/sveltekit/client` draws an edited message again in place.
-- `grai/next`, `grai/next/config` and `grai/next/proxy` fit it to Next's App Router, and `grai/react`'s `Markup` draws markup in server and client components.
-- `grai/astro` fits it to Astro, in a static build and on demand.
-- `grai/vue` and `grai/vue/client` fit it to Vue, and `grai/nuxt` to Nuxt.
-- `grai/register`, loaded with `node --import grai/register`, gives each key's own path a module of that key alone in Node, as `grai/vite` does in a build and a test run.
+- `@xyrolle/grai/vite` compiles when Vite starts and patches an edited message into the open page. In a build it gives each chunk only the keys its code uses, and fails where code reads a key no catalog has.
+- `@xyrolle/grai/svelte`, `@xyrolle/grai/sveltekit` and `@xyrolle/grai/sveltekit/vite` fit grai to Svelte and SvelteKit. In dev, `@xyrolle/grai/sveltekit/client` draws an edited message again in place.
+- `@xyrolle/grai/next`, `@xyrolle/grai/next/config` and `@xyrolle/grai/next/proxy` fit it to Next's App Router, and `@xyrolle/grai/react`'s `Markup` draws markup in server and client components.
+- `@xyrolle/grai/astro` fits it to Astro, in a static build and on demand.
+- `@xyrolle/grai/vue` and `@xyrolle/grai/vue/client` fit it to Vue, and `@xyrolle/grai/nuxt` to Nuxt.
+- `@xyrolle/grai/register`, loaded with `node --import @xyrolle/grai/register`, gives each key's own path a module of that key alone in Node, as `@xyrolle/grai/vite` does in a build and a test run.
 
 ### Locales on the server and in the page
 - The output's `server.js` resolves each request's locale by the config's `strategy`: the cookie, the URL, `Accept-Language`, a query parameter, or a strategy the server defines with `defineServerStrategy`. It binds the locale for everything the request renders, and lists what it read in `Vary`. `withLocale` runs a job's or a test's code in a locale.

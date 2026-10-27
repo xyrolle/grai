@@ -18,19 +18,22 @@ import { localizedPages, sharedPath } from "./pages.ts";
 /** The module's options. `config` is the path of the project's grai.config.json, from its root. */
 export type GraiNuxtOptions = { config: string };
 
-/** The name grai/nuxt's runtime imports the project's compiled output by, in the app and the server. */
+/**
+ * The name @xyrolle/grai/nuxt's runtime imports the project's compiled output by, in the app and
+ * the server.
+ */
 const output = `${packageName}/nuxt/output`;
 
 /**
  * grai's Nuxt module, with grai.config.json in the project's root:
  *
- *     export default defineNuxtConfig({ modules: ["grai/nuxt"] });
+ *     export default defineNuxtConfig({ modules: ["@xyrolle/grai/nuxt"] });
  *
- * It compiles the catalogs before Nuxt builds anything, and grai/vite compiles again on each
- * edit in dev. A server middleware resolves each request's locale by the config's strategy, the
- * render binds it, and the page's `<html>` takes it with its direction. With the `url` strategy,
- * every page is routed under each prefixed locale's prefix too, and a page asked for without the
- * prefix it needs is sent to its locale's path.
+ * It compiles the catalogs before Nuxt builds anything, and @xyrolle/grai/vite compiles again on
+ * each edit in dev. A server middleware resolves each request's locale by the config's strategy,
+ * the render binds it, and the page's `<html>` takes it with its direction. With the `url`
+ * strategy, every page is routed under each prefixed locale's prefix too, and a page asked for
+ * without the prefix it needs is sent to its locale's path.
  */
 const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 	meta: { name: "grai", configKey: "grai" },
@@ -40,7 +43,7 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		const config = readConfig(configFile);
 		if (!nuxt.options.ssr) {
 			throw new Error(
-				"grai: grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
+				"grai: @xyrolle/grai/nuxt renders each page in its request's locale on the server, and Nuxt's ssr is off. Turn it on.",
 			);
 		}
 		const base = baseDisagreement(config, {
@@ -54,7 +57,7 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 				base,
 			);
 		}
-		// As grai/vite's compile, so that the output it finds is already the one it would write.
+		// As @xyrolle/grai/vite's compile, so that the output it finds is already the one it would write.
 		const { result } = await recompile(configFile, undefined, {
 			localeCopies: true,
 		});
@@ -63,7 +66,7 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		const runtime = createResolver(import.meta.url).resolve;
 		nuxt.options.alias[output] = config.outdir;
 		// Only the browser's build: Nuxt runs the server's dev modules in a runner of its own,
-		// which takes an edit when the output's files change, not through grai/vite's patch. A
+		// which takes an edit when the output's files change, not through @xyrolle/grai/vite's patch. A
 		// build writes each message chunk's copy per locale, which a page then loads alone.
 		// Nuxt's own base is checked against grai's above: Vite's is where Nuxt puts its assets.
 		addVitePlugin(

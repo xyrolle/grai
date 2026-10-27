@@ -7,7 +7,7 @@
 	"required": ["locales", "baseLocale", "catalogs", "outdir"],
 	"properties": {
 		"$schema": {
-			"description": "This schema, for editors: \"./node_modules/grai/config.schema.json\".",
+			"description": "This schema, for editors: \"./node_modules/@xyrolle/grai/config.schema.json\".",
 			"type": "string"
 		},
 		"locales": {

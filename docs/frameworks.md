@@ -6,17 +6,17 @@ How grai joins each framework's build and its requests. `examples/` holds a comp
 
 ```ts
 // vite.config.ts
-import { grai } from "grai/vite";
+import { grai } from "@xyrolle/grai/vite";
 
 export default { plugins: [grai()] };
 ```
 
-The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, a page loads the keys its code uses in few chunks: keys the same pages use share a chunk, and small sets of them are pooled (`docs/design.md`). With `grai({ localeChunks: true })`, the client build also copies each of those chunks once per locale, for an adapter that points each page at its own locale's copies, as `grai/sveltekit` does.
+The plugin compiles when Vite starts. In dev, it patches an edited message into the open page without a reload. In a build, a page loads the keys its code uses in few chunks: keys the same pages use share a chunk, and small sets of them are pooled (`docs/design.md`). With `grai({ localeChunks: true })`, the client build also copies each of those chunks once per locale, for an adapter that points each page at its own locale's copies, as `@xyrolle/grai/sveltekit` does.
 
 A tool that reads a client build's chunks can ask which of grai's modules an id is, rather than spell grai's module ids:
 
 ```ts
-import { graiModules } from "grai/vite";
+import { graiModules } from "@xyrolle/grai/vite";
 
 const kindOf = graiModules(); // reads grai.config.json
 kindOf(id); // "runtime", "config", "plurals", "formats" (the grai-runtime chunk), "key" or "text" (a message chunk), or undefined
@@ -24,33 +24,33 @@ kindOf(id); // "runtime", "config", "plurals", "formats" (the grai-runtime chunk
 
 ## Svelte
 
-In a Svelte app, take the plugin from `grai/svelte`, listed before Svelte's, and in a SvelteKit app from `grai/sveltekit/vite` (below):
+In a Svelte app, take the plugin from `@xyrolle/grai/svelte`, listed before Svelte's, and in a SvelteKit app from `@xyrolle/grai/sveltekit/vite` (below):
 
 ```ts
 // vite.config.ts
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { grai } from "grai/svelte";
+import { grai } from "@xyrolle/grai/svelte";
 
 export default { plugins: [grai(), svelte()] };
 ```
 
-It is `grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. Svelte draws a string as a plain value, where it gives each call a signal of its own, so a page of 2,000 messages with app A's catalog hydrates in two-thirds of the time (`docs/runtime.md`). The app needs `svelte` and `magic-string`. With `"switch": "live"` in the config, for a page that changes locale in place, every call stays a call.
+It is `@xyrolle/grai/vite`'s plugin, and in the client build a component's call of a message without inputs, such as `{m.title()}`, reads that message's string in the page's locale. Svelte draws a string as a plain value, where it gives each call a signal of its own, so a page of 2,000 messages with app A's catalog hydrates in two-thirds of the time (`docs/runtime.md`). The app needs `svelte` and `magic-string`. With `"switch": "live"` in the config, for a page that changes locale in place, every call stays a call.
 
 ## SvelteKit
 
-`grai/sveltekit`'s `handleLocale` renders each request in its locale, from the output's middleware and text direction, and `grai/sveltekit/vite`'s plugin, listed before Kit's, builds the app. `examples/sveltekit` is a complete app.
+`@xyrolle/grai/sveltekit`'s `handleLocale` renders each request in its locale, from the output's middleware and text direction, and `@xyrolle/grai/sveltekit/vite`'s plugin, listed before Kit's, builds the app. `examples/sveltekit` is a complete app.
 
 ```ts
 // vite.config.ts
 import { sveltekit } from "@sveltejs/kit/vite";
-import { grai } from "grai/sveltekit/vite";
+import { grai } from "@xyrolle/grai/sveltekit/vite";
 
 export default { plugins: [grai(), sveltekit()] };
 ```
 
 ```ts
 // src/hooks.server.ts
-import { handleLocale } from "grai/sveltekit";
+import { handleLocale } from "@xyrolle/grai/sveltekit";
 import { getTextDirection } from "#lib/i18n/runtime.js";
 import { localeCopies, middleware } from "#lib/i18n/server.js";
 
@@ -78,7 +78,7 @@ Links then name their locale with `localizeHref("/about")`. A page holds its own
 ```svelte
 <!-- src/routes/+layout.svelte -->
 <script lang="ts">
-	import { reloadAcrossLocales } from "grai/sveltekit/navigation";
+	import { reloadAcrossLocales } from "@xyrolle/grai/sveltekit/navigation";
 	import { localizeUrl } from "#lib/i18n/runtime.js";
 
 	let { children } = $props();
@@ -88,22 +88,22 @@ Links then name their locale with `localizeHref("/about")`. A page holds its own
 {@render children()}
 ```
 
-A built page downloads only its own locale's words. The plugin is `grai/svelte`'s, and it also writes a copy of each message chunk per locale, which the output's `localeCopies` says; `handleLocale` then writes the page an import map from the shared chunks to its locale's copies, and points Kit's preloads at the copies. Built with any other plugin, `localeCopies` is false, and a page loads the shared chunks.
+A built page downloads only its own locale's words. The plugin is `@xyrolle/grai/svelte`'s, and it also writes a copy of each message chunk per locale, which the output's `localeCopies` says; `handleLocale` then writes the page an import map from the shared chunks to its locale's copies, and points Kit's preloads at the copies. Built with any other plugin, `localeCopies` is false, and a page loads the shared chunks.
 
-In dev, an edited message shows in the open page without a reload once `src/hooks.client.ts` imports `grai/sveltekit/client`. Svelte draws again only what read the edited keys, and the page's loads and remote functions run again for the text they return. A build leaves the module out.
+In dev, an edited message shows in the open page without a reload once `src/hooks.client.ts` imports `@xyrolle/grai/sveltekit/client`. Svelte draws again only what read the edited keys, and the page's loads and remote functions run again for the text they return. A build leaves the module out.
 
 ```ts
 // src/hooks.client.ts
-import "grai/sveltekit/client";
+import "@xyrolle/grai/sveltekit/client";
 ```
 
 ## Next.js
 
-`grai/next` binds the locale in Next's App Router: the proxy resolves it, server components bind it, and client components get it on the server from `LocaleProvider` and in the browser from `<html lang>`. A message call stays a plain function. `examples/next` is a complete app.
+`@xyrolle/grai/next` binds the locale in Next's App Router: the proxy resolves it, server components bind it, and client components get it on the server from `LocaleProvider` and in the browser from `<html lang>`. A message call stays a plain function. `examples/next` is a complete app.
 
 ```ts
 // next.config.ts: `next build` compiles the catalogs, `next dev` recompiles on each save
-import { withGrai } from "grai/next/config";
+import { withGrai } from "@xyrolle/grai/next/config";
 
 export default withGrai({ /* the app's own config */ });
 ```
@@ -112,7 +112,7 @@ export default withGrai({ /* the app's own config */ });
 
 ```ts
 // src/proxy.ts
-export { proxy } from "grai/next/proxy";
+export { proxy } from "@xyrolle/grai/next/proxy";
 
 export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] };
 ```
@@ -121,7 +121,7 @@ The proxy resolves the locale by `grai.config.json`'s `strategy` and rewrites th
 
 ```tsx
 // src/app/[locale]/layout.tsx
-import { bindLocale, LocaleProvider } from "grai/next";
+import { bindLocale, LocaleProvider } from "@xyrolle/grai/next";
 import { getTextDirection, locales } from "@/i18n/runtime.js";
 
 export function generateStaticParams() {
@@ -150,12 +150,12 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
 
   ```ts
   // vitest.config.ts
-  import { grai } from "grai/vite";
+  import { grai } from "@xyrolle/grai/vite";
   import { defineConfig } from "vitest/config";
 
   export default defineConfig({ plugins: [grai()] });
   ```
-- **A markup message** renders with `grai/react`'s `Markup`, in server and client components alike. Each element's function takes what it encloses and the options and attributes the message writes on it, so `{#link href=|/terms|}terms{/link}` gives `options.href`:
+- **A markup message** renders with `@xyrolle/grai/react`'s `Markup`, in server and client components alike. Each element's function takes what it encloses and the options and attributes the message writes on it, so `{#link href=|/terms|}terms{/link}` gives `options.href`:
 
   ```tsx
   <Markup parts={m.terms.parts()} markup={{ link: (children, { options }) => <a href={String(options.href)}>{children}</a> }} />
@@ -165,12 +165,12 @@ On a page of 400 messages in a server component and 100 in a client component, t
 
 ## Astro
 
-`grai/astro` is an Astro integration. It adds `grai/vite`, compiles the catalogs for `astro build`, and for `astro sync`, which `astro check` runs. It adds a middleware that renders each request in its locale, islands included. `examples/astro` is a complete site, static and rendered on demand.
+`@xyrolle/grai/astro` is an Astro integration. It adds `@xyrolle/grai/vite`, compiles the catalogs for `astro build`, and for `astro sync`, which `astro check` runs. It adds a middleware that renders each request in its locale, islands included. `examples/astro` is a complete site, static and rendered on demand.
 
 ```ts
 // astro.config.ts
 import { defineConfig } from "astro/config";
-import { grai } from "grai/astro";
+import { grai } from "@xyrolle/grai/astro";
 
 export default defineConfig({
 	i18n: { locales: ["en", "ro", "ar"], defaultLocale: "en" },
@@ -201,11 +201,11 @@ On a static site whose page renders 400 messages and a Svelte island 100, `astro
 
 ## Vue
 
-A message is a plain function, so a template calls it as it calls anything `<script setup>` imports, with Vite and `grai/vite` as above. Import the messages as a namespace, from `keys.js`: Vue's compiler takes a namespace import as a constant, so a build keeps only the keys the template calls, where `import { m }` would ship every key. `grai/vue`'s `Markup` draws a markup message's parts, each element by the app's function:
+A message is a plain function, so a template calls it as it calls anything `<script setup>` imports, with Vite and `@xyrolle/grai/vite` as above. Import the messages as a namespace, from `keys.js`: Vue's compiler takes a namespace import as a constant, so a build keeps only the keys the template calls, where `import { m }` would ship every key. `@xyrolle/grai/vue`'s `Markup` draws a markup message's parts, each element by the app's function:
 
 ```vue
 <script setup lang="ts">
-import { Markup } from "grai/vue";
+import { Markup } from "@xyrolle/grai/vue";
 import { h } from "vue";
 import * as m from "./i18n/keys.js";
 </script>
@@ -235,16 +235,16 @@ export const render = (request: Request, template: string) =>
 	});
 ```
 
-The browser takes the page's locale from its `<html lang>`, so the page hydrates in the words the server drew. With `grai({ localeChunks: true })`, the page loads only its locale's words, as a static site's does: the page's locale script keeps the `lang` the server wrote and points the page at that locale's copies. In dev, `import "grai/vue/client"` in the browser's entry renders an edited message again in place, keeping the page's state; a build leaves it out. `examples/vue` is a complete server-rendered app.
+The browser takes the page's locale from its `<html lang>`, so the page hydrates in the words the server drew. With `grai({ localeChunks: true })`, the page loads only its locale's words, as a static site's does: the page's locale script keeps the `lang` the server wrote and points the page at that locale's copies. In dev, `import "@xyrolle/grai/vue/client"` in the browser's entry renders an edited message again in place, keeping the page's state; a build leaves it out. `examples/vue` is a complete server-rendered app.
 
 ## Nuxt
 
 ```ts
 // nuxt.config.ts
-export default defineNuxtConfig({ modules: ["grai/nuxt"] });
+export default defineNuxtConfig({ modules: ["@xyrolle/grai/nuxt"] });
 ```
 
-The module compiles the catalogs before Nuxt builds anything, and again on each edit in dev, where the open page renders the edit again in place. Its server middleware resolves each request's locale by `grai.config.json`'s `strategy`, the render binds it, and the page's `<html lang>` and `dir` take it. Templates call messages, and `grai/vue`'s `Markup` draws markup, as in any Vue app.
+The module compiles the catalogs before Nuxt builds anything, and again on each edit in dev, where the open page renders the edit again in place. Its server middleware resolves each request's locale by `grai.config.json`'s `strategy`, the render binds it, and the page's `<html lang>` and `dir` take it. Templates call messages, and `@xyrolle/grai/vue`'s `Markup` draws markup, as in any Vue app.
 
 - With the `url` strategy, every page is also routed under each other locale's prefix (`/ro/about`), the base locale's too with `localePrefix: "always"`, and links name their locale with `localizeHref("/about")`. A locale's prefix is the one `localePrefixes` gives it, a page at a path `unlocalizedPaths` names has no copies, and a page asked for without the prefix it needs is sent to its locale's path, as the output's middleware sends it. A link into another locale loads that page anew, since a page holds its own locale's words alone.
 - A page downloads only its locale's copies of its message chunks.

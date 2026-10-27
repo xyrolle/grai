@@ -6,7 +6,7 @@ import {
 	graiPlugin,
 } from "./vite-plugin.ts";
 
-/** grai/svelte's plugins, with what a framework built on Svelte tells grai's own. */
+/** `@xyrolle/grai/svelte`'s plugins, with what a framework built on Svelte tells grai's own. */
 export function sveltePlugins(
 	options: GraiOptions,
 	adapter: GraiAdapter,

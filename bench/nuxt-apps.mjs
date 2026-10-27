@@ -1,5 +1,5 @@
-// The same Nuxt page (vue-page.mjs), written from a catalog: on grai/nuxt, on @nuxtjs/i18n and
-// with its words written in (no library), the floor for bytes. Both libraries route each locale
+// The same Nuxt page (vue-page.mjs), written from a catalog: on @xyrolle/grai/nuxt, on @nuxtjs/i18n
+// and with its words written in (no library), the floor for bytes. Both libraries route each locale
 // but the base under its prefix, and the page is a non-base locale's. @nuxtjs/i18n is set up as
 // its docs advise: its locale files loaded lazily, the page's locale's alone, its messages
 // compiled ahead of time. Each catalog's apps sit under bench/.cache/nuxt/<catalog>/, inside
@@ -8,7 +8,7 @@
 import { cpSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { compile } from "grai";
+import { compile } from "@xyrolle/grai";
 import { cacheDir } from "./apps.mjs";
 import {
 	categoriesOf,
@@ -54,7 +54,7 @@ function writeGrai(app, page) {
 			outdir: "app/i18n",
 			strategy: ["url"],
 		}),
-		"nuxt.config.ts": nuxtConfig('\tmodules: ["grai/nuxt"],\n'),
+		"nuxt.config.ts": nuxtConfig('\tmodules: ["@xyrolle/grai/nuxt"],\n'),
 		"app/app.vue": "<template><NuxtPage /></template>\n",
 		"app/plugins/bench.client.js": benchPlugin,
 		"app/pages/index.vue": `<script setup>

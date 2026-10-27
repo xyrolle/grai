@@ -1,4 +1,4 @@
-import { bindLocale, LocaleProvider } from "grai/next";
+import { bindLocale, LocaleProvider } from "@xyrolle/grai/next";
 import { getTextDirection, locales } from "@/i18n/runtime.js";
 
 export function generateStaticParams() {

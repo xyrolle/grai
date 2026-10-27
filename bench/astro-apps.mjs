@@ -7,7 +7,7 @@
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { compile } from "grai";
+import { compile } from "@xyrolle/grai";
 import { cacheDir } from "./apps.mjs";
 
 export const SERVER_KEYS = 400;
@@ -130,7 +130,7 @@ function writeGrai(app, keys) {
 			strategy: ["url"],
 		}),
 		"astro.config.mjs": astroConfig(app, {
-			imports: 'import { grai } from "grai/astro";',
+			imports: 'import { grai } from "@xyrolle/grai/astro";',
 			integrations: "grai(), ",
 		}),
 		"src/pages/[...locale]/index.astro": page(

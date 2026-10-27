@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Markup } from "grai/vue";
+import { Markup } from "@xyrolle/grai/vue";
 import { h, onMounted, ref } from "vue";
 import * as m from "~/i18n/keys.js";
 import { getLocale, locales, localizeHref } from "~/i18n/runtime.js";

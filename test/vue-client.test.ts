@@ -10,10 +10,10 @@ import { fixtures, project } from "./project.ts";
 const repository = fileURLToPath(new URL("..", import.meta.url));
 
 /**
- * Two Vue components, with grai/vue/client imported: one shows the title and counts its clicks,
- * the other shows a note; each counts its renders.
+ * Two Vue components, with @xyrolle/grai/vue/client imported: one shows the title and counts its
+ * clicks, the other shows a note; each counts its renders.
  */
-const main = `import "grai/vue/client";
+const main = `import "@xyrolle/grai/vue/client";
 import { createApp, h, ref } from "vue";
 import { m } from "./out/messages.js";
 
@@ -60,7 +60,7 @@ it("renders again in place, after an edit, the Vue components that called an edi
 		optimizeDeps: { noDiscovery: true },
 		resolve: {
 			alias: {
-				"grai/vue/client": join(repository, "src/vue/client.ts"),
+				"@xyrolle/grai/vue/client": join(repository, "src/vue/client.ts"),
 				vue: join(repository, "node_modules/vue"),
 			},
 		},

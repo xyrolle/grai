@@ -4,7 +4,7 @@ Catalogs are the inlang message format, one JSON file per locale, as Paraglide r
 
 ```json
 {
-	"$schema": "./node_modules/grai/config.schema.json",
+	"$schema": "./node_modules/@xyrolle/grai/config.schema.json",
 	"locales": ["en", "de"],
 	"baseLocale": "en",
 	"catalogs": "messages/{locale}.json",
@@ -88,10 +88,10 @@ import { withLocale } from "./src/lib/i18n/server.js";
 aroundEach((test) => withLocale("de", test));
 ```
 
-A key's own path, `#i18n/messages/<key>.js`, is a module of that key alone wherever grai resolves it, so a test that mocks one key's path mocks that key and no other: in Vite's builds and in Vitest, through grai's plugin, and in Node through `grai/register`, loaded before the app. Without them every key's path is keys.js, and a mock of one mocks them all.
+A key's own path, `#i18n/messages/<key>.js`, is a module of that key alone wherever grai resolves it, so a test that mocks one key's path mocks that key and no other: in Vite's builds and in Vitest, through grai's plugin, and in Node through `@xyrolle/grai/register`, loaded before the app. Without them every key's path is keys.js, and a mock of one mocks them all.
 
 ```sh
-node --import grai/register --experimental-test-module-mocks --test
+node --import @xyrolle/grai/register --experimental-test-module-mocks --test
 ```
 
 ```ts

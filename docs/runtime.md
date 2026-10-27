@@ -21,10 +21,10 @@ Each section names its bench: `pnpm <name>` in `bench/`, after `pnpm install` an
 | Dev | One module. An edit sends only the changed keys' functions, as a patch, from grai's own watcher on the catalogs. | 10–15 ms from the save to the page with grai's plugin, and 8.7–11.5 ms to a server render, against 225–251 ms re-sending and re-evaluating the module (`hmr`). |
 | Runtime | Constants, `getLocale`, `setLocale` and the URL helpers. | The apps' surface, as grai compiles it, is 633 bytes min+gzip with a cookie strategy and 755 with a URL strategy; Paraglide's is 1.9–2.1 KB (`runtime-size`). |
 
-**Not adopted: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.3–2.6 ms against 5.4–5.6 ms with the locale's copies, and the bundle 19.1–20.4 KB against 22.9–23.8 KB (`hydrate`); a server render takes 0.04 ms against 0.13 ms (`ssr`). On app A's real pages, where messages are a small part of what hydration does, it hydrates within the noise of `grai/svelte`'s strings, for a copy per locale of every component chunk with such a text (Browser, below). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
+**Not adopted: inlining text into templates before the framework compiles them.** Svelte then sees static text. On the 2,000-message page, hydration takes 2.3–2.6 ms against 5.4–5.6 ms with the locale's copies, and the bundle 19.1–20.4 KB against 22.9–23.8 KB (`hydrate`); a server render takes 0.04 ms against 0.13 ms (`ssr`). On app A's real pages, where messages are a small part of what hydration does, it hydrates within the noise of `@xyrolle/grai/svelte`'s strings, for a copy per locale of every component chunk with such a text (Browser, below). On app A, 43% of the 10,185 message uses in `src/` are the whole of a text, attribute or prop expression and would become static; 13% sit inside a larger expression; 44% are in script or used as values, and keep the per-locale call (`call-sites`).
 
 Not adopted:
-- **Strings put in place of the calls after the framework compiled them.** Svelte has compiled each call as a dynamic expression, so the page hydrates as it does with the calls: 23.9–24.1 ms against 23.3–24.3 ms at a 4× slowdown, where `grai/svelte`'s strings take 15.9–16.2 ms (`svelte-texts`). It would also cost the build: SvelteKit has one client build, so a build per locale, 2 more client builds of 8.1 s on app A, cannot serve its pages, and copies per locale of the 326 of its 1,598 client chunks that call a message are 978 more files behind the import map (`inline-cost`).
+- **Strings put in place of the calls after the framework compiled them.** Svelte has compiled each call as a dynamic expression, so the page hydrates as it does with the calls: 23.9–24.1 ms against 23.3–24.3 ms at a 4× slowdown, where `@xyrolle/grai/svelte`'s strings take 15.9–16.2 ms (`svelte-texts`). It would also cost the build: SvelteKit has one client build, so a build per locale, 2 more client builds of 8.1 s on app A, cannot serve its pages, and copies per locale of the 326 of its 1,598 client chunks that call a message are 978 more files behind the import map (`inline-cost`).
 - **A strategy lookup per call.** The locale is resolved once per request on the server, and fixed by the bundle in the browser.
 - **A dispatcher generated per key for a text message.** Each copy reads the request's locale itself, and it is slower than one shared dispatcher: 49–103 ns against 19–25 ns a call (`server`). The engine keeps one hot function fast, and thousands of small copies slow. For a message with inputs, a dispatch of each key's own halves the call: a server build has one, and a page does not, where it costs the load more than the calls save (`docs/design.md`).
 - **One object `m` of every key on a server, in place of a binding per key.** It loads faster: app A's keys and a page of calls load in 13.7 ms against 18.9, and app B's in 21.7 against 34.3 ms. But each call then reads `m` as a dictionary of thousands of properties: 24.7 ns a call against 18.0 on app A and 22.1 against 16.6 on app B, once optimized. With Node's compile cache warm it loads no faster, 9.9 ms against 9.3 on app A (`server-shapes`). A server pays the load once, and the call on every render.
@@ -101,22 +101,22 @@ A server-rendered Svelte page of 2,000 message calls, hydrated, then mounted aga
 
 The copies are grai's own client build, its message chunks swapped for the locale's copies as the import map swaps them, and hydrate in the time the prototype's per-locale module did, 5.8–5.9 ms in the same window. On app B, whose URL strategy makes Paraglide's per-call lookup cheaper, the locale's copies hydrate 20–24% faster instead of 32–34%.
 
-In a Svelte client build, `grai/svelte` reads each message without inputs as its string (`svelte-texts`). The same page and catalog, built by Vite through grai's own plugins and loaded through its locale's import map, `ro`, at full CPU speed and at a 4× slowdown:
+In a Svelte client build, `@xyrolle/grai/svelte` reads each message without inputs as its string (`svelte-texts`). The same page and catalog, built by Vite through grai's own plugins and loaded through its locale's import map, `ro`, at full CPU speed and at a 4× slowdown:
 
 | text messages as | JS, brotli | hydrate | mount again |
 |---|---|---|---|
-| calls (`grai/vite`) | 24.7 KB | 5.8 / 24.3 ms | 2.6 / 10.9 ms |
-| strings (`grai/svelte`) | 23.9 KB | 3.8 / 16.2 ms | 2.0 / 8.2 ms |
+| calls (`@xyrolle/grai/vite`) | 24.7 KB | 5.8 / 24.3 ms | 2.6 / 10.9 ms |
+| strings (`@xyrolle/grai/svelte`) | 23.9 KB | 3.8 / 16.2 ms | 2.0 / 8.2 ms |
 | strings put in place of the calls after Svelte compiled | 22.7 KB | 5.8 / 23.9 ms | 2.5 / 10.9 ms |
 | inlined into the template | 21.2 KB | 2.9 / 12.9 ms | 1.9 / 7.9 ms |
 
 `ru` gives 23.3, 15.9, 24.1 and 12.5 ms at 4×.
 
-A page that imports each key by its own path (`#i18n/messages/<key>.js`, mapped to keys.js) reads the same strings. On the synthetic catalog, in `ro`, it loads 23.4 KB and hydrates in 4.9 / 20.8 ms, against 23.3 KB and 4.9 / 20.5 ms through the namespace. Before `grai/svelte` followed a key's path to the key's own module, that page kept its calls: 24.3 KB and 5.6 / 23.1 ms (`svelte-texts synthetic`).
+A page that imports each key by its own path (`#i18n/messages/<key>.js`, mapped to keys.js) reads the same strings. On the synthetic catalog, in `ro`, it loads 23.4 KB and hydrates in 4.9 / 20.8 ms, against 23.3 KB and 4.9 / 20.5 ms through the namespace. Before `@xyrolle/grai/svelte` followed a key's path to the key's own module, that page kept its calls: 24.3 KB and 5.6 / 23.1 ms (`svelte-texts synthetic`).
 
 Seven of app A's real pages, built three ways (`inline-build` in copies of the app) and served side by side (`inline-pages`): the five heaviest its demo data fills, by the keys they load (ranks 1, 2, 3, 5 and 8 of 73), and two typical ones. On each, every build's page has the same text, whitespace included, as served and as hydrated, and hydration keeps the same server elements. Median of 15 interleaved loads, ms from SvelteKit's start until it has hydrated the page, at full speed and at a 4× slowdown, at a load of 15–22:
 
-| keys | JS, brotli: strings / inlined | calls (`grai/vite`) | strings (`grai/svelte`) | inlined into the template |
+| keys | JS, brotli: strings / inlined | calls (`@xyrolle/grai/vite`) | strings (`@xyrolle/grai/svelte`) | inlined into the template |
 |---|---|---|---|---|
 | 1,315 | 522 / 509 KB | 485 / 635 | 457 / 658 | 429 / 600 |
 | 1,094 | 478 / 466 KB | 384 / 527 | 400 / 520 | 409 / 523 |
@@ -130,7 +130,7 @@ Against the strings, inlining changes the 4× time by −9% to +4%, no more than
 
 ## Bytes per page
 
-Every page of app A's production build, built twice from one commit, on Paraglide 2.25.4 and on grai with `localeChunks`, as `grai/sveltekit/vite` builds it (`record-build` in a copy of each, then `bytes`). grai's columns are the files its build writes: its message chunks, which hold every locale, and the locale's copies of them, which a page loads through the import map. Paraglide's build mixes its messages into other chunks, so its columns bundle the page's keys alone, with Rolldown, into one file, which compresses better than chunks do. Brotli KB, in `ru`:
+Every page of app A's production build, built twice from one commit, on Paraglide 2.25.4 and on grai with `localeChunks`, as `@xyrolle/grai/sveltekit/vite` builds it (`record-build` in a copy of each, then `bytes`). grai's columns are the files its build writes: its message chunks, which hold every locale, and the locale's copies of them, which a page loads through the import map. Paraglide's build mixes its messages into other chunks, so its columns bundle the page's keys alone, with Rolldown, into one file, which compresses better than chunks do. Brotli KB, in `ru`:
 
 | page | keys, Paraglide / grai | page JS, Paraglide | page JS, grai, the locale's copies | Paraglide, every locale | Paraglide's per-locale build | grai's chunks, every locale | grai, the locale's copies |
 |---|---|---|---|---|---|---|---|

@@ -42,7 +42,7 @@ it("ships in the package, where a config's $schema names it", async () => {
 	expect(
 		await errorsOf(
 			{ en: { title: "Title" } },
-			{ $schema: "./node_modules/grai/config.schema.json" },
+			{ $schema: "./node_modules/@xyrolle/grai/config.schema.json" },
 		),
 	).toEqual([]);
 });

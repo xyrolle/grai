@@ -164,7 +164,7 @@ describe("a key named as something the output's code calls", () => {
 		expect(said(join(assets, client ?? ""))).toEqual(expected);
 	});
 
-	it("compiles in grai/svelte's module of a text key's string", async () => {
+	it("compiles in @xyrolle/grai/svelte's module of a text key's string", async () => {
 		const { dir, config } = project({ en: catalog });
 		const { build: compiled } = await recompile(config, undefined);
 		if (compiled === undefined) throw new Error("the compile failed");

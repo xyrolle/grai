@@ -1,6 +1,6 @@
 # Releasing
 
-The owner publishes grai to npm from his own machine, confirming each publish with his account's two-factor authentication. The steps below are for 0.1.0; a later release swaps in its own version.
+The owner publishes grai to npm, as `@xyrolle/grai`, from his own machine, confirming each publish with his account's two-factor authentication. The steps below are for 0.1.0; a later release swaps in its own version.
 
 The release's pull request has already set the version in `package.json` and written the release's section at the top of `CHANGELOG.md`, headed `## 0.1.0 (unreleased)` (AGENTS.md, Releases).
 
@@ -42,11 +42,11 @@ The release's pull request has already set the version in `package.json` and wri
 
    ```sh
    npm pack
-   tar -tzf grai-0.1.0.tgz | grep -v '^package/dist/'
+   tar -tzf xyrolle-grai-0.1.0.tgz | grep -v '^package/dist/'
    ```
 
    Check:
-   - The file is `grai-0.1.0.tgz`, about 400 kB, with about 490 files.
+   - The file is `xyrolle-grai-0.1.0.tgz`, about 400 kB, with about 490 files.
    - Apart from `dist/`, the tarball holds only `package.json`, `README.md`, `LICENSE`, `CHANGELOG.md`, `SECURITY.md` and `config.schema.json`.
 
 5. **Tag the commit and push the tag.**
@@ -69,20 +69,20 @@ The release's pull request has already set the version in `package.json` and wri
 7. **Publish the tarball.**
 
    ```sh
-   npm publish grai-0.1.0.tgz
+   npm publish xyrolle-grai-0.1.0.tgz
    ```
 
-   npm runs no scripts when it publishes a tarball, so it publishes exactly the bytes that steps 3 and 4 checked. `publishConfig` makes the package public. npm lists the tarball's contents, then asks for the second factor: in the browser, with a security key or an authenticator, or as a one-time code passed with `--otp=<code>`.
+   npm runs no scripts when it publishes a tarball, so it publishes exactly the bytes that steps 3 and 4 checked. A scoped package is restricted by default, and `publishConfig` makes it public. npm lists the tarball's contents, then asks for the second factor: in the browser, with a security key or an authenticator, or as a one-time code passed with `--otp=<code>`.
 
-   Check: the output ends with `+ grai@0.1.0`.
+   Check: the output ends with `+ @xyrolle/grai@0.1.0`.
 
 8. **Check what the registry serves.**
 
    ```sh
-   npm view grai dist-tags.latest
-   npm view grai@0.1.0 dist.shasum
-   shasum grai-0.1.0.tgz
-   cd "$(mktemp -d)" && npx -y grai@0.1.0 help
+   npm view @xyrolle/grai dist-tags.latest
+   npm view @xyrolle/grai@0.1.0 dist.shasum
+   shasum xyrolle-grai-0.1.0.tgz
+   cd "$(mktemp -d)" && npx -y @xyrolle/grai@0.1.0 help
    ```
 
    Check:
@@ -131,7 +131,7 @@ Set-up:
    A GitHub environment, such as `npm`, with the owner as its required reviewer, holds each run until he approves it.
 3. **On npmjs.com,** open the package's Settings, then Trusted Publisher, then GitHub Actions. Enter the user `xyrolle`, the repository `grai`, the workflow filename `publish.yml` and the environment `npm`.
 
-   The CLI can do the same: `npm trust github grai --file publish.yml --repo xyrolle/grai --env npm --allow-publish`, with npm 11.15 or later. The configuration expires unless a publish through it succeeds within 2 days.
+   The CLI can do the same: `npm trust github @xyrolle/grai --file publish.yml --repo xyrolle/grai --env npm --allow-publish`, with npm 11.15 or later. The configuration expires unless a publish through it succeeds within 2 days.
 4. **Restrict publishing access** to "Require two-factor authentication and disallow tokens". That leaves the trusted publisher and sessions confirmed with the second factor.
 5. **On GitHub, add a tag ruleset** so that only the owner can create `v*` tags, since a pushed tag publishes.
 
