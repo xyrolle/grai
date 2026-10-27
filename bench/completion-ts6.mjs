@@ -48,7 +48,7 @@ function parseConfig(directory) {
 	);
 }
 
-/** A language service on the project of the file it opens, which it reads from the editor. */
+/** A language service on the project of a file, which it reads from the editor once opened. */
 function languageService() {
 	const versions = new Map();
 	let projectVersion = 0;
@@ -60,10 +60,9 @@ function languageService() {
 	let service;
 	let first;
 	return {
-		open(path, text) {
+		prepare(path) {
 			const config = parseConfig(dirname(path));
-			opened = { path, text };
-			touch(path);
+			opened = { path, text: "" };
 			const host = {
 				getProjectVersion: () => String(projectVersion),
 				getScriptFileNames: () => config.fileNames,
@@ -85,6 +84,10 @@ function languageService() {
 				getDirectories: ts.sys.getDirectories,
 			};
 			service = ts.createLanguageService(host, ts.createDocumentRegistry());
+		},
+		open(text) {
+			opened.text = text;
+			touch(opened.path);
 		},
 		change(text) {
 			opened.text = text;
@@ -114,6 +117,9 @@ function languageService() {
 				first.data,
 			);
 			return details && ts.displayPartsToString(details.displayParts);
+		},
+		stop() {
+			service.dispose();
 		},
 	};
 }
