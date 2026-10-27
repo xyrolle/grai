@@ -27,7 +27,9 @@ import { grai } from "../src/vite.ts";
  * compiler, set with the templates of the output's declarations beside it as files: the package's
  * own 32,551 B, ./next/config 34,496 B, ./vite 55,846 B with its locale script and the build's
  * reader of code, and with ./vite's plugins ./svelte 56,167 B, ./sveltekit/vite 56,221 B, ./astro
- * 58,675 B and ./nuxt 56,820 B. The others: ./sveltekit 541 B with its import map,
+ * 58,675 B and ./nuxt 56,820 B. The others: ./sveltekit 711 B with its import map, and the
+ * import map and preload of a dev page's keys.js, 170 B of it, which its handle writes while Vite
+ * renders the page, as SvelteKit lets no plugin write into a page,
  * ./sveltekit/client 382 B, ./sveltekit/navigation 210 B, ./next 516 B, ./next/proxy 265 B,
  * ./react 413 B, ./astro/middleware 1,838 B, ./vue 426 B, ./vue/client 292 B,
  * ./astro/translated-paths 1,621 B, which a static Astro build loads to list the pages in a
@@ -39,7 +41,7 @@ const budgets: Record<string, number> = {
 	"./vite": 67_000,
 	"./register": 900,
 	"./svelte": 67_400,
-	"./sveltekit": 650,
+	"./sveltekit": 850,
 	"./sveltekit/vite": 67_500,
 	"./sveltekit/client": 460,
 	"./sveltekit/navigation": 250,
