@@ -358,13 +358,20 @@ it("places the keys by the groups saved in the running server at its next catalo
 	expect(moduleOf(dir, "de key900")).toMatch(/^keys\/g1-/);
 });
 
-it("groups apart the keys two routes take through one barrel, and a re-exported client component's with every route that loads its barrel, as each layer compiles them", {
+it("groups apart the keys two routes take through one barrel of keys and one of keys' own paths, and a re-exported client component's with every route that loads its barrel, as each layer compiles them", {
 	timeout: 240_000,
 }, async () => {
 	const dir = nextProject(
 		1200,
 		{
+			"package.json": JSON.stringify({
+				name: "app",
+				type: "module",
+				imports: { "#i18n/messages/*": "./i18n/keys.js" },
+			}),
 			"app/messages.js": 'export { key100, key200 } from "../i18n/keys.js";\n',
+			"app/paths.js":
+				'export { key500 } from "#i18n/messages/key500.js";\nexport { key600 } from "#i18n/messages/key600.js";\n',
 			"app/components.js":
 				'export { Hello } from "./hello.jsx";\nexport { Bye } from "./bye.jsx";\n',
 			"app/hello.jsx": `"use client";
@@ -382,17 +389,19 @@ export function Bye() {
 }
 `,
 			"app/a/page.jsx": `import { key100 } from "../messages.js";
+import { key500 } from "../paths.js";
 import { Hello } from "../components.js";
 
 export default function A() {
-	return <main>{key100({}, { locale: "de" })}<Hello /></main>;
+	return <main>{key100({}, { locale: "de" })}{key500({}, { locale: "de" })}<Hello /></main>;
 }
 `,
 			"app/b/page.jsx": `import { key200 } from "../messages.js";
+import { key600 } from "../paths.js";
 import { Bye } from "../components.js";
 
 export default function B() {
-	return <main>{key200({}, { locale: "de" })}<Bye /></main>;
+	return <main>{key200({}, { locale: "de" })}{key600({}, { locale: "de" })}<Bye /></main>;
 }
 `,
 		},
@@ -403,6 +412,82 @@ export default function B() {
 	await requested(first.origin, "/b");
 	// The app's own modules keep their side effects, so a route that loads the components' barrel
 	// compiles both components, and their keys go together.
+	expect(await savedGroups(dir, (groups) => groups.length > 0)).toEqual([
+		["key100", "key500"],
+		["key200", "key600"],
+		["key300", "key400"],
+	]);
+	await stopped(first.server);
+
+	for (const [route, server, path] of [
+		["/a", "de key100", "de key500"],
+		["/b", "de key200", "de key600"],
+	] as const) {
+		rmSync(join(dir, ".next"), { recursive: true, force: true });
+		const { server: running, origin } = await started(dir);
+		const html = await requested(origin, route);
+		expect(html).toContain(server);
+		expect(html).toContain(path);
+		expect(moduleOf(dir, path)).toBe(moduleOf(dir, server));
+		const client = moduleOf(dir, "de key300");
+		expect(moduleOf(dir, "de key400")).toBe(client);
+		expect(compiledKeys(dir)).toEqual({
+			"app-rsc": [moduleOf(dir, server)],
+			"app-ssr": [client],
+			"app-client": [client],
+		});
+		await stopped(running);
+	}
+});
+
+it("groups the keys of a server component an export * barrel passes on with the routes that take it, in an app whose modules have no side effects, and a client component's with every route, as each layer compiles them", {
+	timeout: 240_000,
+}, async () => {
+	const component = (name: string, key: string, client: boolean) =>
+		`${client ? '"use client";\n' : ""}import * as m from "../i18n/keys.js";
+
+export function ${name}() {
+	return <p>{m.${key}({}, { locale: "de" })}</p>;
+}
+`;
+	const dir = nextProject(
+		1200,
+		{
+			"package.json": JSON.stringify({
+				name: "app",
+				type: "module",
+				sideEffects: false,
+			}),
+			"app/servers.js":
+				'export * from "./sa.jsx";\nexport * from "./sb.jsx";\n',
+			"app/clients.js":
+				'export * from "./hello.jsx";\nexport * from "./bye.jsx";\n',
+			"app/sa.jsx": component("SA", "key100", false),
+			"app/sb.jsx": component("SB", "key200", false),
+			"app/hello.jsx": component("Hello", "key300", true),
+			"app/bye.jsx": component("Bye", "key400", true),
+			"app/a/page.jsx": `import { SA } from "../servers.js";
+import { Hello } from "../clients.js";
+
+export default function A() {
+	return <main><SA /><Hello /></main>;
+}
+`,
+			"app/b/page.jsx": `import { SB } from "../servers.js";
+import { Bye } from "../clients.js";
+
+export default function B() {
+	return <main><SB /><Bye /></main>;
+}
+`,
+		},
+		{ withGrai: true },
+	);
+	const first = await started(dir);
+	await requested(first.origin, "/a");
+	await requested(first.origin, "/b");
+	// Next's bundler sees into a server component's module through the barrel, and not into a
+	// client component's, which the server holds a reference to: it compiles both client branches.
 	expect(await savedGroups(dir, (groups) => groups.length > 0)).toEqual([
 		["key100"],
 		["key200"],
@@ -418,7 +503,6 @@ export default function B() {
 		const { server: running, origin } = await started(dir);
 		expect(await requested(origin, route)).toContain(server);
 		const client = moduleOf(dir, "de key300");
-		expect(moduleOf(dir, "de key400")).toBe(client);
 		expect(compiledKeys(dir)).toEqual({
 			"app-rsc": [moduleOf(dir, server)],
 			"app-ssr": [client],
