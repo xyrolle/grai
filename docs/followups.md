@@ -28,7 +28,7 @@ Done when: a key reaches a page's first paint only if that page's first paint, n
 
 ## A page's locale copies against Paraglide's per-locale build
 
-On app A, a page's locale copies take 1,250 KB brotli summed over its 73 pages, 13% more than Paraglide's per-locale build of the same pages' keys bundled into one file per page, and 34.5 KB against 30.0 KB on its largest page (`bytes`). The chunks hold keys a page does not name, as sets of entries share them, each chunk compresses alone, and a copy keeps a `void 0` for each other locale's variant.
+On app A, a page's Russian copies take 1,017 KB brotli summed over its 73 pages, under Paraglide's per-locale build of each page's keys bundled into one file, 1,105 KB. On app B, with SvelteKit's pages, its Russian copies take 1,195 KB summed over its 89 pages, against 1,183 KB for Paraglide's tuned setup, though its English take 845 KB against 862. With every file's hashes made equal, the Russian is 1,176.5 against 1,173.5 KB. So 9 of the 12 KB gap as built is hash strings, which brotli cannot compress: each copy imports the runtime's chunk by a name that is all hash. The rest is the keys a page loads and does not name, as sets of entries share chunks, and each chunk compressing alone.
 
 Done when: a page's locale copies take no more than Paraglide's per-locale build in `bytes`, on both apps.
 

@@ -138,7 +138,7 @@ Every page of app A's production build, built twice from one commit, on Paraglid
 | 10th | 673 / 975 | 445.0 | 409.5 | 43.1 | 23.8 | 57.5 | 26.8 |
 | all 73, summed | | 21,059 | 19,477 | 2,008 | 1,104 | 2,685 | 1,250 |
 
-- **The locale's copies are 53% smaller than grai's chunks** and 38% smaller than Paraglide's messages in every locale, but 13% larger than Paraglide's per-locale build. grai's chunks hold keys a page's own code does not name, as chunks that sets of entries share (1,348 keys on the largest page, against the 992 its code names); each chunk compresses alone; and a copy keeps a `void 0` where each other locale's variant was (`docs/followups.md`).
+- **The locale's copies are 53% smaller than grai's chunks** and 38% smaller than Paraglide's messages in every locale, but 13% larger than Paraglide's per-locale build. grai's chunks hold keys a page's own code does not name, as chunks that sets of entries share (1,348 keys on the largest page, against the 992 its code names); and each chunk compresses alone (`docs/followups.md`).
 - **A page's JS on grai is 8% smaller than on Paraglide** with the locale's copies, and 0.7% smaller with the chunks as written, which a build without `localeChunks` writes alone.
 - **Inlining the text into the template is a prototype.** Its per-locale module of plain functions takes 918 KB summed, and 692 KB with each message without inputs inlined at its call sites. The 224 KB between them, 1.1% of the pages' JS, is what inlining moves into the components.
 
