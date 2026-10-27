@@ -41,6 +41,8 @@ export class TextTest {
 	private readonly passers: OutsidePackages;
 	/** The names the files were tested by, once they were: as they only grow, a file left out failed them. */
 	private tested: ReadonlySet<string> | undefined;
+	/** The test of an import's path by the names last tested, or undefined to take every import. */
+	private leading: RegExp | undefined;
 
 	constructor(naming: Naming) {
 		this.naming = naming;
@@ -72,11 +74,15 @@ export class TextTest {
 						packages,
 					)
 				: keyNamesOf(key, { ...output, barrels }, mappings, links, packages));
-		if (names === undefined) return [...files];
+		if (names === undefined) {
+			this.leading = undefined;
+			return [...files];
+		}
 		for (const name of [...this.leaving, ...reached]) names.add(name);
 		for (const name of this.passers.passing(names)) names.add(written(name));
 		const tested = this.tested;
 		this.tested = names;
+		this.leading = new RegExp([...names].join("|"));
 		if (tested === undefined) {
 			const test = textTest(names);
 			return files.filter(
@@ -87,5 +93,18 @@ export class TextTest {
 		if (found.length === 0) return [];
 		const test = new RegExp(found.join("|"));
 		return files.filter(({ text }) => test.test(text));
+	}
+
+	/**
+	 * Whether an import of a file read may name what holds grai's or a module outside the listed
+	 * sources, by its path and the names the last call of `taken` tested by, as a file's text may.
+	 * A path that holds a quote or a line break, which would end it there, is taken.
+	 */
+	leads(source: string, importer: string): boolean {
+		if (this.leading === undefined || /['"`\n\r\u2028\u2029]/.test(source)) {
+			return true;
+		}
+		const written = `"${source}"`;
+		return this.leading.test(written) || this.beyond.test(importer, written);
 	}
 }

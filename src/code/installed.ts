@@ -111,16 +111,21 @@ export class Installed {
 		return this.resolved.get(memo);
 	}
 
+	/** Whether a specifier names an installed package's module, by the package's name. */
+	imports(specifier: string): boolean {
+		const segments = specifier.split("/");
+		const name = specifier.startsWith("@")
+			? segments.slice(0, 2).join("/")
+			: segments[0];
+		return name !== undefined && this.names.has(name);
+	}
+
 	/** The specifiers in a text that may name an installed package's module. */
 	private specifiers(text: string): Set<string> {
 		const found = new Set<string>();
 		if (this.names.size === 0) return found;
 		for (const specifier of specifiersIn(text)) {
-			const segments = specifier.split("/");
-			const name = specifier.startsWith("@")
-				? segments.slice(0, 2).join("/")
-				: segments[0];
-			if (name !== undefined && this.names.has(name)) found.add(specifier);
+			if (this.imports(specifier)) found.add(specifier);
 		}
 		return found;
 	}
