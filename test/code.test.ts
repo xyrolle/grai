@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { type ModuleCode, readCode } from "../src/code/read.ts";
 import { Scopes } from "../src/code/scopes.ts";
-import { fileOffset } from "../src/code/source.ts";
+import { CodeWriter, fileOffset } from "../src/code/source.ts";
 import { childrenOf, type Node } from "../src/code/syntax.ts";
 
 /**
@@ -47,6 +47,29 @@ function readsIn(text: string) {
 		return reads;
 	};
 }
+
+describe("a file's text as a parser decoded its HTML entities", () => {
+	it("keeps each stretch the file writes as it is at its place, and a run of entities at its first", () => {
+		const file = "<p :x=\"a &amp;&amp; b['tit&#108;e']\">";
+		const from = file.indexOf("a ");
+		const to = file.lastIndexOf('"');
+		const code = new CodeWriter(file)
+			.write("(")
+			.decoded(from, to, "a && b['title']")
+			.code("js");
+		const placeOf = (written: string) =>
+			fileOffset(code, code.text.indexOf(written));
+
+		expect(code.text).toBe("(a && b['title']");
+		expect(placeOf("a ")).toBe(file.indexOf("a "));
+		expect(placeOf("&&")).toBe(file.indexOf("&amp;"));
+		expect(placeOf(" b")).toBe(file.indexOf(" b"));
+		expect(placeOf("'title")).toBe(file.indexOf("'tit"));
+		expect(placeOf("le']")).toBe(file.indexOf("&#108;"));
+		expect(placeOf("e']")).toBe(file.indexOf("e']"));
+		expect(fileOffset(code, code.text.length)).toBe(to);
+	});
+});
 
 describe("reading a file's code", () => {
 	it("reads a script as it is, JSX text and all", async () => {
