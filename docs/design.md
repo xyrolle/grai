@@ -498,10 +498,9 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
 
       Or it must hold what may lead outside the listed sources, where the reading follows a module as it follows any, and that module may pass the output on unseen (`code/outside.ts`):
       - an absolute path to an entry of the system's root, or a `file:` URL;
-      - a path that climbs out of its root, which from a directory `d` levels down takes `d + 1` segments `..` in one string, so on one line; a path through a mapping with `*` climbs from its target's directory, on a line that writes its key;
+      - a path that climbs out of its root, by its own segments `..`: a relative one from its file's directory, and one through a mapping with `*`, which starts with its key, from its target's directory;
       - the name of a directory the listing leaves out, a mapping key whose target is outside the listed sources, or a symlink to outside them.
 
-      Counting the segments on a line, not in a string, keeps the test free of a lexer: a line holds every segment of each string on it, and maybe more.
     - An installed package is no source, so the test never sees what it holds (`code/installed.ts`). A file imports one by a specifier that starts with its name, so a left-out file's specifiers that start with an installed package's name are resolved from it and followed, as reading it would. A file that writes one whose module passes grai's on is read.
     - A tsconfig's `baseUrl` maps any specifier that is not a relative path to below it, so it is a mapping of `*`.
     - The test is necessary, not sufficient, so the reading it gives is the full reading's. On app B and the synthetic project, the reads, reaches and unresolved imports are identical with it and without it.
