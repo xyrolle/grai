@@ -484,6 +484,7 @@ grai reads an app's code to know which keys it reads: to report a key no catalog
       - the output directory's name, or a barrel's name (its file's, or its folder's for an index);
       - the key of a mapping that may name one without that name: a Vite alias, a tsconfig `paths` key or a package.json `imports` key;
       - the name of a symlink or a package that holds one.
+      - a key's path (`messages/` and a key's name). An import of one that nothing resolves is the output's, unresolved, which a check reports whatever names it.
 
       Or else it must hold what may spell a specifier otherwise. A specifier is a string right after `from`, `import`, `import(` or `require(`, so that is a comment there, an escape in one, `\u` anywhere (an identifier may spell `require` with one), a load by anything but one whole string, or a glob.
 
