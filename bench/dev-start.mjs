@@ -1,6 +1,7 @@
 // Dev start: a Vite dev server started cold, until its page of 500 messages shows, per library
 // (dev-pages.mjs): grai's plugin, Paraglide's, i18next's and use-intl's pages, and the page with no
-// messages, which draws the same texts from its own code.
+// messages, which draws the same texts from its own code. Two pages: 500 plain texts, and 500
+// calls in the catalog's own mix of texts, inputs, plurals and markup.
 //
 // Each start is a new Node process, in a new directory with no output and no cache, Vite's own
 // among them. It is timed from the server's creation, once Vite, the plugins and Chromium have
@@ -12,12 +13,13 @@
 // Every library starts once a round, in an order that rotates, so the load from other work weighs
 // on each alike; medians of ROUNDS, with every round kept.
 //   node dev-start.mjs [app...]
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import {
 	createServer,
+	mixedPage,
 	pluginsFor,
 	textPage,
 	writeFixture,
@@ -52,10 +54,10 @@ function fault(drawn, texts, errors) {
 }
 
 /** Runs in the child: one cold start of the design's page, printed as JSON. */
-async function child(design, name) {
+async function child(design, name, pageFile) {
 	const [app] = selectedApps([name]);
 	const locale = otherLocale(app);
-	const page = textPage(app, locale);
+	const page = JSON.parse(readFileSync(pageFile, "utf8"));
 	const root = join(cacheDir, "dev-start", app.id);
 	writeFixture(root, app, locale, design, page);
 	const viteCache = join(root, ".vite");
@@ -109,10 +111,10 @@ async function child(design, name) {
 }
 
 /** One cold start in a new process, in a process group of its own, stopped however it ends. */
-async function start(design, app) {
+async function start(design, app, pageFile) {
 	const starting = startServer(
 		process.execPath,
-		[self, "--child", design, app.id],
+		[self, "--child", design, app.id, pageFile],
 		{ stdio: ["ignore", "pipe", "inherit"] },
 	);
 	let output = "";
@@ -140,47 +142,74 @@ async function start(design, app) {
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
+/** Every design's starts on one page, round by round. */
+async function rounds(app, page) {
+	const directory = join(cacheDir, "dev-start");
+	mkdirSync(directory, { recursive: true });
+	const pageFile = join(directory, `${app.id}.${page.name}.json`);
+	writeFileSync(pageFile, JSON.stringify(page));
+	const runs = Object.fromEntries(designs.map((design) => [design, []]));
+	for (let round = 0; round < ROUNDS; round++) {
+		for (let index = 0; index < designs.length; index++) {
+			const design = designs[(index + round) % designs.length];
+			runs[design].push(await start(design, app, pageFile));
+		}
+	}
+	return runs;
+}
+
+/** Prints and records one page's starts: each design's medians. */
+function report(app, page, runs) {
+	console.log(
+		`\n### ${app.name}, ${page.title}: a cold Vite dev server until its page shows, each start a new process, medians of ${ROUNDS}, ms\n`,
+	);
+	console.log(
+		"| design | shown, median | range | ready, median | listening, median |\n|---|---|---|---|---|",
+	);
+	const rows = designs.map((design) => {
+		const field = (name) => runs[design].map((result) => result[name]);
+		const shown = field("shown");
+		const ms = median(shown);
+		const low = Math.min(...shown);
+		const high = Math.max(...shown);
+		console.log(
+			`| ${design} | ${ms.toFixed(0)} | ${low.toFixed(0)}–${high.toFixed(0)} | ${median(field("ready")).toFixed(0)} | ${median(field("listening")).toFixed(0)} |`,
+		);
+		return {
+			design,
+			ms,
+			runs: shown,
+			ready: field("ready"),
+			listening: field("listening"),
+		};
+	});
+	recordResults(
+		page.name === "text"
+			? `dev-start-${app.id}`
+			: `dev-start-${page.name}-${app.id}`,
+		rows,
+		{
+			app: app.name,
+			page: page.title,
+			rounds: ROUNDS,
+			chromium: runs[designs[0]][0].chromium,
+		},
+	);
+}
+
 if (process.argv[2] === "--child") {
-	await child(process.argv[3], process.argv[4]);
+	await child(process.argv[3], process.argv[4], process.argv[5]);
 } else {
 	for (const app of selectedApps()) {
-		const runs = Object.fromEntries(designs.map((design) => [design, []]));
-		let chromiumVersion;
-		for (let round = 0; round < ROUNDS; round++) {
-			for (let index = 0; index < designs.length; index++) {
-				const design = designs[(index + round) % designs.length];
-				const result = await start(design, app);
-				chromiumVersion = result.chromium;
-				runs[design].push(result);
-			}
-		}
-		console.log(
-			`\n### ${app.name}: a cold Vite dev server until its page of messages shows, each start a new process, medians of ${ROUNDS}, ms\n`,
-		);
-		console.log(
-			"| design | shown, median | range | ready, median | listening, median |\n|---|---|---|---|---|",
-		);
-		const rows = designs.map((design) => {
-			const field = (name) => runs[design].map((result) => result[name]);
-			const shown = field("shown");
-			const ms = median(shown);
-			const low = Math.min(...shown);
-			const high = Math.max(...shown);
-			console.log(
-				`| ${design} | ${ms.toFixed(0)} | ${low.toFixed(0)}–${high.toFixed(0)} | ${median(field("ready")).toFixed(0)} | ${median(field("listening")).toFixed(0)} |`,
-			);
-			return {
-				design,
-				ms,
-				runs: shown,
-				ready: field("ready"),
-				listening: field("listening"),
-			};
-		});
-		recordResults(`dev-start-${app.id}`, rows, {
-			app: app.name,
-			rounds: ROUNDS,
-			chromium: chromiumVersion,
-		});
+		const locale = otherLocale(app);
+		const pages = [
+			{ name: "text", title: "500 plain texts", ...textPage(app, locale) },
+			{
+				name: "mixed",
+				title: "500 calls in the catalog's own mix",
+				...(await mixedPage(app, locale)),
+			},
+		];
+		for (const page of pages) report(app, page, await rounds(app, page));
 	}
 }
