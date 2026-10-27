@@ -13,18 +13,14 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
-import { graiSource } from "./grai.mjs";
+import { graiEntry, graiVite } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 
-const { grai } = await import(join(graiSource, "vite.ts"));
-// The dev server comes from the Vite grai's source imports, as an app has one Vite: grai's plugin
-// tells a server environment it can patch in place by Vite's own class, and the bench's copy of
-// Vite is another, so a server made by it would have its messages taken again on every edit.
-export const { createServer } = await import(
-	join(graiSource, "../node_modules/vite/dist/node/index.js")
-);
+const { grai } = await import(graiEntry("./vite"));
+// The dev server comes from the Vite grai's build imports (`graiVite`), as an app has one Vite.
+export const { createServer } = await import(graiVite);
 
 const SHOWN = 500;
 

@@ -5,7 +5,7 @@
 // project, as an editor's watcher sees the tool write it.
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { graiSource } from "./grai.mjs";
+import { graiEntry } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput, resolveTypeScript6 } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
@@ -52,7 +52,7 @@ export async function writeCatalogs(app, config) {
 		mkdirSync(state(name, when), { recursive: true });
 		writeFileSync(join(state(name, when), file), JSON.stringify(catalog));
 	};
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	const compileGrai = async (when) => {
 		const { errors } = await compile(config);
 		if (errors.length > 0) throw new Error(errors[0].message);

@@ -1,5 +1,5 @@
 // Compile time: what a developer waits for, per library, each run a new Node process. grai's
-// compile from this repository's source: cold, with nothing to do, and after one edited message.
+// compile from this repository's build: cold, with nothing to do, and after one edited message.
 // Each time starts once the library's modules have loaded.
 // Paraglide's compile, without its TypeScript declarations and with them (through TypeScript 6,
 // whose API its emit needs). formatjs compiling one locale's ICU catalog to an AST. Edits go to a copy of
@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { selectedApps } from "./apps.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, graiModule, writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { resolveTypeScript6, writeProject } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
@@ -22,7 +22,7 @@ const self = new URL(import.meta.url).pathname;
 /** Runs in the child: one compile of the named kind, timed after its modules load, as JSON. */
 async function child(kind, ...args) {
 	if (kind === "grai") {
-		const { compile } = await import(join(graiSource, "index.ts"));
+		const { compile } = await import(graiEntry("."));
 		const [config] = args;
 		const start = performance.now();
 		const cold = await compile(config);
@@ -35,7 +35,7 @@ async function child(kind, ...args) {
 		return;
 	}
 	if (kind === "grai-edit") {
-		const { recompile } = await import(join(graiSource, "compile.ts"));
+		const { recompile } = await import(graiModule("compile.ts"));
 		const [config, catalog, key] = args;
 		const { build } = await recompile(config, undefined);
 		const parsed = JSON.parse(readFileSync(catalog, "utf8"));

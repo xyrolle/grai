@@ -4,14 +4,14 @@
 // them; the page then loads either the chunks as built, every locale in them, as a SvelteKit page
 // loads them today, or its locale's copies, as an import map points it at them. The build's files
 // are then bundled into one, so every variant is one script and a page times only its work.
-import { dirname, join, posix } from "node:path";
+import { dirname, posix } from "node:path";
 import { rolldown } from "rolldown";
 import { build } from "vite";
-import { graiOutput, graiSource } from "./grai.mjs";
+import { graiEntry, graiModule, graiOutput } from "./grai.mjs";
 
-const { grai: graiPlugin } = await import(join(graiSource, "vite.ts"));
+const { grai: graiPlugin } = await import(graiEntry("./vite"));
 const { localeDirectory, messageDirectory } = await import(
-	join(graiSource, "message-directories.ts")
+	graiModule("message-directories.ts")
 );
 
 /** What a Vite build of `entry` with grai's plugin writes: its files' code by name, and the entry's. */

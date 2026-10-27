@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { selectedApps } from "./apps.mjs";
 import { writeBuildApps } from "./build-apps.mjs";
 import { bundlerTimings } from "./bundler-timings.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiEntry } from "./grai.mjs";
 import { recordResults } from "./results.mjs";
 
 const RUNS = 5;
@@ -39,7 +39,7 @@ function clean(root) {
 /** The library's compile alone, catalogs to output, loaded and ready to call. */
 async function compiler(variant, root, extra) {
 	if (variant === "grai") {
-		const { compile } = await import(join(graiSource, "index.ts"));
+		const { compile } = await import(graiEntry("."));
 		return async () => {
 			const result = await compile(extra);
 			if (result.errors.length > 0) throw result.errors[0];
@@ -61,7 +61,7 @@ async function buildOnce(variant, root, extra) {
 	const { build } = await import("vite");
 	const plugins =
 		variant === "grai"
-			? [(await import(join(graiSource, "vite.ts"))).grai({ config: extra })]
+			? [(await import(graiEntry("./vite"))).grai({ config: extra })]
 			: variant === "paraglide"
 				? [
 						(await import("@inlang/paraglide-js")).paraglideVitePlugin({

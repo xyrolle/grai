@@ -21,7 +21,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { graiSource } from "./grai.mjs";
+import { graiModule } from "./grai.mjs";
 import { recordResults } from "./results.mjs";
 
 const RUNS = 3;
@@ -42,7 +42,7 @@ const commands = {
  */
 async function child(command, config, ...args) {
 	const [file, name] = commands[command];
-	const exported = (await import(join(graiSource, file)))[name];
+	const exported = (await import(graiModule(file)))[name];
 	const start = performance.now();
 	if (command === "fix") {
 		const code = await exported.run(["--fix", "--config", config]);
