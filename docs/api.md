@@ -74,7 +74,7 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `grai compile`: writes the output, if the catalogs or the config changed.
 - `grai watch`: writes it, then again on each change of a catalog or the config.
 - `grai check [--source <dir>]... [--json]`: reports every problem, reading the code as the bundler does. It writes nothing but the output, which it compiles first when it is missing. `--json` prints `{ problems: [{ code, file, key, locale, message }], untranslated: { [locale]: string[] } }`.
-- `grai check --fix [--source <dir>]...`: removes from every catalog the keys no shipped code reads or may reach, lists each one, then checks. It removes nothing while a source does not parse.
+- `grai check --fix [--source <dir>]...`: removes from every catalog the keys no shipped code reads or may reach, lists each one, writes each import of keys by name from keys.js as an import of each key from its own path where package.json `imports` gives one, lists each, then checks. It removes nothing while a source does not parse.
 - `grai add <key> --<locale> <text>...`: adds the key to every catalog, with a text for each locale, then compiles.
 - `grai find <key> [--source <dir>]...`: prints the key's line in each catalog, and each call site.
 - `grai rename <key> <new> [--source <dir>]...`: renames the key in every catalog and at every call site, then compiles.
