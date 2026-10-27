@@ -3,13 +3,16 @@
 // the locale's JSON (`CustomTypeOptions`), and use-intl's, inferred from the messages it is
 // given. `tsc --noEmit` with TypeScript 7, and the editor's completions after `m.` or inside `t("`
 // (completions.mjs), from TypeScript 6's language service, which tsserver runs: the first request,
-// which checks what it needs of the program, and the next one, the file unchanged. Each sample is
-// a new process; every library takes one each round, in an order that rotates, so the load from
-// other work weighs on each alike. Medians of ROUNDS, with every sample kept.
+// which checks what it needs of the program; the next one, the file unchanged; and one after each
+// edit an editor's user makes: a typed prefix, a new call site, and a key added to the catalog.
+// Each sample is a new process, its project's catalog written as the app has it; every library
+// takes one each round, in an order that rotates, so the load from other work weighs on each
+// alike. Medians of ROUNDS, with every sample kept.
 //   node types.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { selectedApps } from "./apps.mjs";
+import { writeState } from "./completions.mjs";
 import { recordResults } from "./results.mjs";
 import { CALLS, writeProjects } from "./types-projects.mjs";
 
@@ -33,6 +36,15 @@ function typeCheck(project) {
 	return performance.now() - start;
 }
 
+/** The requests of a completion sample, as the table heads them. */
+const steps = {
+	first: "first completion",
+	next: "next completion, unchanged",
+	prefix: "after a typed prefix",
+	callSite: "at a new call site",
+	catalog: "after a catalog change",
+};
+
 /** One completion sample in a new process: each request's milliseconds, and TypeScript's version. */
 function completions(project) {
 	const output = execFileSync(
@@ -55,47 +67,51 @@ for (const app of selectedApps()) {
 	const samples = new Map(
 		projects.map((project) => [
 			project,
-			{ tsc: [], first: [], next: [], typescript: undefined },
+			{
+				tsc: [],
+				...Object.fromEntries(Object.keys(steps).map((step) => [step, []])),
+			},
 		]),
 	);
+	let typescript;
 	for (let round = 0; round < ROUNDS; round++) {
 		for (let index = 0; index < projects.length; index++) {
 			const project = projects[(index + round) % projects.length];
 			const taken = samples.get(project);
+			writeState(project, "before");
 			taken.tsc.push(typeCheck(project));
-			const { typescript, first, next } = completions(project);
-			taken.first.push(first);
-			taken.next.push(next);
-			taken.typescript = typescript;
+			const sample = completions(project);
+			for (const step of Object.keys(steps)) taken[step].push(sample[step]);
+			typescript = sample.typescript;
 		}
 	}
 	console.log(
 		`\n### ${app.name}: type checking ${CALLS} message calls, ms, medians of ${ROUNDS} (range)\n`,
 	);
 	console.log(
-		"| keys typed by | `tsc --noEmit`, TypeScript 7 | first completion, TypeScript 6 | next completion, unchanged |",
+		`| keys typed by | \`tsc --noEmit\`, TypeScript 7 | ${Object.values(steps).join(" | ")}, TypeScript 6 |`,
 	);
-	console.log("|---|---|---|---|");
+	console.log(
+		`|---|---|${Object.keys(steps)
+			.map(() => "---|")
+			.join("")}`,
+	);
 	const rows = projects.map((project) => {
-		const { tsc, first, next } = samples.get(project);
-		console.log(
-			`| ${project.title} | ${cell(tsc)} | ${cell(first)} | ${cell(next)} |`,
-		);
+		const taken = samples.get(project);
+		const cells = [taken.tsc, ...Object.keys(steps).map((step) => taken[step])];
+		console.log(`| ${project.title} | ${cells.map(cell).join(" | ")} |`);
 		return {
 			library: project.title,
-			tsc: median(tsc),
-			first: median(first),
-			next: median(next),
-			samples: { tsc, first, next },
+			...Object.fromEntries(
+				Object.entries(taken).map(([field, values]) => [field, median(values)]),
+			),
+			samples: taken,
 		};
 	});
 	recordResults(`types-${app.id}`, rows, {
 		app: app.name,
 		calls: CALLS,
 		runs: ROUNDS,
-		typescript: {
-			tsc: ts7Version(),
-			languageService: samples.get(projects[0]).typescript,
-		},
+		typescript: { tsc: ts7Version(), languageService: typescript },
 	});
 }
