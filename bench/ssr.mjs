@@ -19,6 +19,7 @@ import {
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { writePrototype } from "./prototype.mjs";
 import { inRequest, otherLocale } from "./request.mjs";
+import { recordResults } from "./results.mjs";
 
 const INLINED = "prototype, inlined into the template";
 
@@ -49,6 +50,7 @@ for (const app of selectedApps()) {
 	);
 	console.log("| variant | locale | ms per render | messages' share |");
 	console.log("|---|---|---|---|");
+	const recorded = [];
 	for (const locale of [app.baseLocale, otherLocale(app)]) {
 		const results = [];
 		let expected;
@@ -82,6 +84,11 @@ for (const app of selectedApps()) {
 			console.log(
 				`| ${name} | ${locale} | ${formatNs(ns / 1e6)} | ${((100 * (ns - inlined)) / ns).toFixed(0)}% |`,
 			);
+			recorded.push({ variant: name, locale, ns });
 		}
 	}
+	recordResults(`ssr-${app.id}`, recorded, {
+		app: app.name,
+		calls: PAGE_CALLS,
+	});
 }
