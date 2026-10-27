@@ -3,7 +3,8 @@
 // Each time starts once the library's modules have loaded.
 // Paraglide's compile, without its TypeScript declarations and with them (through TypeScript 6,
 // whose API its emit needs). formatjs compiling one locale's ICU catalog to an AST. Edits go to a copy of
-// the catalogs under .cache. Medians of three runs; one run for Paraglide's declarations.
+// the catalogs under .cache. Medians of three runs; one run for Paraglide's locale modules with
+// its declarations, which take minutes.
 //   node compile-time.mjs [app...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -126,7 +127,7 @@ if (process.argv[2] === "--child") {
 			],
 			[
 				"message modules, with declarations",
-				paraglide("true", "message-modules", 1),
+				paraglide("true", "message-modules", RUNS),
 			],
 			[
 				"locale modules, with declarations",
