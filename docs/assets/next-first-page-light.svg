@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 196" width="480" height="196" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>Next.js: the first page of a cold next dev</title>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Next.js: the first page of a cold next dev</text>
+<text x="16" y="44" font-size="13" fill="#52514e">Milliseconds until the page's first response, from an empty .next;</text>
+<text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>
+<line x1="99" y1="82" x2="99" y2="150" stroke="#c3c2b7" stroke-width="1"/>
+<text x="99" y="167" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="171.3" y1="82" x2="171.3" y2="150" stroke="#e1e0d9" stroke-width="1"/>
+<text x="171.3" y="167" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">500</text>
+<line x1="243.5" y1="82" x2="243.5" y2="150" stroke="#e1e0d9" stroke-width="1"/>
+<text x="243.5" y="167" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
+<line x1="315.8" y1="82" x2="315.8" y2="150" stroke="#e1e0d9" stroke-width="1"/>
+<text x="315.8" y="167" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,500</text>
+<line x1="388" y1="82" x2="388" y2="150" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="167" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
+<text x="89" y="103" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl</text>
+<path d="M99,91H360.2A4,4 0 0 1 364.2,95V101A4,4 0 0 1 360.2,105H99Z" fill="#898781"/>
+<text x="370.2" y="103" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">1,835 ms</text>
+<text x="89" y="135" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,123H365.6A4,4 0 0 1 369.6,127V133A4,4 0 0 1 365.6,137H99Z" fill="#2a78d6"/>
+<text x="375.6" y="135" font-size="14" fill="#0b0b0b" style="font-variant-numeric: tabular-nums">1,873 ms</text>
+<text x="388" y="187" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
+</svg>

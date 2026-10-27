@@ -1,0 +1,416 @@
+{
+	"bench": "hydrate-synthetic",
+	"date": "2026-10-27T13:13:08.128Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 12.9,
+		"end": 9.8
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 6,366 keys",
+	"calls": 2000,
+	"runs": 15,
+	"chromium": "156.0.8078.4",
+	"rows": [
+		{
+			"variant": "Paraglide",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 176423,
+				"brotli": 37554
+			},
+			"ms": {
+				"starts": 13.7,
+				"evaluates": 2.6,
+				"hydrates": 9.4,
+				"hydratedAt": 25.8,
+				"mounts": 3.6
+			}
+		},
+		{
+			"variant": "grai, the locale's copies",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 85675,
+				"brotli": 22392
+			},
+			"ms": {
+				"starts": 10.2,
+				"evaluates": 1.7,
+				"hydrates": 6.4,
+				"hydratedAt": 18.2,
+				"mounts": 2.9
+			}
+		},
+		{
+			"variant": "grai, every locale's chunks",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 140610,
+				"brotli": 34719
+			},
+			"ms": {
+				"starts": 11.7,
+				"evaluates": 2.1,
+				"hydrates": 6.4,
+				"hydratedAt": 20.4,
+				"mounts": 2.8
+			}
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 68078,
+				"brotli": 19746
+			},
+			"ms": {
+				"starts": 9.4,
+				"evaluates": 0.9,
+				"hydrates": 3.1,
+				"hydratedAt": 13.4,
+				"mounts": 1.4
+			}
+		},
+		{
+			"variant": "i18next",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 549176,
+				"brotli": 126630
+			},
+			"ms": {
+				"starts": 22.7,
+				"evaluates": 6.1,
+				"hydrates": 14.1,
+				"hydratedAt": 42.7,
+				"mounts": 6.2
+			}
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 551087,
+				"brotli": 125390
+			},
+			"ms": {
+				"starts": 22.7,
+				"evaluates": 5.2,
+				"hydrates": 19.9,
+				"hydratedAt": 48.2,
+				"mounts": 6.6
+			}
+		},
+		{
+			"variant": "Paraglide",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 176423,
+				"brotli": 37554
+			},
+			"ms": {
+				"starts": 43.8,
+				"evaluates": 11.3,
+				"hydrates": 38.7,
+				"hydratedAt": 94.2,
+				"mounts": 14.4
+			}
+		},
+		{
+			"variant": "grai, the locale's copies",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 85675,
+				"brotli": 22392
+			},
+			"ms": {
+				"starts": 31.9,
+				"evaluates": 7.9,
+				"hydrates": 25.4,
+				"hydratedAt": 65.2,
+				"mounts": 11.4
+			}
+		},
+		{
+			"variant": "grai, every locale's chunks",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 140610,
+				"brotli": 34719
+			},
+			"ms": {
+				"starts": 36.2,
+				"evaluates": 9.6,
+				"hydrates": 26.2,
+				"hydratedAt": 72,
+				"mounts": 11.4
+			}
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 68078,
+				"brotli": 19746
+			},
+			"ms": {
+				"starts": 28.8,
+				"evaluates": 4,
+				"hydrates": 13.1,
+				"hydratedAt": 45.6,
+				"mounts": 5.9
+			}
+		},
+		{
+			"variant": "i18next",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 549176,
+				"brotli": 126630
+			},
+			"ms": {
+				"starts": 66.8,
+				"evaluates": 26.7,
+				"hydrates": 56.7,
+				"hydratedAt": 152.2,
+				"mounts": 26.1
+			}
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 551087,
+				"brotli": 125390
+			},
+			"ms": {
+				"starts": 64.9,
+				"evaluates": 22.1,
+				"hydrates": 78.7,
+				"hydratedAt": 162.3,
+				"mounts": 25.9
+			}
+		},
+		{
+			"variant": "Paraglide",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 176423,
+				"brotli": 37554
+			},
+			"ms": {
+				"starts": 12.6,
+				"evaluates": 2.3,
+				"hydrates": 8.7,
+				"hydratedAt": 23.9,
+				"mounts": 3.2
+			}
+		},
+		{
+			"variant": "grai, the locale's copies",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 97939,
+				"brotli": 23117
+			},
+			"ms": {
+				"starts": 9.4,
+				"evaluates": 1.5,
+				"hydrates": 6,
+				"hydratedAt": 16.7,
+				"mounts": 2.5
+			}
+		},
+		{
+			"variant": "grai, every locale's chunks",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 140610,
+				"brotli": 34719
+			},
+			"ms": {
+				"starts": 10.8,
+				"evaluates": 2,
+				"hydrates": 6,
+				"hydratedAt": 19,
+				"mounts": 2.6
+			}
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 79935,
+				"brotli": 20356
+			},
+			"ms": {
+				"starts": 8.9,
+				"evaluates": 0.9,
+				"hydrates": 2.8,
+				"hydratedAt": 12.6,
+				"mounts": 1.2
+			}
+		},
+		{
+			"variant": "i18next",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 698495,
+				"brotli": 132338
+			},
+			"ms": {
+				"starts": 22.9,
+				"evaluates": 5.5,
+				"hydrates": 12.9,
+				"hydratedAt": 41.4,
+				"mounts": 5.9
+			}
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 698737,
+				"brotli": 130173
+			},
+			"ms": {
+				"starts": 22.8,
+				"evaluates": 4.6,
+				"hydrates": 18.5,
+				"hydratedAt": 46.1,
+				"mounts": 6.1
+			}
+		},
+		{
+			"variant": "Paraglide",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 176423,
+				"brotli": 37554
+			},
+			"ms": {
+				"starts": 40.3,
+				"evaluates": 10.4,
+				"hydrates": 36,
+				"hydratedAt": 87,
+				"mounts": 13.6
+			}
+		},
+		{
+			"variant": "grai, the locale's copies",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 97939,
+				"brotli": 23117
+			},
+			"ms": {
+				"starts": 29.7,
+				"evaluates": 7.1,
+				"hydrates": 23.7,
+				"hydratedAt": 60.8,
+				"mounts": 10.3
+			}
+		},
+		{
+			"variant": "grai, every locale's chunks",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 140610,
+				"brotli": 34719
+			},
+			"ms": {
+				"starts": 34.8,
+				"evaluates": 9.2,
+				"hydrates": 24.8,
+				"hydratedAt": 69.4,
+				"mounts": 10.1
+			}
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 79935,
+				"brotli": 20356
+			},
+			"ms": {
+				"starts": 27.6,
+				"evaluates": 3.8,
+				"hydrates": 12.1,
+				"hydratedAt": 43.1,
+				"mounts": 5.4
+			}
+		},
+		{
+			"variant": "i18next",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 698495,
+				"brotli": 132338
+			},
+			"ms": {
+				"starts": 67.3,
+				"evaluates": 24,
+				"hydrates": 52.1,
+				"hydratedAt": 142.8,
+				"mounts": 24.4
+			}
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 698737,
+				"brotli": 130173
+			},
+			"ms": {
+				"starts": 67.5,
+				"evaluates": 20.4,
+				"hydrates": 77.5,
+				"hydratedAt": 165,
+				"mounts": 24.5
+			}
+		}
+	]
+}

@@ -1,0 +1,167 @@
+{
+	"bench": "nextjs-synthetic",
+	"date": "2026-10-27T13:22:47.822Z",
+	"machine": {
+		"cpu": "Apple M5 Pro",
+		"cores": 18,
+		"memoryGB": 64,
+		"os": "darwin 27.2.0"
+	},
+	"load": {
+		"start": 15.4,
+		"end": 14.9
+	},
+	"node": "24.16.0",
+	"grai": "cee60fe2",
+	"versions": {
+		"@inlang/paraglide-js": "2.29.1",
+		"i18next": "26.4.7",
+		"use-intl": "4.14.9",
+		"next-intl": "4.14.9",
+		"next": "16.4.3",
+		"vite": "8.3.5",
+		"rolldown": "1.2.15",
+		"playwright-core": "1.64.1"
+	},
+	"app": "synthetic, 6,366 keys",
+	"locale": "ru",
+	"keys": {
+		"server": 400,
+		"client": 100
+	},
+	"chromium": "156.0.8078.4",
+	"rows": {
+		"bytes": {
+			"grai": {
+				"document": 9535,
+				"script": 122595,
+				"other": 0
+			},
+			"next-intl": {
+				"document": 109245,
+				"script": 127201,
+				"other": 0
+			},
+			"next-intl, client keys picked": {
+				"document": 10826,
+				"script": 127166,
+				"other": 0
+			},
+			"plain": {
+				"document": 9466,
+				"script": 116852,
+				"other": 0
+			}
+		},
+		"dev": {
+			"grai": {
+				"empty": {
+					"ready": 371.1,
+					"page": 1738
+				},
+				"kept": {
+					"ready": 477.1,
+					"page": 3271.5
+				},
+				"edits": {
+					"server": {
+						"shown": 162.9,
+						"written": 7.1
+					},
+					"client": {
+						"shown": 109.2,
+						"written": 12.6
+					}
+				}
+			},
+			"next-intl": {
+				"empty": {
+					"ready": 694,
+					"page": 2800.8
+				},
+				"kept": {
+					"ready": 345.5,
+					"page": 1887.4
+				},
+				"edits": {
+					"server": {
+						"shown": 185
+					},
+					"client": {
+						"shown": 189.5
+					}
+				}
+			}
+		},
+		"cold": {
+			"grai": {
+				"ready": 258.1,
+				"page": 1872.8,
+				"runs": [
+					{
+						"ready": 372.9,
+						"page": 1839
+					},
+					{
+						"ready": 223.5,
+						"page": 2113.4
+					},
+					{
+						"ready": 423.9,
+						"page": 1975.4
+					},
+					{
+						"ready": 220.2,
+						"page": 2096.1
+					},
+					{
+						"ready": 258.1,
+						"page": 1597.9
+					},
+					{
+						"ready": 214.4,
+						"page": 1872.8
+					},
+					{
+						"ready": 276.8,
+						"page": 1542.9
+					}
+				]
+			},
+			"next-intl": {
+				"ready": 298.1,
+				"page": 1835.3,
+				"runs": [
+					{
+						"ready": 514.7,
+						"page": 2050.8
+					},
+					{
+						"ready": 331.7,
+						"page": 2351.3
+					},
+					{
+						"ready": 252.7,
+						"page": 1599.8
+					},
+					{
+						"ready": 334.7,
+						"page": 1260.7
+					},
+					{
+						"ready": 274.9,
+						"page": 1835.3
+					},
+					{
+						"ready": 298.1,
+						"page": 1278.3
+					},
+					{
+						"ready": 286.3,
+						"page": 1953.8
+					}
+				]
+			}
+		}
+	}
+}
