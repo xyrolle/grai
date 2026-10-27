@@ -242,6 +242,77 @@ describe("the contexts that read a key through a barrel", () => {
 	});
 });
 
+/**
+ * Two routes that take their keys through a barrel of keys' own paths, and their components
+ * through a barrel of `export *`, in an app whose package.json says its modules have no side
+ * effects.
+ */
+const pathAndStarBarrels = {
+	"package.json": JSON.stringify({
+		type: "module",
+		sideEffects: false,
+		imports: { "#i18n/messages/*": "./out/keys.js" },
+	}),
+	"app/paths.js":
+		'export { heading_a } from "#i18n/messages/heading_a.js";\nexport { heading_b } from "#i18n/messages/heading_b.js";\n',
+	"app/star.js": 'export * from "./hello.jsx";\nexport * from "./bye.jsx";\n',
+	"app/hello.jsx": barrels["app/hello.jsx"],
+	"app/bye.jsx": barrels["app/bye.jsx"],
+	"app/layout.jsx": barrels["app/layout.jsx"],
+	"app/a/page.jsx": `import { heading_a } from "../paths.js";
+import { Hello } from "../star.js";
+
+export default function A() {
+	return <main>{heading_a()}<Hello /></main>;
+}
+`,
+	"app/b/page.jsx": `import { heading_b } from "../paths.js";
+import { Bye } from "../star.js";
+
+export default function B() {
+	return <main>{heading_b()}<Bye /></main>;
+}
+`,
+};
+
+describe("the contexts that read a key through a barrel of paths or of `export *`", () => {
+	it("are those of the routes that take the key from a barrel of keys' own paths", async () => {
+		const { dir, config, compilation } = await compiledApp(
+			[],
+			pathAndStarBarrels,
+			barrelWords,
+		);
+
+		const contexts = await contextsIn(dir, config, compilation);
+
+		expect([contexts.heading_a, contexts.heading_b]).toEqual([
+			["a/page.jsx server"],
+			["b/page.jsx server"],
+		]);
+	});
+
+	it("are those of the routes that take a component an `export *` passes on, when its module exports it", async () => {
+		const { dir, config, compilation } = await compiledApp(
+			[],
+			pathAndStarBarrels,
+			barrelWords,
+		);
+
+		const contexts = await contextsIn(dir, config, compilation);
+
+		expect([contexts.hello_text, contexts.bye_text]).toEqual([
+			["a/page.jsx client"],
+			["b/page.jsx client"],
+		]);
+		expect(await nextKeyGroups(config, compilation)).toEqual([
+			["bye_text"],
+			["heading_a"],
+			["heading_b"],
+			["hello_text"],
+		]);
+	});
+});
+
 describe("a Next app's groups of keys", () => {
 	it("hold the keys the same routes' sides read, and leave out those no route reads", async () => {
 		const large = [
