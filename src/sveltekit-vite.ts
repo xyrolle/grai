@@ -24,7 +24,7 @@ export function grai(options: SvelteKitGraiOptions = {}): Plugin[] {
 
 /**
  * Has Vite run grai's own modules in a server render, not Node: `handleLocale` reads from Vite's
- * `import.meta.env` whether its dev server renders the page, to point it at its locale's keys.js.
+ * `import.meta.hot` whether its dev server renders the page, to point it at its locale's keys.js.
  */
 const renderedByVite: Plugin = {
 	name: "grai:sveltekit-render",
