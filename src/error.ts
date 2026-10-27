@@ -22,6 +22,7 @@ export type GraiErrorCode =
 	| "resolution-invalid"
 	| "source-invalid"
 	| "import-unresolved"
+	| "key-path-bypassed"
 	| "message-invalid"
 	| "unsupported"
 	| "plural-category-unknown"
