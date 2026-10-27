@@ -5,11 +5,23 @@
 
 import type { LoadFact, Span } from "./facts.ts";
 import type { ESTree } from "./parse.ts";
+import type { Scopes } from "./scopes.ts";
 import { literalText, type Node } from "./syntax.ts";
 
 /** Whether a node loads a module at run time: `import(…)`, `require(…)` or `import.meta.glob(…)`. */
 export function isLoad(node: Node): boolean {
 	return node.type === "ImportExpression" || isRequire(node) || isGlob(node);
+}
+
+/**
+ * Whether a node the walk took for a load is one, now that the module's scopes are known: a call of
+ * a `require` the module declares itself, as a callback's parameter, calls a function of its own.
+ */
+export function loadsModule(node: Node, scopes: Scopes): boolean {
+	return (
+		!isRequire(node) ||
+		scopes.resolve("require", node.callee.start) === undefined
+	);
 }
 
 function isRequire(node: Node): node is ESTree.CallExpression {

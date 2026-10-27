@@ -6,7 +6,7 @@
  * Every offset is the file's.
  */
 
-import { isLoad, loadFact } from "./loads.ts";
+import { isLoad, loadFact, loadsModule } from "./loads.ts";
 import type { ESTree } from "./parse.ts";
 import { type CodeError, type ModuleCode, readCode } from "./read.ts";
 import { Scopes } from "./scopes.ts";
@@ -150,6 +150,7 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 	// nothing the bundler follows, so it has none, and nor have its uses.
 	const followed: Node[] = [];
 	for (const node of loadNodes) {
+		if (!loadsModule(node, scopes)) continue;
 		const fact = loadFact(node, span);
 		if (fact === undefined) continue;
 		loads.push(fact);
