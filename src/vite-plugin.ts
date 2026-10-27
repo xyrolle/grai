@@ -1,10 +1,7 @@
 import { basename, join, resolve } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
-import { BuildReading } from "./code/build-reading.ts";
-import { FactsCache } from "./code/facts-cache.ts";
-import { parse } from "./code/parse.ts";
-import { withGroups } from "./code-splitting.ts";
+import type { BuildReading } from "./code/build-reading.ts";
 import { type Build, recompile } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
@@ -14,25 +11,11 @@ import {
 	keyModulePrefix,
 	keyPrefix,
 	outputPrefix,
-	textModulePrefix,
 	textPrefix,
 } from "./locale-chunks.ts";
-import { type ModuleLinks, moduleLinks, seenThrough } from "./module-links.ts";
 import { moduleOf } from "./output-paths.ts";
 import { realPath } from "./real-path.ts";
-import { sharedKeys } from "./server-chunks.ts";
-import { stateDirectory } from "./state-directory.ts";
-import {
-	type ChunkingGraph,
-	chunkFileName,
-	keyModule,
-	keyPageChunks,
-	keysModule,
-	messageChunkCopies,
-	messageGroups,
-	placeholderTexts,
-	textModule,
-} from "./vite-build.ts";
+import type { Bundling } from "./vite-bundling.ts";
 import {
 	devKeysId,
 	followedFile,
@@ -43,7 +26,7 @@ import {
 	serveMessages,
 } from "./vite-dev.ts";
 import { pagePreloads } from "./vite-preloads.ts";
-import { buildReads, chunkReads } from "./vite-reads.ts";
+import { buildReads } from "./vite-reads.ts";
 
 /**
  * The plugin's options:
@@ -74,9 +57,6 @@ export type GraiPlugin = {
 	/** A build environment's reading of its modules, which the adapters' transforms share. */
 	reading: (environment: string) => BuildReading | undefined;
 };
-
-/** The modules whose shipped code links the client build's modules: scripts, and components. */
-const scanned = /\.(?:[cm]?[jt]sx?|svelte|vue|astro|mdx)$/;
 
 /**
  * What a framework's adapter tells the plugin:
@@ -116,68 +96,21 @@ export function graiPlugin(
 	): string | undefined => undefined;
 	/** How many patches the dev server has made: the version of the dev module it serves now. */
 	let patchesMade = () => 0;
-	/** Each build environment's reading of its modules, from its start. */
-	const readings = new Map<string, BuildReading>();
-	// The facts of the modules the build reads, kept with the CLI's by their code's hash.
-	let facts: FactsCache | undefined;
 	let closeMessages = async () => {};
-	const copies = messageChunkCopies();
-	/**
-	 * What the client build read of its modules, for the keys' reach: the keys each reads or may
-	 * reach, before any transform; those that may reach any key; and each one's links, from the
-	 * code it ships.
-	 */
-	const read = {
-		reads: new Map<string, ReadonlySet<string>>(),
-		computed: new Set<string>(),
-		modules: new Map<string, ModuleLinks>(),
-	};
-	/** The client build's imports that change once re-export modules are seen through, at its end. */
-	let seen = new Map<string, string[]>();
-	/** The client build's chunk of each key it reaches exactly, by the pages that load it. */
-	let pageChunks: Map<string, string> | undefined;
-	const pageChunkOf = (id: string, graph: ChunkingGraph) => {
-		if (build === undefined) return undefined;
-		pageChunks ??= keyPageChunks(
-			build,
-			files.keysFile,
-			(module) => graph.getModuleInfo(module),
-			{ reads: read.reads, computed: read.computed, imports: seen },
-			adapter.pageEntries === undefined
-				? undefined
-				: [...adapter.pageEntries()],
-		);
-		return pageChunks.get(id);
-	};
-
-	const building = (environment: { name: string } | undefined) =>
-		!serving && environment?.name === "client";
-	/** Whether this build writes each message chunk's copies, one per locale. */
-	const copying = (environment: { name: string } | undefined) =>
-		options.localeChunks === true && building(environment);
-	/**
-	 * keys.js, a key's module or a text key's string module, from the compiler's model, for the
-	 * browser or a server.
-	 */
-	const moduleCode = (
-		id: string,
-		compiled: Build,
-		consumer: "client" | "server",
-	) => {
-		if (id.startsWith(textModulePrefix))
-			return textModule(compiled, id, consumer);
+	/** The plugin's part in a build, which a dev server never runs: loaded as a build's config is. */
+	let bundling: Bundling | undefined;
+	/** keys.js, or a key's module, as the dev server serves them from memory; nothing for any other id. */
+	const devCode = (id: string, compiled: Build) => {
 		if (id === devKeysId || id === files.keysFile)
-			return serving
-				? devModule(files.outdir, compiled, patchesMade())
-				: keysModule(compiled);
-		return serving
+			return devModule(files.outdir, compiled, patchesMade());
+		return id.startsWith(keyModulePrefix)
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
-			: keyModule(compiled, id, consumer);
+			: undefined;
 	};
 
 	const plugin: Plugin = {
 		name: "grai",
-		config(config, environment) {
+		async config(config, environment) {
 			// Real paths, as the bundler names modules: a project reached through a symlink would
 			// otherwise match none of its own module ids.
 			const configFile = realPath(
@@ -187,6 +120,14 @@ export function graiPlugin(
 			files = { configFile, outdir, keysFile: join(outdir, "keys.js") };
 			serving = environment.command === "serve";
 			testing = environment.mode === "test";
+			if (serving) return;
+			const { bundling: bundlingOf } = await import("./vite-bundling.ts");
+			bundling = bundlingOf({
+				files,
+				localeChunks: options.localeChunks === true,
+				pageEntries: adapter.pageEntries,
+				build: () => build,
+			});
 		},
 		configEnvironment(name, environment) {
 			if (serving || name !== "client" || options.localeChunks !== true)
@@ -213,63 +154,17 @@ export function graiPlugin(
 			}
 		},
 		outputOptions(output) {
-			// grai's groups join each output as Vite resolved it, and none that splits no code
-			// (`code-splitting.ts`).
-			if (serving || output.codeSplitting === false) return null;
-			if (this.environment.config.consumer === "server")
-				return {
-					...output,
-					codeSplitting: withGroups(output.codeSplitting, [sharedKeys]),
-				};
-			if (!building(this.environment)) return null;
-			const named = output.chunkFileNames;
-			return {
-				...output,
-				codeSplitting: withGroups(
-					output.codeSplitting,
-					messageGroups(files.outdir, pageChunkOf),
-				),
-				chunkFileNames: (chunk) =>
-					chunkFileName(
-						chunk.moduleIds,
-						typeof named === "function"
-							? named(chunk)
-							: (named ?? "[name]-[hash].js"),
-					),
-			};
+			return bundling?.outputOptions(this, output) ?? null;
 		},
 		renderChunk(code, chunk) {
-			if (copying(this.environment)) {
-				copies.render(
-					chunk.fileName,
-					chunk.moduleIds,
-					code,
-					build?.config.locales ?? [],
-				);
-			}
+			bundling?.renderChunk(this, code, chunk);
 			return null;
 		},
 		generateBundle(_, bundle) {
-			if (!copying(this.environment)) return;
-			const chunks = Object.values(bundle).filter(
-				(file) => file.type === "chunk",
-			);
-			copies.emit(
-				chunks,
-				this.environment.config.build.minify !== false,
-				(fileName, source) =>
-					this.emitFile({ type: "asset", fileName, source }),
-			);
+			bundling?.generateBundle(this, bundle);
 		},
 		async buildStart() {
 			if (serving) return;
-			pageChunks = undefined;
-			if (building(this.environment)) {
-				read.reads.clear();
-				read.computed.clear();
-				read.modules.clear();
-				seen = new Map();
-			}
 			first ??= recompile(files.configFile, undefined, {
 				localeCopies: options.localeChunks === true,
 			}).then(({ result, build: next }) => {
@@ -278,40 +173,13 @@ export function graiPlugin(
 			});
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
-			const held = placeholderTexts(compiled);
-			if (held.length > 0) this.error(messagesOf(held));
-			facts ??= new FactsCache(join(files.outdir, stateDirectory));
-			readings.set(
-				this.environment.name,
-				new BuildReading(
-					compiled.config.root,
-					files.outdir,
-					// Through grai's own resolveId too, which gives a key's path its key's module.
-					(source, importer) =>
-						this.resolve(source, importer, { skipSelf: false }).then(
-							(resolved) => resolved?.id,
-							// A build that ends first drops its resolver: what it can no longer follow is
-							// none of grai's, as the bundler reports what it cannot resolve itself.
-							() => undefined,
-						),
-					facts,
-				),
-			);
+			bundling?.start(this, compiled);
 		},
-		// A module's code as the client build ships it, a component's compiled, tells its chunking what
-		// the module links to, globs expanded.
 		transform: {
 			order: "post",
 			filter: { id: { exclude: [/\/node_modules\//, /^\0/] } },
 			handler(code, id) {
-				if (!building(this.environment) || build === undefined) return null;
-				if (
-					id.startsWith(files.outdir) ||
-					!scanned.test(id.split("?")[0] ?? id)
-				)
-					return null;
-				const { program } = parse(id, code, { lang: "js" });
-				read.modules.set(id, moduleLinks(program));
+				bundling?.shipped(this, code, id);
 				return null;
 			},
 		},
@@ -339,21 +207,7 @@ export function graiPlugin(
 		// written into the project once the server has closed.
 		async buildEnd() {
 			await closeMessages();
-			if (!building(this.environment)) return;
-			if (facts !== undefined) {
-				facts.keepAll();
-				try {
-					facts.save();
-				} catch {
-					// A cache that cannot be written only costs the next build its parse.
-				}
-			}
-			seen = await seenThrough(
-				read.modules,
-				(id) => this.getModuleInfo(id),
-				async (source, importer) =>
-					(await this.resolve(source, importer)) ?? undefined,
-			);
+			await bundling?.end(this);
 		},
 		resolveId: {
 			// Ahead of Vite's resolver, which keeps a lookup that found nothing until its watcher reports
@@ -421,7 +275,9 @@ export function graiPlugin(
 			if (!("compilation" in compiled)) return this.error(messagesOf(compiled));
 			// Without side effects, a build leaves out every key a chunk's code does not use, so a key
 			// lands in the chunks of the entries that use it.
-			const code = moduleCode(id, compiled, this.environment.config.consumer);
+			const code = serving
+				? devCode(id, compiled)
+				: bundling?.moduleCode(id, compiled, this.environment.config.consumer);
 			if (code === undefined) return null;
 			// No source map in dev: the module is the compiler's, with no source of its own to map back
 			// to, and Vite would inline a map of every line it rewrites, several times the module's size.
@@ -438,21 +294,14 @@ export function graiPlugin(
 	const reads = buildReads({
 		build: () => build,
 		outdir: () => files.outdir,
-		reading: (environment) => readings.get(environment),
-		read: (environment, id, reading) => {
-			if (environment !== "client" || build === undefined) return;
-			const { keys, every } = chunkReads(
-				reading,
-				build.compilation.keys.keys(),
-			);
-			if (keys.size > 0) read.reads.set(id, keys);
-			if (every) read.computed.add(id);
-		},
+		reading: (environment) => bundling?.reading(environment),
+		read: (environment, id, reading) =>
+			bundling?.took(environment, id, reading),
 	});
 	return {
 		plugins: [reads, plugin],
 		build: () => build,
 		config: () => build?.config ?? readConfig(files.configFile),
-		reading: (environment) => readings.get(environment),
+		reading: (environment) => bundling?.reading(environment),
 	};
 }
