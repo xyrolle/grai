@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { readConfig } from "./config.ts";
+import { type GraiModuleKind, moduleKindIn } from "./module-kinds.ts";
 import { realPath } from "./real-path.ts";
-import { type GraiModuleKind, moduleKindIn } from "./vite-build.ts";
 import { pageLocale } from "./vite-html.ts";
 import { type GraiOptions, graiPlugin, viteBase } from "./vite-plugin.ts";
 

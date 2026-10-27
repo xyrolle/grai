@@ -1,7 +1,5 @@
-import { basename, dirname } from "node:path";
 import { minifySync, type Rolldown } from "vite";
 import type { Build } from "./compile.ts";
-import { withoutContentHash } from "./content-names.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { keyExports } from "./key-exports.ts";
@@ -19,6 +17,7 @@ import {
 } from "./locale-chunks.ts";
 import { localeCopies } from "./locale-copies.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
+import { runtimeKindIn } from "./module-kinds.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
@@ -69,53 +68,6 @@ export function textModule(
 	const names = calledNames([key], ["pageText"]);
 	const value = `/*#__PURE__*/ pageText(${key.variants.join(", ")})`;
 	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
-}
-
-/**
- * A module grai's client build puts in a chunk of its own. The runtime and the modules it reads
- * (`runtime`, `config`, `plurals`, `formats`) go to the `grai-runtime` chunk; a key's module
- * (`key`) and a text key's string module (`text`) go to the message chunks under `grai/`.
- */
-export type GraiModuleKind =
-	| "runtime"
-	| "config"
-	| "plurals"
-	| "formats"
-	| "key"
-	| "text";
-
-/**
- * The output's files that go to the `grai-runtime` chunk, with their kinds, by their names without
- * the hash of their content: the entries apps import and the modules they re-export alike.
- */
-const runtimeFiles = new Map<string, GraiModuleKind>([
-	["runtime.js", "runtime"],
-	["internal.js", "runtime"],
-	["config.js", "config"],
-	["plurals.js", "plurals"],
-	["formats.js", "formats"],
-]);
-
-/** The kind of the `grai-runtime` chunk's module an id is, in a project whose output is `outdir`. */
-function runtimeKindIn(
-	outdir: string,
-): (id: string) => GraiModuleKind | undefined {
-	return (id) =>
-		dirname(id) === outdir
-			? runtimeFiles.get(withoutContentHash(basename(id)))
-			: undefined;
-}
-
-/** Which module of grai's an id is, in a project whose output is `outdir`; nothing for any other. */
-export function moduleKindIn(
-	outdir: string,
-): (id: string) => GraiModuleKind | undefined {
-	const runtimeKind = runtimeKindIn(outdir);
-	return (id) => {
-		if (id.startsWith(keyModulePrefix)) return "key";
-		if (id.startsWith(textModulePrefix)) return "text";
-		return runtimeKind(id);
-	};
 }
 
 /**
