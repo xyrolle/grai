@@ -1,23 +1,30 @@
 // A cold `next dev`'s first page: each app started from an empty .next, ROUNDS times, timed from the
-// process's launch until its first response is complete. next-intl starts twice: with its provider
-// passing the client component every message, as by default, and only its keys, as its docs
-// advise. The apps take turns in an order that rotates each round, so each takes each place in a
-// round alike and the machine's load weighs on all alike; a block is one turn of the rotation.
-// Each round pairs grai with the others: the median of those differences, their range and each
-// block's median say how far apart the apps are.
+// process's launch until its first response is complete. grai starts twice: with its output
+// prepared, as the watch leaves it, and from an empty outdir, compiling the catalogs as Next
+// starts. next-intl starts twice: with its provider passing the client component every message, as
+// by default, and only its keys, as its docs advise. The apps take turns in an order that rotates
+// each round, so each takes each place in a round alike and the machine's load weighs on all alike;
+// a block is one turn of the rotation. Each round pairs grai with the others: the median of those
+// differences, their range and each block's median say how far apart the apps are.
 import { devStart } from "./next-dev.mjs";
 import { stopServer } from "./servers.mjs";
 
 export const COLD_ROUNDS = 12;
 
-/** The apps the rounds start. */
+/** The apps the rounds start, each with the directories a start removes first. */
 export function coldApps(apps) {
 	return [
-		{ name: "grai", root: apps.grai },
-		{ name: "next-intl", root: apps["next-intl"] },
+		{ name: "grai", root: apps.grai, cleared: [".next"] },
+		{
+			name: "grai, empty output",
+			root: apps.grai,
+			cleared: [".next", "src/i18n"],
+		},
+		{ name: "next-intl", root: apps["next-intl"], cleared: [".next"] },
 		{
 			name: "next-intl, client keys picked",
 			root: apps["next-intl, client keys picked"],
+			cleared: [".next"],
 		},
 	];
 }
@@ -26,6 +33,7 @@ export function coldApps(apps) {
 const coldPairs = [
 	["grai", "next-intl"],
 	["grai", "next-intl, client keys picked"],
+	["grai, empty output", "next-intl"],
 ];
 
 const median = (values) => {
@@ -45,10 +53,13 @@ const spread = (values) => ({
 async function round(apps, first, path, words) {
 	const samples = {};
 	for (let turn = 0; turn < apps.length; turn++) {
-		const { name, root } = apps[(first + turn) % apps.length];
-		const { server, ready, page, cpu } = await devStart(root, path, words, {
-			empty: true,
-		});
+		const { name, root, cleared } = apps[(first + turn) % apps.length];
+		const { server, ready, page, cpu } = await devStart(
+			root,
+			path,
+			words,
+			cleared,
+		);
 		await stopServer(server.child);
 		samples[name] = { ready, page, cpu };
 	}
