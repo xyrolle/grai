@@ -136,7 +136,7 @@ Every command takes `--config <file>`, `grai.config.json` in the current directo
 - `descriptions?: string`: a JSON file of each key's description for translators, which `grai export` writes as each unit's note.
 - `$schema?: string`: `./node_modules/grai/config.schema.json`, which the package ships, for an editor to complete and check the config.
 
-Relative paths start from the config file's directory. The README's table says more about each field.
+Relative paths start from the config file's directory. [Config](config.md)'s table says more about each field.
 
 ## The output
 

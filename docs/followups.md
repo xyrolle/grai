@@ -124,7 +124,7 @@ Done when: a change brings the first compile level with next-intl's, or the desi
 
 ## `import { m }` in `next dev`
 
-`next dev` builds `m`, the namespace messages.js re-exports, whole in each layer that imports it, and again after each edit, so the README has Next's modules import the namespace of keys.js, which Turbopack reads member by member (`docs/design.md`). Turbopack tracks a member read through a re-exported namespace when it builds for production ([vercel/next.js#96396](https://github.com/vercel/next.js/pull/96396)), but `next dev` 16.4.3 and 16.5.0-canary.27 still compile the namespace's module whole: with four modules behind it and a page reading one, all four are compiled through `import { m }`, one through `import * as m`. Meanwhile `grai migrate` writes the namespace import in a Next app, and `import { m }` everywhere else.
+`next dev` builds `m`, the namespace messages.js re-exports, whole in each layer that imports it, and again after each edit, so the frameworks guide has Next's modules import the namespace of keys.js, which Turbopack reads member by member (`docs/design.md`). Turbopack tracks a member read through a re-exported namespace when it builds for production ([vercel/next.js#96396](https://github.com/vercel/next.js/pull/96396)), but `next dev` 16.4.3 and 16.5.0-canary.27 still compile the namespace's module whole: with four modules behind it and a page reading one, all four are compiled through `import { m }`, one through `import * as m`. Meanwhile `grai migrate` writes the namespace import in a Next app, and `import { m }` everywhere else.
 
 Done when: `next dev` reads `m.key` through `export * as m` as it reads `import * as m`, with the bench's edits through `import { m }` as fast as through the namespace.
 
@@ -142,9 +142,9 @@ Done when: the compile, or `grai check`, reports a markup element that a locale 
 
 ## Prove the design on both reference apps
 
-App A runs on grai, and the README cites its numbers. On the client, a forced `{ locale }` other than the current one throws, and every key must be in every locale; app B is not known to break either rule outside its tests.
+App A runs on grai, and `docs/benchmarks.md` cites its numbers. On the client, a forced `{ locale }` other than the current one throws, and every key must be in every locale; app B is not known to break either rule outside its tests.
 
-Done when: a local branch of app B on grai passes its own checks and tests, and the README cites its cold `dev` and one-message edit times.
+Done when: a local branch of app B on grai passes its own checks and tests, and `docs/benchmarks.md` cites its cold `dev` and one-message edit times.
 
 ## Import what `grai import` leaves out
 
