@@ -6,6 +6,7 @@
  * Every offset is the file's.
  */
 
+import { moduleLinks } from "../module-links.ts";
 import { isLoad, loadFact, loadsModule } from "./loads.ts";
 import { exportFacts, importFact } from "./module-record.ts";
 import { type CodeError, type ModuleCode, readCode } from "./read.ts";
@@ -166,6 +167,11 @@ export type ModuleFacts = {
 	 * Next reads it to put a module, and every module it imports, in the client's graphs.
 	 */
 	directives: string[];
+	/**
+	 * Whether the module's code is re-exports and nothing else, which a bundler sees through to the
+	 * modules that hold the names an importer takes (`module-links.ts`).
+	 */
+	reexportsOnly: boolean;
 };
 
 /**
@@ -236,6 +242,7 @@ function moduleFacts({ program, source }: ModuleCode): ModuleFacts {
 		aliases,
 		importsAt: source.importsAt,
 		directives: directivesOf(program),
+		reexportsOnly: moduleLinks(program).reexportsOnly,
 	};
 }
 
