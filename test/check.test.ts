@@ -146,3 +146,30 @@ describe("grai check's modules, named as the bundler names them", () => {
 		]);
 	});
 });
+
+describe("grai check's reads of a Svelte component's scripts", () => {
+	it("reads a Svelte component's instance script and template in a scope of their own, inside its module script's", async () => {
+		const { dir, config } = project({
+			en: { title: "Title" },
+			de: { title: "Titel" },
+		});
+		writeSources(dir, {
+			"src/Heading.svelte": [
+				"<script module>",
+				'\timport * as messages from "../out/messages.js";',
+				"\tconst m = messages.m;",
+				"\texport const heading = () => m.title();",
+				"</script>",
+				"<script>",
+				'\tconst m = { local: () => "local" };',
+				"</script>",
+				"<p>{m.local()}</p>",
+				"",
+			].join("\n"),
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([]);
+	});
+});
