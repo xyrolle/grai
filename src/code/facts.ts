@@ -103,6 +103,15 @@ export function originOf(from: UseFact["from"]): string {
 	return "local" in from ? from.local : `#${from.load}`;
 }
 
+/**
+ * A table of a module's facts by name, without a prototype: a name is any identifier, so an
+ * `Object.prototype` property's, `constructor` or `__proto__`, must be the table's own entry and
+ * nothing it inherits. `entries` copies another's into it, as JSON gives back an object.
+ */
+export function table<T>(entries: Record<string, T> = {}): Record<string, T> {
+	return Object.assign(Object.create(null), entries);
+}
+
 /** The uses that start from an origin, parsed from what the cache kept the first time. */
 export function usesFrom(uses: Uses, origin: string): readonly UseFact[] {
 	const kept = uses[origin];
