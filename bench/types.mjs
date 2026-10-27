@@ -102,11 +102,16 @@ declare module "i18next" {
 	});
 }
 
-/** Milliseconds to the first completion at the project's marker, appended to its calls, and to the next one. */
+/**
+ * Milliseconds to the first completion at the project's marker, appended to its calls, and to the
+ * next one. The host gives the project a version, as tsserver's does, so that a request on a
+ * project that has not changed skips synchronizing it.
+ */
 function completion({ name, files, marker, directory }) {
 	const path = join(directory, `${name}.ts`);
 	const text = `${readFileSync(path, "utf8")}${marker}`;
 	const host = {
+		getProjectVersion: () => "1",
 		getScriptFileNames: () => files,
 		getScriptVersion: () => "1",
 		getScriptSnapshot: (file) =>
