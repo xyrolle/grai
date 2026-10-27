@@ -12,11 +12,11 @@ import {
 	assertOutdirIsGrais,
 	outdirContents,
 	presentIn,
-	stateDirectory,
 } from "./outdir-contents.ts";
 import { lockOutput } from "./output-lock.ts";
 import type { Output, OutputFile } from "./render.ts";
 import { removeTemporary, writeTemporary } from "./replace-file.ts";
+import { stateDirectory } from "./state-directory.ts";
 
 /**
  * How long a file stays once the output stops naming it, in ms: far longer than a module loader
