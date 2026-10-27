@@ -1,7 +1,8 @@
 // A cold `next dev`'s first page: each app started from an empty .next, ROUNDS times, timed from the
 // process's launch until its first response is complete and, in a start of its own, until Chromium
-// has hydrated it. grai starts twice: with its output prepared, as the watch leaves it, and from an
-// empty outdir, compiling the catalogs as Next starts. next-intl starts twice: with its provider
+// has hydrated it. grai starts twice: with its output prepared, as its watch leaves it after a
+// session (the groups of keys its routes read saved), and from an empty outdir in a copy of its app,
+// compiling the catalogs as Next starts. next-intl starts twice: with its provider
 // passing the client component every message, as by default, and only its keys, as its docs
 // advise. The apps take turns in an order that rotates each round, so each takes each place in a
 // round alike and the machine's load weighs on all alike; a block is one turn of the rotation.
@@ -12,13 +13,17 @@ import { stopServer } from "./servers.mjs";
 
 export const COLD_ROUNDS = 12;
 
-/** The apps the rounds start, each with the directories a start removes first. */
-export function coldApps(apps) {
+/**
+ * The apps the rounds start, each with the directories a start removes first. grai's empty outdir
+ * is a copy of its app (`emptyOutput`), so that its starts leave the prepared app's output as its
+ * watch prepared it.
+ */
+export function coldApps(apps, emptyOutput) {
 	return [
 		{ name: "grai", root: apps.grai, cleared: [".next"] },
 		{
 			name: "grai, empty output",
-			root: apps.grai,
+			root: emptyOutput,
 			cleared: [".next", "src/i18n"],
 		},
 		{ name: "next-intl", root: apps["next-intl"], cleared: [".next"] },

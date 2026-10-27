@@ -18,6 +18,7 @@
 // Every first response and hydrated page is checked to list each of the page's messages.
 import { spawnSync } from "node:child_process";
 import {
+	existsSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
@@ -28,7 +29,7 @@ import { join } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
-import { writeNextApps } from "./next-apps.mjs";
+import { emptyOutputCopy, writeNextApps } from "./next-apps.mjs";
 import {
 	COLD_ROUNDS,
 	coldApps,
@@ -129,6 +130,26 @@ setTimeout(() => {
 			cpu: median(warm.map(({ cpu }) => cpu)),
 		},
 	};
+}
+
+/**
+ * grai's app started until its watch has saved the groups of the keys its routes read
+ * (`.grai/groups.json`), which it does once the server is quiet, as a developer's earlier session
+ * leaves them; at most two minutes.
+ */
+async function prepared(root, path, words) {
+	const groups = join(root, "src/i18n/.grai/groups.json");
+	const { server } = await devStart(root, path, words, [".next"]);
+	const deadline = performance.now() + 120_000;
+	while (!existsSync(groups) && performance.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 200));
+	}
+	await stopServer(server.child);
+	if (!existsSync(groups)) {
+		throw new Error(
+			`grai's watch saved no groups of keys in two minutes in ${root}`,
+		);
+	}
 }
 
 /** A message's text in its catalog, as the page shows it, edited and saved; returns when saved. */
@@ -262,7 +283,8 @@ for (const app of selectedApps()) {
 		};
 	}
 
-	const cold = coldApps(apps);
+	await prepared(apps.grai, path, words);
+	const cold = coldApps(apps, emptyOutputCopy(apps.grai));
 	const runs = await coldRounds(browser, cold, path, words, COLD_ROUNDS);
 	const summary = coldSummary(runs, cold.length);
 	printCold(summary, COLD_ROUNDS);
