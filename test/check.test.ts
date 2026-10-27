@@ -117,6 +117,27 @@ describe("grai check's reads of components", () => {
 	});
 });
 
+describe("grai check's loads", () => {
+	it("takes a call of a `require` the module declares itself, a callback's parameter, for no load", async () => {
+		const { dir, config } = project({
+			en: { title: "Title" },
+			de: { title: "Titel" },
+		});
+		writeSources(dir, {
+			"src/load.js": [
+				'import { m } from "../out/messages.js";',
+				"m.title();",
+				'export const f = require => require("#i18n/messages/absent.js");',
+				"",
+			].join("\n"),
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems).toEqual([]);
+	});
+});
+
 describe("grai check's modules, named as the bundler names them", () => {
 	it("reads a project reached through a symlink, its modules named by their real paths, so its imports of the output are reads", async () => {
 		const { dir } = project({ en: { title: "Title", unused: "Unused" } });
