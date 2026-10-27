@@ -12,7 +12,7 @@ describe("the names a file must write to read one key", () => {
 		barrels: new Set(["/p/src/lib/labels.ts"]),
 	};
 
-	it("takes the key, a path that ends at messages.js or keys.js, and a barrel that holds the key", () => {
+	it("takes the key's name whole, a path that ends at messages.js or keys.js, and a barrel that holds the key", () => {
 		const names = keyNamesOf("heading", holders, [], [], []);
 		const test = names && textTest(names);
 		const taken = [
@@ -25,6 +25,7 @@ describe("the names a file must write to read one key", () => {
 			'import { caption } from "./lib/grai/messages/caption.js";',
 			"Object.keys(rows).length;",
 			"this.messages.push(row);",
+			"m.heading_note();",
 		];
 
 		expect(taken.map((text) => test?.test(text))).toEqual(
