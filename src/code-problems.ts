@@ -30,20 +30,9 @@ export function codeProblems(
 	const isTest = globMatcher(config.tests);
 	const testing = ({ source }: { source: { file: string } }) =>
 		isTest(source.file.replaceAll(sep, "/"));
-	const texts = config.locales.map((locale) => `--${locale} "…"`).join(" ");
 	const errors = [
 		...readErrors(reading),
-		// A read off a key's own module is reported where its path is.
-		...reading.reads
-			.filter(({ key, via }) => !keys.has(key) && via !== "module")
-			.map(
-				({ source, at, key, written }) =>
-					new GraiError(
-						"key-missing",
-						{ file: placeOf(source, at.start), key },
-						`${written} names a key no catalog has. Add it with grai add ${key} ${texts}, or fix the name.`,
-					),
-			),
+		...keysMissing(reading, keys, config),
 	];
 	const shipped = {
 		reads: reading.reads.filter((read) => !testing(read)),
@@ -65,6 +54,26 @@ export function codeProblems(
 		reached,
 		tests: [...tests].map(([file, names]) => ({ file, names })),
 	};
+}
+
+/** Each read of a key no catalog has, at its place, as a check and a build report it. */
+export function keysMissing(
+	reading: Reading,
+	keys: { has: (key: string) => boolean },
+	config: Config,
+): GraiError[] {
+	const texts = config.locales.map((locale) => `--${locale} "…"`).join(" ");
+	// A read off a key's own module is reported where its path is.
+	return reading.reads
+		.filter(({ key, via }) => !keys.has(key) && via !== "module")
+		.map(
+			({ source, at, key, written }) =>
+				new GraiError(
+					"key-missing",
+					{ file: placeOf(source, at.start), key },
+					`${written} names a key no catalog has. Add it with grai add ${key} ${texts}, or fix the name.`,
+				),
+		);
 }
 
 /**
