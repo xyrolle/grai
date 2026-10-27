@@ -40,6 +40,20 @@ describe("grai check --fix", () => {
 		expect(fixed.removed).toEqual([]);
 	});
 
+	it('keeps a key a type names through an inline import type, `typeof import("…/keys.js").key`', async () => {
+		const { dir, config } = project(catalogs);
+		writeSources(dir, {
+			"src/types.ts":
+				'export type Label = typeof import("../out/keys.js").cart_title;\n',
+			"src/total.js":
+				'import { m } from "../out/messages.js";\nm.cart_total({ count: 1 });\n',
+		});
+
+		const fixed = await removeUnusedKeys(config);
+
+		expect(fixed.removed.toSorted()).toEqual(["banner_old", "promo_spring"]);
+	});
+
 	it("removes the keys no source names from every catalog, keeping each catalog's layout", async () => {
 		const { dir, config } = project(catalogs);
 		writeSources(dir, {
