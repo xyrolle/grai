@@ -1,5 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** Writes source files into a project, by path relative to its root. */
 export function writeSources(dir: string, files: Record<string, string>): void {
@@ -71,3 +72,38 @@ export function handLaid(...entries: string[]): string {
 /** The `$schema` entry a catalog starts with, for `handLaid`. */
 export const schemaEntry =
 	'"$schema": "https://inlang.com/schema/inlang-message-format"';
+
+/**
+ * A Vite app that imports the package's entries by its name: the Vite plugin in its config, and
+ * React's `Markup` beside the messages in a component. `installPackage` installs the package.
+ */
+export const packageApp: Record<string, string> = {
+	"vite.config.ts": `import { grai } from "@xyrolle/grai/vite";
+
+export default { plugins: [grai()] };
+`,
+	"src/Cart.tsx": `import { Markup } from "@xyrolle/grai/react";
+import { m } from "../out/messages.js";
+
+export const Cart = () => (
+	<>
+		<h1>{m.cart_title()}</h1>
+		<Markup parts={m.cart_terms.parts()} markup={{ b: (children) => <b>{children}</b> }} />
+	</>
+);
+`,
+};
+
+/**
+ * Installs this repository in a project's node_modules under the package's name, as pnpm links a
+ * workspace's package: a junction, as Windows links a directory without an administrator only so.
+ */
+export function installPackage(dir: string): void {
+	const installed = join(dir, "node_modules/@xyrolle/grai");
+	mkdirSync(dirname(installed), { recursive: true });
+	symlinkSync(
+		fileURLToPath(new URL("..", import.meta.url)),
+		installed,
+		"junction",
+	);
+}
