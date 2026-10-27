@@ -89,6 +89,37 @@ async function open(
 const html = (page: Page, attribute: "lang" | "dir") =>
 	page.locator("html").getAttribute(attribute);
 
+/** Opens `path` as `open` does, recording the paths of keys.js's dev modules the page loads. */
+async function openRecordingKeys(origin: string, path: string) {
+	const page = await (await browser.newContext()).newPage();
+	const keys: string[] = [];
+	page.on("request", (request) => {
+		const { pathname } = new URL(request.url());
+		if (pathname.includes("grai:keys")) keys.push(pathname);
+	});
+	await page.goto(origin + path);
+	await page.waitForLoadState("networkidle");
+	return { page, keys };
+}
+
+/** Starts `vite dev` on the example, on a port the system picks. */
+const viteDev = () =>
+	listening(bin("vite"), ["dev", "--host", "127.0.0.1", "--port", "0"]);
+
+/**
+ * Writes a message no catalog parses into a locale's catalog, as a translator's slip, and puts
+ * the catalog back once the test has finished.
+ */
+function broken(locale: string, key: string): void {
+	const file = join(example, "messages", `${locale}.json`);
+	const catalog = readFileSync(file, "utf8");
+	onTestFinished(() => writeFileSync(file, catalog));
+	writeFileSync(
+		file,
+		`${JSON.stringify({ ...JSON.parse(catalog), [key]: "{$count :weekday}" }, null, "\t")}\n`,
+	);
+}
+
 // Building and serving an app takes seconds.
 describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 	let origin = "";
@@ -322,13 +353,7 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 	let origin = "";
 	let app: Served | undefined;
 	beforeAll(async () => {
-		app = await listening(bin("vite"), [
-			"dev",
-			"--host",
-			"127.0.0.1",
-			"--port",
-			"0",
-		]);
+		app = await viteDev();
 		origin = app.origin;
 	}, 60_000);
 	afterAll(() => app && stopped(app.server));
@@ -355,6 +380,23 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 	};
 	const marked = (page: Page) => page.evaluate("window.unreloaded");
 
+	it("loads each page's locale's words alone, the locale the server drew it in", async () => {
+		const ro = await openRecordingKeys(origin, "/ro/");
+		const en = await openRecordingKeys(origin, "/");
+		await ro.page.getByText("Desenat în browser").waitFor();
+
+		expect([await html(ro.page, "lang"), ro.keys]).toEqual([
+			"ro",
+			["/@id/__x00__grai:keys/ro"],
+		]);
+		expect([await html(en.page, "lang"), en.keys]).toEqual([
+			"en",
+			["/@id/__x00__grai:keys/en"],
+		]);
+		await ro.page.context().close();
+		await en.page.context().close();
+	});
+
 	it("draws an edited message again in place, without a reload", async () => {
 		const page = await open(origin, "/ro/");
 		await page.getByText("Desenat în browser").waitFor();
@@ -377,5 +419,19 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 
 		expect(await marked(page)).toBe(true);
 		await page.context().close();
+	});
+});
+
+describe("@xyrolle/grai/sveltekit under vite dev, a message invalid in a locale no page loads", {
+	timeout: 60_000,
+}, () => {
+	it("serves no page's words, the page's locale's neither", async () => {
+		broken("ar", "greeting");
+		const app = await viteDev();
+		onTestFinished(() => stopped(app.server));
+		const response = await fetch(`${app.origin}/@id/__x00__grai:keys/ro`);
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toContain("ar.json");
 	});
 });
