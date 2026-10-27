@@ -315,6 +315,21 @@ ${items(words.client)}
 }
 
 /**
+ * A copy of grai's app beside it, for the starts from an empty outdir, which then leave the app's
+ * own output as its watch prepared it. Its .next and outdir are left out, as each start removes them.
+ */
+export function emptyOutputCopy(root) {
+	const copy = join(root, "..", "grai-empty");
+	rmSync(copy, { recursive: true, force: true });
+	cpSync(root, copy, {
+		recursive: true,
+		filter: (path) =>
+			![".next", "src/i18n"].some((each) => path === join(root, each)),
+	});
+	return copy;
+}
+
+/**
  * Writes the four apps for one catalog, after compiling grai's catalogs for the page's words: the
  * words of the page's messages, in its order, which every app's page lists.
  */
