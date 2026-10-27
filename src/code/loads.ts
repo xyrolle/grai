@@ -1,15 +1,25 @@
 /**
  * A module's loads of other modules at run time: `import(…)`, `require(…)` and Vite's
- * `import.meta.glob(…)`, each by a literal path, a pattern of paths, or nothing the code can show.
+ * `import.meta.glob(…)`, each by a literal path, a pattern of paths, or nothing the code can show;
+ * and a type's import of one, `typeof import("…").key`, which loads nothing at run time but reads
+ * the module's exports for its types.
  */
 
 import type { LoadFact, Span } from "./facts.ts";
 import type { ESTree } from "./parse.ts";
 import { literalText, type Node } from "./syntax.ts";
 
-/** Whether a node loads a module at run time: `import(…)`, `require(…)` or `import.meta.glob(…)`. */
+/**
+ * Whether a node loads a module: `import(…)`, `require(…)` or `import.meta.glob(…)` at run time,
+ * or an import type for the types.
+ */
 export function isLoad(node: Node): boolean {
-	return node.type === "ImportExpression" || isRequire(node) || isGlob(node);
+	return (
+		node.type === "ImportExpression" ||
+		node.type === "TSImportType" ||
+		isRequire(node) ||
+		isGlob(node)
+	);
 }
 
 function isRequire(node: Node): node is ESTree.CallExpression {
@@ -42,7 +52,7 @@ export function loadFact(
 	span: (node: Span) => Span,
 ): LoadFact | undefined {
 	const argument =
-		node.type === "ImportExpression"
+		node.type === "ImportExpression" || node.type === "TSImportType"
 			? node.source
 			: node.type === "CallExpression"
 				? node.arguments[0]

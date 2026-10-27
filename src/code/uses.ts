@@ -74,7 +74,12 @@ export function usesOf(
 		}
 	}
 	loads.forEach((node, load) => {
-		follow(node, { load }, [], false);
+		// An import type reads its qualifier's names from the module, for the types alone.
+		if (node.type === "TSImportType") {
+			follow(node, { load }, qualified(node, span), true);
+		} else {
+			follow(node, { load }, [], false);
+		}
 	});
 	return { uses, aliases };
 }
@@ -243,4 +248,26 @@ function boundBy(
 		at: span(target),
 		references: scopes.usesOf(binding).map((use) => span(use)),
 	};
+}
+
+/** The names an import type's qualifier reads from its module, `title` of `import("…").title`. */
+function qualified(
+	node: ESTree.TSImportType,
+	span: (node: Span) => Span,
+): UseFact["chain"] {
+	const names: ESTree.IdentifierName[] = [];
+	for (let name = node.qualifier; name !== null; ) {
+		if (name.type === "TSQualifiedName") {
+			names.unshift(name.right);
+			name = name.left;
+		} else {
+			names.unshift(name);
+			name = null;
+		}
+	}
+	return names.map((name) => ({
+		name: name.name,
+		at: span(name),
+		expression: span({ start: node.start, end: name.end }),
+	}));
 }
