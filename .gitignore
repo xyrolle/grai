@@ -6,3 +6,4 @@ coverage/
 bench/.cache/
 bench/.wrangler/
 bench/.migrate-*/
+*.tgz
