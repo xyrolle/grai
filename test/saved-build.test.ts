@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
-import { savedBuild, savingFile } from "../src/saved-build.ts";
+import { savedBuild } from "../src/saved-build.ts";
+import { savingFile } from "../src/state-saves.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -247,7 +248,7 @@ it("leaves a save under way alone when a compile under the output's lock clears 
 	const { build } = await started(file);
 	const state = join(dir, "out", ".grai");
 	// A save another process is writing, and a temporary file a compile that stopped halfway left.
-	const saving = savingFile(state, process.ppid);
+	const saving = savingFile(state, "build", process.ppid);
 	const leftover = join(state, "keys-0.js.tmp");
 	writeFileSync(saving, "part of a build");
 	writeFileSync(leftover, "");
@@ -263,8 +264,8 @@ it("removes a save a process left as it crashed, and none whose process still ru
 	const state = join(dir, "out", ".grai");
 	// A process that has ended, whose pid no process has yet.
 	const { pid: ended } = spawnSync(process.execPath, ["--eval", ""]);
-	const stale = savingFile(state, ended);
-	const running = savingFile(state, process.ppid);
+	const stale = savingFile(state, "build", ended);
+	const running = savingFile(state, "build", process.ppid);
 	writeFileSync(stale, "part of a build");
 	writeFileSync(running, "part of a build");
 	writeFileSync(
