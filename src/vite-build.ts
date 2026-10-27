@@ -4,7 +4,6 @@ import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { keyExports } from "./key-exports.ts";
 import { type KeyLinks, keyReach, type ModuleGraph } from "./key-reach.ts";
-import { pageChunks } from "./key-sets.ts";
 import {
 	besideDirectory,
 	inDirectory,
@@ -19,6 +18,7 @@ import { localeCopies } from "./locale-copies.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { runtimeKindIn } from "./module-kinds.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
+import { pageChunks } from "./page-chunks.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
 export function keysModule(build: Build): string {
