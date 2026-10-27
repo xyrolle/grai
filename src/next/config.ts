@@ -11,10 +11,11 @@ import { baseDisagreement } from "../base-agreement.ts";
 import { type CompileResult, compile, isCompiled } from "../compile.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
+import { packageName } from "../package-name.ts";
 import { count, reportErrors } from "./errors.ts";
 
 /** The name grai/next imports the project's compiled output by, in every layer Next bundles. */
-const output = "grai/next/output";
+const output = `${packageName}/next/output`;
 
 /** What withGrai takes besides Next's config: the grai config's file, grai.config.json by default. */
 export type WithGraiOptions = { config?: string };

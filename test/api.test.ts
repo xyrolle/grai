@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
+import { packageName } from "../src/package-name.ts";
 import { importableNames } from "./language-server.ts";
 import { project } from "./project.ts";
 
@@ -88,7 +90,15 @@ it("exports the middleware, its lookup, redirect and Vary, defineServerStrategy,
 	]);
 });
 
-it("exports from grai, grai/vite and grai/svelte only their API", async () => {
+it("names the package in its code as package.json names it", () => {
+	const manifest: { name: string } = JSON.parse(
+		readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+	);
+
+	expect(packageName).toBe(manifest.name);
+});
+
+it("exports from the package, its Vite entry and its Svelte entry only their API", async () => {
 	const { dir } = project(catalogs);
 
 	expect(Object.keys(await import("../src/index.ts")).sort()).toEqual([
@@ -100,40 +110,39 @@ it("exports from grai, grai/vite and grai/svelte only their API", async () => {
 		"graiModules",
 	]);
 	expect(Object.keys(await import("../src/svelte.ts"))).toEqual(["grai"]);
-	expect(await importableNames(dir, "grai")).toEqual([
+	expect(await importableNames(dir, packageName)).toEqual([
 		"CompileResult",
 		"GraiError",
 		"GraiErrorCode",
 		"compile",
 	]);
-	expect(await importableNames(dir, "grai/vite")).toEqual([
+	expect(await importableNames(dir, `${packageName}/vite`)).toEqual([
 		"GraiModuleKind",
 		"grai",
 		"graiModules",
 	]);
-	expect(await importableNames(dir, "grai/svelte")).toEqual(["grai"]);
+	expect(await importableNames(dir, `${packageName}/svelte`)).toEqual(["grai"]);
 });
 
-it("exports from grai/sveltekit, grai/sveltekit/vite, grai/sveltekit/navigation, grai/next, grai/next/config, grai/next/proxy and grai/react only their API", async () => {
+it("exports from the SvelteKit, Next and React entries only their API", async () => {
 	const { dir } = project(catalogs);
 
 	expect(Object.keys(await import("../src/sveltekit.ts"))).toEqual([
 		"handleLocale",
 	]);
-	expect(await importableNames(dir, "grai/sveltekit")).toEqual([
+	expect(await importableNames(dir, `${packageName}/sveltekit`)).toEqual([
 		"handleLocale",
 	]);
 	expect(Object.keys(await import("../src/sveltekit-vite.ts"))).toEqual([
 		"grai",
 	]);
-	expect(await importableNames(dir, "grai/sveltekit/vite")).toEqual([
+	expect(await importableNames(dir, `${packageName}/sveltekit/vite`)).toEqual([
 		"SvelteKitGraiOptions",
 		"grai",
 	]);
-	expect(await importableNames(dir, "grai/sveltekit/navigation")).toEqual([
-		"PageUrls",
-		"reloadAcrossLocales",
-	]);
+	expect(
+		await importableNames(dir, `${packageName}/sveltekit/navigation`),
+	).toEqual(["PageUrls", "reloadAcrossLocales"]);
 
 	expect(Object.keys(await import("../src/next/config.ts"))).toEqual([
 		"withGrai",
@@ -141,40 +150,40 @@ it("exports from grai/sveltekit, grai/sveltekit/vite, grai/sveltekit/navigation,
 	expect(Object.keys(await import("../src/react/markup.ts"))).toEqual([
 		"Markup",
 	]);
-	expect(await importableNames(dir, "grai/next")).toEqual([
+	expect(await importableNames(dir, `${packageName}/next`)).toEqual([
 		"LocaleProvider",
 		"bindLocale",
 	]);
-	expect(await importableNames(dir, "grai/next/config")).toEqual([
+	expect(await importableNames(dir, `${packageName}/next/config`)).toEqual([
 		"WithGraiOptions",
 		"withGrai",
 	]);
-	expect(await importableNames(dir, "grai/next/proxy")).toEqual(["proxy"]);
-	expect(await importableNames(dir, "grai/react")).toEqual(["Markup"]);
+	expect(await importableNames(dir, `${packageName}/next/proxy`)).toEqual([
+		"proxy",
+	]);
+	expect(await importableNames(dir, `${packageName}/react`)).toEqual([
+		"Markup",
+	]);
 });
 
-it("exports from grai/astro, grai/astro/middleware and grai/astro/translated-paths only their API", async () => {
+it("exports from the Astro entries only their API", async () => {
 	const { dir } = project(catalogs);
 
 	expect(Object.keys(await import("../src/astro.ts"))).toEqual(["grai"]);
-	expect(await importableNames(dir, "grai/astro")).toEqual([
+	expect(await importableNames(dir, `${packageName}/astro`)).toEqual([
 		"GraiAstroOptions",
 		"grai",
 	]);
 	expect(Object.keys(await import("../src/astro/middleware.ts"))).toEqual([
 		"localeMiddleware",
 	]);
-	expect(await importableNames(dir, "grai/astro/middleware")).toEqual([
-		"LocaleContext",
-		"LocaleProject",
-		"localeMiddleware",
-	]);
+	expect(await importableNames(dir, `${packageName}/astro/middleware`)).toEqual(
+		["LocaleContext", "LocaleProject", "localeMiddleware"],
+	);
 	expect(Object.keys(await import("../src/astro/translated-paths.ts"))).toEqual(
 		["translatedStaticPaths"],
 	);
-	expect(await importableNames(dir, "grai/astro/translated-paths")).toEqual([
-		"PageRoute",
-		"TranslatedPages",
-		"translatedStaticPaths",
-	]);
+	expect(
+		await importableNames(dir, `${packageName}/astro/translated-paths`),
+	).toEqual(["PageRoute", "TranslatedPages", "translatedStaticPaths"]);
 });

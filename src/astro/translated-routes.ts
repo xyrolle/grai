@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IntegrationResolvedRoute } from "astro";
 import type { Config } from "../config.ts";
+import { packageName } from "../package-name.ts";
 import type { RoutePart } from "./route-paths.ts";
 
 /**
@@ -96,7 +97,7 @@ export function translatedPathsModule(
 		return `\t{ ...${shape}, load: () => import(${JSON.stringify(file)}) },\n`;
 	});
 	const internal = JSON.stringify(join(config.outdir, "internal.js"));
-	return `import { translatedStaticPaths } from "grai/astro/translated-paths";
+	return `import { translatedStaticPaths } from "${packageName}/astro/translated-paths";
 import { pathOfRoute } from ${internal};
 
 export const getStaticPaths = translatedStaticPaths({

@@ -21,6 +21,7 @@ import { compile } from "./compile.ts";
 import { type Config, readConfig, type Strategy } from "./config.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
+import { packageName } from "./package-name.ts";
 import { graiPlugin } from "./vite-plugin.ts";
 
 /** The integration's options. `config` is the path of the project's grai.config.json, from Astro's root. */
@@ -173,7 +174,7 @@ function middlewareCode(
 	>,
 ): string {
 	const output = (file: string) => JSON.stringify(join(grai.outdir, file));
-	return `import { localeMiddleware } from "grai/astro/middleware";
+	return `import { localeMiddleware } from "${packageName}/astro/middleware";
 import { middleware } from ${output("server.js")};
 import { getTextDirection } from ${output("runtime.js")};
 import { localeOfPath, routeOfPath } from ${output("internal.js")};
