@@ -10,10 +10,13 @@
 // Once timed, the page's texts are checked against the texts its calls show, and an error in the
 // page fails the start.
 //
-// Every library starts once a round, in an order that rotates, so the load from other work weighs
-// on each alike; medians of ROUNDS, with every round kept.
-//   node dev-start.mjs [app...]
+// Every library starts once a round, in an order that rotates, the rounds a multiple of their
+// number so that each takes every place in the order alike. Each round is kept with the load it
+// started at; medians of the rounds, with a 95% interval, and each library's difference from
+// grai's plugin in the same round, so that load shared by a round cancels out.
+//   ROUNDS=10 node dev-start.mjs [app...]
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { loadavg } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { cacheDir, selectedApps } from "./apps.mjs";
@@ -24,11 +27,11 @@ import {
 	textPage,
 	writeFixture,
 } from "./dev-pages.mjs";
+import { median, medianInterval } from "./medians.mjs";
 import { otherLocale } from "./request.mjs";
 import { recordResults } from "./results.mjs";
 import { startServer, stopServer } from "./servers.mjs";
 
-const ROUNDS = 7;
 const designs = [
 	"grai's plugin",
 	"paraglide",
@@ -36,7 +39,8 @@ const designs = [
 	"use-intl",
 	"no messages",
 ];
-/** How long one start may take, Paraglide's compile of 13,326 keys among it. */
+const ROUNDS = Number(process.env.ROUNDS ?? 10);
+/** How long one start may take, Paraglide's compile of 13,326 keys included. */
 const PATIENCE_MS = 120_000;
 const self = new URL(import.meta.url).pathname;
 
@@ -139,49 +143,70 @@ async function start(design, app, pageFile) {
 	);
 }
 
-const median = (values) =>
-	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-
-/** Every design's starts on one page, round by round. */
+/** Every design's starts on one page, round by round, each round with the load it started at. */
 async function rounds(app, page) {
 	const directory = join(cacheDir, "dev-start");
 	mkdirSync(directory, { recursive: true });
 	const pageFile = join(directory, `${app.id}.${page.name}.json`);
 	writeFileSync(pageFile, JSON.stringify(page));
-	const runs = Object.fromEntries(designs.map((design) => [design, []]));
+	const kept = [];
 	for (let round = 0; round < ROUNDS; round++) {
+		const load = loadavg()[0];
+		const starts = {};
 		for (let index = 0; index < designs.length; index++) {
 			const design = designs[(index + round) % designs.length];
-			runs[design].push(await start(design, app, pageFile));
+			starts[design] = await start(design, app, pageFile);
 		}
+		kept.push({ load, starts });
 	}
-	return runs;
+	return kept;
 }
 
-/** Prints and records one page's starts: each design's medians. */
-function report(app, page, runs) {
+const whole = (ms) => ms.toFixed(0);
+const signed = (ms) => `${ms > 0 ? "+" : ""}${whole(ms)}`;
+const between = ({ low, high }, write = whole) =>
+	`${write(low)} to ${write(high)}`;
+const percent = ({ confidence }) => `${(confidence * 100).toFixed(1)}%`;
+
+/** Prints and records one page's rounds: each design's medians, and its difference from grai's. */
+function report(app, page, kept) {
+	const runs = (design, field) =>
+		kept.map(({ starts }) => starts[design][field]);
+	const loads = kept.map(({ load }) => load);
+	const [grai, ...others] = designs;
 	console.log(
-		`\n### ${app.name}, ${page.title}: a cold Vite dev server until its page shows, each start a new process, medians of ${ROUNDS}, ms\n`,
+		`\n### ${app.name}, ${page.title}: a cold Vite dev server until its page shows, each start a new process, ${ROUNDS} rounds at a load of ${loads.map(whole).join(", ")}, ms\n`,
 	);
+	const confidence = percent(medianInterval(runs(grai, "shown")));
 	console.log(
-		"| design | shown, median | range | ready, median | listening, median |\n|---|---|---|---|---|",
+		`| design | shown, median | ${confidence} interval | range | ready, median | listening, median |\n|---|---|---|---|---|---|`,
 	);
 	const rows = designs.map((design) => {
-		const field = (name) => runs[design].map((result) => result[name]);
-		const shown = field("shown");
-		const ms = median(shown);
-		const low = Math.min(...shown);
-		const high = Math.max(...shown);
+		const shown = runs(design, "shown");
+		const range = { low: Math.min(...shown), high: Math.max(...shown) };
 		console.log(
-			`| ${design} | ${ms.toFixed(0)} | ${low.toFixed(0)}–${high.toFixed(0)} | ${median(field("ready")).toFixed(0)} | ${median(field("listening")).toFixed(0)} |`,
+			`| ${design} | ${whole(median(shown))} | ${between(medianInterval(shown))} | ${between(range)} | ${whole(median(runs(design, "ready")))} | ${whole(median(runs(design, "listening")))} |`,
 		);
 		return {
 			design,
-			ms,
+			ms: median(shown),
 			runs: shown,
-			ready: field("ready"),
-			listening: field("listening"),
+			ready: runs(design, "ready"),
+			listening: runs(design, "listening"),
 		};
+	});
+	console.log(
+		`\n${grai} minus each, in the same round, ms:\n\n| against | median difference | ${confidence} interval | rounds ${grai} is faster |\n|---|---|---|---|`,
+	);
+	const differences = others.map((design) => {
+		const each = kept.map(
+			({ starts }) => starts[grai].shown - starts[design].shown,
+		);
+		const faster = each.filter((difference) => difference < 0).length;
+		console.log(
+			`| ${design} | ${signed(median(each))} | ${between(medianInterval(each), signed)} | ${faster} of ${each.length} |`,
+		);
+		return { against: design, ms: median(each), runs: each };
 	});
 	recordResults(
 		page.name === "text"
@@ -192,7 +217,9 @@ function report(app, page, runs) {
 			app: app.name,
 			page: page.title,
 			rounds: ROUNDS,
-			chromium: runs[designs[0]][0].chromium,
+			loads,
+			differences,
+			chromium: kept[0].starts[grai].chromium,
 		},
 	);
 }
@@ -200,6 +227,10 @@ function report(app, page, runs) {
 if (process.argv[2] === "--child") {
 	await child(process.argv[3], process.argv[4], process.argv[5]);
 } else {
+	if (ROUNDS % designs.length !== 0)
+		throw new Error(
+			`ROUNDS is ${ROUNDS}: a multiple of ${designs.length} gives every library each place in the order alike.`,
+		);
 	for (const app of selectedApps()) {
 		const locale = otherLocale(app);
 		const pages = [
