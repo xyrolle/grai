@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseSync } from "oxc-parser";
 import { rolldown } from "rolldown";
 import { expect, it } from "vitest";
@@ -119,6 +120,56 @@ console.log(withLocale("de", () => [m.greeting({ name: "Ana" }), m.items({ count
 		expect(loaded.stderr, `type ${type}`).toBe("");
 		expect(loaded.stdout).toBe("Hallo Ana / 2 Artikel\n");
 	}
+});
+
+/** The package's own TypeScript, as a project type-checks the output. */
+const tsc = fileURLToPath(new URL("../node_modules/.bin/tsc", import.meta.url));
+
+it("is required as ES modules by a CommonJS project's Node, and type-checks as such: under nodenext, and not under node16, which models a Node that cannot require one", async () => {
+	const { dir, compile } = project(catalogs);
+	writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "app" }));
+	expect((await compile()).errors).toEqual([]);
+
+	const required = spawnSync(
+		process.execPath,
+		[
+			"-e",
+			'const { m } = require("./out/messages.js"); console.log(m.title({}, { locale: "de" }));',
+		],
+		{ cwd: dir, encoding: "utf8" },
+	);
+	expect(required.stderr).toBe("");
+	expect(required.stdout).toBe("Titel\n");
+
+	writeFileSync(
+		join(dir, "app.ts"),
+		'import { m } from "./out/messages.js";\nexport const title: string = m.title();\n',
+	);
+	const checked = (module: string) => {
+		writeFileSync(
+			join(dir, "tsconfig.json"),
+			JSON.stringify({
+				compilerOptions: {
+					module,
+					moduleResolution: module,
+					strict: true,
+					noEmit: true,
+					types: [],
+				},
+				files: ["app.ts"],
+			}),
+		);
+		return spawnSync(tsc, ["-p", "tsconfig.json"], {
+			cwd: dir,
+			encoding: "utf8",
+		});
+	};
+	const nodenext = checked("nodenext");
+	expect(nodenext.stdout).toBe("");
+	expect(nodenext.status).toBe(0);
+	const node16 = checked("node16");
+	expect(node16.status).not.toBe(0);
+	expect(node16.stdout).toContain("error TS1479");
 });
 
 /** A bundle of an entry that imports the output's keys, as a bundler that reads `sideEffects` makes it. */
