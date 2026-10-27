@@ -1,7 +1,8 @@
 // A bench page in Chromium, opened as a reader in a locale opens it: with the app's cookie set and
 // at the URL of the locale, its document served there and the files of its build beside it, as a
 // server serves them. Every script the page loads is kept with its size, compressed on its own as
-// a server sends it. A request for a file the build does not have fails the load.
+// a server sends it. An error in the page, a warning or an error in its console, or a request for
+// a file the build does not have fails the load.
 import { readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { brotliCompressSync } from "node:zlib";
@@ -56,6 +57,11 @@ export async function benchPage(
 			},
 		]);
 		const page = await context.newPage();
+		page.on("pageerror", (error) => fail(String(error)));
+		page.on("console", (message) => {
+			if (message.type() === "error" || message.type() === "warning")
+				fail(`${message.type()}: ${message.text()}`);
+		});
 		const cdp = await context.newCDPSession(page);
 		await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 		const path = localePath(app, locale);

@@ -9,8 +9,10 @@
 // files one by one; its JS is the sum of the scripts it loads, each compressed on its own, and of
 // those its index.html holds inline. The bench's own script goes in the page beside them, outside
 // that sum: it imports what the page's entry gives, then times `hydrate`, from when every module
-// has been evaluated until it returns. The page then mounts itself again, the client work of a
-// locale switch that does not reload. Runs alternate between variants, each in a fresh context.
+// has been evaluated until it returns, with Svelte's recovery off, so that a page that fails to
+// hydrate fails the bench rather than mounting anew. The page then mounts itself again, the client
+// work of a locale switch that does not reload. Both texts are checked against the server's. Runs
+// alternate between variants, each in a fresh context.
 //   node hydrate.mjs [app...]
 import { join } from "node:path";
 import { chromium } from "playwright-core";
@@ -19,7 +21,7 @@ import { benchPage } from "./chromium.mjs";
 import { graiOutput } from "./grai.mjs";
 import { i18nextValues, writeLibraryModules } from "./libraries.mjs";
 import { median } from "./medians.mjs";
-import { PAGE_CALLS, pageKeys, pageProps } from "./page.mjs";
+import { PAGE_CALLS, pageKeys, pageProps, pageText } from "./page.mjs";
 import {
 	APP_HEAD,
 	APP_HTML,
@@ -43,14 +45,14 @@ const evaluated = performance.now();
 const loaded = Math.max(...performance.getEntriesByType("resource").filter((resource) => resource.name.endsWith(".js")).map((resource) => resource.responseEnd));
 const target = document.getElementById("app");
 const props = JSON.parse(document.getElementById("props").textContent);
-let app = hydrate(Page, { target, props });
+let app = hydrate(Page, { target, props, recover: false });
 const hydrated = performance.now();
 const text = target.textContent;
 unmount(app);
 const unmounted = performance.now();
 app = mount(Page, { target, props });
 const mounted = performance.now() - unmounted;
-window.bench = { loaded, evaluated, hydrated, mounted, text };
+window.bench = { loaded, evaluated, hydrated, mounted, text, remounted: target.textContent };
 `;
 
 async function variants(app, locale) {
@@ -100,7 +102,8 @@ async function variants(app, locale) {
 /**
  * A variant's page in a locale: the app built, the page rendered by its server build inside a
  * request and drawn into the built index.html with the request's locale, its props beside it,
- * and the bench's script after them; with the scripts the page holds inline.
+ * and the bench's script after them. With the text the server drew and the scripts the page
+ * holds inline.
  */
 async function documentFor(app, locale, index, variant) {
 	const root = writePageApp(app, `hydrate-${locale}-${index}`, variant);
@@ -125,7 +128,22 @@ async function documentFor(app, locale, index, variant) {
 			() =>
 				`<script id="props" type="application/json">${json}</script><script type="module">${bench}</script></body>`,
 		);
-	return { html, directory: client.directory, inline: client.inline };
+	return {
+		page: { html, directory: client.directory, inline: client.inline },
+		text: pageText(body),
+	};
+}
+
+/** Fails a load whose page hydrated or mounted again to other text than the server drew. */
+function checkTexts(name, locale, document, { bench }) {
+	if (bench.text !== document.text)
+		throw new Error(
+			`${name} hydrates other text than its server drew in ${locale}`,
+		);
+	if (bench.remounted !== document.text)
+		throw new Error(
+			`${name} mounts again to other text than its server drew in ${locale}`,
+		);
 }
 
 /** The JS a page loads: each script it asked for and each it holds inline, compressed on its own. */
@@ -143,20 +161,17 @@ async function benchLocale(browser, app, locale) {
 	).entries())
 		documents.push({
 			name,
-			page: await documentFor(app, locale, index, variant),
+			...(await documentFor(app, locale, index, variant)),
 		});
-	let expected;
+	if (new Set(documents.map(({ text }) => text)).size !== 1)
+		throw new Error(`The variants' servers drew other texts in ${locale}`);
 	for (const rate of THROTTLING) {
 		const samples = documents.map(() => []);
 		for (let run = 0; run < RUNS; run++) {
 			for (const [index, document] of documents.entries()) {
 				const load = await benchPage(browser, app, locale, document.page, rate);
+				checkTexts(document.name, locale, document, load);
 				document.scripts ??= load.scripts;
-				expected ??= load.bench.text;
-				if (load.bench.text !== expected)
-					throw new Error(
-						`${document.name} hydrates other text than Paraglide in ${locale}`,
-					);
 				samples[index].push(load.bench);
 			}
 		}
