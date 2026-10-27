@@ -79,6 +79,14 @@ export async function paraglideOutput(app, options = {}) {
 	return outdir;
 }
 
+/**
+ * Paraglide's output for a Vite build, as its docs set `isServer` up for Vite: Vite's own flag,
+ * which a client build reads as false and a server build as true, so that each drops the other's
+ * code.
+ */
+export const paraglideForVite = (app) =>
+	paraglideOutput(app, { isServer: "import.meta.env.SSR" });
+
 export const paraglideVersion = version;
 
 /**
