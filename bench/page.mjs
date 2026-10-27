@@ -87,6 +87,13 @@ export function pageSource(app, { from, inline, translate }) {
 `;
 }
 
+/** The keys the page calls: its shell's and its rows', each once. */
+export const pageKeys = (app) => [
+	...new Set(
+		sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW).map((call) => call.key),
+	),
+];
+
 /**
  * The page's text exactly as the DOM holds it, whitespace and all: its tags and Svelte's
  * hydration comments dropped, and the entities Svelte writes read back.
