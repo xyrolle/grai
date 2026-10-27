@@ -5,6 +5,7 @@
  * already, and no other read of the new name inside its scope would read it instead.
  */
 
+import { written } from "./candidates.ts";
 import type { Binding, Span } from "./facts.ts";
 import { fileSpan } from "./facts.ts";
 import { readCode } from "./read.ts";
@@ -21,9 +22,10 @@ export async function bindingConflicts(
 	binding: Binding,
 	to: string,
 ): Promise<Conflict[]> {
-	// A file that never writes the new name, plainly or with an escape, declares and reads nothing by
-	// it, so its scopes need no reading.
-	if (!text.includes(to) && !text.includes("\\u")) return [];
+	// A file that never writes the new name as a whole name, plainly or with an escape, declares and
+	// reads nothing by it, so its scopes need no reading. A longer name that holds it is another.
+	const whole = new RegExp(`(?<![\\w$])${written(to)}(?![\\w$])`);
+	if (!whole.test(text) && !text.includes("\\u")) return [];
 	const modules = await readCode(path, text);
 	if (!Array.isArray(modules)) return [];
 	for (const { program, source } of modules) {
