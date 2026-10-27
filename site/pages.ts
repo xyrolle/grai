@@ -1,14 +1,22 @@
 // The site's pages, written from the repo's own docs before each build, so each fact has one
 // source: the README's sections, and the docs a section points to. A link to another page's source
-// becomes that page's route; a link to any other file of the repo goes to it on GitHub.
+// becomes that page's route; a link to any other file of the repo goes to it on GitHub. The charts
+// in docs/assets are served from the site's own public directory.
 //
 // usage: node pages.ts
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	cpSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = new URL("../", import.meta.url);
 const pagesDir = new URL("src/content/docs/", import.meta.url);
+const assetsDir = new URL("public/assets/", import.meta.url);
 const github = "https://github.com/xyrolle/grai/blob/main/";
 
 /** A page: its route, its title, and where its text comes from. */
@@ -83,21 +91,38 @@ const routeOf = new Map(
 	),
 );
 
-/** The text's relative links, each to the page its target is or else to the file on GitHub. */
+/**
+ * The text's relative links, each to the page its target is or else to the file on GitHub, and
+ * its pictures' sources, each to the site's copy of docs/assets.
+ */
 function rewriteLinks(text: string, source: string): string {
-	return text.replace(
-		/\]\((?![a-z]+:|#)([^)#\s]+)(#[^)\s]*)?\)/g,
-		(_, target: string, anchor = "") => {
-			const file = posix.normalize(posix.join(posix.dirname(source), target));
-			const route = routeOf.get(file);
-			return route === undefined
-				? `](${github}${file}${anchor})`
-				: `](/${route}/${anchor})`;
-		},
-	);
+	return text
+		.replace(
+			/\]\((?![a-z]+:|#)([^)#\s]+)(#[^)\s]*)?\)/g,
+			(_, target: string, anchor = "") => {
+				const file = posix.normalize(posix.join(posix.dirname(source), target));
+				const route = routeOf.get(file);
+				return route === undefined
+					? `](${github}${file}${anchor})`
+					: `](/${route}/${anchor})`;
+			},
+		)
+		.replace(
+			/\b(src|srcset)="(?![a-z]+:|\/)([^"]+)"/g,
+			(_, attribute: string, target: string) => {
+				const file = posix.normalize(posix.join(posix.dirname(source), target));
+				if (!file.startsWith("docs/assets/"))
+					throw new Error(
+						`${source} shows ${file}, which is not in docs/assets`,
+					);
+				return `${attribute}="/${file.slice("docs/".length)}"`;
+			},
+		);
 }
 
 rmSync(pagesDir, { recursive: true, force: true });
+rmSync(assetsDir, { recursive: true, force: true });
+cpSync(new URL("docs/assets/", repo), assetsDir, { recursive: true });
 const sections = readmeSections();
 for (const page of pages) {
 	const source = typeof page.from === "string" ? page.from : "README.md";
