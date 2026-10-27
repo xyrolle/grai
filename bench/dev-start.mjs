@@ -12,7 +12,6 @@
 // Every library starts once a round, in an order that rotates, so the load from other work weighs
 // on each alike; medians of ROUNDS, with every round kept.
 //   node dev-start.mjs [app...]
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
@@ -25,6 +24,7 @@ import {
 } from "./dev-pages.mjs";
 import { otherLocale } from "./request.mjs";
 import { recordResults } from "./results.mjs";
+import { startServer, stopServer } from "./servers.mjs";
 
 const ROUNDS = 7;
 const designs = [
@@ -34,7 +34,7 @@ const designs = [
 	"use-intl",
 	"no messages",
 ];
-/** How long a page may take to show, Paraglide's compile of 13,326 keys among it. */
+/** How long one start may take, Paraglide's compile of 13,326 keys among it. */
 const PATIENCE_MS = 120_000;
 const self = new URL(import.meta.url).pathname;
 
@@ -108,13 +108,29 @@ async function child(design, name) {
 	}
 }
 
-/** One cold start in a new process, its result. */
-function start(design, app) {
-	const output = execFileSync(
+/** One cold start in a new process, in a process group of its own, stopped however it ends. */
+async function start(design, app) {
+	const starting = startServer(
 		process.execPath,
 		[self, "--child", design, app.id],
-		{ encoding: "utf8" },
+		{ stdio: ["ignore", "pipe", "inherit"] },
 	);
+	let output = "";
+	starting.stdout.setEncoding("utf8").on("data", (chunk) => {
+		output += chunk;
+	});
+	let timer;
+	const exit = await Promise.race([
+		new Promise((resolve) => starting.once("close", resolve)),
+		new Promise((resolve) => {
+			timer = setTimeout(() => resolve("timeout"), PATIENCE_MS);
+		}),
+	]);
+	clearTimeout(timer);
+	await stopServer(starting);
+	if (exit === "timeout")
+		throw new Error(`${design}'s start took over ${PATIENCE_MS} ms`);
+	if (exit !== 0) throw new Error(`${design}'s start exited with ${exit}`);
 	// Its result is its one line of JSON; Paraglide's plugin logs its compiles around it.
 	return JSON.parse(
 		output.split("\n").findLast((line) => line.startsWith("{")),
@@ -133,7 +149,7 @@ if (process.argv[2] === "--child") {
 		for (let round = 0; round < ROUNDS; round++) {
 			for (let index = 0; index < designs.length; index++) {
 				const design = designs[(index + round) % designs.length];
-				const result = start(design, app);
+				const result = await start(design, app);
 				chromiumVersion = result.chromium;
 				runs[design].push(result);
 			}
