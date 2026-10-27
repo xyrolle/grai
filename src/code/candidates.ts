@@ -49,6 +49,13 @@ export function specifiersIn(text: string): string[] {
 	);
 }
 
+/**
+ * A key's path, as `output-paths.ts` takes one: `messages/` and a key's name, maybe with an
+ * extension, that end a specifier. An import of one that nothing resolves is the output's, whose
+ * reads are unknown, so a file that writes one is read whatever it names.
+ */
+export const keyPath: string = String.raw`(?:['"]|\/)messages\/[A-Za-z_$][\w$]*(?:\.[cm]?[jt]s)?['"]`;
+
 /** The test a file's text must pass to be read, from the names that may name a destination. */
 export function textTest(names: ReadonlySet<string>): RegExp {
 	return new RegExp([unwritten.source, ...names].join("|"));
@@ -60,8 +67,8 @@ export function written(name: string): string {
 }
 
 /**
- * Every name a specifier that names a destination must write, or undefined when a mapping may name
- * one from any specifier, such as a `*` key, so that every file is read.
+ * Every name a specifier that names a destination must write, and a key's path, or undefined when a
+ * mapping may name one from any specifier, such as a `*` key, so that every file is read.
  */
 export function namesOf(
 	destinations: Destinations,
@@ -69,7 +76,7 @@ export function namesOf(
 	links: readonly Link[],
 	packages: readonly Package[],
 ): Set<string> | undefined {
-	const names = new Set([written(basename(destinations.outdir))]);
+	const names = new Set([written(basename(destinations.outdir)), keyPath]);
 	for (const barrel of destinations.barrels) names.add(written(nameOf(barrel)));
 	const lands = (path: string) => landsOn(path, destinations);
 	for (const { key, targets } of mappings) {
