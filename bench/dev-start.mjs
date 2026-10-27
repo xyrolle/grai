@@ -1,11 +1,13 @@
 // Dev start: a Vite dev server started cold, until its page of 500 messages shows, per library
 // (dev-pages.mjs): grai's plugin, Paraglide's, i18next's and use-intl's pages, and the page with no
 // messages. Each start is a new Node process, in a new directory with no output and no cache,
-// timed from the server's creation, once Vite, the plugins and Chromium have loaded, until the
-// page shows its messages. Every library starts once a round, in an order that rotates, so the
-// load from other work weighs on each alike; medians of ROUNDS, with every round kept.
+// Vite's own among them, timed from the server's creation, once Vite, the plugins and Chromium
+// have loaded, until the page shows its messages. Every library starts once a round, in an order
+// that rotates, so the load from other work weighs on each alike; medians of ROUNDS, with every
+// round kept.
 //   node dev-start.mjs [app...]
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { cacheDir, selectedApps } from "./apps.mjs";
@@ -29,11 +31,15 @@ async function child(design, name) {
 	const locale = otherLocale(app);
 	const root = join(cacheDir, "dev-start", app.id);
 	writeFixture(root, app, locale, design);
+	const viteCache = join(root, ".vite");
+	if (existsSync(viteCache))
+		throw new Error(`Vite's cache ${viteCache} is there before the start`);
 	const browser = await chromium.launch();
 	const page = await browser.newPage();
 	const start = performance.now();
 	const server = await createServer({
 		root,
+		cacheDir: viteCache,
 		configFile: false,
 		logLevel: "silent",
 		server: { host: "127.0.0.1", port: 0 },
