@@ -1,5 +1,7 @@
+/// <reference types="vite/client" />
 import type { Handle } from "@sveltejs/kit/hooks";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
+import { pageKeysImports, pageKeysUrl } from "./page-keys.ts";
 
 /** Where `src/app.html` takes the page's locale and its text direction. */
 const LANG = "%grai.lang%";
@@ -13,6 +15,8 @@ const ENTRY_PRELOAD =
  * among them.
  */
 const CHUNKS = "chunks/";
+/** A page's `<head>` tag, which a dev page's import map goes right after. */
+const HEAD = /<head\b[^>]*>/i;
 /** The nonce Kit gives its own inline script, under a `csp` whose scripts need one. */
 const KIT_NONCE = /<script nonce="([^"]+)">/;
 /** Kit's preload of a message chunk, with what comes before and after the message directory. */
@@ -53,7 +57,8 @@ type CompiledLocale = {
  *
  * The browser then takes the page's `<html lang>` as its locale, so it hydrates in the words the
  * server drew. A built page loads only its locale's copies of the message chunks, which
- * `@xyrolle/grai/sveltekit/vite`'s plugin writes.
+ * `@xyrolle/grai/sveltekit/vite`'s plugin writes, and a page `vite dev` serves only its locale's
+ * words in keys.js.
  */
 export function handleLocale({
 	middleware,
@@ -66,13 +71,33 @@ export function handleLocale({
 				transformPageChunk: ({ html }) => {
 					const pointed = localeCopies
 						? localeChunks(html, locale, event.url)
-						: html;
+						: localeKeys(html, locale);
 					return pointed
 						.replaceAll(LANG, locale)
 						.replaceAll(DIR, getTextDirection(locale));
 				},
 			}),
 		);
+}
+
+/**
+ * Points a page `vite dev` serves at its locale's keys.js, with an import map first in its head,
+ * ahead of every module the page loads, and preloads it, so the dev server makes it while the page
+ * loads the modules that import it. Vite's `import.meta.env` tells whether its dev server renders
+ * the page, and the base it serves modules under; a build or a server without Vite has no dev
+ * keys.js, and the page is left as it is.
+ */
+function localeKeys(html: string, locale: string): string {
+	if (import.meta.env?.DEV !== true) return html;
+	const head = HEAD.exec(html);
+	if (head === null) return html;
+	const base = import.meta.env.BASE_URL;
+	const map = JSON.stringify({ imports: pageKeysImports(base, locale) });
+	const nonce = KIT_NONCE.exec(html)?.[1];
+	const attributes = nonce === undefined ? "" : ` nonce="${nonce}"`;
+	const at = head.index + head[0].length;
+	const tags = `<script type="importmap"${attributes}>${map}</script><link rel="modulepreload" href="${pageKeysUrl(base, locale)}">`;
+	return html.slice(0, at) + tags + html.slice(at);
 }
 
 /**

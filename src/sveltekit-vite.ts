@@ -1,5 +1,6 @@
 import type { Plugin, ResolvedConfig } from "vite";
 import type { FrameworkBase } from "./base-agreement.ts";
+import { packageName } from "./package-name.ts";
 import { svelteTexts } from "./svelte-texts.ts";
 import { type GraiOptions, graiPlugin } from "./vite-plugin.ts";
 
@@ -18,8 +19,17 @@ export function grai(options: SvelteKitGraiOptions = {}): Plugin[] {
 		{ ...options, localeChunks: true },
 		{ frameworkBase: kitBase },
 	);
-	return [...core.plugins, svelteTexts(core)];
+	return [...core.plugins, svelteTexts(core), renderedByVite];
 }
+
+/**
+ * Has Vite run grai's own modules in a server render, not Node: `handleLocale` reads from Vite's
+ * `import.meta.env` whether its dev server renders the page, to point it at its locale's keys.js.
+ */
+const renderedByVite: Plugin = {
+	name: "grai:sveltekit-render",
+	config: () => ({ ssr: { noExternal: [packageName] } }),
+};
 
 /**
  * SvelteKit's `paths.base`, from the options its setup plugin keeps, where Kit itself reads its
