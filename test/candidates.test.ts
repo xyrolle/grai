@@ -182,6 +182,42 @@ describe("a reading of the files that may read grai's messages", () => {
 		});
 	});
 
+	it("reads a file that names an index barrel by its file, by a path of dots, or a barrel by the folder whose package.json names it", async () => {
+		const dir = projectWith({
+			"src/index.ts": 'export { m } from "../out/messages.js";\n',
+			"src/a.ts": 'import { m } from "./index.ts";\nm.title();\n',
+			"src/b.ts": 'import { m } from ".";\nm.title();\n',
+			"src/lib/c.ts": 'import { m } from "../lib/..";\nm.title();\n',
+			"src/pkg/package.json": JSON.stringify({ main: "./entry.ts" }),
+			"src/pkg/entry.ts": 'export { m } from "../../out/messages.js";\n',
+			"src/d.ts": 'import { m } from "./pkg";\nm.title();\n',
+			"src/e.ts": "export const e = 1;\n",
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: [
+				"src/a.ts",
+				"src/b.ts",
+				"src/d.ts",
+				"src/index.ts",
+				"src/lib/c.ts",
+				"src/pkg/entry.ts",
+			],
+			reads: [
+				"src/a.ts title",
+				"src/b.ts title",
+				"src/d.ts title",
+				"src/lib/c.ts title",
+			],
+		});
+		expect((await readingIn(dir, "title")).reads).toEqual([
+			"src/a.ts title",
+			"src/b.ts title",
+			"src/d.ts title",
+			"src/lib/c.ts title",
+		]);
+	});
+
 	it("reads a file that names the output by a Vite alias, a tsconfig path or a package.json import", async () => {
 		const dir = projectWith({
 			"tsconfig.json": JSON.stringify({
