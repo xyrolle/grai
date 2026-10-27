@@ -22,7 +22,7 @@ import { keyPathPatterns, projectMappings } from "./mappings.ts";
 import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Pool } from "./pool.ts";
 import { projectResolution, resolverFor } from "./resolution.ts";
-import { importKey, resolvedImports } from "./resolved.ts";
+import { Resolutions, unnamed } from "./resolved.ts";
 import { TextTest } from "./text-test.ts";
 import { workspacePackages } from "./workspace.ts";
 
@@ -73,13 +73,11 @@ export async function readProjectCode(
 	const files = sourceFiles(listedRoots, config.root, config.outdir, seen);
 	const listed = new Set(files.map(({ path }) => path));
 	const sources = new Map<string, SourceCode>();
-	const resolved = new Map<string, string | undefined>();
+	const pool = new Pool();
+	const resolutions = new Resolutions(resolution, resolveFile, pool);
 	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
 	const resolve: Resolve = async (source, importer) => {
-		const key = importKey(source, importer);
-		const path = resolved.has(key)
-			? resolved.get(key)
-			: resolveFile(source, importer);
+		const path = resolutions.path(source, importer);
 		const module = moduleOf(source);
 		return path === output.keys && module.type === "key"
 			? `${keyModulePrefix}${module.key}`
@@ -89,8 +87,11 @@ export async function readProjectCode(
 	const factsOfPath = (path: string) => {
 		const source = sources.get(path);
 		if (source !== undefined) return Promise.resolve(source.facts);
-		// A source its text leaves out of the reading holds nothing of grai's.
-		if (listed.has(path)) return Promise.resolve(holdsNothing);
+		// A source its text leaves out of the reading holds nothing of grai's, and nor does a module an
+		// import names without what holds it.
+		if (listed.has(path) || path.startsWith(unnamed)) {
+			return Promise.resolve(holdsNothing);
+		}
 		const known = followed.get(path);
 		if (known !== undefined) return known;
 		const facts = sourceExtensions.has(extname(path))
@@ -107,7 +108,6 @@ export async function readProjectCode(
 	const mappings = projectMappings(resolution, manifests);
 	const links = seen.links.map((path) => ({ path, real: realPath(path) }));
 	const packages = workspacePackages(config.root);
-	const pool = new Pool();
 	try {
 		// The files whose text may name the output, a barrel or a module outside the listed sources,
 		// read and resolved, until the barrels they hold and the packages the rest import name no file
@@ -131,13 +131,17 @@ export async function readProjectCode(
 			mappings ?? [],
 			resolveFile,
 		);
+		const wanted = (source: string, importer: string) =>
+			test.leads(source, importer) || installed.imports(source);
 		let barrels = new Set<string>();
 		let reached = new Set<string>();
 		for (let round = 0; ; round += 1) {
 			const left = files.filter(({ path }) => !sources.has(path));
 			const taken = test.taken(left, barrels, reached);
+			// The imports of the files read that the names found since may name.
+			const again = round > 0 && (await resolutions.again(wanted));
 			// The first round goes on with no file to read, to find the packages the files may import.
-			if (taken.length === 0 && round > 0) break;
+			if (taken.length === 0 && !again && round > 0) break;
 			const read = await factsOfSources(taken, cache, pool);
 			const added = new Map<string, SourceCode>();
 			taken.forEach(({ path, file, text }, index) => {
@@ -145,8 +149,7 @@ export async function readProjectCode(
 				if (facts !== undefined) added.set(path, { file, text, facts });
 			});
 			for (const [path, source] of added) sources.set(path, source);
-			const paths = await resolvedImports(added, resolution, resolveFile, pool);
-			for (const [key, path] of paths) resolved.set(key, path);
+			await resolutions.add(added, wanted);
 			const holds = holding(new ModuleGraph(output, resolve, factsOfPath), key);
 			barrels = await barrelsOf(sources.keys(), holds);
 			// The installed packages the sources left out may import, and that pass grai's on.

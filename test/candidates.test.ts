@@ -166,6 +166,22 @@ describe("a reading of the files that may read grai's messages", () => {
 		]);
 	});
 
+	it("reads through a re-export of a barrel found in the same round, resolving it once the barrel's name is known", async () => {
+		const dir = projectWith({
+			"src/b.ts": 'export { m } from "../out/messages.js";\n',
+			"src/a.ts":
+				'import "../out/messages.js";\nexport { m as n } from "./b.ts";\n',
+			"src/c.ts": 'import { n } from "./a.ts";\nn.title();\n',
+			"src/d.ts": 'import { d } from "./e.ts";\nexport const f = d;\n',
+			"src/e.ts": "export const d = 1;\n",
+		});
+
+		expect(await readingIn(dir)).toEqual({
+			read: ["src/a.ts", "src/b.ts", "src/c.ts"],
+			reads: ["src/c.ts title"],
+		});
+	});
+
 	it("reads a file that names the output by a Vite alias, a tsconfig path or a package.json import", async () => {
 		const dir = projectWith({
 			"tsconfig.json": JSON.stringify({
