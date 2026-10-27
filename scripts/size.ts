@@ -21,43 +21,46 @@ import { build } from "vite";
 import { grai } from "../src/vite.ts";
 
 /**
- * Each one's budget, in bytes. The runtime's is the design's 1 KB, and the 37 B that read a
- * relative href from the page's URL. An entry's is about a fifth over its
- * size when it was set. The entries that carry the compiler, set with the templates of the output's
- * declarations beside it as files: grai 32,551 B, grai/next/config 34,496 B, grai/vite 55,846 B
- * with its locale script and the build's reader of code, and with grai/vite's plugins grai/svelte
- * 56,167 B, grai/sveltekit/vite 56,221 B, grai/astro 58,675 B and grai/nuxt 56,820 B. The others: grai/sveltekit 541 B
- * with its import map, grai/sveltekit/client 382 B, grai/sveltekit/navigation 210 B, grai/next
- * 516 B, grai/next/proxy 265 B, grai/react 413 B, grai/astro/middleware 1,838 B, grai/vue 426 B,
- * grai/vue/client 292 B, grai/astro/translated-paths 1,621 B, which a static Astro build loads
- * to list the pages in a locale's words, and grai/register 744 B.
+ * Each one's budget, in bytes: the runtime's, and each entry's by its path in package.json's
+ * exports. The runtime's is the design's 1 KB, and the 37 B that read a relative href from the
+ * page's URL. An entry's is about a fifth over its size when it was set. The entries that carry the
+ * compiler, set with the templates of the output's declarations beside it as files: the package's
+ * own 32,551 B, ./next/config 34,496 B, ./vite 55,846 B with its locale script and the build's
+ * reader of code, and with ./vite's plugins ./svelte 56,167 B, ./sveltekit/vite 56,221 B, ./astro
+ * 58,675 B and ./nuxt 56,820 B. The others: ./sveltekit 541 B with its import map,
+ * ./sveltekit/client 382 B, ./sveltekit/navigation 210 B, ./next 516 B, ./next/proxy 265 B,
+ * ./react 413 B, ./astro/middleware 1,838 B, ./vue 426 B, ./vue/client 292 B,
+ * ./astro/translated-paths 1,621 B, which a static Astro build loads to list the pages in a
+ * locale's words, and ./register 744 B.
  */
 const budgets: Record<string, number> = {
 	runtime: 1061,
-	grai: 39_100,
-	"grai/vite": 67_000,
-	"grai/register": 900,
-	"grai/svelte": 67_400,
-	"grai/sveltekit": 650,
-	"grai/sveltekit/vite": 67_500,
-	"grai/sveltekit/client": 460,
-	"grai/sveltekit/navigation": 250,
-	"grai/next": 650,
-	"grai/next/config": 41_400,
-	"grai/next/proxy": 350,
-	"grai/react": 500,
-	"grai/astro": 70_400,
-	"grai/astro/middleware": 2_200,
-	"grai/astro/translated-paths": 1_950,
-	"grai/vue": 520,
-	"grai/vue/client": 350,
-	"grai/nuxt": 68_200,
+	".": 39_100,
+	"./vite": 67_000,
+	"./register": 900,
+	"./svelte": 67_400,
+	"./sveltekit": 650,
+	"./sveltekit/vite": 67_500,
+	"./sveltekit/client": 460,
+	"./sveltekit/navigation": 250,
+	"./next": 650,
+	"./next/config": 41_400,
+	"./next/proxy": 350,
+	"./react": 500,
+	"./astro": 70_400,
+	"./astro/middleware": 2_200,
+	"./astro/translated-paths": 1_950,
+	"./vue": 520,
+	"./vue/client": 350,
+	"./nuxt": 68_200,
 };
 
 const root = new URL("../", import.meta.url);
-const exported: Record<string, { default: string }> = JSON.parse(
-	readFileSync(new URL("package.json", root), "utf8"),
-).exports;
+/** The package's name, and its exports by path, each with the file a server loads. */
+const manifest: {
+	name: string;
+	exports: Record<string, { default: string }>;
+} = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
 
 /** A bundle of `entry`'s code, minified, with the modules `external` names left out. */
 async function gzipped(
@@ -155,35 +158,40 @@ globalThis.page = [${api}, m.title, m.greeting, m.terms];
 	}
 }
 
-/** Each export's bundle, from dist, its dependencies and Node's modules left out. */
-async function entrySizes(): Promise<[string, number][]> {
-	const sizes: [string, number][] = [];
-	for (const [path, { default: file }] of Object.entries(exported)) {
-		const name = path === "." ? "grai" : `grai/${path.slice(2)}`;
-		const size = await gzipped(
+/** A size measured: the key of its budget, the name it is shown by, and its bytes. */
+type Size = { key: string; name: string; bytes: number };
+
+/**
+ * Each export's bundle, from dist, its dependencies and Node's modules left out, shown by the name
+ * a project imports it by.
+ */
+async function entrySizes(): Promise<Size[]> {
+	const sizes: Size[] = [];
+	for (const [path, { default: file }] of Object.entries(manifest.exports)) {
+		const bytes = await gzipped(
 			fileURLToPath(new URL(file, root)),
 			"node",
 			(id) => !id.startsWith(".") && !isAbsolute(id),
 		);
-		sizes.push([name, size]);
+		sizes.push({ key: path, name: `${manifest.name}${path.slice(1)}`, bytes });
 	}
 	return sizes;
 }
 
-const sizes: [string, number][] = [
-	["runtime", await runtimeSize()],
+const sizes: Size[] = [
+	{ key: "runtime", name: "runtime", bytes: await runtimeSize() },
 	...(await entrySizes()),
 ];
 let over = 0;
-for (const [name, size] of sizes) {
-	const budget = budgets[name];
+for (const { key, name, bytes } of sizes) {
+	const budget = budgets[key];
 	const verdict =
 		budget === undefined
 			? "no budget: add one to scripts/size.ts"
-			: size > budget
+			: bytes > budget
 				? `over its budget of ${budget} B`
 				: `budget ${budget} B`;
-	if (budget === undefined || size > budget) over++;
-	console.log(`${name}: ${size} B, ${verdict}`);
+	if (budget === undefined || bytes > budget) over++;
+	console.log(`${name}: ${bytes} B, ${verdict}`);
 }
 process.exitCode = over > 0 ? 1 : 0;

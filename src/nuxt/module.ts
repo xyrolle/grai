@@ -11,6 +11,7 @@ import { baseDisagreement } from "../base-agreement.ts";
 import { type CompileResult, recompile } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
+import { packageName } from "../package-name.ts";
 import { graiPlugin } from "../vite-plugin.ts";
 import { localizedPages, sharedPath } from "./pages.ts";
 
@@ -18,7 +19,7 @@ import { localizedPages, sharedPath } from "./pages.ts";
 export type GraiNuxtOptions = { config: string };
 
 /** The name grai/nuxt's runtime imports the project's compiled output by, in the app and the server. */
-const output = "grai/nuxt/output";
+const output = `${packageName}/nuxt/output`;
 
 /**
  * grai's Nuxt module, with grai.config.json in the project's root:

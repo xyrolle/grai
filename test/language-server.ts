@@ -2,10 +2,31 @@ import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { packageName } from "../src/package-name.ts";
 
 const tsc = fileURLToPath(new URL("../node_modules/.bin/tsc", import.meta.url));
 const source = (file: string) =>
 	fileURLToPath(new URL(`../src/${file}`, import.meta.url));
+
+/**
+ * The source of each of the package's entries an editor resolves, by its path below the package's
+ * name.
+ */
+const entrySources: Record<string, string> = {
+	"": "index.ts",
+	"/vite": "vite.ts",
+	"/svelte": "svelte.ts",
+	"/sveltekit": "sveltekit.ts",
+	"/sveltekit/vite": "sveltekit-vite.ts",
+	"/sveltekit/navigation": "sveltekit-navigation.ts",
+	"/next": "next/render.ts",
+	"/next/config": "next/config.ts",
+	"/next/proxy": "next/proxy.ts",
+	"/react": "react/markup.ts",
+	"/astro": "astro.ts",
+	"/astro/middleware": "astro/middleware.ts",
+	"/astro/translated-paths": "astro/translated-paths.ts",
+};
 
 type Position = { line: number; character: number };
 type Location = { uri: string; range: { start: Position } };
@@ -59,7 +80,7 @@ export async function definitionOf(
 
 /**
  * The names an editor offers in `import {  } from "<specifier>"`, sorted: every value and type
- * the module's declarations export. `grai` and `grai/…` name the package's own entries.
+ * the module's declarations export. The package's name and its entries name its own sources.
  */
 export async function importableNames(
 	dir: string,
@@ -96,21 +117,12 @@ async function askEditor(
 				strict: true,
 				noEmit: true,
 				allowImportingTsExtensions: true,
-				paths: {
-					grai: [source("index.ts")],
-					"grai/vite": [source("vite.ts")],
-					"grai/svelte": [source("svelte.ts")],
-					"grai/sveltekit": [source("sveltekit.ts")],
-					"grai/sveltekit/vite": [source("sveltekit-vite.ts")],
-					"grai/sveltekit/navigation": [source("sveltekit-navigation.ts")],
-					"grai/next": [source("next/render.ts")],
-					"grai/next/config": [source("next/config.ts")],
-					"grai/next/proxy": [source("next/proxy.ts")],
-					"grai/react": [source("react/markup.ts")],
-					"grai/astro": [source("astro.ts")],
-					"grai/astro/middleware": [source("astro/middleware.ts")],
-					"grai/astro/translated-paths": [source("astro/translated-paths.ts")],
-				},
+				paths: Object.fromEntries(
+					Object.entries(entrySources).map(([path, file]) => [
+						`${packageName}${path}`,
+						[source(file)],
+					]),
+				),
 			},
 			files: ["use.ts"],
 		}),
