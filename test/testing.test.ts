@@ -1,6 +1,8 @@
 /// <reference lib="dom" />
+import { spawnSync } from "node:child_process";
+import { symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { JSDOM } from "jsdom";
 import { aroundEach, describe, expect, it, onTestFinished } from "vitest";
 import { type Messages, project } from "./project.ts";
@@ -89,4 +91,80 @@ describe("a test in a process that serves requests, bound with server.js's withL
 
 		expect([first, m.title?.()]).toEqual(["Ihr Warenkorb", "Ihr Warenkorb"]);
 	});
+});
+
+/**
+ * Runs a project's test file in Vitest's browser mode, in Chromium, with grai's plugin, in a process
+ * of its own, as an app's component tests run: each test's name and state, with its errors.
+ */
+function inVitestBrowser(dir: string, test: string) {
+	// The project's imports of Vitest resolve to this repository's.
+	symlinkSync(
+		fileURLToPath(new URL("../node_modules", import.meta.url)),
+		join(dir, "node_modules"),
+		"junction",
+	);
+	writeFileSync(join(dir, "locale.test.js"), test);
+	const script = `
+const { startVitest } = await import("vitest/node");
+const { playwright } = await import("@vitest/browser-playwright");
+const { grai } = await import(${JSON.stringify(new URL("../src/vite.ts", import.meta.url).href)});
+const vitest = await startVitest("test", [], {
+	root: process.cwd(),
+	config: false,
+	watch: false,
+	reporters: [],
+	browser: {
+		enabled: true,
+		headless: true,
+		provider: playwright(),
+		instances: [{ browser: "chromium" }],
+		api: { port: 0 },
+	},
+}, { plugins: [grai()] });
+await vitest.close();
+const tests = vitest.state.getFiles().flatMap((file) => file.tasks);
+console.log(JSON.stringify(tests.map((test) => ({ name: test.name, state: test.result?.state, errors: test.result?.errors?.map((error) => error.message) ?? [] }))));
+`;
+	// Vitest's own variables would have the run take itself for this test's worker.
+	const env = Object.fromEntries(
+		Object.entries(process.env).filter(([name]) => !name.startsWith("VITEST")),
+	);
+	const run = spawnSync(
+		process.execPath,
+		["--input-type=module", "-e", script],
+		{ cwd: dir, env, encoding: "utf8" },
+	);
+	const last = run.stdout.trim().split("\n").at(-1);
+	const results: unknown = last?.startsWith("[")
+		? JSON.parse(last)
+		: { failed: run.stderr };
+	return results;
+}
+
+it("renders in each locale useLocale binds in Vitest's browser mode, where the plugin's dev server serves the messages", {
+	timeout: 60_000,
+}, () => {
+	const { dir } = project({
+		en: { title: "Your cart" },
+		de: { title: "Ihr Warenkorb" },
+	});
+	const results = inVitestBrowser(
+		dir,
+		`import { expect, test } from "vitest";
+import { m } from "./out/messages.js";
+import { useLocale } from "./out/testing.js";
+
+test("switches", () => {
+	useLocale("en");
+	expect(m.title()).toBe("Your cart");
+	useLocale("de");
+	expect(m.title()).toBe("Ihr Warenkorb");
+	useLocale("en");
+	expect(m.title()).toBe("Your cart");
+});
+`,
+	);
+
+	expect(results).toEqual([{ name: "switches", state: "pass", errors: [] }]);
 });

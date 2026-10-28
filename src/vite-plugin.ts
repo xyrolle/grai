@@ -103,14 +103,20 @@ export function graiPlugin(
 	/**
 	 * keys.js, a page's in one locale, or a key's module, as the dev server serves them from memory;
 	 * nothing for any other id. keys.js holds every locale, for a server, a worker and a page no
-	 * import map points at its locale's.
+	 * import map points at its locale's. A test holds every locale through any of them, as
+	 * `useLocale` switches between them.
 	 */
 	const devCode = (id: string, compiled: Build) => {
 		if (id === devKeysId || id === files.keysFile)
 			return devModule(files.outdir, compiled, patchesMade());
 		const locale = pageKeysLocale(id, compiled.config.locales);
 		if (locale !== undefined)
-			return devModule(files.outdir, compiled, patchesMade(), locale);
+			return devModule(
+				files.outdir,
+				compiled,
+				patchesMade(),
+				testing ? undefined : locale,
+			);
 		return id.startsWith(keyModulePrefix)
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
 			: undefined;
