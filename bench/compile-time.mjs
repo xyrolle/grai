@@ -15,16 +15,23 @@
 // The edit is the same each time: one message of plain words in the locale benches show beside the
 // base one, its text prefixed. The variants take turns in rounds whose order rotates (rounds.mjs),
 // every sample is kept with its round's load, and Paraglide's figures are paired with grai's of
-// the same round.
+// the same round. Outside the clocks, each output's texts are checked, every key in every locale
+// with the edit (compiled-texts.mjs), and its declarations by TypeScript, or that it has none where
+// none were asked for (compiled-declarations.mjs).
 //   node compile-time.mjs [app...]      ROUNDS=<multiple of 6> to change the rounds
 import { execFileSync } from "node:child_process";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { selectedApps } from "./apps.mjs";
+import {
+	checkDeclarations,
+	checkNoDeclarations,
+} from "./compiled-declarations.mjs";
 import { writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
 import { median, medianInterval } from "./medians.mjs";
 import { writeProject } from "./paraglide.mjs";
+import { writeReference } from "./reference-texts.mjs";
 import { otherLocale } from "./request.mjs";
 import { recordResults } from "./results.mjs";
 import {
@@ -135,7 +142,7 @@ function formatjsRun({ directory, icu, icuKeys }) {
 	return { cold };
 }
 
-/** One measurement of a variant in a process of its own. */
+/** One measurement of a variant in a process of its own, its output checked after. */
 function measure(app, setup, name) {
 	restore(app, setup);
 	const variant = variants[name];
@@ -144,14 +151,14 @@ function measure(app, setup, name) {
 		setup.directory,
 		variant.run === "grai" ? "out" : "paraglide",
 	);
-	const { config, project, edit } = setup;
+	const { config, project, edit, reference } = setup;
 	const output = execFileSync(
 		process.execPath,
 		[
 			runner,
 			JSON.stringify({
 				...variant,
-				...{ config, project, outdir, edit },
+				...{ config, project, outdir, edit, reference },
 				compilerOptions: app.compilerOptions,
 			}),
 		],
@@ -163,6 +170,9 @@ function measure(app, setup, name) {
 			timeout: PATIENCE_MS,
 		},
 	);
+	if (variant.declarations)
+		checkDeclarations(setup.directory, outdir, setup.calls);
+	else checkNoDeclarations(outdir);
 	return JSON.parse(output.trim().split("\n").at(-1));
 }
 
@@ -226,6 +236,8 @@ const recorded = [];
 let rounds;
 for (const app of selectedApps()) {
 	const setup = writeProjects(app);
+	setup.reference = join(setup.directory, "reference.json");
+	setup.calls = await writeReference(app, setup.reference);
 	const icu = libraryCatalogs(app, setup.edit.locale).icu;
 	setup.icu = join(setup.directory, `${setup.edit.locale}.icu.json`);
 	setup.icuKeys = Object.keys(icu).length;
