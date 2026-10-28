@@ -127,6 +127,9 @@ const { output } = await bundle.write({
 	format: "esm",
 	entryFileNames: "[name].js",
 	chunkFileNames: "[name]-[hash].js",
+	// Each module's map beside it, holding its sources, which the package does not ship: a stack
+	// trace under --enable-source-maps names the source's file and line.
+	sourcemap: true,
 	// The module that finds grai's files by its own location, alone at dist's root.
 	codeSplitting: {
 		groups: [
