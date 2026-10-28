@@ -56,26 +56,44 @@ export function parsePattern(source: string): Part[] {
 	}
 	const parts: Part[] = [];
 	let text = "";
-	for (let index = 0; index < source.length; index++) {
-		const char = source.charAt(index);
-		const next = source.charAt(index + 1);
-		if (char === "\\" && escapable.has(next)) {
-			text += next;
-			index++;
+	// The text between one `{` or `\` and the next is taken whole.
+	let from = 0;
+	while (from < source.length) {
+		const at = nextSpecial(source, from);
+		if (at === -1) {
+			text += source.slice(from);
+			break;
+		}
+		text += source.slice(from, at);
+		if (source.charAt(at) === "\\") {
+			const next = source.charAt(at + 1);
+			const escaped = escapable.has(next);
+			text += escaped ? next : "\\";
+			from = at + (escaped ? 2 : 1);
 			continue;
 		}
-		const close = char === "{" ? placeholderEnd(source, index) : -1;
+		const close = placeholderEnd(source, at);
 		if (close === -1) {
-			text += char;
+			text += "{";
+			from = at + 1;
 			continue;
 		}
 		if (text !== "") parts.push({ type: "text", value: text });
 		text = "";
-		parts.push(placeholder(source.slice(index + 1, close)));
-		index = close;
+		parts.push(placeholder(source.slice(at + 1, close)));
+		from = close + 1;
 	}
 	if (text !== "") parts.push({ type: "text", value: text });
 	return parts;
+}
+
+/** The index of the next `{` or `\` from an index on, or -1 when there is none. */
+function nextSpecial(source: string, from: number): number {
+	const brace = source.indexOf("{", from);
+	const slash = source.indexOf("\\", from);
+	if (brace === -1) return slash;
+	if (slash === -1) return brace;
+	return Math.min(brace, slash);
 }
 
 /**
