@@ -12,7 +12,7 @@ import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { savedBuild } from "../src/saved-build.ts";
-import { saveGroups } from "../src/saved-groups.ts";
+import { savedGroups } from "../src/saved-groups.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -203,11 +203,10 @@ it("settles the first compile once its read again of a catalog met mid-save has 
 	expect(events).toEqual(["report catalog-invalid", "first"]);
 });
 
-/** A watcher of the project whose first compile is given groups, which it saves as Next's start does. */
-function placed(config: string, outdir: string) {
+/** A watcher of the project whose first compile is given groups, as Next's start gives them. */
+function placed(config: string) {
 	const asked: number[] = [];
 	const reported: CompileResult[] = [];
-	const saving: Promise<void>[] = [];
 	const watcher = watch(
 		config,
 		(result) => reported.push(result),
@@ -217,21 +216,21 @@ function placed(config: string, outdir: string) {
 		{
 			placeFirst: async (compilation) => {
 				asked.push(compilation.keys.size);
-				saving.push(saveGroups(outdir, [["title"]]));
 				return { groups: Promise.resolve([["title"]]), waited: true };
 			},
 		},
 	);
-	return { watcher, asked, reported, saving };
+	return { watcher, asked, reported };
 }
 
 it("places the keys by the groups the first compile is given, and saves that build for the next start, which takes it up and saves nothing", async () => {
 	const { dir, config } = project(catalogs);
 	const outdir = join(dir, "out");
-	const { watcher, saving } = placed(config, outdir);
+	const { watcher } = placed(config);
 	await watcher.first;
-	await Promise.all(saving);
 	await watcher.close();
+
+	expect(savedGroups(outdir)).toEqual([["title"]]);
 
 	expect(
 		readdirSync(join(outdir, "keys")).some((name) => /^g0-.*\.js$/.test(name)),
@@ -252,7 +251,7 @@ it("places the keys by the groups the first compile is given, and saves that bui
 
 it("asks no compile after the first for the groups", async () => {
 	const { dir, config } = project(catalogs);
-	const { watcher, asked, reported } = placed(config, join(dir, "out"));
+	const { watcher, asked, reported } = placed(config);
 	onTestFinished(() => watcher.close());
 	await watcher.first;
 

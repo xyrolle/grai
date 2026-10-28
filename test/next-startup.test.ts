@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
@@ -84,6 +84,35 @@ it("places the keys by the groups that have come when the first compile asks, in
 	expect(
 		JSON.parse(readFileSync(groupsFile(join(dir, "out")), "utf8")),
 	).toEqual([["about"], ["home"]]);
+});
+
+it("writes nothing into an outdir another tool fills, not even the groups it was given, at the start or at an edit after it", async () => {
+	const { dir, config } = freshApp();
+	const out = join(dir, "out");
+	mkdirSync(out);
+	writeFileSync(join(out, "notes.md"), "Not grai's\n");
+	const held = heldRead();
+	held.answer([["about"], ["home"]]);
+	const { reports, release } = started(config, out, held.reading);
+
+	const { grouped } = await release;
+
+	const refused = () =>
+		reports.map(({ errors }) => errors.map(({ code }) => code));
+	expect(grouped).toBe(false);
+	expect(refused()).toEqual([["outdir-not-empty"]]);
+	expect(readdirSync(out)).toEqual(["notes.md"]);
+	const catalog = join(dir, "messages", "en.json");
+	writeFileSync(
+		catalog,
+		JSON.stringify({
+			...JSON.parse(readFileSync(catalog, "utf8")),
+			added: "Added",
+		}),
+	);
+	await expect.poll(() => reports.length).toBe(2);
+	expect(refused()).toEqual([["outdir-not-empty"], ["outdir-not-empty"]]);
+	expect(readdirSync(out)).toEqual(["notes.md"]);
 });
 
 it("places the keys by their shards, and releases the start without waiting, when the code is still being read and the groups do not come while the first compile renders", async () => {

@@ -25,7 +25,7 @@ import {
 import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
-import { type KeyGroups, savedGroups } from "./saved-groups.ts";
+import { type KeyGroups, savedGroups, saveGroups } from "./saved-groups.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
 export type CompileResult = { written: string[]; errors: GraiError[] };
@@ -350,6 +350,10 @@ export async function writeBuild(
 		if (!(error instanceof GraiError)) throw error;
 		return { result: { written: [], errors: [error] } };
 	}
+	// Groups `placing` gave are the outdir's once the output placed by them is written, and not
+	// before: only a write of grai's own output, which refuses an outdir another tool fills, makes
+	// the state directory (`assertOutdirIsGrais`).
+	if (placement !== groups) await saveGroups(config.outdir, placement);
 	return {
 		result: { written, errors: [] },
 		build: { ...compiled, compilation, positions, rendered },
