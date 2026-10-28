@@ -25,13 +25,14 @@ const scannedPrefix = "\0grai:unwritten:";
  * file the plugin serves by its path, with or without its `.js`, resolves to that file, or to the
  * dev module for keys.js: the path relative to the module that imports it, absolute, as an alias
  * makes it, from the server's root, as a module runner asks for a module by its URL, or as the
- * package's `imports` map a package import to a path (`packageImportPath`). Any other import from
- * a module, as one with a query (`?raw`) or by a mapping only the file system resolves, as a
- * tsconfig's paths, has the output written now, and is resolved again once it is. Vite's dependency
- * scan reads the files it is given from the disk: it gets the output as an import it leaves out,
- * since the output imports no dependency. A module with a glob (`import.meta.glob`), which Vite
- * expands from the disk, waits for the output to be written. Once it is written, an import nothing
- * resolved fails as it would.
+ * package's `imports` map a package import to a path (`packageImportPath`). Any other import of a
+ * file of the output, as one with a query (`?raw`), or from a module of the app by a name that may
+ * be a module's (`mayNameModule`) through a mapping only the file system resolves, as a tsconfig's
+ * paths, has the output written now, and is resolved again once it is. Vite's dependency scan
+ * reads the files it is given from the disk: it gets the output as an import it leaves out, since
+ * the output imports no dependency. A module with a glob (`import.meta.glob`), which Vite expands
+ * from the disk, waits for the output to be written. Once it is written, an import nothing resolved
+ * fails as it would.
  */
 export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 	let root = "";
@@ -48,11 +49,8 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 				if (served === undefined || id.startsWith("\0")) return null;
 				const { outdir, keysFile } = dev.files();
 				const query = id.indexOf("?");
-				const named = pathsOf(
-					query === -1 ? id : id.slice(0, query),
-					importer,
-					root,
-				);
+				const specifier = query === -1 ? id : id.slice(0, query);
+				const named = pathsOf(specifier, importer, root);
 				const output = named.filter((path) => isInside(outdir, path));
 				// Vite's dependency scan marks its calls with `scan`, which its types keep internal.
 				const scanning = "scan" in options && options.scan === true;
@@ -70,7 +68,17 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 						? { id: `${scannedPrefix}${resolved}`, external: true }
 						: resolved;
 				}
-				if (importer === undefined || (scanning && output.length > 0))
+				// An entry, as Vite looks one up, is no import of a module's. A name that is no path may
+				// map to the output only from a module of the app, and by a module's name: a lookup Vite
+				// or a framework makes on its own, from the root's index.html or a dependency, as of a
+				// package an app lacks, is left to fail.
+				if (
+					importer === undefined ||
+					options.isEntry ||
+					(scanning && output.length > 0) ||
+					(named.length === 0 &&
+						!(isAppModule(importer) && mayNameModule(specifier)))
+				)
 					return null;
 				if (!(await dev.write())) return null;
 				return this.resolve(id, importer, { ...options, skipSelf: true });
@@ -85,6 +93,20 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 			},
 		},
 	};
+}
+
+/**
+ * Whether a specifier, by a mapping, may name a module of the output: it ends in `.js`, or in a name
+ * with no extension, which a mapping may complete.
+ */
+function mayNameModule(specifier: string): boolean {
+	const name = specifier.slice(specifier.lastIndexOf("/") + 1);
+	return name.endsWith(".js") || !name.includes(".");
+}
+
+/** Whether a module is the app's own: no dependency's, and no page's HTML. */
+function isAppModule(id: string): boolean {
+	return !/[\\/]node_modules[\\/]/.test(id) && !id.endsWith(".html");
 }
 
 /** Whether a path is inside a directory. */
