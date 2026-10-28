@@ -1,193 +1,256 @@
-// Compile time: what a developer waits for, per library, each run a new Node process. grai's
-// compile from this repository's build: cold, with nothing to do, and after one edited message.
-// Each time starts once the library's modules have loaded.
-// Paraglide's compile, without its TypeScript declarations and with them (through TypeScript 6,
-// whose API its emit needs). formatjs compiling one locale's ICU catalog to an AST. Edits go to a copy of
-// the catalogs under .cache. Medians of three runs; one run for Paraglide's locale modules with
-// its declarations, which take minutes.
-//   node compile-time.mjs [app...]
+// Compile time: what a developer waits for, per library, each measurement a new Node process
+// (compile-runs.mjs) timed once the library's modules have loaded, from the same restored catalogs
+// and no output, no cache.
+// - grai, from its build: a full compile; the same compile again with nothing changed; one message
+//   edited, compiled again by `recompile` from the build a compile before it kept, as its Vite
+//   plugin and `grai watch` compile an edit.
+// - Paraglide's compiler: a full compile in its production layout, message modules, without
+//   declarations, and with them, which it emits through TypeScript 6; and in its locale modules,
+//   with them. Its TypeScript 7 path is not what grai is compared against yet.
+// - formatjs's CLI compiling one locale's ICU catalog to an AST, its process included.
+// The edit is the same each time: one message of plain words in the locale benches show beside the
+// base one, its text prefixed. The variants take turns in rounds whose order rotates (rounds.mjs),
+// every sample is kept with its round's load, and Paraglide's figures are paired with grai's of
+// the same round.
+//   node compile-time.mjs [app...]      ROUNDS=<multiple of 5> to change the rounds
 import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { selectedApps } from "./apps.mjs";
-import { graiEntry, graiModule, writeGraiProject } from "./grai.mjs";
+import { writeGraiProject } from "./grai.mjs";
 import { libraryCatalogs } from "./libraries.mjs";
-import { resolveTypeScript6, writeProject } from "./paraglide.mjs";
+import { median, medianInterval } from "./medians.mjs";
+import { writeProject } from "./paraglide.mjs";
 import { otherLocale } from "./request.mjs";
 import { recordResults } from "./results.mjs";
+import {
+	inRounds,
+	pairedRatio,
+	ratioText,
+	roundCount,
+	roundsRecord,
+} from "./rounds.mjs";
 
-const RUNS = 3;
-const self = new URL(import.meta.url).pathname;
+const runner = new URL("compile-runs.mjs", import.meta.url).pathname;
+const formatjs = new URL("node_modules/.bin/formatjs", import.meta.url)
+	.pathname;
+/** How long one measurement may take: Paraglide's locale modules with declarations take minutes. */
+const PATIENCE_MS = 30 * 60_000;
 
-/** Runs in the child: one compile of the named kind, timed after its modules load, as JSON. */
-async function child(kind, ...args) {
-	if (kind === "grai") {
-		const { compile } = await import(graiEntry("."));
-		const [config] = args;
-		const start = performance.now();
-		const cold = await compile(config);
-		const coldMs = performance.now() - start;
-		const noopStart = performance.now();
-		await compile(config);
-		const noopMs = performance.now() - noopStart;
-		if (cold.errors.length > 0) throw new Error(cold.errors[0].message);
-		console.log(JSON.stringify({ cold: coldMs, noop: noopMs }));
-		return;
-	}
-	if (kind === "grai-edit") {
-		const { recompile } = await import(graiModule("compile.ts"));
-		const [config, catalog, key] = args;
-		const { build } = await recompile(config, undefined);
-		const parsed = JSON.parse(readFileSync(catalog, "utf8"));
-		parsed[key] = `Edited: ${parsed[key]}`;
-		writeFileSync(catalog, JSON.stringify(parsed, null, "\t"));
-		const editStart = performance.now();
-		const { result } = await recompile(config, build);
-		const ms = performance.now() - editStart;
-		if (result.errors.length > 0) throw new Error(result.errors[0].message);
-		console.log(JSON.stringify({ edit: ms }));
-		return;
-	}
-	const [project, outdir, declarations, strategy, outputStructure] = args;
-	if (declarations === "true") resolveTypeScript6();
-	const { compile } = await import("@inlang/paraglide-js");
-	rmSync(outdir, { recursive: true, force: true });
-	const start = performance.now();
-	await compile({
-		project,
-		outdir,
-		emitTsDeclarations: declarations === "true",
-		strategy: strategy.split(","),
-		outputStructure,
-		emitGitIgnore: false,
-		emitPrettierIgnore: false,
-		emitReadme: false,
-	});
-	console.log(JSON.stringify({ cold: performance.now() - start }));
-}
+const paraglide = "Paraglide, message modules";
+const localeModules = "Paraglide, locale modules";
+const withDeclarations = "declarations through TypeScript 6";
+const withoutDeclarations = "without declarations";
 
-function run(args) {
-	return JSON.parse(
-		execFileSync(process.execPath, [self, "--child", ...args], {
-			encoding: "utf8",
-			maxBuffer: 1 << 26,
-		})
-			.trim()
-			.split("\n")
-			.at(-1),
+/** The variants, by the label each row carries, and how compile-runs.mjs measures each. */
+const variants = {
+	grai: { run: "grai", declarations: true },
+	[`${paraglide}, ${withoutDeclarations}`]: {
+		run: "paraglide-compiler",
+		outputStructure: "message-modules",
+		declarations: false,
+	},
+	[`${paraglide}, ${withDeclarations}`]: {
+		run: "paraglide-compiler",
+		outputStructure: "message-modules",
+		declarations: true,
+	},
+	[`${localeModules}, ${withDeclarations}`]: {
+		run: "paraglide-compiler",
+		outputStructure: "locale-modules",
+		declarations: true,
+	},
+	formatjs: { run: "formatjs" },
+};
+const names = Object.keys(variants);
+const measures = ["cold", "noop", "edit"];
+
+/** grai's project, Paraglide's on the same copy of the catalogs, and the edit both get. */
+function writeProjects(app) {
+	const config = writeGraiProject(app, "compile-time");
+	const directory = dirname(config);
+	const catalogs = Object.fromEntries(
+		app.locales.map((locale) => [
+			locale,
+			join(directory, "messages", `${locale}.json`),
+		]),
 	);
+	const locale = otherLocale(app);
+	const words = (name) =>
+		typeof app.messages[locale][name] === "string" &&
+		!app.messages[locale][name].includes("{");
+	const key = Object.keys(app.messages[locale]).find(words);
+	return {
+		config,
+		directory,
+		catalogs,
+		project: writeProject({ ...app, catalogs }, directory),
+		edit: {
+			catalog: catalogs[locale],
+			locale,
+			key,
+			text: `Edited: ${app.messages[locale][key]}`,
+		},
+	};
 }
 
-const median = (values) =>
-	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-const times = (count, measure) => Array.from({ length: count }, measure);
+/** Puts back the app's catalogs and removes every output and cache, as before the first compile. */
+function restore(app, { directory, catalogs, project }) {
+	for (const locale of app.locales)
+		cpSync(app.catalogs[locale], catalogs[locale]);
+	for (const each of ["out", "paraglide", "ast.json"])
+		rmSync(join(directory, each), { recursive: true, force: true });
+	rmSync(join(project, "cache"), { recursive: true, force: true });
+}
 
-if (process.argv[2] === "--child") {
-	await child(...process.argv.slice(3));
-} else {
-	const recorded = [];
-	for (const app of selectedApps()) {
-		const config = writeGraiProject(app, "compile-time");
-		const directory = join(config, "..");
-		const grai = times(RUNS, () => {
-			rmSync(join(directory, "out"), { recursive: true, force: true });
-			return run(["grai", config]);
-		});
-		const locale = otherLocale(app);
-		const key = Object.keys(app.messages[locale]).find(
-			(name) => typeof app.messages[locale][name] === "string",
-		);
-		const edits = times(RUNS, () =>
-			run([
-				"grai-edit",
-				config,
-				join(directory, "messages", `${locale}.json`),
-				key,
-			]),
-		);
-		const project = writeProject(app, directory);
-		const strategy = app.compilerOptions.strategy.join(",");
-		const paraglide = (declarations, structure, count) =>
-			median(
-				times(count, () =>
-					run([
-						"paraglide",
-						project,
-						join(directory, "paraglide"),
-						declarations,
-						strategy,
-						structure,
-					]),
-				).map((result) => result.cold),
-			);
-		const paraglideRows = [
-			[
-				"message modules, without declarations",
-				paraglide("false", "message-modules", RUNS),
-			],
-			[
-				"message modules, with declarations",
-				paraglide("true", "message-modules", RUNS),
-			],
-			[
-				"locale modules, with declarations",
-				paraglide("true", "locale-modules", 1),
-			],
-		];
-		const icu = join(directory, `${locale}.icu.json`);
-		writeFileSync(icu, JSON.stringify(libraryCatalogs(app, locale).icu));
-		const formatjs = times(RUNS, () => {
-			const start = performance.now();
-			execFileSync(
-				join(
-					new URL(".", import.meta.url).pathname,
-					"node_modules/.bin/formatjs",
-				),
-				[
-					"compile",
-					icu,
-					"--format",
-					"simple",
-					"--ast",
-					"--ignore-tag",
-					"--out-file",
-					join(directory, "ast.json"),
-				],
-			);
-			return { cold: performance.now() - start };
-		});
-		const ms = (value) =>
-			value < 1000
-				? `${value.toFixed(0)} ms`
-				: `${(value / 1000).toFixed(1)} s`;
-		console.log(
-			`\n### ${app.name}: compile time, a new Node ${process.versions.node} process each\n`,
-		);
-		console.log(
-			"| library | full compile | nothing changed | one message edited |\n|---|---|---|---|",
-		);
-		console.log(
-			`| grai | ${ms(median(grai.map((r) => r.cold)))} | ${ms(median(grai.map((r) => r.noop)))} | ${ms(median(edits.map((r) => r.edit)))} |`,
-		);
-		for (const [name, cold] of paraglideRows)
-			console.log(`| Paraglide, ${name} | ${ms(cold)} | the same | the same |`);
-		console.log(
-			`| intl-messageformat, \`formatjs compile --ast\`, one locale (optional) | ${ms(median(formatjs.map((r) => r.cold)))} | the same | the same |`,
-		);
-		console.log(
-			"| i18next, use-intl | none, the catalogs are read at run time | | |",
-		);
-		recorded.push({
-			app: app.name,
-			keys: Object.keys(app.messages[app.baseLocale]).length,
-			grai: {
-				cold: median(grai.map((r) => r.cold)),
-				noop: median(grai.map((r) => r.noop)),
-				edit: median(edits.map((r) => r.edit)),
-			},
-			paraglide: Object.fromEntries(paraglideRows),
-			formatjs: median(formatjs.map((r) => r.cold)),
-		});
+/** formatjs's CLI on one locale's ICU catalog, its process included; it must write every key. */
+function formatjsRun({ directory, icu, icuKeys }) {
+	const ast = join(directory, "ast.json");
+	const start = performance.now();
+	execFileSync(formatjs, [
+		...["compile", icu, "--format", "simple", "--ast", "--ignore-tag"],
+		...["--out-file", ast],
+	]);
+	const cold = performance.now() - start;
+	const written = Object.keys(JSON.parse(readFileSync(ast, "utf8"))).length;
+	if (written !== icuKeys)
+		throw new Error(`formatjs wrote ${written} keys of ${icuKeys}.`);
+	return { cold };
+}
+
+/** One measurement of a variant in a process of its own. */
+function measure(app, setup, name) {
+	restore(app, setup);
+	const variant = variants[name];
+	if (variant.run === "formatjs") return formatjsRun(setup);
+	const outdir = join(
+		setup.directory,
+		variant.run === "grai" ? "out" : "paraglide",
+	);
+	const { config, project, edit } = setup;
+	const output = execFileSync(
+		process.execPath,
+		[
+			runner,
+			JSON.stringify({
+				...variant,
+				...{ config, project, outdir, edit },
+				compilerOptions: app.compilerOptions,
+			}),
+		],
+		{
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "inherit"],
+			maxBuffer: 1 << 26,
+			timeout: PATIENCE_MS,
+		},
+	);
+	return JSON.parse(output.trim().split("\n").at(-1));
+}
+
+/** A variant's samples of each measure, in the rounds' order, with their median and interval. */
+function summary(kept, name) {
+	const measured = {};
+	for (const each of measures) {
+		const samples = kept.map((round) => round.measured.get(name)[each]);
+		if (samples[0] === undefined) continue;
+		measured[each] = {
+			median: median(samples),
+			...medianInterval(samples),
+			samples,
+		};
 	}
-	recordResults("compile-time", recorded, { runs: RUNS });
+	return measured;
 }
+
+/** Each Paraglide variant's full compile over grai's of the same round. */
+function ratios(summaries) {
+	const paired = {};
+	for (const name of names.filter((each) => each.startsWith("Paraglide")))
+		for (const each of ["cold"]) {
+			const figures = summaries[name][each];
+			if (figures !== undefined)
+				paired[`${name}, ${each}`] = pairedRatio(
+					figures.samples,
+					summaries.grai[each].samples,
+				);
+		}
+	return paired;
+}
+
+const ms = (value) =>
+	value < 1000 ? `${value.toFixed(0)} ms` : `${(value / 1000).toFixed(1)} s`;
+const cell = (figure) =>
+	figure === undefined
+		? "—"
+		: `${ms(figure.median)} (${ms(figure.low)}–${ms(figure.high)})`;
+
+function print(app, rounds, summaries, paired) {
+	console.log(
+		`\n### ${app.name}: compile time, each measurement a new Node ${process.versions.node} process, ${rounds} rounds in rotating order, medians (intervals)\n`,
+	);
+	console.log(
+		"| variant | full compile | nothing changed | one message edited | full compile, × grai's |\n|---|---|---|---|---|",
+	);
+	for (const name of names) {
+		const each = summaries[name];
+		const ratio = (measure) => {
+			const figure = paired[`${name}, ${measure}`];
+			return figure === undefined ? "" : ratioText(figure);
+		};
+		console.log(
+			`| ${name} | ${cell(each.cold)} | ${cell(each.noop)} | ${cell(each.edit)} | ${ratio("cold")} |`,
+		);
+	}
+}
+
+const recorded = [];
+let rounds;
+for (const app of selectedApps()) {
+	const setup = writeProjects(app);
+	const icu = libraryCatalogs(app, setup.edit.locale).icu;
+	setup.icu = join(setup.directory, `${setup.edit.locale}.icu.json`);
+	setup.icuKeys = Object.keys(icu).length;
+	writeFileSync(setup.icu, JSON.stringify(icu));
+	rounds = roundCount(names.length);
+	const kept = await inRounds(names, rounds, (name) =>
+		measure(app, setup, name),
+	);
+	restore(app, setup);
+	const summaries = Object.fromEntries(
+		names.map((name) => [name, summary(kept, name)]),
+	);
+	const paired = ratios(summaries);
+	print(app, rounds, summaries, paired);
+	const medianOf = (name, each) => summaries[name][each].median;
+	recorded.push({
+		app: app.name,
+		keys: Object.keys(app.messages[app.baseLocale]).length,
+		edited: { locale: setup.edit.locale, key: setup.edit.key },
+		grai: {
+			cold: medianOf("grai", "cold"),
+			noop: medianOf("grai", "noop"),
+			edit: medianOf("grai", "edit"),
+		},
+		// The full compiles, by the names scripts/charts reads them by.
+		paraglide: {
+			"message modules, without declarations": medianOf(
+				`${paraglide}, ${withoutDeclarations}`,
+				"cold",
+			),
+			"message modules, with declarations": medianOf(
+				`${paraglide}, ${withDeclarations}`,
+				"cold",
+			),
+			"locale modules, with declarations": medianOf(
+				`${localeModules}, ${withDeclarations}`,
+				"cold",
+			),
+		},
+		formatjs: medianOf("formatjs", "cold"),
+		variants: summaries,
+		ratios: paired,
+		rounds: roundsRecord(kept),
+	});
+}
+recordResults("compile-time", recorded, { runs: rounds });
