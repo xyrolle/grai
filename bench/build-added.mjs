@@ -1,213 +1,149 @@
 // The time i18n adds to a production build: one app (build-apps.mjs) built by Vite on grai, on
-// Paraglide, and with every message written in, each build a new Node process from a clean
-// checkout, no output and no cache, as CI builds it. What a library adds is its build less the
-// build without i18n, made of:
-// - its compile, catalogs to output, which both plugins run in `buildStart`: timed alone, in a new
-//   process as the build is, its modules loaded first;
-// - the rest: its plugin's other work and the bundler's on its message modules.
-// Rolldown's own timing of the plugins' hooks (`checks.bundlerTimings`, bundler-timings.mjs) is
-// kept beside them, for each hook it names: one of a second or more. Vite times plugins only in its
-// dev server. The builds take turns, RUNS rounds of the three, so the load from other work weighs
-// on each alike; medians. After each build, every page of it is opened in Chromium and must draw
-// its texts (built-pages.mjs).
-//   node build-added.mjs [app...]      synthetic and synthetic-13326 by default
+// Paraglide, and with every message's text written in, each build a new Node process from a clean
+// checkout, no output and no cache, as CI builds it (build-runs.mjs). A build's clock runs from
+// before Vite and the library's plugin are imported until the build has written its files: both
+// imports and the plugin's construction are in it, Node's own start is not. What a library adds is
+// its build less the build without i18n of the same round. Of that, the library's plugins'
+// `buildStart`, where both compile the catalogs, is timed around the plugins' own hooks; the rest
+// is everything else the library adds, its plugin's import and its other hooks and Rolldown's work
+// on its modules, by the same round's subtraction. Rolldown's own report of a plugin hook of a
+// second or more (bundler-timings.mjs) is kept beside them. The builds take turns in rounds whose
+// order rotates (rounds.mjs), every sample is kept with its round's load, and after each build,
+// outside its clock, every page of it is opened in Chromium and must draw its texts
+// (built-pages.mjs).
+//   node build-added.mjs [app...]   synthetic and synthetic-13326 by default
+//   ROUNDS=<multiple of 3> to change the rounds
 import { execFileSync } from "node:child_process";
-import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeBuildApps } from "./build-apps.mjs";
 import { checkBuiltPages } from "./built-pages.mjs";
-import { bundlerTimings } from "./bundler-timings.mjs";
-import { graiEntry } from "./grai.mjs";
+import { median, medianInterval } from "./medians.mjs";
 import { recordResults } from "./results.mjs";
+import {
+	inRounds,
+	pairedRatio,
+	ratioText,
+	roundCount,
+	roundsRecord,
+} from "./rounds.mjs";
 
-const RUNS = 5;
-const self = new URL(import.meta.url).pathname;
+const runner = new URL("build-runs.mjs", import.meta.url).pathname;
 const variants = ["stub", "grai", "paraglide"];
+const libraries = ["grai", "paraglide"];
 /** Each library's plugin, as Rolldown names it. */
-const plugins = { grai: "grai", paraglide: "unplugin-paraglide-js" };
+const pluginNames = { grai: "grai", paraglide: "unplugin-paraglide-js" };
+const CLOCK =
+	"from before Vite and the library's plugin are imported until the build has written its files; Node's own start is not in it";
 
-/** What a build starts from, as a fresh checkout: each library's output and cache gone. */
-function clean(root) {
-	for (const each of [
-		"dist",
-		"src/i18n",
-		"src/paraglide",
-		"project.inlang/cache",
-	])
-		rmSync(join(root, each), { recursive: true, force: true });
-}
-
-/** The library's compile alone, catalogs to output, loaded and ready to call. */
-async function compiler(variant, root, extra) {
-	if (variant === "grai") {
-		const { compile } = await import(graiEntry("."));
-		return async () => {
-			const result = await compile(extra);
-			if (result.errors.length > 0) throw result.errors[0];
-		};
-	}
-	const { compile } = await import("@inlang/paraglide-js");
-	return () =>
-		compile({
-			project: extra,
-			outdir: join(root, "src/paraglide"),
-			emitGitIgnore: false,
-			emitPrettierIgnore: false,
-			emitReadme: false,
-		});
-}
-
-/** One build, as Vite builds the app for production, with the report Rolldown logs, if any. */
-async function buildOnce(variant, root, extra) {
-	const { build } = await import("vite");
-	const plugins =
-		variant === "grai"
-			? [(await import(graiEntry("./vite"))).grai({ config: extra })]
-			: variant === "paraglide"
-				? [
-						(await import("@inlang/paraglide-js")).paraglideVitePlugin({
-							project: extra,
-							outdir: join(root, "src/paraglide"),
-						}),
-					]
-				: [];
-	let timings;
-	const quiet = () => {};
-	const customLogger = {
-		info: quiet,
-		warn: (message) => {
-			timings ??= bundlerTimings(message);
-		},
-		warnOnce: quiet,
-		error: quiet,
-		clearScreen: quiet,
-		hasErrorLogged: () => false,
-		hasWarned: false,
-	};
-	const start = performance.now();
-	await build({
-		root,
-		configFile: false,
-		customLogger,
-		plugins,
-		build: { outDir: join(root, "dist"), reportCompressedSize: false },
-	});
-	return { ms: performance.now() - start, timings };
-}
-
-/** Runs in the child: one build or one compile, timed after its modules load, printed as JSON. */
-async function child(task, variant, root, extra) {
-	clean(root);
-	if (task === "compile") {
-		const compile = await compiler(variant, root, extra);
-		const start = performance.now();
-		await compile();
-		console.log(JSON.stringify({ ms: performance.now() - start }));
-		return;
-	}
-	console.log(JSON.stringify(await buildOnce(variant, root, extra)));
-}
-
-const median = (values) =>
-	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-
-/** One task in a new process, its result. */
-function run(task, variant, root, extra) {
+/** One build in a new process, then each of its pages checked in Chromium. */
+async function measure(browser, app, variant) {
 	const output = execFileSync(
 		process.execPath,
-		[self, "--child", task, variant, root, extra ?? ""],
-		{ cwd: root, encoding: "utf8" },
+		[runner, variant, app.roots[variant], app.extra[variant] ?? ""],
+		{ cwd: app.roots[variant], encoding: "utf8" },
 	);
+	await checkBuiltPages(browser, join(app.roots[variant], "dist"), app.pages);
 	return JSON.parse(output.trim().split("\n").at(-1));
 }
 
-/** The plugin's hooks Rolldown names in a build's report, and their time: none under a second. */
-function reported(build, plugin) {
-	return (build.timings?.hooks ?? []).filter((each) => each.plugin === plugin);
-}
+/** Samples in the rounds' order, with their median and interval. */
+const spread = (samples) => ({
+	median: median(samples),
+	...medianInterval(samples),
+	samples,
+});
 
-/** One app's builds and compiles, as results/build-added.json has them. */
-async function measure(browser, app) {
-	const { roots, graiConfig, project, calls, pages } =
-		await writeBuildApps(app);
-	const extra = { stub: undefined, grai: graiConfig, paraglide: project };
-	const builds = { stub: [], grai: [], paraglide: [] };
-	const compiles = { grai: [], paraglide: [] };
-	for (let round = 0; round < RUNS; round++) {
-		const order = variants.map(
-			(_, index) => variants[(index + round) % variants.length],
-		);
-		for (const variant of order) {
-			builds[variant].push(
-				run("build", variant, roots[variant], extra[variant]),
-			);
-			await checkBuiltPages(browser, join(roots[variant], "dist"), pages);
-		}
-		for (const library of round % 2 === 0
-			? ["grai", "paraglide"]
-			: ["paraglide", "grai"])
-			compiles[library].push(
-				run("compile", library, roots[library], extra[library]).ms,
-			);
-	}
-	const ms = (variant) => median(builds[variant].map((each) => each.ms));
-	const stub = ms("stub");
+/** The plugin's hooks Rolldown names in a build's report, and their time: none under a second. */
+const reported = (build, plugin) =>
+	(build.timings?.hooks ?? []).filter((each) => each.plugin === plugin);
+
+/** One app's rounds, as results/build-added.json has them. */
+function summary(app, kept) {
+	const of = (variant) => kept.map((round) => round.measured.get(variant));
+	const stub = of("stub").map((build) => build.ms);
 	const measured = {
 		app: app.name,
 		keys: Object.keys(app.messages[app.baseLocale]).length,
-		calls,
-		stub: { build: stub, runs: builds.stub.map((each) => each.ms) },
+		calls: app.calls,
+		stub: { build: median(stub), runs: stub, builds: spread(stub) },
 	};
-	for (const [library, plugin] of Object.entries(plugins)) {
-		const build = ms(library);
-		const compile = median(compiles[library]);
+	for (const library of libraries) {
+		const builds = of(library);
+		const ms = builds.map((build) => build.ms);
+		const added = ms.map((each, round) => each - stub[round]);
+		const buildStart = builds.map((build) => build.buildStart);
+		const rest = added.map((each, round) => each - buildStart[round]);
 		measured[library] = {
-			build,
-			added: build - stub,
-			compile,
-			rest: build - stub - compile,
-			hooks: builds[library].map((each) => reported(each, plugin)),
-			runs: {
-				builds: builds[library].map((each) => each.ms),
-				compiles: compiles[library],
-			},
+			build: median(ms),
+			added: median(added),
+			compile: median(buildStart),
+			rest: median(rest),
+			hooks: builds.map((build) => reported(build, pluginNames[library])),
+			runs: { builds: ms, compiles: buildStart },
+			builds: spread(ms),
+			additions: spread(added),
+			buildStarts: spread(buildStart),
+			rests: spread(rest),
 		};
 	}
+	measured.paraglideOverGrai = pairedRatio(
+		measured.paraglide.additions.samples,
+		measured.grai.additions.samples,
+	);
+	measured.rounds = roundsRecord(kept);
 	return measured;
 }
 
-if (process.argv[2] === "--child") {
-	await child(...process.argv.slice(3));
-} else {
-	const names = process.argv.slice(2);
-	const browser = await chromium.launch();
-	const recorded = [];
+const s = (ms) => `${(ms / 1000).toFixed(2)} s`;
+const range = ({ median, low, high }) => `${s(median)} (${s(low)}–${s(high)})`;
+
+function print(measured, rounds) {
+	console.log(
+		`\n### ${measured.app}: ${measured.calls} calls on its pages, ${rounds} rounds in rotating order, medians (intervals); each build's clock ${CLOCK}\n`,
+	);
+	console.log(
+		"| | build | added by i18n | its plugins' buildStart | the rest |\n|---|---|---|---|---|",
+	);
+	console.log(`| no i18n | ${range(measured.stub.builds)} | | | |`);
+	for (const library of libraries) {
+		const each = measured[library];
+		console.log(
+			`| ${library} | ${range(each.builds)} | ${range(each.additions)} | ${range(each.buildStarts)} | ${range(each.rests)} |`,
+		);
+	}
+	console.log(
+		`\nParaglide adds ${ratioText(measured.paraglideOverGrai)} what grai adds, paired by round.`,
+	);
+}
+
+const names = process.argv.slice(2);
+const browser = await chromium.launch();
+const recorded = [];
+let rounds;
+try {
 	for (const app of selectedApps(
 		names.length > 0 ? names : ["synthetic", "synthetic-13326"],
 	)) {
-		const measured = await measure(browser, app);
+		const { roots, graiConfig, project, calls, pages } =
+			await writeBuildApps(app);
+		const built = {
+			...app,
+			roots,
+			calls,
+			pages,
+			extra: { grai: graiConfig, paraglide: project },
+		};
+		rounds = roundCount(variants.length, 3);
+		const kept = await inRounds(variants, rounds, (variant) =>
+			measure(browser, built, variant),
+		);
+		const measured = summary(built, kept);
+		print(measured, rounds);
 		recorded.push(measured);
-		console.log(
-			`\n### ${app.name}: ${measured.calls} calls on its pages, ms, medians of ${RUNS}\n`,
-		);
-		console.log(
-			"| | build | added by i18n | its compile | the rest | hooks Rolldown names in the median build |",
-		);
-		console.log("|---|---|---|---|---|---|");
-		console.log(`| no i18n | ${measured.stub.build.toFixed(0)} | | | | |`);
-		for (const library of Object.keys(plugins)) {
-			const each = measured[library];
-			const named =
-				each.hooks[each.runs.builds.indexOf(each.build)]
-					.map((hook) => `${hook.hook} ${hook.ms.toFixed(0)}`)
-					.join(", ") || "none of 1 s or more";
-			console.log(
-				`| ${library} | ${each.build.toFixed(0)} | ${each.added.toFixed(0)} | ${each.compile.toFixed(0)} | ${each.rest.toFixed(0)} | ${named} |`,
-			);
-		}
 	}
+} finally {
 	await browser.close();
-	recordResults("build-added", recorded, { runs: RUNS });
 }
+recordResults("build-added", recorded, { runs: rounds, clock: CLOCK });
