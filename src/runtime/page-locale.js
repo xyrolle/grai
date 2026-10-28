@@ -2,9 +2,10 @@
 // browser extension. The Vite plugin writes these functions' sources into each page, as an inline
 // classic script ahead of every module script: `pickPageLocale`, called with the project's settings
 // and a reader of each place the config's strategy reads, made by its function here, with the
-// server's language matching (`localeReach` in `server.js`) for those that match a language. It
-// runs before any module can, so each function refers to nothing outside its own body and its
-// arguments. The compiler does not copy them into the output.
+// server's language matching (`localeReach` in `server.js`) for those that match a language; then,
+// in a build that copies the message chunks per locale, `pointAtCopies`. It runs before any module
+// can, so each function refers to nothing outside its own body and its arguments. The compiler
+// does not copy them into the output.
 
 /**
  * What every page's script takes from the project's config.
@@ -50,34 +51,39 @@
  * its order, the first locale one names winning. Where none names a locale, the page keeps the one
  * it was built with, else takes the base locale.
  *
- * In a build that copies each message chunk per locale, the script's `data-grai-chunks` names the
- * page's chunks, and it maps them to the locale's copies with an import map, before any module
- * loads, then preloads the copies the page's entry imports. It gives both its own nonce, for a page
- * whose Content Security Policy allows scripts by nonce.
- *
  * @param {PageSettings} settings
  * @param {readonly (() => string | undefined)[]} readers
  */
 export function pickPageLocale({ locales, baseLocale, directions }, readers) {
 	const root = document.documentElement;
-	const script = document.currentScript;
 	const drawn = locales.includes(root.lang) ? root.lang : undefined;
-	if (drawn === undefined || drawn === script?.dataset.graiLang) {
-		let locale = drawn ?? baseLocale;
-		for (const read of readers) {
-			const found = read();
-			if (found === undefined) continue;
-			locale = found;
-			break;
-		}
-		root.lang = locale;
-		root.dir = directions[locales.indexOf(locale)] ?? "ltr";
+	if (drawn !== undefined && drawn !== document.currentScript?.dataset.graiLang)
+		return;
+	let locale = drawn ?? baseLocale;
+	for (const read of readers) {
+		const found = read();
+		if (found === undefined) continue;
+		locale = found;
+		break;
 	}
+	root.lang = locale;
+	root.dir = directions[locales.indexOf(locale)] ?? "ltr";
+}
 
+/**
+ * In a build that copies each message chunk per locale, points the page at its locale's copies:
+ * the script's `data-grai-chunks` names the page's chunks, which an import map maps to the copies
+ * before any module loads, and the copies the page's entry imports are preloaded. It gives both the
+ * script's own nonce, for a page whose Content Security Policy allows scripts by nonce.
+ */
+export function pointAtCopies() {
+	const script = document.currentScript;
 	const chunks = script?.dataset.graiChunks;
 	if (script === null || chunks === undefined) return;
 	/** @type {PageChunks} */
-	const copies = JSON.parse(chunks.replaceAll("{locale}", root.lang));
+	const copies = JSON.parse(
+		chunks.replaceAll("{locale}", document.documentElement.lang),
+	);
 	const map = document.createElement("script");
 	map.type = "importmap";
 	map.nonce = script.nonce;

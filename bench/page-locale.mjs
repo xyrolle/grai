@@ -31,7 +31,7 @@ const RUNS = 31;
 const THROTTLING = [1, 4];
 const locales = ["ro", "ru", "en"];
 
-/** The script's bytes for a config, minified as a build writes it. */
+/** The script's bytes for a config, minified as a build with each locale's copies writes it. */
 function scriptBytes(name, strategy) {
 	const config = {
 		locales,
@@ -46,7 +46,7 @@ function scriptBytes(name, strategy) {
 			unlocalizedPaths: [],
 		},
 	};
-	const text = localeScript(config, true);
+	const text = localeScript(config, { minify: true, copies: true });
 	return `| ${name} | ${text.length} | ${gzipSync(text).length} | ${brotliCompressSync(text).length} |`;
 }
 
