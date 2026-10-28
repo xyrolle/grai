@@ -58,7 +58,7 @@ export function session(
 	start.released(watching).then(({ compiled, grouped: saved }) => {
 		released = true;
 		grouped ||= saved;
-		// withGrai waits for this when the output is not current: the first compile is done.
+		// withGrai waits for this when the output is not current: the watch has started.
 		parentPort?.postMessage("compiled");
 		if ("build" in compiled && compiled.build !== undefined)
 			regroupOnce(compiled.build);

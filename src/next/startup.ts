@@ -1,10 +1,10 @@
 // A `next dev` start's first compile and its release, when the groups are read beside it
 // (`first-groups.ts`). The compile asks for them once it has compiled the catalogs (`placing`), and
 // places the keys by them if they come in time (`placing.ts`), in the one output it writes, and
-// saves them for the compiles after once that output is written. The start may go on once that
-// compile has ended and the read's thread has stopped (`released`): a compile of an edit that ends
-// meanwhile releases nothing, and no compile after the first asks, so no output is written for the
-// groups read once Next has started.
+// saves them for the compiles after once that output is written. The start may go on once the
+// watch has started (`Watch.first`: that compile has ended, and so has the compile of every edit
+// that came meanwhile) and the read's thread has stopped (`released`). No compile after the first
+// asks, so no output is written for the groups read once Next has started.
 import type { Compilation } from "../compilation.ts";
 import type { Placing } from "../placing.ts";
 import { type KeyGroups, savedGroups } from "../saved-groups.ts";
@@ -12,13 +12,13 @@ import type { Compiled, Watch } from "../watch.ts";
 import type { FirstGroups } from "./first-groups.ts";
 import { keyWeights } from "./key-groups.ts";
 
-/** How the start's first compile ended, and whether the groups read beside it are saved. */
+/** How the start's last compile ended, and whether the groups read beside the first are saved. */
 export type Started = { compiled: Compiled; grouped: boolean };
 
 /** What the first compile asks for the groups, and the start's release. */
 export type Startup = {
 	placing: Placing | undefined;
-	/** Settles once Next may start: the first compile has ended, and the read's thread has stopped. */
+	/** Settles once Next may start: the watch has started, and the read's thread has stopped. */
 	released: (watching: Watch) => Promise<Started>;
 };
 

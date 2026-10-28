@@ -50,11 +50,12 @@ const writeDeadline = 2000;
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
  * the outdir cannot be written, goes to `failed`, and the next change compiles again.
  *
- * `first` settles once the first compile has ended: with how it ended, after its report, and
- * after the read again a catalog in the middle of a save takes, so a caller that waits for it never
- * sees output that compile is still to write. That compile, and none after it, asks `placeFirst`
- * for the groups to place the keys by (`placing.ts`), as Next's watch does with the groups it reads
- * beside it.
+ * `first` settles once the watch has started: its first compile has ended, after its report and
+ * after the read again a catalog in the middle of a save takes, and so has every compile of a change
+ * that came meanwhile, and of one that came during those, so a caller that waits for it never sees
+ * output the start is still to write. It settles with how the last of them ended. The first compile
+ * that writes, and none after it, asks `placeFirst` for the groups to place the keys by
+ * (`placing.ts`), as Next's watch does with the groups it reads beside it.
  *
  * The first compile starts from the build the project's last watcher saved, if this grai saved it
  * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
@@ -64,7 +65,7 @@ const writeDeadline = 2000;
  * once the process is quiet (`whenQuiet`), or by `writeDeadline`, on the next change, when `write`
  * asks for it, or as the watcher closes. Its result is reported, closing or not, and ends the
  * compile; a change since the first compile is compiled after it. Every other compile is reported
- * once its output is written. Its first build written is saved for the next start
+ * once its output is written. The build the start ends with is saved for the next start
  * (`firstBuildSaver`). It watches until the process ends or `close` is called, whose promise settles once the
  * compile under way, if any, has finished, the output is written and the build is saved, so the
  * project can then be removed.
@@ -117,25 +118,24 @@ export function watch(
 	let reportedBuild = false;
 	/** Whether the next compile is the first, which starts from the saved build. */
 	let first = true;
+	/** Whether the watch is starting, until `first` settles; and how the last compile ended. */
+	let starting = true;
+	let last: Compiled | undefined;
+	const start = Promise.withResolvers<Compiled>();
 	const saver = firstBuildSaver();
-	/** How many compiles have begun, and those waiting for a compile begun after a count to end. */
-	let begun = 0;
-	let waiting: { after: number; ended: (compiled: Compiled) => void }[] = [];
-	/** Ends the wait of every caller a compile begun since its call was waiting for. */
-	const ended = (compiled: Compiled) => {
-		const done = waiting.filter(({ after }) => after < begun);
-		waiting = waiting.filter(({ after }) => after >= begun);
-		for (const waiter of done) waiter.ended(compiled);
-		// No compile after the first asks for the groups to place the keys by.
+	/** Ends the start, with how its last compile ended: no compile after it asks for groups. */
+	const endStart = (compiled: Compiled) => {
+		starting = false;
 		placeFirst = undefined;
+		saver.started();
+		start.resolve(compiled);
 	};
-	/** How the next compile begun from now ends. */
-	const nextCompile = () =>
-		new Promise<Compiled>((resolve) => {
-			if (closed) resolve({ closed: true });
-			else waiting.push({ after: begun, ended: resolve });
-		});
-
+	/** The groups for this write to place the keys by: asked once, of the start's first write. */
+	const placing = () => {
+		const asked = placeFirst;
+		placeFirst = undefined;
+		return asked;
+	};
 	/**
 	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
 	 * saved by renaming another over it is a new file, and a change during the compile is seen.
@@ -183,7 +183,7 @@ export function watch(
 			const next = await writeBuild(
 				{ ...compiled, compilation: unchanged },
 				undefined,
-				{ ...developing, placing: placeFirst },
+				{ ...developing, placing: placing() },
 			);
 			if (next.build !== undefined) {
 				saver.took(next.build, build);
@@ -224,7 +224,7 @@ export function watch(
 		}
 		const next = await writeBuild(compiled, build, {
 			...developing,
-			placing: placeFirst,
+			placing: placing(),
 		});
 		if (next.build === undefined) return next;
 		saver.took(next.build, build);
@@ -238,7 +238,6 @@ export function watch(
 			again = false;
 			const quiet = settled;
 			settled = false;
-			begun += 1;
 			const started = performance.now();
 			try {
 				follow();
@@ -250,7 +249,7 @@ export function watch(
 				if (unwritten !== undefined) {
 					const served = await writeServed(unwritten, started);
 					if (!changes) {
-						ended(served);
+						last = served;
 						continue;
 					}
 				}
@@ -274,13 +273,16 @@ export function watch(
 					report(next.result, milliseconds, next.build);
 					reportedBuild = next.build !== undefined;
 				}
-				ended({ result: next.result, milliseconds, build: next.build });
+				last = { result: next.result, milliseconds, build: next.build };
 			} catch (error) {
 				reportedBuild = false;
 				failed(error);
-				ended({ error });
+				last = { error };
 			}
 		} while (again && !closed);
+		// The start ends with the last compile of the changes that came during it, written.
+		if (starting && !closed && unwritten === undefined && last !== undefined)
+			endStart(last);
 	};
 
 	const run = () => {
@@ -293,10 +295,9 @@ export function watch(
 		});
 	};
 
-	const firstCompile = nextCompile();
 	run();
 	return {
-		first: firstCompile,
+		first: start.promise,
 		write: async () => {
 			if (unwritten === undefined) return false;
 			const { written } = unwritten;
@@ -318,8 +319,7 @@ export function watch(
 				run();
 				await running;
 			}
-			for (const waiter of waiting) waiter.ended({ closed: true });
-			waiting = [];
+			if (starting) endStart(last ?? { closed: true });
 			await saver.flush();
 		},
 	};

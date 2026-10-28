@@ -1,16 +1,25 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	watch as watchFile,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { type FirstGroups, firstGroups } from "../src/next/first-groups.ts";
 import { startup } from "../src/next/startup.ts";
+import { savedBuild } from "../src/saved-build.ts";
 import { groupsFile, type KeyGroups } from "../src/saved-groups.ts";
-import { watch } from "../src/watch.ts";
+import { developing, watch } from "../src/watch.ts";
 import { freshApp } from "./next-fresh-app.ts";
 
 // A fresh `next dev` start whose first compile asks for the groups read beside it (`startup.ts`):
 // it places the keys by them in the one output it writes when they come in time, and the start is
-// released once that compile has ended and the read has stopped. No other compile releases it.
+// released once the watch has started, that compile and those of the edits that came meanwhile
+// ended, and the read has stopped.
 
 /**
  * A read of the groups whose answer the test gives, once the compile has asked for it: its code read
@@ -84,6 +93,70 @@ it("places the keys by the groups that have come when the first compile asks, in
 	expect(
 		JSON.parse(readFileSync(groupsFile(join(dir, "out")), "utf8")),
 	).toEqual([["about"], ["home"]]);
+});
+
+it("releases the start once an edit that came while its first compile waited for the groups is written, and saves that edit's build for the next start", async () => {
+	const { dir, config } = freshApp();
+	const out = join(dir, "out");
+	const held = heldRead();
+	const start = startup(held.reading, out, Promise.resolve(true));
+	const lock = join(out, ".grai", "lock");
+	const reports: CompileResult[] = [];
+	const watching = watch(
+		config,
+		(result) => {
+			reports.push(result);
+			// Once the first compile's output is written, the next write waits for this lock.
+			if (reports.length === 1) writeFileSync(lock, String(process.pid));
+		},
+		(error) => {
+			throw error;
+		},
+		{ placeFirst: start.placing },
+	);
+	onTestFinished(() => watching.close());
+	let released = false;
+	const release = start.released(watching).then((started) => {
+		released = true;
+		return started;
+	});
+	// Heard by the time the watch has asked, as the watch's own watcher is.
+	const catalog = join(dir, "messages", "en.json");
+	const seen = new Promise<void>((resolve) => {
+		const watcher = watchFile(catalog, () => {
+			watcher.close();
+			resolve();
+		});
+	});
+	await held.asking;
+	writeFileSync(
+		catalog,
+		JSON.stringify({
+			...JSON.parse(readFileSync(catalog, "utf8")),
+			added: "Added",
+		}),
+	);
+	await seen;
+	// The watch hears the edit in the same turn of the event loop.
+	await new Promise((resolve) => setImmediate(resolve));
+	held.answer([["about"], ["home"]]);
+
+	await expect.poll(() => reports.length).toBe(1);
+	// The edit's write waits for the lock: the start is not released meanwhile.
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(released).toBe(false);
+	rmSync(lock);
+	const { compiled, grouped } = await release;
+
+	expect(grouped).toBe(true);
+	expect(reports).toHaveLength(2);
+	expect(
+		"result" in compiled && compiled.build?.compilation.keys.has("added"),
+	).toBe(true);
+	await watching.close();
+	const saved = await savedBuild(config, developing);
+	expect(saved?.compilation.keys.has("added")).toBe(true);
+	expect(saved?.rendered.groups).toBe(JSON.stringify([["about"], ["home"]]));
 });
 
 it("writes nothing into an outdir another tool fills, not even the groups it was given, at the start or at an edit after it", async () => {
