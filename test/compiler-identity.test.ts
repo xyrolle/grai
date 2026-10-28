@@ -1,9 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { type BuiltPart, builtModulesFile } from "../src/compiler-identity.ts";
+import {
+	type BuiltPart,
+	builtModulesFile,
+	listedPath,
+} from "../src/compiler-identity.ts";
 import { project } from "./project.ts";
 
 /** grai as built, which the gate builds before the tests. */
@@ -70,4 +74,16 @@ it("lists no entry among the compiler's chunks, as an entry's own code is no com
 
 	for (const entry of ["cli.js", "index.js", "vite.js", "next/config.js"])
 		expect(compiler).not.toContain(entry);
+});
+
+it("takes a chunk's path in grai's directory apart by slashes, as the build lists it, on Windows too", () => {
+	const dist = "C:\\app\\node_modules\\@xyrolle\\grai\\dist";
+
+	expect(listedPath(dist, `${dist}\\code\\pool-worker.js`, win32)).toBe(
+		"code/pool-worker.js",
+	);
+	expect(listedPath(dist, `${dist}\\vite.js`, win32)).toBe("vite.js");
+	expect(listedPath("/app/dist", "/app/dist/code/pool-worker.js")).toBe(
+		"code/pool-worker.js",
+	);
 });

@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import { isAbsolute, join, relative, sep } from "node:path";
+import platformPaths, {
+	isAbsolute,
+	join,
+	type PlatformPath,
+	relative,
+	sep,
+} from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RuntimeSources } from "./output-modules.ts";
 import {
@@ -127,7 +133,8 @@ function builtModules(part: BuiltPart): Map<string, string> | undefined {
 	const modules = new Map<string, string>();
 	for (const [path, built] of Object.entries(chunks)) {
 		const file = join(root, path);
-		if (!within(root, file) || relative(root, file) !== path) return undefined;
+		if (!within(root, file) || listedPath(root, file) !== path)
+			return undefined;
 		let bytes: Buffer;
 		try {
 			bytes = readFileSync(file);
@@ -138,9 +145,21 @@ function builtModules(part: BuiltPart): Map<string, string> | undefined {
 		if (digest !== built) return undefined;
 		modules.set(path, digest);
 	}
-	if (part === "compiler" && !modules.has(relative(root, packageFilesModule)))
+	if (part === "compiler" && !modules.has(listedPath(root, packageFilesModule)))
 		return undefined;
 	return modules;
+}
+
+/**
+ * A file's path in a directory as grai's build lists it, apart by `/`, whatever separator the
+ * platform's paths take: Windows's `\\`. `paths` are Node's for the platform, or another's in a test.
+ */
+export function listedPath(
+	directory: string,
+	file: string,
+	paths: PlatformPath = platformPaths,
+): string {
+	return paths.relative(directory, file).split(paths.sep).join("/");
 }
 
 /**
