@@ -15,6 +15,9 @@ export type UnwrittenOutput = {
 	write: () => Promise<boolean>;
 };
 
+/** The prefix of the id Vite's dependency scan gets for a file of the output not written yet. */
+const scannedPrefix = "\0grai:unwritten:";
+
 /**
  * The dev server's resolver of the output's files while its first compile's output is not written:
  * Vite resolves an import by the file system, which does not have them yet, and the plugin serves
@@ -24,8 +27,10 @@ export type UnwrittenOutput = {
  * makes it, from the server's root, as a module runner asks for a module by its URL, or as the
  * package's `imports` map a package import to a path (`packageImportPath`). Any other import from
  * a module, as one with a query (`?raw`) or by a mapping only the file system resolves, as a
- * tsconfig's paths, has the output written now, and is resolved again once it is. Once it is
- * written, an import nothing resolved fails as it would.
+ * tsconfig's paths, has the output written now, and is resolved again once it is. Vite's dependency
+ * scan reads the files it is given from the disk: it gets the output as an import it leaves out,
+ * since the output imports no dependency. Once it is written, an import nothing resolved fails as it
+ * would.
  */
 export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 	let root = "";
@@ -48,6 +53,8 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 					root,
 				);
 				const output = named.filter((path) => isInside(outdir, path));
+				// Vite's dependency scan marks its calls with `scan`, which its types keep internal.
+				const scanning = "scan" in options && options.scan === true;
 				// A path outside the output is not the plugin's to resolve.
 				if (named.length > 0 && output.length === 0) return null;
 				for (const path of query === -1 ? output : []) {
@@ -58,9 +65,12 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 					);
 					if (file === undefined) continue;
 					const resolved = file === keysFile ? devKeysId : file;
-					return resolved;
+					return scanning
+						? { id: `${scannedPrefix}${resolved}`, external: true }
+						: resolved;
 				}
-				if (importer === undefined) return null;
+				if (importer === undefined || (scanning && output.length > 0))
+					return null;
 				if (!(await dev.write())) return null;
 				return this.resolve(id, importer, { ...options, skipSelf: true });
 			},
