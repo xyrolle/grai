@@ -13,6 +13,11 @@ import {
 	onTestFinished,
 } from "vitest";
 import { outsideTests } from "./app-environment.ts";
+import {
+	conflictingInput,
+	conflictingInputError,
+	firstStart,
+} from "./first-start.ts";
 import { stopped } from "./stopped.ts";
 
 // The Nuxt example (examples/nuxt), built by `nuxt build`, checked by `nuxt typecheck` against the
@@ -20,6 +25,7 @@ import { stopped } from "./stopped.ts";
 // cookie and Accept-Language, then under `nuxt dev`; its pages in Chromium. One file, so that the dev suite's edits never reach a build.
 const example = fileURLToPath(new URL("../examples/nuxt/", import.meta.url));
 const nuxt = join(example, "node_modules/.bin/nuxt");
+const outdir = join(example, "app/i18n");
 /** No telemetry, which would phone home and outlive the test in a process of its own. */
 const telemetry = { NUXT_TELEMETRY_DISABLED: "1" };
 
@@ -288,6 +294,9 @@ describe("the Nuxt example under nuxt dev", { timeout: 60_000 }, () => {
 	let origin = "";
 	let app: Served | undefined;
 	beforeAll(async () => {
+		// A first start: the module compiles in its setup, and the browser's dev modules come from the
+		// plugin's first compile, served before its output is written.
+		firstStart(outdir);
 		app = await nuxtDev();
 		origin = app.origin;
 	}, 120_000);
@@ -363,5 +372,33 @@ describe("the Nuxt example under nuxt dev, a message invalid in a locale no page
 		const every = await fetch(`${app.origin}/_nuxt/@id/__x00__grai:keys`);
 
 		expect([(await keys()).ok, every.ok]).toEqual([false, false]);
+	});
+});
+
+describe("the Nuxt example under nuxt dev, a first start with an error only the output's write finds", {
+	timeout: 60_000,
+}, () => {
+	let origin = "";
+	let app: Served | undefined;
+	let restore = () => {};
+	beforeAll(async () => {
+		restore = conflictingInput(join(example, "messages"));
+		firstStart(outdir);
+		app = await nuxtDev();
+		origin = app.origin;
+	}, 120_000);
+	afterAll(async () => {
+		if (app) await stopped(app.server);
+		restore();
+	});
+
+	it("hydrates the first page in its locale, then sends it the error, which Nuxt's overlay shows", async () => {
+		await page.goto(`${origin}/ro/`);
+		await page.locator("#hydrated").waitFor();
+		expect(await html("lang")).toBe("ro");
+		// Nuxt shows a dev error in an overlay of its own, and Vite's client logs it.
+		await expect
+			.poll(() => logged.join("\n"), { timeout: 20_000 })
+			.toContain(conflictingInputError);
 	});
 });

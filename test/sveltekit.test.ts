@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
@@ -11,6 +11,11 @@ import {
 	it,
 	onTestFinished,
 } from "vitest";
+import {
+	conflictingInput,
+	conflictingInputError,
+	firstStart,
+} from "./first-start.ts";
 import { stopped } from "./stopped.ts";
 
 // The SvelteKit example (examples/sveltekit), built as an app builds it, with
@@ -18,6 +23,7 @@ import { stopped } from "./stopped.ts";
 const example = fileURLToPath(
 	new URL("../examples/sveltekit/", import.meta.url),
 );
+const outdir = join(example, "src/lib/i18n");
 const bin = (name: string) => join(example, "node_modules/.bin", name);
 
 /** Runs one of the example's build steps, failing with what it printed. */
@@ -352,11 +358,17 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 }, () => {
 	let origin = "";
 	let app: Served | undefined;
+	let first = { release: () => {} };
 	beforeAll(async () => {
+		// A first start, whose output another writer keeps from being written until the second test.
+		first = firstStart(outdir, { held: true });
 		app = await viteDev();
 		origin = app.origin;
 	}, 60_000);
-	afterAll(() => app && stopped(app.server));
+	afterAll(async () => {
+		first.release();
+		if (app) await stopped(app.server);
+	});
 
 	/** Gives a Romanian message new text, as an editor saves it, and puts the catalog back after. */
 	function edit(key: string, text: string): void {
@@ -379,6 +391,28 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 		await page.evaluate("window.unreloaded = true");
 	};
 	const marked = (page: Page) => page.evaluate("window.unreloaded");
+
+	it("serves the first page before its first compile's output is written", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByRole("heading", { name: "Bună ziua" }).waitFor();
+		await page.getByText("Desenat în browser").waitFor();
+
+		expect(existsSync(join(outdir, ".grai", "lock"))).toBe(true);
+		await page.context().close();
+	});
+
+	it("draws an edit made while the first compile's output waits to be written", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByText("Desenat în browser").waitFor();
+		await mark(page);
+
+		edit("greeting", "Salutare");
+		first.release();
+		await page.getByRole("heading", { name: "Salutare" }).waitFor();
+
+		expect(await marked(page)).toBe(true);
+		await page.context().close();
+	});
 
 	it("loads each page's locale's words alone, the locale the server drew it in", async () => {
 		const ro = await openRecordingKeys(origin, "/ro/");
@@ -433,5 +467,34 @@ describe("@xyrolle/grai/sveltekit under vite dev, a message invalid in a locale 
 
 		expect(response.status).toBe(500);
 		expect(await response.text()).toContain("ar.json");
+	});
+});
+
+describe("@xyrolle/grai/sveltekit under vite dev, a first start with an error only the output's write finds", {
+	timeout: 30_000,
+}, () => {
+	let origin = "";
+	let app: Served | undefined;
+	let restore = () => {};
+	beforeAll(async () => {
+		restore = conflictingInput(join(example, "messages"));
+		firstStart(outdir);
+		app = await viteDev();
+		origin = app.origin;
+	}, 60_000);
+	afterAll(async () => {
+		if (app) await stopped(app.server);
+		restore();
+	});
+
+	it("serves the first page in its locale, then shows the error in Vite's overlay", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByRole("heading", { name: "Bună ziua" }).waitFor();
+		await page.getByText("Desenat în browser").waitFor();
+		await page
+			.locator("vite-error-overlay")
+			.getByText(conflictingInputError)
+			.waitFor();
+		await page.context().close();
 	});
 });
