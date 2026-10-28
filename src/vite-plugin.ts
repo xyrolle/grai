@@ -79,6 +79,13 @@ export type GraiAdapter = {
 	frameworkBase?: (config: ResolvedConfig) => FrameworkBase | undefined;
 };
 
+/**
+ * Whether a Vite config is Vitest's, in any mode a run gives it, its browser mode's included: Vitest
+ * adds plugins of its own to every server it makes, named `vitest:…`.
+ */
+const isVitest = (config: ResolvedConfig): boolean =>
+	config.plugins.some(({ name }) => name.startsWith("vitest:"));
+
 /** Vite's own base, for an app Vite alone serves; none for a relative base, which names no path. */
 export const viteBase = (config: ResolvedConfig): FrameworkBase | undefined =>
 	config.base.startsWith("/")
@@ -92,7 +99,10 @@ export function graiPlugin(
 ): GraiPlugin {
 	let files: ProjectFiles = { configFile: "", outdir: "", keysFile: "" };
 	let serving = false;
-	/** Whether Vite runs tests, as Vitest has it, where a module is what a test can mock. */
+	/**
+	 * Whether Vite runs tests, where a module is what a test can mock: in mode `test`, or as Vitest's
+	 * server in whatever mode it runs (`isVitest`).
+	 */
 	let testing = false;
 	/** A build's compile: its build, or the errors that kept it from one, which every environment's build awaits. */
 	let first: Promise<Build | readonly Error[]> | undefined;
@@ -178,6 +188,7 @@ export function graiPlugin(
 				: { build: { modulePreload: preloads } };
 		},
 		configResolved(resolved) {
+			testing ||= isVitest(resolved);
 			const framework = adapter.frameworkBase?.(resolved);
 			const problem =
 				framework === undefined

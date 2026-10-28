@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { spawnSync } from "node:child_process";
-import { symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { JSDOM } from "jsdom";
@@ -95,9 +95,10 @@ describe("a test in a process that serves requests, bound with server.js's withL
 
 /**
  * Runs a project's test file in Vitest's browser mode, in Chromium, with grai's plugin, in a process
- * of its own, as an app's component tests run: each test's name and state, with its errors.
+ * of its own, as an app's component tests run, in Vitest's own mode or the one given: each test's
+ * name and state, with its errors.
  */
-function inVitestBrowser(dir: string, test: string) {
+function inVitestBrowser(dir: string, test: string, mode?: string) {
 	// The project's imports of Vitest resolve to this repository's.
 	symlinkSync(
 		fileURLToPath(new URL("../node_modules", import.meta.url)),
@@ -111,7 +112,7 @@ const { playwright } = await import("@vitest/browser-playwright");
 const { grai } = await import(${JSON.stringify(new URL("../src/vite.ts", import.meta.url).href)});
 const vitest = await startVitest("test", [], {
 	root: process.cwd(),
-	config: false,
+	config: false,${mode === undefined ? "" : `\n\tmode: ${JSON.stringify(mode)},`}
 	watch: false,
 	reporters: [],
 	browser: {
@@ -167,4 +168,45 @@ test("switches", () => {
 	);
 
 	expect(results).toEqual([{ name: "switches", state: "pass", errors: [] }]);
+});
+
+describe("Vitest's browser mode in a mode of its own, as a project's config gives it", {
+	timeout: 60_000,
+}, () => {
+	/** A test that marks that it ran, and reads a file of the output, which only its write makes. */
+	const marking = `import { expect, test } from "vitest";
+import { commands } from "vitest/browser";
+import { m } from "./out/messages.js";
+
+test("written", async () => {
+	await commands.writeFile("./ran", "");
+	expect(await commands.readFile("./out/keys.d.ts")).toContain("./keys/");
+	expect(m.title()).toBe("Your cart");
+});
+`;
+
+	it("writes the output before a test takes the messages", () => {
+		const { dir } = project({
+			en: { title: "Your cart" },
+			de: { title: "Ihr Warenkorb" },
+		});
+
+		expect(inVitestBrowser(dir, marking, "development")).toEqual([
+			{ name: "written", state: "pass", errors: [] },
+		]);
+	});
+
+	it("runs no test of a project whose catalogs fail the output's write", () => {
+		const { dir } = project({
+			en: { title: "Your cart", listed: "{x :list}" },
+			de: { title: "Ihr Warenkorb", listed: "{x :number}" },
+		});
+
+		const results = inVitestBrowser(dir, marking, "development");
+
+		expect(results).not.toContainEqual(
+			expect.objectContaining({ state: "pass" }),
+		);
+		expect(existsSync(join(dir, "ran"))).toBe(false);
+	});
 });
