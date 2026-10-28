@@ -89,11 +89,7 @@ async function buildOnce(variant, root, extra) {
 		configFile: false,
 		customLogger,
 		plugins,
-		build: {
-			outDir: join(root, "dist"),
-			reportCompressedSize: false,
-			rolldownOptions: { input: join(root, "src/main.js") },
-		},
+		build: { outDir: join(root, "dist"), reportCompressedSize: false },
 	});
 	return { ms: performance.now() - start, timings };
 }
@@ -130,8 +126,8 @@ function reported(build, plugin) {
 }
 
 /** One app's builds and compiles, as results/build-added.json has them. */
-function measure(app) {
-	const { roots, graiConfig, project, calls } = writeBuildApps(app);
+async function measure(app) {
+	const { roots, graiConfig, project, calls } = await writeBuildApps(app);
 	const extra = { stub: undefined, grai: graiConfig, paraglide: project };
 	const builds = { stub: [], grai: [], paraglide: [] };
 	const compiles = { grai: [], paraglide: [] };
@@ -184,7 +180,7 @@ if (process.argv[2] === "--child") {
 	for (const app of selectedApps(
 		names.length > 0 ? names : ["synthetic", "synthetic-13326"],
 	)) {
-		const measured = measure(app);
+		const measured = await measure(app);
 		recorded.push(measured);
 		console.log(
 			`\n### ${app.name}: ${measured.calls} calls on its pages, ms, medians of ${RUNS}\n`,
