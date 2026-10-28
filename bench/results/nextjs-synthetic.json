@@ -1,6 +1,6 @@
 {
 	"bench": "nextjs-synthetic",
-	"date": "2026-10-27T23:00:04.218Z",
+	"date": "2026-10-28T00:35:20.031Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,11 +8,11 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 14.4,
-		"end": 13.5
+		"start": 18.5,
+		"end": 19.7
 	},
 	"node": "24.16.0",
-	"grai": "819fb87d",
+	"grai": "74cd6a1c",
 	"versions": {
 		"@inlang/paraglide-js": "2.29.1",
 		"i18next": "26.4.7",
@@ -40,22 +40,22 @@
 	"rows": {
 		"bytes": {
 			"grai": {
-				"document": 9556,
+				"document": 9585,
 				"script": 122571,
 				"other": 0
 			},
 			"next-intl": {
-				"document": 109181,
+				"document": 109185,
 				"script": 127177,
 				"other": 0
 			},
 			"next-intl, client keys picked": {
-				"document": 10780,
+				"document": 10786,
 				"script": 127178,
 				"other": 0
 			},
 			"plain": {
-				"document": 9525,
+				"document": 9541,
 				"script": 116852,
 				"other": 0
 			}
@@ -63,409 +63,461 @@
 		"dev": {
 			"grai": {
 				"empty": {
-					"ready": 452.4,
-					"page": 3745.8
+					"ready": 355.8,
+					"page": 2234.7
 				},
 				"kept": {
-					"ready": 292,
-					"page": 1965.1
+					"ready": 341.9,
+					"page": 2088.4
 				},
 				"edits": {
 					"server": {
-						"shown": 188.6,
-						"written": 6.5
+						"shown": 167.3,
+						"written": 6.6
 					},
 					"client": {
-						"shown": 61.6,
-						"written": 5
+						"shown": 54.6,
+						"written": 4.8
 					}
 				}
 			},
 			"next-intl": {
 				"empty": {
-					"ready": 292.3,
-					"page": 2042.1
+					"ready": 333.1,
+					"page": 2305
 				},
 				"kept": {
-					"ready": 234.9,
-					"page": 1534.9
+					"ready": 290.6,
+					"page": 1702.2
 				},
 				"edits": {
 					"server": {
-						"shown": 168.9
+						"shown": 182
 					},
 					"client": {
-						"shown": 162.8
+						"shown": 163.2
 					}
 				}
 			}
 		},
 		"cold": {
 			"grai": {
-				"ready": 316.1,
-				"page": 1771.4,
-				"hydrated": 1904.4,
-				"cpu": 4925,
+				"ready": 298.6,
+				"page": 1772,
+				"hydrated": 1878.6,
+				"browser": 131.4,
+				"cpu": 4695,
 				"runs": [
 					{
 						"round": 0,
-						"ready": 291.9,
-						"page": 1730.2,
-						"cpu": 4840,
-						"hydrated": 1738.5
+						"ready": 214.5,
+						"page": 1325.5,
+						"cpu": 4670,
+						"hydrated": 1452.2,
+						"browser": 116.5
 					},
 					{
 						"round": 1,
-						"ready": 340.3,
-						"page": 2221.5,
-						"cpu": 5050,
-						"hydrated": 2721.9
+						"ready": 262.6,
+						"page": 1709,
+						"cpu": 4550,
+						"hydrated": 1709.3,
+						"browser": 128.1
 					},
 					{
 						"round": 2,
-						"ready": 364.2,
-						"page": 2309.8,
-						"cpu": 5120,
-						"hydrated": 3228.6
+						"ready": 248.4,
+						"page": 1487.2,
+						"cpu": 4640,
+						"hydrated": 1659.4,
+						"browser": 126.9
 					},
 					{
 						"round": 3,
-						"ready": 407,
-						"page": 2630.9,
-						"cpu": 5010,
-						"hydrated": 2055.6
+						"ready": 303.7,
+						"page": 1629.9,
+						"cpu": 4800,
+						"hydrated": 1869,
+						"browser": 131.8
 					},
 					{
 						"round": 4,
-						"ready": 379.1,
-						"page": 2683.4,
-						"cpu": 4980,
-						"hydrated": 2295.1
+						"ready": 299.3,
+						"page": 1891.6,
+						"cpu": 4720,
+						"hydrated": 1909.5,
+						"browser": 141.1
 					},
 					{
 						"round": 5,
-						"ready": 272.7,
-						"page": 1787.2,
-						"cpu": 4820,
-						"hydrated": 1784.5
+						"ready": 266.7,
+						"page": 1704.8,
+						"cpu": 4720,
+						"hydrated": 1859.5,
+						"browser": 135.3
 					},
 					{
 						"round": 6,
-						"ready": 349.1,
-						"page": 1755.6,
-						"cpu": 5000,
-						"hydrated": 1845.2
+						"ready": 304.8,
+						"page": 1994.8,
+						"cpu": 4650,
+						"hydrated": 2021.5,
+						"browser": 134.1
 					},
 					{
 						"round": 7,
-						"ready": 374,
-						"page": 1901.3,
-						"cpu": 5010,
-						"hydrated": 1835.1
+						"ready": 328.5,
+						"page": 1992.9,
+						"cpu": 4740,
+						"hydrated": 3247.8,
+						"browser": 490.5
 					},
 					{
 						"round": 8,
-						"ready": 289,
-						"page": 1571.8,
-						"cpu": 4720,
-						"hydrated": 1713.8
+						"ready": 815,
+						"page": 3549,
+						"cpu": 4540,
+						"hydrated": 2078.1,
+						"browser": 138.5
 					},
 					{
 						"round": 9,
-						"ready": 244.2,
-						"page": 1716.2,
-						"cpu": 4820,
-						"hydrated": 2195.2
+						"ready": 284.2,
+						"page": 1834.9,
+						"cpu": 4660,
+						"hydrated": 1907.8,
+						"browser": 126.3
 					},
 					{
 						"round": 10,
-						"ready": 253.6,
-						"page": 1521.1,
-						"cpu": 4650,
-						"hydrated": 1963.6
+						"ready": 297.9,
+						"page": 1695.3,
+						"cpu": 4830,
+						"hydrated": 1888.2,
+						"browser": 131
 					},
 					{
 						"round": 11,
-						"ready": 262.3,
-						"page": 1562.7,
-						"cpu": 4870,
-						"hydrated": 1621.3
+						"ready": 386.9,
+						"page": 2244.8,
+						"cpu": 4890,
+						"hydrated": 1839.8,
+						"browser": 128.4
 					}
 				]
 			},
 			"grai, empty output": {
-				"ready": 310.5,
-				"page": 2371.4,
-				"hydrated": 2667.5,
-				"cpu": 6115,
+				"ready": 276.6,
+				"page": 1964.4,
+				"hydrated": 2128.4,
+				"browser": 132.4,
+				"cpu": 5040,
 				"runs": [
 					{
 						"round": 0,
-						"ready": 380.9,
-						"page": 2715.7,
-						"cpu": 6240,
-						"hydrated": 2625
+						"ready": 208.6,
+						"page": 1517,
+						"cpu": 4950,
+						"hydrated": 1636.2,
+						"browser": 119.4
 					},
 					{
 						"round": 1,
-						"ready": 371.4,
-						"page": 2786.6,
-						"cpu": 6330,
-						"hydrated": 2701.4
+						"ready": 268.7,
+						"page": 2010.2,
+						"cpu": 5100,
+						"hydrated": 2051.2,
+						"browser": 132.1
 					},
 					{
 						"round": 2,
-						"ready": 348.6,
-						"page": 2502.2,
-						"cpu": 6100,
-						"hydrated": 2963.1
+						"ready": 256.7,
+						"page": 1749.5,
+						"cpu": 5030,
+						"hydrated": 2108.7,
+						"browser": 129.3
 					},
 					{
 						"round": 3,
-						"ready": 317.3,
-						"page": 2514.8,
-						"cpu": 6140,
-						"hydrated": 2821.9
+						"ready": 277,
+						"page": 1926,
+						"cpu": 5000,
+						"hydrated": 2090.1,
+						"browser": 129.1
 					},
 					{
 						"round": 4,
-						"ready": 411.2,
-						"page": 2773.2,
-						"cpu": 6280,
-						"hydrated": 2817.7
+						"ready": 283.2,
+						"page": 2052.5,
+						"cpu": 5060,
+						"hydrated": 2148,
+						"browser": 140.3
 					},
 					{
 						"round": 5,
-						"ready": 287.9,
-						"page": 2454.3,
-						"cpu": 6000,
-						"hydrated": 2688.8
+						"ready": 287.7,
+						"page": 1953.4,
+						"cpu": 5120,
+						"hydrated": 2056.9,
+						"browser": 135.6
 					},
 					{
 						"round": 6,
-						"ready": 303.6,
-						"page": 2288.4,
-						"cpu": 6050,
-						"hydrated": 2453.1
+						"ready": 276.3,
+						"page": 1975.3,
+						"cpu": 5040,
+						"hydrated": 2572.2,
+						"browser": 129.9
 					},
 					{
 						"round": 7,
-						"ready": 282.8,
-						"page": 2262.9,
-						"cpu": 6130,
-						"hydrated": 2899.3
+						"ready": 274.9,
+						"page": 2063.2,
+						"cpu": 5140,
+						"hydrated": 4824.5,
+						"browser": 252.2
 					},
 					{
 						"round": 8,
-						"ready": 323.5,
-						"page": 2279.4,
-						"cpu": 6290,
-						"hydrated": 2108
+						"ready": 574.5,
+						"page": 4069.8,
+						"cpu": 5000,
+						"hydrated": 2280.8,
+						"browser": 143.2
 					},
 					{
 						"round": 9,
-						"ready": 233.5,
-						"page": 2101.3,
-						"cpu": 6020,
-						"hydrated": 2646.1
+						"ready": 275.4,
+						"page": 1893.4,
+						"cpu": 5110,
+						"hydrated": 2212.4,
+						"browser": 132.5
 					},
 					{
 						"round": 10,
-						"ready": 240.4,
-						"page": 2136.7,
-						"cpu": 5910,
-						"hydrated": 2097
+						"ready": 278.3,
+						"page": 1923.7,
+						"cpu": 4930,
+						"hydrated": 2431.8,
+						"browser": 141.9
 					},
 					{
 						"round": 11,
-						"ready": 234.2,
-						"page": 1919.9,
-						"cpu": 5940,
-						"hydrated": 2243.4
+						"ready": 345.4,
+						"page": 2462.8,
+						"cpu": 5040,
+						"hydrated": 1998.5,
+						"browser": 132.2
 					}
 				]
 			},
 			"next-intl": {
-				"ready": 317.7,
-				"page": 1986.9,
-				"hydrated": 1897.7,
-				"cpu": 4565,
+				"ready": 273.1,
+				"page": 1817,
+				"hydrated": 1904.3,
+				"browser": 141.3,
+				"cpu": 4345,
 				"runs": [
 					{
 						"round": 0,
-						"ready": 296.8,
-						"page": 2227,
-						"cpu": 4730,
-						"hydrated": 2393.4
+						"ready": 211.6,
+						"page": 1353.4,
+						"cpu": 4180,
+						"hydrated": 1580.3,
+						"browser": 130
 					},
 					{
 						"round": 1,
-						"ready": 313,
-						"page": 1863.5,
-						"cpu": 4520,
-						"hydrated": 2019.4
+						"ready": 262.5,
+						"page": 1773,
+						"cpu": 4250,
+						"hydrated": 1946.5,
+						"browser": 142.1
 					},
 					{
 						"round": 2,
-						"ready": 381,
-						"page": 1930.8,
-						"cpu": 4670,
-						"hydrated": 1945.7
+						"ready": 255.6,
+						"page": 1659.7,
+						"cpu": 4300,
+						"hydrated": 1679.3,
+						"browser": 134.9
 					},
 					{
 						"round": 3,
-						"ready": 302.1,
-						"page": 1998.7,
-						"cpu": 4560,
-						"hydrated": 2670.4
+						"ready": 274.1,
+						"page": 1808.7,
+						"cpu": 4310,
+						"hydrated": 1969,
+						"browser": 140.7
 					},
 					{
 						"round": 4,
-						"ready": 369.1,
-						"page": 2148.2,
-						"cpu": 4650,
-						"hydrated": 2230.1
+						"ready": 286.7,
+						"page": 2047,
+						"cpu": 4240,
+						"hydrated": 1878.7,
+						"browser": 143.5
 					},
 					{
 						"round": 5,
-						"ready": 355.2,
-						"page": 2011,
-						"cpu": 4690,
-						"hydrated": 1784.2
+						"ready": 279.1,
+						"page": 1747,
+						"cpu": 4540,
+						"hydrated": 1831,
+						"browser": 139.5
 					},
 					{
 						"round": 6,
-						"ready": 335.4,
-						"page": 1975.1,
-						"cpu": 4520,
-						"hydrated": 1983.2
+						"ready": 272.1,
+						"page": 1825.3,
+						"cpu": 4410,
+						"hydrated": 1944.6,
+						"browser": 139.9
 					},
 					{
 						"round": 7,
-						"ready": 322.5,
-						"page": 2137.3,
-						"cpu": 4690,
-						"hydrated": 1788.4
+						"ready": 266.7,
+						"page": 1862.4,
+						"cpu": 4420,
+						"hydrated": 3853.5,
+						"browser": 247.9
 					},
 					{
 						"round": 8,
-						"ready": 324.7,
-						"page": 2167.5,
-						"cpu": 4570,
-						"hydrated": 1687.5
+						"ready": 571.8,
+						"page": 3191.8,
+						"cpu": 4530,
+						"hydrated": 2096,
+						"browser": 145.3
 					},
 					{
 						"round": 9,
-						"ready": 286.5,
-						"page": 1861.7,
-						"cpu": 4530,
-						"hydrated": 1762.6
+						"ready": 299.7,
+						"page": 2162.6,
+						"cpu": 4370,
+						"hydrated": 1929.8,
+						"browser": 145.1
 					},
 					{
 						"round": 10,
-						"ready": 282.5,
-						"page": 1829.3,
-						"cpu": 4440,
-						"hydrated": 1849.6
+						"ready": 247.5,
+						"page": 1640.6,
+						"cpu": 4320,
+						"hydrated": 1746,
+						"browser": 138.5
 					},
 					{
 						"round": 11,
-						"ready": 235.8,
-						"page": 1512.5,
-						"cpu": 4350,
-						"hydrated": 1773
+						"ready": 323.4,
+						"page": 1985.5,
+						"cpu": 4440,
+						"hydrated": 1841.8,
+						"browser": 141.8
 					}
 				]
 			},
 			"next-intl, client keys picked": {
-				"ready": 319.4,
-				"page": 1835.8,
-				"hydrated": 1947.1,
-				"cpu": 4500,
+				"ready": 292.4,
+				"page": 1751.7,
+				"hydrated": 1883,
+				"browser": 133.5,
+				"cpu": 4355,
 				"runs": [
 					{
 						"round": 0,
-						"ready": 312.4,
-						"page": 1896.8,
-						"cpu": 4470,
-						"hydrated": 2258.7
+						"ready": 202.5,
+						"page": 1345,
+						"cpu": 4060,
+						"hydrated": 1918.1,
+						"browser": 134.1
 					},
 					{
 						"round": 1,
-						"ready": 370.7,
-						"page": 2282,
-						"cpu": 4910,
-						"hydrated": 1956.9
+						"ready": 315.9,
+						"page": 1740.1,
+						"cpu": 4330,
+						"hydrated": 1803.2,
+						"browser": 134.3
 					},
 					{
 						"round": 2,
-						"ready": 294.9,
-						"page": 1748.8,
-						"cpu": 4490,
-						"hydrated": 3105.1
+						"ready": 255.8,
+						"page": 1598.2,
+						"cpu": 4240,
+						"hydrated": 1733.5,
+						"browser": 128.7
 					},
 					{
 						"round": 3,
-						"ready": 336.2,
-						"page": 2290.5,
-						"cpu": 4590,
-						"hydrated": 2446.4
+						"ready": 272.2,
+						"page": 1635.3,
+						"cpu": 4290,
+						"hydrated": 1987.3,
+						"browser": 132.5
 					},
 					{
 						"round": 4,
-						"ready": 295.5,
-						"page": 2225.6,
-						"cpu": 4630,
-						"hydrated": 2095.7
+						"ready": 289.1,
+						"page": 1763.2,
+						"cpu": 4400,
+						"hydrated": 1807.1,
+						"browser": 133.9
 					},
 					{
 						"round": 5,
-						"ready": 326.5,
-						"page": 1905.5,
-						"cpu": 4560,
-						"hydrated": 1772
+						"ready": 283.2,
+						"page": 1644.1,
+						"cpu": 4350,
+						"hydrated": 1792.6,
+						"browser": 131.7
 					},
 					{
 						"round": 6,
-						"ready": 255.8,
-						"page": 1880.4,
-						"cpu": 4430,
-						"hydrated": 1888.3
+						"ready": 299,
+						"page": 1861.4,
+						"cpu": 4420,
+						"hydrated": 1888.9,
+						"browser": 133.2
 					},
 					{
 						"round": 7,
-						"ready": 335.4,
-						"page": 1791.1,
-						"cpu": 4510,
-						"hydrated": 1937.2
+						"ready": 307.8,
+						"page": 1948.3,
+						"cpu": 4360,
+						"hydrated": 1972.4,
+						"browser": 139.6
 					},
 					{
 						"round": 8,
-						"ready": 275.3,
-						"page": 1639.9,
-						"cpu": 4330,
-						"hydrated": 1632
+						"ready": 338.8,
+						"page": 1986.7,
+						"cpu": 4510,
+						"hydrated": 1825.2,
+						"browser": 131.8
 					},
 					{
 						"round": 9,
-						"ready": 354.1,
-						"page": 1781.5,
-						"cpu": 4520,
-						"hydrated": 2054
+						"ready": 326.3,
+						"page": 1974.9,
+						"cpu": 4400,
+						"hydrated": 1959.7,
+						"browser": 135.9
 					},
 					{
 						"round": 10,
-						"ready": 271,
-						"page": 1689.3,
-						"cpu": 4460,
-						"hydrated": 1675.1
+						"ready": 253.2,
+						"page": 1716.3,
+						"cpu": 4320,
+						"hydrated": 1877,
+						"browser": 132.8
 					},
 					{
 						"round": 11,
-						"ready": 333.2,
-						"page": 1678.6,
-						"cpu": 4410,
-						"hydrated": 1623.2
+						"ready": 295.6,
+						"page": 1794.6,
+						"cpu": 4370,
+						"hydrated": 1986.3,
+						"browser": 135.2
 					}
 				]
 			}
@@ -475,51 +527,75 @@
 				"first": "grai",
 				"second": "next-intl",
 				"page": {
-					"median": -182.5,
-					"min": -595.6,
-					"max": 632.1,
+					"median": -35,
+					"min": -327.6,
+					"max": 357.3,
 					"blocks": [
-						368.5,
-						-221.7,
-						-226.8
+						-118.2,
+						44.2,
+						157
 					],
 					"values": [
-						-496.8,
-						358,
-						379,
-						632.1,
-						535.2,
-						-223.9,
-						-219.5,
-						-236,
-						-595.6,
-						-145.5,
-						-308.2,
-						50.2
+						-27.9,
+						-63.9,
+						-172.5,
+						-178.9,
+						-155.4,
+						-42.2,
+						169.5,
+						130.5,
+						357.3,
+						-327.6,
+						54.7,
+						259.3
 					]
 				},
 				"hydrated": {
-					"median": 36.4,
-					"min": -654.9,
-					"max": 1282.8,
+					"median": -18.9,
+					"min": -605.7,
+					"max": 142.2,
 					"blocks": [
-						43.9,
-						23.5,
-						70.1
+						-114,
+						29.6,
+						-9.9
 					],
 					"values": [
-						-654.9,
-						702.5,
-						1282.8,
-						-614.7,
-						65,
-						0.3,
-						-138,
-						46.6,
-						26.2,
-						432.7,
-						114,
-						-151.7
+						-128.1,
+						-237.1,
+						-19.9,
+						-100,
+						30.7,
+						28.5,
+						76.9,
+						-605.7,
+						-17.9,
+						-21.9,
+						142.2,
+						-2
+					]
+				},
+				"browser": {
+					"median": -7.7,
+					"min": -18.8,
+					"max": 242.6,
+					"blocks": [
+						-11.2,
+						-3.3,
+						-10.5
+					],
+					"values": [
+						-13.5,
+						-14,
+						-8,
+						-8.9,
+						-2.4,
+						-4.2,
+						-5.8,
+						242.6,
+						-6.8,
+						-18.8,
+						-7.5,
+						-13.4
 					]
 				}
 			},
@@ -527,51 +603,75 @@
 				"first": "grai",
 				"second": "next-intl, client keys picked",
 				"page": {
-					"median": -66.7,
-					"min": -168.2,
-					"max": 561,
+					"median": 19.6,
+					"min": -140,
+					"max": 1562.4,
 					"blocks": [
-						140,
-						-4.1,
-						-91.9
+						-25.3,
+						94.6,
+						214.6
 					],
 					"values": [
-						-166.6,
-						-60.5,
-						561,
-						340.4,
-						457.7,
-						-118.3,
-						-124.8,
-						110.2,
-						-68,
-						-65.3,
-						-168.2,
-						-115.9
+						-19.5,
+						-31.1,
+						-111.1,
+						-5.5,
+						128.4,
+						60.7,
+						133.4,
+						44.6,
+						1562.4,
+						-140,
+						-21,
+						450.2
 					]
 				},
 				"hydrated": {
-					"median": 47.2,
-					"min": -520.3,
-					"max": 765,
+					"median": -20.3,
+					"min": -465.9,
+					"max": 1275.5,
 					"blocks": [
-						-133.6,
-						-15.3,
-						111.5
+						-106.1,
+						117.5,
+						-20.3
 					],
 					"values": [
-						-520.3,
-						765,
-						123.4,
-						-390.7,
-						199.5,
-						12.6,
-						-43.1,
-						-102.2,
-						81.8,
-						141.3,
-						288.5,
-						-1.9
+						-465.9,
+						-93.9,
+						-74.1,
+						-118.3,
+						102.3,
+						66.9,
+						132.6,
+						1275.5,
+						252.8,
+						-51.9,
+						11.2,
+						-146.5
+					]
+				},
+				"browser": {
+					"median": -1.2,
+					"min": -17.6,
+					"max": 350.9,
+					"blocks": [
+						-4,
+						5.4,
+						-4.3
+					],
+					"values": [
+						-17.6,
+						-6.2,
+						-1.8,
+						-0.7,
+						7.2,
+						3.6,
+						0.9,
+						350.9,
+						6.7,
+						-9.6,
+						-1.8,
+						-6.8
 					]
 				}
 			},
@@ -579,51 +679,75 @@
 				"first": "grai, empty output",
 				"second": "next-intl",
 				"page": {
-					"median": 425.3,
-					"min": 111.9,
-					"max": 923.1,
+					"median": 182.2,
+					"min": -269.2,
+					"max": 878.1,
 					"blocks": [
-						543.8,
-						378.3,
-						273.5
+						140.4,
+						175.4,
+						380.2
 					],
 					"values": [
-						488.7,
-						923.1,
-						571.5,
-						516.1,
-						625,
-						443.3,
-						313.3,
-						125.6,
-						111.9,
-						239.6,
-						307.5,
-						407.3
+						163.6,
+						237.2,
+						89.8,
+						117.3,
+						5.5,
+						206.4,
+						150,
+						200.8,
+						878.1,
+						-269.2,
+						283,
+						477.3
 					]
 				},
 				"hydrated": {
-					"median": 529,
-					"min": 151.5,
-					"max": 1110.8,
+					"median": 247.6,
+					"min": 55.8,
+					"max": 970.9,
 					"blocks": [
-						456.8,
-						746.1,
-						445.4
+						112.9,
+						448.4,
+						233.7
 					],
 					"values": [
-						231.6,
-						682,
-						1017.4,
-						151.5,
-						587.6,
-						904.6,
-						469.9,
-						1110.8,
-						420.5,
-						883.6,
-						247.4,
-						470.4
+						55.8,
+						104.8,
+						429.4,
+						121.1,
+						269.2,
+						225.9,
+						627.6,
+						970.9,
+						184.8,
+						282.6,
+						685.8,
+						156.8
+					]
+				},
+				"browser": {
+					"median": -7.6,
+					"min": -12.6,
+					"max": 4.3,
+					"blocks": [
+						-10.3,
+						-3.5,
+						-5.8
+					],
+					"values": [
+						-10.6,
+						-10,
+						-5.6,
+						-11.6,
+						-3.2,
+						-3.9,
+						-10,
+						4.3,
+						-2.1,
+						-12.6,
+						3.4,
+						-9.6
 					]
 				}
 			}
