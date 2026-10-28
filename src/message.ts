@@ -242,10 +242,10 @@ function withInputs(
  * input it is the text of, which is the value MessageFormat 2 gives it.
  */
 function shownAsInputs(
-	variants: readonly Variant[],
+	variants: Variant[],
 	strings: ReadonlyMap<string, string>,
 ): Variant[] {
-	if (strings.size === 0) return [...variants];
+	if (strings.size === 0) return variants;
 	const shown = (name: string) => strings.get(name) ?? name;
 	return variants.map(({ keys, pattern }) => ({
 		keys,
