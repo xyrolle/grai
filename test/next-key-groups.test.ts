@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { rmSync, symlinkSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { members } from "../src/bits.ts";
@@ -407,8 +407,10 @@ describe("the contexts read before the output is written, as beside a fresh clon
 	const unwritten = async (
 		files: Record<string, string>,
 		words: Record<string, string>,
+		prepare: (dir: string) => void = () => {},
 	) => {
 		const { dir, config, compilation } = await compiledApp([], files, words);
+		prepare(dir);
 		const written = await contextsIn(dir, config, compilation);
 		rmSync(config.outdir, { recursive: true, force: true });
 		return { written, unwritten: await contextsIn(dir, config, compilation) };
@@ -503,5 +505,20 @@ export function Widget() {
 			heading_a: ["page.jsx server"],
 			heading_b: ["b/page.jsx client"],
 		});
+	});
+
+	it("are those read once it is, through a tsconfig alias whose target goes by a symlink to the project", async () => {
+		const { written, unwritten: before } = await unwritten(
+			{
+				...pageOf("@catalog"),
+				"tsconfig.json": JSON.stringify({
+					compilerOptions: { paths: { "@catalog": ["./linked/out/keys.js"] } },
+				}),
+			},
+			barrelWords,
+			(dir) => symlinkSync(dir, join(dir, "linked"), "dir"),
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({ heading_a: ["page.jsx server"] });
 	});
 });
