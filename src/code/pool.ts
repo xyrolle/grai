@@ -6,9 +6,8 @@
  */
 
 import { availableParallelism } from "node:os";
-import { extname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
+import { packageModule } from "../package-files.ts";
 import type { Resolution } from "./resolution.ts";
 
 /** A pool's task: files to read into their facts' JSON, or imports to resolve, each from a file. */
@@ -39,10 +38,7 @@ export type Work<T extends Task, A> = {
 
 export class Pool {
 	private readonly workers: Worker[] = [];
-	private readonly script = new URL(
-		`./pool-worker${extname(fileURLToPath(import.meta.url))}`,
-		import.meta.url,
-	);
+	private readonly script = packageModule("code/pool-worker");
 
 	/**
 	 * Each task's answer, in order. This thread takes tasks until none is left, and once the work it

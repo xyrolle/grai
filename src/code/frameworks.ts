@@ -7,6 +7,7 @@
 
 import { createRequire } from "node:module";
 import type { AST } from "svelte/compiler";
+import { packageDirectory } from "../package-files.ts";
 
 /** A framework whose components grai reads. */
 export type Framework = "svelte" | "vue" | "astro" | "mdx";
@@ -33,7 +34,7 @@ export function packageOf(framework: Framework): string {
 	return packages[framework];
 }
 
-const require = createRequire(import.meta.url);
+const require = createRequire(packageDirectory);
 
 /**
  * Svelte's parse of a component's tree, or undefined when the project does not install Svelte.
