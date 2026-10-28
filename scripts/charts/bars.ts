@@ -69,6 +69,8 @@ const width = 480;
 const side = 16;
 /** Room right of the longest bar for its value. */
 const valueRoom = 76;
+/** The narrowest the bars may be drawn: a label that leaves less is too long for a chart. */
+const minimumPlot = 160;
 const bar = 14;
 const row = 32;
 const heading = 28;
@@ -108,6 +110,8 @@ const xmlText = (text: string) =>
 
 /** About the width of a character of the subtitle's 13 px type, to wrap it within the chart. */
 const subtitleCharacterWidth = 6.6;
+/** About the width of a character of the title's 16 px bold type, to wrap it within the chart. */
+const titleCharacterWidth = 8.8;
 
 /** Text broken at spaces into lines of at most `characters` characters. A subtitle too long for one line breaks at its clauses first. */
 function wrapped(text: string, characters: number): string[] {
@@ -135,6 +139,10 @@ export function barChart(chart: BarChart, theme: Theme): string {
 	const labels = Math.ceil(longest * characterWidth) + 12;
 	const x0 = side + labels;
 	const plot = width - x0 - side - valueRoom;
+	if (plot < minimumPlot)
+		throw new Error(
+			`"${chart.title}": its longest label leaves ${plot} px for the bars; shorten it`,
+		);
 	const scale = (value: number) => (value / top) * plot;
 	const characters = Math.floor((width - 2 * side) / subtitleCharacterWidth);
 	const subtitle =
@@ -146,7 +154,12 @@ export function barChart(chart: BarChart, theme: Theme): string {
 						wrapped(index < all.length - 1 ? `${clause};` : clause, characters),
 					);
 	const parts: string[] = [];
-	let y = 48 + subtitle.length * 17;
+	const title = wrapped(
+		chart.title,
+		Math.floor((width - 2 * side) / titleCharacterWidth),
+	);
+	const below = (title.length - 1) * 20;
+	let y = 48 + below + subtitle.length * 17;
 	const plotTop = y;
 	for (const group of chart.groups) {
 		if (group.heading !== undefined) {
@@ -192,8 +205,8 @@ export function barChart(chart: BarChart, theme: Theme): string {
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" ${font}>
 <title>${xmlText(chart.title)}</title>
 <rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="6" fill="${theme.surface}" stroke="${theme.grid}"/>
-<text x="${side}" y="24" font-size="16" font-weight="600" fill="${theme.primary}">${xmlText(chart.title)}</text>
-${subtitle.map((line, index) => `<text x="${side}" y="${44 + index * 17}" font-size="13" fill="${theme.secondary}">${xmlText(line)}</text>`).join("\n")}
+${title.map((line, index) => `<text x="${side}" y="${24 + index * 20}" font-size="16" font-weight="600" fill="${theme.primary}">${xmlText(line)}</text>`).join("\n")}
+${subtitle.map((line, index) => `<text x="${side}" y="${44 + below + index * 17}" font-size="13" fill="${theme.secondary}">${xmlText(line)}</text>`).join("\n")}
 ${grid.join("\n")}
 ${parts.join("\n")}
 <text x="${x0 + plot}" y="${plotBottom + 37}" font-size="12" text-anchor="end" fill="${theme.secondary}">${xmlText(chart.axis)}</text>
