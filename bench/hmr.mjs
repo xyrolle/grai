@@ -1,24 +1,29 @@
 // Dev: one message edited until the page shows it, end to end in Vite: the catalog written, the
 // watcher, the plugin, the socket, the browser, the DOM (hmr-sessions.mjs).
-// "grai's plugin" is grai's own Vite plugin, as an app runs it, and it also times the edit until a
-// server render through Vite's module runner shows it. The designs it was chosen from
+// "grai's plugin" is grai's own Vite plugin, as an app runs it. The designs it was chosen from
 // follow, as experiments: each serves the same module, every locale of every key in one table,
 // from a compiler of this bench's own (prototype.mjs). "whole" lets Vite re-send and re-evaluate it
 // on each edit; "patch" sends a custom HMR event naming a module of only the changed functions,
 // which the page imports and writes into the table; "patch, fs.watch" does the same from its own
 // watcher on the catalogs instead of Vite's. Beside them: Paraglide's own Vite plugin, which
 // compiles again on an edit, and i18next and use-intl, whose page imports the locale's JSON and
-// accepts its update. Each design's session takes its turn once a round, in an order that
+// accepts its update. grai's plugin's edits until a server render shows them are a session of their
+// own, with no page open. Each design's session takes its turn once a round, in an order that
 // rotates (rounds.mjs), every sample kept with its round's load, and each design's edits paired
 // with grai's plugin's of the same round. Each page's heap, once collected, is taken at load and
 // after the edits. Against the same page with no messages, grai's plugin has a budget for it
 // (HEAP_BUDGET), its heap per edit taken in a session of its own after the rounds. The pages and
 // their plugins are dev-pages.mjs's; the edits go to a copy of the catalogs under .cache, never the
 // app's.
-//   node hmr.mjs [app...]      ROUNDS=<multiple of 8> to change the rounds
+//   node hmr.mjs [app...]      ROUNDS=<multiple of 9> to change the rounds
 import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
-import { EDITS, pageSession, WARMUPS } from "./hmr-sessions.mjs";
+import {
+	EDITS,
+	pageSession,
+	serverRenderSession,
+	WARMUPS,
+} from "./hmr-sessions.mjs";
 import { median, medianInterval } from "./medians.mjs";
 import { recordResults } from "./results.mjs";
 import {
@@ -48,6 +53,8 @@ const designs = [
 	"use-intl",
 	"no messages",
 ];
+const SERVER_RENDER = "grai's plugin, a server render";
+const variants = [...designs, SERVER_RENDER];
 
 const spread = (samples) => ({
 	median: median(samples),
@@ -56,7 +63,7 @@ const spread = (samples) => ({
 });
 
 /** A design's figures over its sessions, as results/hmr-*.json has them. */
-function designRow(design, sessions) {
+function designRow(design, sessions, serverRender) {
 	const edits = sessions.flatMap((session) => session.samples);
 	const part = (field) =>
 		edits.length === 0 ? undefined : median(edits.map((edit) => edit[field]));
@@ -70,8 +77,8 @@ function designRow(design, sessions) {
 		pageLoad: median(sessions.map((session) => session.load)),
 		editToPage: part("total"),
 		...(design === "grai's plugin" && {
-			editToServer: part("server"),
-			serverRender: spread(edits.map((edit) => edit.server)),
+			editToServer: median(serverRender.map((edit) => edit.server)),
+			serverRender: spread(serverRender.map((edit) => edit.server)),
 		}),
 		heap,
 		watcher: part("watcher"),
@@ -135,13 +142,20 @@ function checkHeap(app, rows, heapSession) {
 const browser = await chromium.launch();
 try {
 	for (const app of selectedApps()) {
-		const rounds = roundCount(designs.length);
-		const kept = await inRounds(designs, rounds, (design, round) =>
-			pageSession(browser, app, design, round),
+		const rounds = roundCount(variants.length);
+		const kept = await inRounds(variants, rounds, (variant, round) =>
+			variant === SERVER_RENDER
+				? serverRenderSession(app, round)
+				: pageSession(browser, app, variant, round),
 		);
 		const sessions = (variant) =>
 			kept.map((round) => round.measured.get(variant));
-		const rows = designs.map((design) => designRow(design, sessions(design)));
+		const serverRender = sessions(SERVER_RENDER).flatMap(
+			(each) => each.samples,
+		);
+		const rows = designs.map((design) =>
+			designRow(design, sessions(design), serverRender),
+		);
 		/** A design's median edit in each round. */
 		const byRound = (design) =>
 			sessions(design).map((session) =>
