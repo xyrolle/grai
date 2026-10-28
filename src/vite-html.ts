@@ -35,8 +35,8 @@ export function pageLocale(core: GraiPlugin, options: GraiOptions): Plugin {
 		transformIndexHtml: {
 			// After Vite has written the page's module scripts and preloads, which it goes ahead of.
 			order: "post",
-			handler(html, context) {
-				const page = withPageLocale(html, context, core.config(), site);
+			async handler(html, context) {
+				const page = await withPageLocale(html, context, core.config(), site);
 				const unreported = page.hashes.filter((hash) => !reported.has(hash));
 				if (context.bundle !== undefined && unreported.length > 0) {
 					for (const hash of unreported) reported.add(hash);
@@ -65,16 +65,16 @@ type Site = {
  * per locale points them at the locale's copies, and in dev points keys.js at the locale's. A build
  * minifies the script; dev serves it as written.
  */
-function withPageLocale(
+async function withPageLocale(
 	html: string,
 	context: IndexHtmlTransformContext,
 	config: Config,
 	site: Site,
-): { html: string; hashes: string[] } {
+): Promise<{ html: string; hashes: string[] }> {
 	const built = context.bundle !== undefined;
 	// The script points the page at its locale's modules in dev, keys.js, and in a build only with
 	// the message chunks' copies.
-	const script = localeScript(config, {
+	const script = await localeScript(config, {
 		minify: built,
 		copies: !built || site.copies,
 	});
