@@ -77,7 +77,7 @@ const listed = (html) =>
 	);
 
 /** Throws unless `texts` are the page's `words`, in order, naming the first that differs. */
-function check(texts, words, where) {
+export function assertListed(texts, words, where) {
 	const index = words.findIndex((word, at) => texts[at] !== word);
 	if (index === -1 && texts.length === words.length) return;
 	const at = index === -1 ? words.length : index;
@@ -119,7 +119,7 @@ export async function devStart(root, path, words, cleared = []) {
 	const url = `${origin}${path}`;
 	const html = await firstResponse(url);
 	const page = now() - server.launched;
-	check(listed(html), words, `${url}'s first response`);
+	assertListed(listed(html), words, `${url}'s first response`);
 	return { server, url, ready, page, cpu: groupCpu(server.child.pid) };
 }
 
@@ -159,7 +159,7 @@ export async function hydratedStart(browser, root, path, words, cleared = []) {
 	await context.close();
 	if (errors.length > 0)
 		throw new Error(`${url} failed to hydrate:\n${errors.join("\n")}`);
-	check(texts, words, `${url} once hydrated`);
+	assertListed(texts, words, `${url} once hydrated`);
 	return {
 		server,
 		hydrated: hydratedAt - server.launched,

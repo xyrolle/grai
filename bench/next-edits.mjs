@@ -6,14 +6,16 @@
 // component's message in turn, the components' order rotating too: WARMUPS edits that warm the
 // dev server's compiles of the edited module, not counted, then EDITS timed from the catalog's save
 // until the page's Observer saw the edited text. For grai, also until it wrote the edited shard.
-// A session's last edit is saved back once it is shown. A session ends with a start of its own
-// from the .next it left. Every sample is kept with its round's load, and each round pairs grai's median
+// After each edit the whole page must list every message, the edit in its place; the catalog is
+// then saved back, and the page must list every message as before, ahead of the next edit. A page
+// error or a hydration error fails the session. A session ends with a start of its own from the
+// .next it left. Every sample is kept with its round's load, and each round pairs grai's median
 // edit with each next-intl app's.
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { median, medianInterval } from "./medians.mjs";
-import { devStart } from "./next-dev.mjs";
+import { assertListed, devStart } from "./next-dev.mjs";
 import {
 	inRounds,
 	pairedRatio,
@@ -60,9 +62,9 @@ function writtenAt(outdir, text) {
 
 /**
  * Saves `text` as the component's target message, a save interval after the last, and resolves
- * once the page shows it: with ms from the save.
+ * once the page shows it and lists every message with it in place: with ms from the save.
  */
-async function shown(view, component, text) {
+async function shown(view, component, text, words) {
 	await delay(SAVE_INTERVAL_MS);
 	const saved = save(view.catalog, view.keys.targets[component], text);
 	const at = await view.page
@@ -73,24 +75,40 @@ async function shown(view, component, text) {
 			{ timeout: EDIT_PATIENCE_MS },
 		)
 		.then((handle) => handle.jsonValue());
+	const listed = await view.page.$$eval("li", (items) =>
+		items.map((item) => item.textContent),
+	);
+	if (view.faults.length > 0)
+		throw new Error(`${view.url} failed: ${view.faults.join("; ")}`);
+	assertListed(listed, words, `${view.url} after ${JSON.stringify(text)}`);
 	return { saved, ms: at - saved };
 }
 
 /** A component's edits in an open page: each one's ms, and for grai until it wrote the shard. */
-async function editsOf(view, component) {
-	const key = view.keys.targets[component];
+async function editsOf(view, component, words) {
+	const { server, client, targets } = view.keys;
+	const key = targets[component];
 	const original = JSON.parse(readFileSync(view.catalog, "utf8"))[key];
+	const index =
+		component === "server"
+			? server.indexOf(key)
+			: server.length + client.indexOf(key);
+	if (words[index] !== original)
+		throw new Error(
+			`The page lists ${words[index]} for ${key}, not ${original}.`,
+		);
 	const samples = [];
 	for (let edit = 0; edit < WARMUPS + EDITS; edit++) {
 		const text = `Edit ${edit}: ${original}`;
-		const { saved, ms } = await shown(view, component, text);
+		const edited = words.with(index, text);
+		const { saved, ms } = await shown(view, component, text, edited);
 		if (edit >= WARMUPS)
 			samples.push({
 				shown: ms,
 				...(view.outdir && { written: writtenAt(view.outdir, text) - saved }),
 			});
+		await shown(view, component, original, words);
 	}
-	await shown(view, component, original);
 	return samples;
 }
 
@@ -104,11 +122,16 @@ async function session(browser, app, setup, round) {
 	const edits = {};
 	try {
 		const page = await context.newPage();
+		const faults = [];
+		page.on("pageerror", (error) => faults.push(String(error)));
+		page.on("console", (message) => {
+			if (message.type() === "error") faults.push(message.text());
+		});
 		await page.goto(empty.url);
 		await page.waitForFunction(() => "changes" in window);
-		const view = { ...app, ...setup, page };
+		const view = { ...app, ...setup, page, faults, url: empty.url };
 		for (const component of rotated(components, round))
-			edits[component] = await editsOf(view, component);
+			edits[component] = await editsOf(view, component, setup.words);
 	} finally {
 		await context.close();
 		await stopServer(empty.server.child);
