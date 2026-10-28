@@ -100,7 +100,7 @@ export async function savedBuild(
 		if (error instanceof GraiError) return undefined;
 		throw error;
 	}
-	const key = await buildKey(config, options);
+	const key = buildKey(config, options);
 	const saved = await readSaved(
 		join(config.outdir, stateDirectory, savedName),
 		key,
