@@ -2,7 +2,7 @@ import { expect } from "vitest";
 import { compileCatalogs } from "../src/compilation.ts";
 import { parseCatalogs, readProject } from "../src/compile.ts";
 import type { AppData } from "../src/next/app-data.ts";
-import { keyWeights } from "../src/next/key-groups.ts";
+import { keyWeights } from "../src/next/key-weights.ts";
 import { defaultPageExtensions } from "../src/next/routes.ts";
 import { project } from "./project.ts";
 import { writeSources } from "./sources.ts";
