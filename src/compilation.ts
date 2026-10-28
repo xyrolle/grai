@@ -73,15 +73,17 @@ export function compileCatalogs(
 	const keys = new Map(edited === undefined ? undefined : previous?.keys);
 	const candidates = edited ?? allKeys(catalogs);
 	const changed = new Set<string>();
-	const adds = [...candidates].some(
-		(key) =>
-			previous?.keys.has(key) !== true &&
-			catalogs.some((catalog) => catalog.messages.has(key)),
-	);
-	const collisions =
-		previous !== undefined && !adds
-			? new Map<string, string>()
-			: caseCollisions(allKeys(catalogs));
+	// A key added since the previous compilation can collide with another by case.
+	const adds =
+		previous === undefined ||
+		[...candidates].some(
+			(key) =>
+				!previous.keys.has(key) &&
+				catalogs.some((catalog) => catalog.messages.has(key)),
+		);
+	const collisions = adds
+		? caseCollisions(edited === undefined ? candidates : allKeys(catalogs))
+		: new Map<string, string>();
 	const base = catalogs.find((catalog) => catalog.locale === config.baseLocale);
 	const fallbackOf = fallbackPositions(config.locales, config.fallbacks);
 	for (const key of candidates) {
