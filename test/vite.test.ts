@@ -1266,6 +1266,19 @@ export const render = () => \`\${source.includes("export")} \${m.title()}\`;
 		expect(page?.code).toContain('"/out/messages.js?raw"');
 	});
 
+	it("writes the output before a module expands a glob of it, which Vite reads from the file system", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`const modules = import.meta.glob("./out/messages.js", { eager: true });
+export const render = () => modules["./out/messages.js"].m.title();
+`,
+		);
+		const { rendered } = await devServerOf(dir);
+
+		expect(await rendered()).toBe("Title");
+	});
+
 	it("leaves the output out of the dependency scan before it is written, which finds the page's dependencies", async () => {
 		const { dir } = project(catalogs);
 		const release = heldOutput(dir);

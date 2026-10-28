@@ -29,8 +29,9 @@ const scannedPrefix = "\0grai:unwritten:";
  * a module, as one with a query (`?raw`) or by a mapping only the file system resolves, as a
  * tsconfig's paths, has the output written now, and is resolved again once it is. Vite's dependency
  * scan reads the files it is given from the disk: it gets the output as an import it leaves out,
- * since the output imports no dependency. Once it is written, an import nothing resolved fails as it
- * would.
+ * since the output imports no dependency. A module with a glob (`import.meta.glob`), which Vite
+ * expands from the disk, waits for the output to be written. Once it is written, an import nothing
+ * resolved fails as it would.
  */
 export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 	let root = "";
@@ -73,6 +74,14 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 					return null;
 				if (!(await dev.write())) return null;
 				return this.resolve(id, importer, { ...options, skipSelf: true });
+			},
+		},
+		transform: {
+			order: "pre",
+			filter: { code: "import.meta.glob" },
+			async handler() {
+				await dev.write();
+				return null;
 			},
 		},
 	};
