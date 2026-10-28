@@ -175,3 +175,27 @@ it("compiles for development, with the config's pseudo-locale", async () => {
 
 	expect(await locales).toEqual(["en", "de", "en-XA"]);
 });
+
+it("settles a compile asked for once the read again of a catalog met mid-save has ended, after its report", async () => {
+	const { dir, config } = project(catalogs);
+	const events: string[] = [];
+	const watcher = watch(
+		config,
+		(result) =>
+			events.push(`report ${result.errors.map(({ code }) => code).join()}`),
+		() => events.push("failed"),
+	);
+	onTestFinished(() => watcher.close());
+	await watcher.first;
+
+	// The catalog stays broken, so the compile asked for reads it again once the files are quiet,
+	// and that read's result stands.
+	writeFileSync(join(dir, "messages", "de.json"), '{ "title": "Tit');
+	const compiled = await watcher.compileAgain();
+	events.push("compiled");
+
+	expect(
+		"result" in compiled && compiled.result.errors.map(({ code }) => code),
+	).toEqual(["catalog-invalid"]);
+	expect(events.slice(-2)).toEqual(["report catalog-invalid", "compiled"]);
+});
