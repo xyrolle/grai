@@ -1,7 +1,9 @@
 import {
 	existsSync,
 	readdirSync,
+	readFileSync,
 	rmSync,
+	statSync,
 	utimesSync,
 	writeFileSync,
 } from "node:fs";
@@ -9,6 +11,8 @@ import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
+import { savedBuild } from "../src/saved-build.ts";
+import { groupsFile, saveGroups } from "../src/saved-groups.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -198,4 +202,33 @@ it("settles a compile asked for once the read again of a catalog met mid-save ha
 		"result" in compiled && compiled.result.errors.map(({ code }) => code),
 	).toEqual(["catalog-invalid"]);
 	expect(events.slice(-2)).toEqual(["report catalog-invalid", "compiled"]);
+});
+
+it("saves the build of a compile asked for to place the keys by groups saved since, which the next start takes up and saves nothing", async () => {
+	const { dir, config } = project(catalogs);
+	const outdir = join(dir, "out");
+	const watcher = watch(
+		config,
+		() => {},
+		() => {},
+	);
+	await watcher.first;
+	await saveGroups(outdir, [["title"]]);
+	await watcher.compileAgain();
+	await watcher.close();
+
+	const saved = join(outdir, ".grai", "build");
+	const build = await savedBuild(config, { pseudoLocale: true });
+	expect(build?.rendered.groups).toBe(
+		JSON.stringify(JSON.parse(readFileSync(groupsFile(outdir), "utf8"))),
+	);
+	const { mtimeMs } = statSync(saved);
+	const restarted = watch(
+		config,
+		() => {},
+		() => {},
+	);
+	await restarted.first;
+	await restarted.close();
+	expect(statSync(saved).mtimeMs).toBe(mtimeMs);
 });
