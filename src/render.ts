@@ -1,3 +1,4 @@
+import { hash } from "node:crypto";
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
 import { contentName } from "./content-names.ts";
@@ -13,29 +14,44 @@ import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import type { OutputModules, RenderedModules } from "./output-modules.ts";
 import type { KeyGroups } from "./saved-groups.ts";
 
-/** A file of the output: its path in the outdir, and its text. */
-export type OutputFile = readonly [path: string, text: string];
+/**
+ * A file of the output: its path in the outdir, its text, and, for a module of keys, the hash of
+ * its text, taken once as it is rendered, so that a compile hashes only the modules it renders.
+ */
+export type OutputFile = readonly [path: string, text: string, sha1?: string];
+
+/** The texts of lists of files, by their paths. */
+export function textsByPath(
+	...lists: (readonly OutputFile[])[]
+): Map<string, string> {
+	return new Map(lists.flat().map(([path, text]) => [path, text]));
+}
 
 /**
- * The output, as a compile publishes it. The immutable files are named by their content, so a
- * compile writes each once and never replaces it. The mutable ones keep their names and are
- * replaced when their text changes: the entries apps import, which name the immutable files, and
- * each shard's declaration map.
+ * The output, as a compile publishes it, in the order it is renamed into place:
+ * - `immutable`: the files named by their content, which a compile writes once and never replaces;
+ * - `keyModules`: the modules of keys and their declarations, named by their shape (`renderShard`),
+ *   which a compile replaces in place when only their messages change;
+ * - `mutable`: the files with names of their own, replaced when their text changes: the entries
+ *   apps import, which name the files above, and each module of keys' declaration map.
  */
 export type Output = {
 	immutable: readonly OutputFile[];
+	keyModules: readonly OutputFile[];
 	mutable: readonly OutputFile[];
 };
 
 /**
  * A place's files as rendered (`key-placement.ts`): the name of its module and declarations,
- * `<label>-<hash>` within `keys/`, the module, the declarations and their map, `<label>.d.ts.map`,
- * and the line of the declarations each key is on.
+ * `<label>-<hash>` within `keys/`, the module and the declarations, each with the hash of its text,
+ * their map, `<label>.d.ts.map`, and the line of the declarations each key is on.
  */
 type ShardFiles = {
 	name: string;
 	module: string;
+	moduleHash: string;
 	declarations: string;
+	declarationsHash: string;
 	map: string;
 	lines: readonly DeclarationLine[];
 };
@@ -122,13 +138,11 @@ export function renderOutput(
 		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
 		.join("");
 	const output: Output = {
-		immutable: [
-			...moduleFiles.immutable,
-			...files.flatMap(({ name, module, declarations }): OutputFile[] => [
-				[`keys/${name}.js`, module],
-				[`keys/${name}.d.ts`, declarations],
-			]),
-		],
+		immutable: moduleFiles.immutable,
+		keyModules: files.flatMap((shard): OutputFile[] => [
+			[`keys/${shard.name}.js`, shard.module, shard.moduleHash],
+			[`keys/${shard.name}.d.ts`, shard.declarations, shard.declarationsHash],
+		]),
 		mutable: [
 			...moduleFiles.mutable,
 			...[...shardFiles].map(
@@ -145,7 +159,7 @@ export function renderOutput(
 		output,
 		rendered: {
 			...rendered,
-			files: new Map([...output.immutable, ...output.mutable]),
+			files: textsByPath(output.immutable, output.keyModules, output.mutable),
 			groups: placement.groups,
 			shards,
 			shardFiles,
@@ -177,7 +191,12 @@ function importsRenamed(
 }
 
 /**
- * A place's module and declarations, named by their content. They share the name so that
+ * A place's module and declarations, named by their shape: the keys they declare, and the head of
+ * each, which names what they import and the locales they were compiled for. An edit that changes
+ * only messages keeps the name, so the compile replaces the two files in place, each renamed over
+ * the old one at once, and the entries that name them stay as they are: a bundler watching the
+ * outdir then compiles that module again and nothing else. A change of shape renames them, and
+ * keys.js with them, so a reader loads one compile's layout. They share the name so that
  * TypeScript reads the declarations rather than the module, as it does any `.js` beside its
  * `.d.ts`, and leaves the module out of a project that type-checks JavaScript; the declarations
  * name their map by the place's label.
@@ -195,38 +214,58 @@ function renderShard(
 		if (compiledKey !== undefined) compiled.set(key, compiledKey);
 	}
 	const module = shardModule([...compiled.values()], modules, locales);
-	const { body, lines } = shardDeclarations(compiled, modules);
-	const declarations = `${body}//# sourceMappingURL=${label}.d.ts.map\n`;
-	const name = contentName(label, module, declarations);
-	return { name, module, declarations, lines };
+	const types = shardDeclarations(compiled, modules);
+	const declarations = `${types.head}${types.body}//# sourceMappingURL=${label}.d.ts.map\n`;
+	const name = contentName(
+		label,
+		module.head,
+		types.head,
+		[...compiled.keys()].join("\n"),
+	);
+	const text = `${module.head}${module.body}`;
+	return {
+		name,
+		module: text,
+		moduleHash: hash("sha1", text),
+		declarations,
+		declarationsHash: hash("sha1", declarations),
+		lines: types.lines,
+	};
 }
 
 /**
- * A shard's module. It first checks that the runtime it reached through the anchor reads the
- * locales its keys were compiled for, at their positions, as a process that loaded the anchor of
- * one compile and the keys of another may not.
+ * A shard's module: its head, which imports what its keys call and first checks that the runtime
+ * it reached through the anchor reads the locales its keys were compiled for, at their positions,
+ * as a process that loaded the anchor of one compile and the keys of another may not; and its body,
+ * the keys.
  */
 function shardModule(
 	keys: readonly CompiledKey[],
 	modules: OutputModules,
 	locales: readonly string[],
-): string {
+): { head: string; body: string } {
 	// Each shard checks, as it is evaluated, that the runtime was compiled for its locales.
 	const uses = new Set<string>(["assertCompiledFor"]);
 	for (const key of keys) for (const name of key.uses) uses.add(name);
 	const names = calledNames(keys, uses);
-	return `${outputImports(names, (file) => `../${file}`, modules)}\n\nassertCompiledFor(${JSON.stringify(locales)});\n${keyExports(keys, everyName(names))}`;
+	return {
+		head: `${outputImports(names, (file) => `../${file}`, modules)}\n\nassertCompiledFor(${JSON.stringify(locales)});\n`,
+		body: keyExports(keys, everyName(names)),
+	};
 }
 
-/** A shard's declarations, but the line naming their map, and the line each key's is on. */
+/**
+ * A shard's declarations: their head, which imports the types they name, and their body, but the
+ * line naming their map, with the line each key's is on.
+ */
 function shardDeclarations(
 	keys: ReadonlyMap<string, DeclaredKey>,
 	modules: OutputModules,
-): { body: string; lines: DeclarationLine[] } {
+): { head: string; body: string; lines: DeclarationLine[] } {
 	const types = [...keys.values()].some((key) => key.markup)
 		? "MarkupMessage, Message"
 		: "Message";
-	const parts = [`import type { ${types} } from "../${modules.runtime}";\n\n`];
+	const parts: string[] = [];
 	const lines: DeclarationLine[] = [];
 	let line = 2;
 	for (const [name, key] of keys) {
@@ -234,5 +273,9 @@ function shardDeclarations(
 		lines.push([name, line - 1]);
 		parts.push(key.declared.text);
 	}
-	return { body: parts.join(""), lines };
+	return {
+		head: `import type { ${types} } from "../${modules.runtime}";\n\n`,
+		body: parts.join(""),
+		lines,
+	};
 }

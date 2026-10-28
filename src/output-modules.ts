@@ -4,7 +4,7 @@ import { configModule } from "./config-module.ts";
 import { contentName, pinImports } from "./content-names.ts";
 import { type Formatter, formatModule } from "./formatters.ts";
 import { pluralModule } from "./plurals.ts";
-import type { Output, OutputFile } from "./render.ts";
+import { type Output, type OutputFile, textsByPath } from "./render.ts";
 import {
 	type DeclarationTemplates,
 	runtimeDeclarations,
@@ -43,7 +43,7 @@ export type OutputModules = {
  * has every file rendered by path: these, and once the keys' are rendered, theirs too.
  */
 export type RenderedModules = {
-	moduleFiles: Output;
+	moduleFiles: Pick<Output, "immutable" | "mutable">;
 	modules: OutputModules;
 	formats: RenderedFormats;
 	files: ReadonlyMap<string, string>;
@@ -130,7 +130,7 @@ export function renderModules(
 		["./config.js", anchor],
 		["./runtime.js", anchor],
 	]);
-	const moduleFiles: Output = {
+	const moduleFiles: RenderedModules["moduleFiles"] = {
 		immutable: [
 			[configFile, configCode],
 			[`${runtime}.js`, runtimeCode],
@@ -160,7 +160,7 @@ export function renderModules(
 		moduleFiles,
 		modules: { runtime: anchor, plurals, formats: formats?.[0] },
 		formats: rendered,
-		files: new Map([...moduleFiles.immutable, ...moduleFiles.mutable]),
+		files: textsByPath(moduleFiles.immutable, moduleFiles.mutable),
 	};
 }
 

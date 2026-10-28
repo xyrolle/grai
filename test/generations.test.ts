@@ -66,18 +66,21 @@ it("keeps the files the output stops naming while a reader may still load them, 
 	const out = join(dir, "out");
 	const shards = () =>
 		readdirSync(join(out, "keys")).filter((file) => file.endsWith(".js"));
-	const edit = (title: string) =>
-		writeFileSync(
-			join(dir, "messages", "de.json"),
-			JSON.stringify({ ...catalogs.de, title }),
-		);
+	// An edit that adds a key renames its shard, which an edit to a message replaces in place.
+	const add = (key: string) => {
+		for (const [locale, messages] of Object.entries(catalogs))
+			writeFileSync(
+				join(dir, "messages", `${locale}.json`),
+				JSON.stringify({ ...messages, [key]: messages.title }),
+			);
+	};
 	await compile();
 	const [first] = shards();
-	edit("Kopf");
+	add("heading");
 	await compile();
 	const [second] = shards().filter((file) => file !== first);
 	vi.setSystemTime(Date.now() + 10_000);
-	edit("Titelzeile");
+	add("caption");
 	await compile();
 
 	expect(shards()).not.toContain(first);
