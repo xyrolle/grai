@@ -4,6 +4,7 @@ import { type Build, type CompileResult, recompile } from "./compile.ts";
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { firstBuildSaver } from "./first-build-saver.ts";
+import type { Placing } from "./placing.ts";
 import { savedBuild } from "./saved-build.ts";
 
 /**
@@ -18,7 +19,7 @@ const settleMilliseconds = 20;
 
 /**
  * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
- * whenever the config or a catalog changes, or `compileAgain` is called, and nothing else.
+ * whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. A change is compiled on its first event. A compile that finds a catalog that does not
  * parse, as a read in the middle of a save does, is not reported: the files are read again once
@@ -31,17 +32,17 @@ const settleMilliseconds = 20;
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
  * the outdir cannot be written, goes to `failed`, and the next change compiles again.
  *
- * `first` settles once the first compile has ended, and `compileAgain` once a compile it starts,
- * or the one after the compile under way, has: with how it ended, after its report, and after the
- * read again a catalog in the middle of a save takes, so a caller that waits for it never sees
- * output that compile is still to write.
+ * `first` settles once the first compile has ended: with how it ended, after its report, and
+ * after the read again a catalog in the middle of a save takes, so a caller that waits for it never
+ * sees output that compile is still to write. That compile, and none after it, asks `placeFirst`
+ * for the groups to place the keys by (`Placing`), as Next's watch does with the groups it reads
+ * beside it.
  *
  * The first compile starts from the build the project's last watcher saved, if this grai saved it
  * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
- * as an edit does. Its first build is saved for the next start (`firstBuildSaver`), or the build of
- * a compile `compileAgain` asked for, which placed the keys anew. It watches until the process ends
- * or `close` is called, whose promise settles once the compile under way, if any, has finished and
- * the build is saved, so the project can then be removed.
+ * as an edit does. Its first build is saved for the next start (`firstBuildSaver`). It watches until
+ * the process ends or `close` is called, whose promise settles once the compile under way, if any,
+ * has finished and the build is saved, so the project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -51,6 +52,7 @@ export function watch(
 		build: Build | undefined,
 	) => void,
 	failed: (error: unknown) => void,
+	{ placeFirst }: { placeFirst?: Placing | undefined } = {},
 ): Watch {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
@@ -69,21 +71,16 @@ export function watch(
 	/** Whether the next compile is the first, which starts from the saved build. */
 	let first = true;
 	const saver = firstBuildSaver();
-	/** How many compiles have begun, and those waiting for a compile begun after a count to end. */
-	let begun = 0;
-	let waiting: { after: number; ended: (compiled: Compiled) => void }[] = [];
-	/** Ends the wait of every caller a compile begun since its call was waiting for. */
+	/** Ends the wait for the first compile, once one has ended; and the placing it alone asks. */
+	let firstEnded: ((compiled: Compiled) => void) | undefined;
+	const firstCompile = new Promise<Compiled>((resolve) => {
+		firstEnded = resolve;
+	});
 	const ended = (compiled: Compiled) => {
-		const done = waiting.filter(({ after }) => after < begun);
-		waiting = waiting.filter(({ after }) => after >= begun);
-		for (const waiter of done) waiter.ended(compiled);
+		firstEnded?.(compiled);
+		firstEnded = undefined;
+		placeFirst = undefined;
 	};
-	/** How the next compile begun from now ends. */
-	const nextCompile = () =>
-		new Promise<Compiled>((resolve) => {
-			if (closed) resolve({ closed: true });
-			else waiting.push({ after: begun, ended: resolve });
-		});
 
 	/**
 	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
@@ -120,7 +117,6 @@ export function watch(
 			again = false;
 			const quiet = settled;
 			settled = false;
-			begun += 1;
 			const started = performance.now();
 			try {
 				follow();
@@ -130,6 +126,7 @@ export function watch(
 				}
 				const next = await recompile(configFile, build, {
 					pseudoLocale: true,
+					placing: placeFirst,
 				});
 				if (!quiet && unparsed(next.result)) {
 					again = false;
@@ -165,25 +162,15 @@ export function watch(
 		});
 	};
 
-	const firstCompile = nextCompile();
 	run();
 	return {
 		first: firstCompile,
-		compileAgain: async () => {
-			const compiled = nextCompile();
-			if (!closed) run();
-			const again = await compiled;
-			if ("build" in again && again.build !== undefined)
-				saver.retook(again.build);
-			return again;
-		},
 		close: async () => {
 			closed = true;
 			clearTimeout(settling);
 			for (const watcher of watchers) watcher.close();
 			await running;
-			for (const waiter of waiting) waiter.ended({ closed: true });
-			waiting = [];
+			ended({ closed: true });
 			await saver.flush();
 		},
 	};
@@ -202,11 +189,6 @@ export type Compiled =
 export type Watch = {
 	/** How the first compile ends. */
 	first: Promise<Compiled>;
-	/**
-	 * Compiles again, for an input no followed file changes, such as the groups an adapter saved,
-	 * and settles with how that compile ends.
-	 */
-	compileAgain: () => Promise<Compiled>;
 	close: () => Promise<void>;
 };
 
