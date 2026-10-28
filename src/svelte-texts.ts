@@ -22,8 +22,8 @@ const svelteCompile = "vite-plugin-svelte:compile";
  * it reloads, which `switch: "reload"` promises; under `"live"` components are left as they are,
  * as is dev.
  *
- * The server build reads the same calls as a property, `.text`, whose getter calls the key in the
- * request's locale. Under `experimental.async`, Svelte takes a call made after a component's
+ * The server build reads the same calls as a property, `.text`, whose getter reads the key's text
+ * in the request's locale (`requestText` in the runtime). Under `experimental.async`, Svelte takes a call made after a component's
  * `await` as writing what it touches, and every later read of the namespace as waiting on that
  * await: a call kept on the server would compile into blocks of its own, which the client's string
  * does not have, and the page would be drawn again rather than hydrated. A property read waits on
