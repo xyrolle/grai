@@ -69,8 +69,8 @@ const runtime: RuntimeSources = {
  */
 let compilerHash: string | undefined;
 
-function hashOfCompiler(): string {
-	compilerHash ??= compilerIdentity([
+async function hashOfCompiler(): Promise<string> {
+	compilerHash ??= await compilerIdentity([
 		runtime.runtime,
 		runtime.server,
 		runtime.testing,
@@ -92,7 +92,10 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	if ("errors" in read) return { written: [], errors: read.errors };
 	const hashes = hashesOf(read.sources);
 	if (
-		await isUpToDate(read.config.outdir, inputsOf(read.config, hashes, false))
+		await isUpToDate(
+			read.config.outdir,
+			await inputsOf(read.config, hashes, false),
+		)
 	) {
 		return { written: [], errors: [] };
 	}
@@ -109,7 +112,7 @@ export async function isCompiled(configFile: string): Promise<boolean> {
 	if ("errors" in read) return false;
 	return isUpToDate(
 		read.config.outdir,
-		inputsOf(read.config, hashesOf(read.sources), false),
+		await inputsOf(read.config, hashesOf(read.sources), false),
 	);
 }
 
@@ -223,7 +226,7 @@ async function build(
 		written = await writeOutput(
 			config.outdir,
 			output,
-			inputsOf(config, hashes, localeCopies),
+			await inputsOf(config, hashes, localeCopies),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
@@ -240,7 +243,7 @@ async function build(
 			compilation,
 			positions,
 			rendered,
-			key: buildKey(configured, { pseudoLocale, localeCopies }),
+			key: await buildKey(configured, { pseudoLocale, localeCopies }),
 		},
 	};
 }
@@ -291,15 +294,15 @@ function parsed(
  * and every catalog's bytes. The whole config, as no field is then left out by mistake: the
  * catalogs' paths are in the declaration maps.
  */
-function inputsOf(
+async function inputsOf(
 	config: Config,
 	hashes: readonly string[],
 	localeCopies: boolean,
-): string {
+): Promise<string> {
 	return hash(
 		"sha1",
 		JSON.stringify(
-			[hashOfCompiler(), localeCopies, config, hashes],
+			[await hashOfCompiler(), localeCopies, config, hashes],
 			collectionsAsLists,
 		),
 	);
@@ -315,12 +318,12 @@ function collectionsAsLists(_key: string, value: unknown): unknown {
  * that made it, the config as read, and the options it was compiled with. The runtime names V8, in
  * whose format the build is saved, and ICU, whose plural rules and locale data the compile reads.
  */
-export function buildKey(
+export async function buildKey(
 	config: Config,
 	{ pseudoLocale = false, localeCopies = false }: CompileOptions,
-): string {
+): Promise<string> {
 	return JSON.stringify({
-		compiler: hashOfCompiler(),
+		compiler: await hashOfCompiler(),
 		runtime: [process.versions.v8, process.versions.icu],
 		options: { pseudoLocale, localeCopies },
 		config: hash("sha1", serialize(config)),
