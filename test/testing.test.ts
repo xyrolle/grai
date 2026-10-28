@@ -127,9 +127,9 @@ const tests = vitest.state.getFiles().flatMap((file) => file.tasks);
 console.log(JSON.stringify(tests.map((test) => ({ name: test.name, state: test.result?.state, errors: test.result?.errors?.map((error) => error.message) ?? [] }))));
 `;
 	// Vitest's own variables would have the run take itself for this test's worker.
-	const env = Object.fromEntries(
-		Object.entries(process.env).filter(([name]) => !name.startsWith("VITEST")),
-	);
+	const env = { ...process.env };
+	for (const name of Object.keys(env))
+		if (name.startsWith("VITEST")) Reflect.deleteProperty(env, name);
 	const run = spawnSync(
 		process.execPath,
 		["--input-type=module", "-e", script],
