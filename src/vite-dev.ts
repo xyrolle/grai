@@ -254,7 +254,9 @@ export function serveMessages(
 			shown(messagesOf(result.errors));
 		},
 		failed,
-		servesFirst ? { serve: (next) => serve(next, false) } : {},
+		servesFirst
+			? { serve: (next, _milliseconds, written) => serve(next, written) }
+			: {},
 	);
 	/** Writes the first compile's output now, if it is not written yet, and tells Vite of its files. */
 	const write = async () => {

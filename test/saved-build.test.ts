@@ -1,11 +1,18 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
 import { savedBuild, savedIndex } from "../src/saved-build.ts";
 import { saveGroups } from "../src/saved-groups.ts";
+import type { Served } from "../src/served.ts";
 import { savingFile } from "../src/state-saves.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
@@ -346,17 +353,65 @@ it("saves one whole build when two watchers of an outdir close at once, so no st
 	});
 });
 
+/** A watcher that serves before its first compile, as a dev server's does: what it serves, and its first report's build. */
+function serving(file: string) {
+	const served: Served[] = [];
+	const reported = Promise.withResolvers<Build | undefined>();
+	const watcher = watch(
+		file,
+		(_result, _milliseconds, build) => reported.resolve(build),
+		reported.reject,
+		{ serve: (each) => served.push(each) },
+	);
+	onTestFinished(() => watcher.close());
+	return { served, watcher, reported: reported.promise };
+}
+
+/** Each key's code in each locale, as a dev server serves it. */
+const codeOf = (served: Served | undefined) =>
+	[...(served?.compilation.keys ?? [])].map(([key, { kind, variants }]) => [
+		key,
+		kind,
+		variants,
+	]);
+
+it("serves a restart from the saved build's index, the build's own code, and takes the build up after", async () => {
+	const { config: file } = project(catalogs, config);
+	const before = await started(file);
+
+	const { served, watcher, reported } = serving(file);
+	await expect.poll(() => served.length).toBe(1);
+	// The index: the build's code, without its catalogs or its output's keys.
+	expect("sources" in (served[0] ?? {})).toBe(false);
+	expect(codeOf(served[0])).toEqual(codeOf(before.build));
+
+	expect(await watcher.write()).toBe(true);
+	const build = await reported;
+	expect(build?.compilation.changed.size).toBe(0);
+	expect(build?.compilation.keys).toStrictEqual(before.build?.compilation.keys);
+});
+
+it("serves no index of a saved build whose catalogs changed since, and compiles the change from the build", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
+	);
+
+	const { served, reported } = serving(file);
+	const build = await reported;
+
+	expect(served).toEqual([]);
+	expect([...(build?.compilation.changed ?? [])]).toEqual(["title"]);
+});
+
 it("reads a saved build's index alone, the build's own code, while the catalogs are as it was compiled from", async () => {
 	const { dir, config: file } = project(catalogs, config);
 	const { build } = await started(file);
 
 	const index = await savedIndex(file, { pseudoLocale: true });
-	const codeOf = (
-		keys: ReadonlyMap<string, { variants: unknown }> | undefined,
-	) => [...(keys ?? [])].map(([key, { variants }]) => [key, variants]);
-	expect(codeOf(index?.compilation.keys)).toEqual(
-		codeOf(build?.compilation.keys),
-	);
+	expect(codeOf(index)).toEqual(codeOf(build));
 	expect(index?.rendered.modules).toEqual(build?.rendered.modules);
 	expect("sources" in (index ?? {})).toBe(false);
 
@@ -366,4 +421,16 @@ it("reads a saved build's index alone, the build's own code, while the catalogs 
 	);
 	expect(await savedIndex(file, { pseudoLocale: true })).toBeUndefined();
 	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
+});
+
+it("writes a file of the output gone since the last start, as it takes up the build after serving its index", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	rmSync(join(dir, "out", "messages.js"));
+
+	const { served, watcher } = serving(file);
+	await expect.poll(() => served.length).toBe(1);
+	expect(await watcher.write()).toBe(true);
+
+	expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
 });
