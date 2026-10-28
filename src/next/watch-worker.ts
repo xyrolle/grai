@@ -10,7 +10,7 @@ import { GraiError } from "../error.ts";
 import { savedGroups, saveGroups } from "../saved-groups.ts";
 import { watch } from "../watch.ts";
 import { reportErrors } from "./errors.ts";
-import { nextKeyGroups } from "./key-groups.ts";
+import { keyWeights, nextKeyGroups } from "./key-groups.ts";
 import { whenQuiet } from "./quiet.ts";
 
 /** What withGrai hands the watch: the grai config's path, and the extensions of Next's pages. */
@@ -51,7 +51,7 @@ watch(
 async function regroup(build: Build): Promise<void> {
 	const groups = await nextKeyGroups(
 		build.config,
-		build.compilation,
+		keyWeights(build.compilation),
 		pageExtensions,
 	);
 	if (groups instanceof GraiError) {

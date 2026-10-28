@@ -8,7 +8,7 @@ import { parseCatalogs, readProject } from "../src/compile.ts";
 import type { Config } from "../src/config.ts";
 import { GraiError } from "../src/error.ts";
 import { keyContexts } from "../src/next/key-contexts.ts";
-import { nextKeyGroups } from "../src/next/key-groups.ts";
+import { keyWeights, nextKeyGroups } from "../src/next/key-groups.ts";
 import { nextRoutes } from "../src/next/routes.ts";
 import { project } from "./project.ts";
 import { writeSources } from "./sources.ts";
@@ -216,7 +216,7 @@ describe("the contexts that read a key through a barrel", () => {
 			heading_b: ["b/page.jsx server"],
 			hello_text: ["a/page.jsx client", "b/page.jsx client"],
 		});
-		expect(await nextKeyGroups(config, compilation)).toEqual([
+		expect(await nextKeyGroups(config, keyWeights(compilation))).toEqual([
 			["bye_text", "hello_text"],
 			["heading_a"],
 			["heading_b"],
@@ -325,7 +325,7 @@ describe("the contexts that read a key through a barrel of paths or of `export *
 			["a/page.jsx client", "b/page.jsx client"],
 			["a/page.jsx client", "b/page.jsx client"],
 		]);
-		expect(await nextKeyGroups(config, compilation)).toEqual([
+		expect(await nextKeyGroups(config, keyWeights(compilation))).toEqual([
 			["bye_text", "hello_text"],
 			["heading_a", "sa_text"],
 			["heading_b", "sb_text"],
@@ -343,7 +343,7 @@ describe("a Next app's groups of keys", () => {
 		];
 		const { config, compilation } = await compiledApp(large);
 
-		expect(await nextKeyGroups(config, compilation)).toEqual([
+		expect(await nextKeyGroups(config, keyWeights(compilation))).toEqual([
 			["about_heading", "map_caption"],
 			["badge_text", "home_button"],
 			["home_heading"],
@@ -354,7 +354,7 @@ describe("a Next app's groups of keys", () => {
 	it("take a small group into a larger one its routes read anyway, as a module costs more than a few keys", async () => {
 		const { config, compilation } = await compiledApp(["home_button"]);
 
-		expect(await nextKeyGroups(config, compilation)).toEqual([
+		expect(await nextKeyGroups(config, keyWeights(compilation))).toEqual([
 			[
 				"about_heading",
 				"home_heading",
