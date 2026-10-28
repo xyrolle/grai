@@ -409,10 +409,8 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 	let origin = "";
 	let served: Served | undefined;
 	let first = { release: () => {} };
-	const catalog = join(example, "messages/ro.json");
-	const words = readFileSync(catalog, "utf8");
 	beforeAll(async () => {
-		// A first start, whose output another writer keeps from being written until the second test.
+		// A first start, whose output another writer keeps from being written while the tests run.
 		first = firstStart(outdir, { held: true });
 		served = await astroDev();
 		origin = served.origin;
@@ -420,7 +418,6 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 	afterAll(async () => {
 		first.release();
 		if (served) await stopped(served.server);
-		writeFileSync(catalog, words);
 	});
 
 	it("matches a path in its locale's words to grai's route, and renders the page's route there", async () => {
@@ -444,7 +441,47 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 		expect(existsSync(join(outdir, ".grai", "lock"))).toBe(true);
 	});
 
+	it("loads each page's locale's words alone in its islands, the locale the server drew it in", async () => {
+		const loaded = scripts();
+		await page.goto(`${origin}/ro/`);
+		await page.locator("#svelte").waitFor();
+		await page.locator("#react").waitFor();
+		await page.waitForLoadState("networkidle");
+		const keys = [...loaded.keys()].filter((path) =>
+			path.includes("grai:keys"),
+		);
+
+		expect(await html("lang")).toBe("ro");
+		expect(await text("#react")).toBe("Desenat de React în browser");
+		expect(keys).toEqual(["/@id/__x00__grai:keys/ro"]);
+		expect(errors).toEqual([]);
+	});
+});
+
+// A server of its own: Vite keeps the reload an edit sends for the next page that connects.
+describe("the Astro example in dev, a first start whose output waits to be written", {
+	timeout: 30_000,
+}, () => {
+	let origin = "";
+	let served: Served | undefined;
+	let first = { release: () => {} };
+	const catalog = join(example, "messages/ro.json");
+	const words = readFileSync(catalog, "utf8");
+	beforeAll(async () => {
+		first = firstStart(outdir, { held: true });
+		served = await astroDev();
+		origin = served.origin;
+	}, 60_000);
+	afterAll(async () => {
+		first.release();
+		if (served) await stopped(served.server);
+		writeFileSync(catalog, words);
+	});
+
 	it("renders an edit made while the first compile's output waits to be written", async () => {
+		expect((await pageAt(origin, "/ro/despre/"))[2]).toBe(
+			"<h1>Despre acest exemplu</h1>",
+		);
 		writeFileSync(
 			catalog,
 			words.replace('"Despre acest exemplu"', '"Despre exemplu"'),
@@ -466,22 +503,6 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 				'<html lang="ro" dir="ltr">',
 				"<h1>Despre acest exemplu</h1>",
 			]);
-	});
-
-	it("loads each page's locale's words alone in its islands, the locale the server drew it in", async () => {
-		const loaded = scripts();
-		await page.goto(`${origin}/ro/`);
-		await page.locator("#svelte").waitFor();
-		await page.locator("#react").waitFor();
-		await page.waitForLoadState("networkidle");
-		const keys = [...loaded.keys()].filter((path) =>
-			path.includes("grai:keys"),
-		);
-
-		expect(await html("lang")).toBe("ro");
-		expect(await text("#react")).toBe("Desenat de React în browser");
-		expect(keys).toEqual(["/@id/__x00__grai:keys/ro"]);
-		expect(errors).toEqual([]);
 	});
 });
 
