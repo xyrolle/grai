@@ -12,14 +12,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { sampleCalls, takesInputs } from "./calls.mjs";
 import { graiEntry, graiVite } from "./grai.mjs";
 import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
 import { paraglideOutput, writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 
-const { grai } = await import(graiEntry("./vite"));
 // The dev server comes from the Vite grai's build imports (`graiVite`), as an app has one Vite.
 export const { createServer } = await import(graiVite);
 
@@ -331,21 +329,28 @@ export function writeFixture(
 			`import { m } from "./out/messages.js";\nexport const render = (key, locale) => m[key]({}, { locale });\n`,
 		);
 	}
-	writeFileSync(join(root, "main.js"), pageModule(design, locale, page));
-	return page.calls[0].key;
-}
-
-/** The design's plugins: grai's dev plugin, or Paraglide's Vite plugin, or none but the timing. */
-export function pluginsFor(design, app, root, locale, timings) {
-	const catalogFile = join(root, "messages", `${locale}.json`);
 	if (design === "paraglide") {
 		const catalogs = Object.fromEntries(
 			app.locales.map((each) => [each, join(root, "messages", `${each}.json`)]),
 		);
-		const project = writeProject({ ...app, catalogs }, root);
+		writeProject({ ...app, catalogs }, root);
+	}
+	writeFileSync(join(root, "main.js"), pageModule(design, locale, page));
+	return page.calls[0].key;
+}
+
+/**
+ * The design's plugins: grai's dev plugin, or Paraglide's Vite plugin, or none but the timing. A
+ * library's plugin is imported here, as an app's config imports it before its server starts, so a
+ * start timed from this call counts it.
+ */
+export async function pluginsFor(design, app, root, locale, timings) {
+	const catalogFile = join(root, "messages", `${locale}.json`);
+	if (design === "paraglide") {
+		const { paraglideVitePlugin } = await import("@inlang/paraglide-js");
 		return [
 			paraglideVitePlugin({
-				project,
+				project: join(root, "project.inlang"),
 				outdir: join(root, "paraglide"),
 				outputStructure: "locale-modules",
 				strategy: app.compilerOptions.strategy,
@@ -356,7 +361,9 @@ export function pluginsFor(design, app, root, locale, timings) {
 	if (design === "no messages") return [];
 	if (design === "i18next" || design === "use-intl")
 		return [timingPlugin(catalogFile, timings)];
-	if (design === "grai's plugin")
+	if (design === "grai's plugin") {
+		const { grai } = await import(graiEntry("./vite"));
 		return [grai({ config: join(root, "grai.config.json") })];
+	}
 	return [devPlugin(root, app.locales, design, timings)];
 }

@@ -7,10 +7,11 @@
 //
 // Each start is a new Node process. A cold one is in a new directory with no output and no cache,
 // Vite's own among them; a restart follows a cold start of its own library, untimed, which loaded
-// the page and closed its server. Each start is timed from the server's creation, once Vite, the
-// plugins and Chromium have loaded, by the page's clock: until its texts are in the DOM ("ready"),
-// and until the frame drawn after that ("shown"). Importing the plugins and writing the page are
-// outside the time.
+// the page and closed its server. Each start is timed from the import of its library's Vite plugin,
+// as an app's config imports it before its server starts, once Vite and Chromium have loaded, by
+// the page's clock: until its texts are in the DOM ("ready"), and until the frame drawn after that
+// ("shown"). A library with no plugin of its own, as i18next and use-intl, imports none. Writing
+// the page is outside the time.
 // Once timed, the page's texts are checked against the texts its calls show, and an error in the
 // page fails the start.
 //
@@ -87,13 +88,14 @@ async function child(design, name, pageFile, restart) {
 			if (message.type() === "error") errors.push(message.text());
 		});
 		const start = now();
+		const plugins = await pluginsFor(design, app, root, locale, { edits: [] });
 		const server = await createServer({
 			root,
 			cacheDir: viteCache,
 			configFile: false,
 			logLevel: "silent",
 			server: { host: "127.0.0.1", port: 0 },
-			plugins: pluginsFor(design, app, root, locale, { edits: [] }),
+			plugins,
 		});
 		try {
 			await server.listen();

@@ -43,7 +43,7 @@ async function serve(app, root, design, locale, timings) {
 			port: 0,
 			watch: { ignored: ["**/render.js", "**/main.js", "**/index.html"] },
 		},
-		plugins: pluginsFor(design, app, root, locale, timings),
+		plugins: await pluginsFor(design, app, root, locale, timings),
 	});
 	await server.listen();
 	return server;
