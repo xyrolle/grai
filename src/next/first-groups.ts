@@ -3,11 +3,13 @@
 // (`group-worker.ts`), and taken by that compile (`startup.ts`) when they come in time.
 //
 // The thread reads the code at once, through the output not written yet (`unwritten-output.ts`).
-// Once the compile has compiled the catalogs, it sends each key's weight, and takes the groups the
-// thread answers if they have come by then, or come while it renders the keys by their shards,
-// rendering them again by the groups (`placing.ts`); it writes the output once. Taking them costs
-// the start that render at most; they save the first page the shards it would compile in each layer
-// that reads a key. NUMBERS_TBD A start cannot tell what the groups save its pages, so the rule is a
+// Once the compile has compiled the catalogs, it sends each key's weight: if the code is read by
+// then, it waits for the groups, as only grouping the keys by their weights is left; if not, it
+// renders the keys by their shards meanwhile, and takes the groups if they came during that render,
+// rendering the keys again by them (`placing.ts`). It writes the output once. Taking the groups
+// costs the start that grouping, or that render; they save the first page the shards it would
+// compile in each layer that reads a key. On the bench's page every fresh start waited for them,
+// as the read was done when the catalogs were. A start cannot tell what the groups save its pages, so the rule is a
 // heuristic, measured on those: a page that reads no key gains nothing from them. A start with
 // groups saved never reads beside its compile.
 
