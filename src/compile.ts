@@ -1,6 +1,6 @@
 import { hash } from "node:crypto";
-import { serialize } from "node:v8";
 import { basePositions, basePositionsMoved } from "./base-positions.ts";
+import { buildKey } from "./build-key.ts";
 import {
 	type Catalog,
 	type CatalogSource,
@@ -10,17 +10,13 @@ import {
 } from "./catalog.ts";
 import { localeCatalogs, type ParsedCatalogs } from "./catalog-parts.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
+import { hashOfCompiler, runtimeSources } from "./compiler-identity.ts";
 import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { type DeclaredKey, declareKeys } from "./key-declarations.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
-import {
-	hashesOf,
-	hashOfCompiler,
-	inputsOf,
-	runtimeSources,
-} from "./output-inputs.ts";
+import { hashesOf, inputsOf } from "./output-inputs.ts";
 import { type RenderedModules, renderModules } from "./output-modules.ts";
 import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
@@ -331,21 +327,4 @@ function parsed(
 	if (old === undefined || catalog === undefined) return parseCatalog(source);
 	if (old.bytes.equals(source.bytes)) return catalog;
 	return parseEditedCatalog(source, catalog, old.bytes);
-}
-
-/**
- * What a saved build must match to be taken up again (`savedBuild`): the compiler and the runtime
- * that made it, the config as read, and the options it was compiled with. The runtime names V8, in
- * whose format the build is saved, and ICU, whose plural rules and locale data the compile reads.
- */
-export function buildKey(
-	config: Config,
-	{ pseudoLocale = false, localeCopies = false }: CompileOptions,
-): string {
-	return JSON.stringify({
-		compiler: hashOfCompiler(),
-		runtime: [process.versions.v8, process.versions.icu],
-		options: { pseudoLocale, localeCopies },
-		config: hash("sha1", serialize(config)),
-	});
 }

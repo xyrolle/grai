@@ -12,8 +12,8 @@ import { within } from "./compiler-identity.ts";
 const root = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The modules a compile runs and a saved build is read by, by their paths: saved-build's, which
- * imports the compiler's, and every module they import in turn, as oxc's parser reads them: an
+ * The modules a compile runs and a saved build is read by, by their paths: the compiler's and
+ * saved-build's, and every module they import in turn, as oxc's parser reads them: an
  * `import` or `export … from` of a value, an import for a module's effects alone, and an `import()`
  * of a literal path. An import of types alone is left out, as Node and the build erase it, and so is
  * a module of Node's or of another package. Undefined when a module does not parse, imports a path
@@ -24,9 +24,10 @@ export async function compilerModules(): Promise<
 > {
 	const { parse } = await import("./code/parse.ts");
 	const modules = new Map<string, Buffer>();
-	const unread = [
-		join(root, `saved-build${extname(fileURLToPath(import.meta.url))}`),
-	];
+	const extension = extname(fileURLToPath(import.meta.url));
+	const unread = ["compile", "saved-build"].map((name) =>
+		join(root, `${name}${extension}`),
+	);
 	for (let file = unread.pop(); file !== undefined; file = unread.pop()) {
 		const path = relative(root, file);
 		if (modules.has(path)) continue;

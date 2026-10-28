@@ -6,73 +6,15 @@
  */
 
 import { hash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type CatalogSource, readCatalogSources } from "./catalog.ts";
-import { compilerIdentity } from "./compiler-identity.ts";
+import { hashOfCompiler } from "./compiler-identity.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { readManifest } from "./manifest.ts";
 import { isUpToDate } from "./output.ts";
-import type { RuntimeSources } from "./output-modules.ts";
 import { type KeyGroups, savedGroups } from "./saved-groups.ts";
 import { stateDirectory } from "./state-directory.ts";
-
-const text = (url: URL): string => readFileSync(url, "utf8");
-
-/**
- * The runtime's modules, which every output carries, their imports of each other pinned, and the
- * templates of the output's declarations; read once.
- */
-let runtime: RuntimeSources | undefined;
-
-export function runtimeSources(): RuntimeSources {
-	runtime ??= {
-		runtime: text(new URL("./runtime/runtime.js", import.meta.url)),
-		server: text(new URL("./runtime/server.js", import.meta.url)),
-		testing: text(new URL("./runtime/testing.js", import.meta.url)),
-		declarations: {
-			runtime: text(
-				new URL("./runtime/runtime.d.ts.template", import.meta.url),
-			),
-			server: text(new URL("./runtime/server.d.ts.template", import.meta.url)),
-			testing: text(
-				new URL("./runtime/testing.d.ts.template", import.meta.url),
-			),
-			setLocale: {
-				live: text(
-					new URL("./runtime/set-locale.live.d.ts.template", import.meta.url),
-				),
-				reload: text(
-					new URL("./runtime/set-locale.reload.d.ts.template", import.meta.url),
-				),
-			},
-		},
-	};
-	return runtime;
-}
-
-/**
- * The compiler's identity (`compilerIdentity`): what decides the output besides the config and the
- * catalogs. A new version of grai changes it, and so does a local build, which keeps its version,
- * so the output is written again after either. Taken once.
- */
-let compilerHash: string | undefined;
-
-export function hashOfCompiler(): string {
-	const sources = runtimeSources();
-	compilerHash ??= compilerIdentity([
-		sources.runtime,
-		sources.server,
-		sources.testing,
-		sources.declarations.runtime,
-		sources.declarations.server,
-		sources.declarations.testing,
-		sources.declarations.setLocale.live,
-		sources.declarations.setLocale.reload,
-	]);
-	return compilerHash;
-}
 
 /** Each catalog file's hash. */
 export function hashesOf(sources: readonly CatalogSource[]): string[] {
