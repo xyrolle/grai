@@ -268,6 +268,43 @@ describe("grai check's reads of a Svelte component's scripts", () => {
 	});
 });
 
+describe("grai check's reads of a Svelte component in Svelte's async mode", () => {
+	it("reads a component that awaits in a snippet and in an each block, as Svelte's async mode lets it", async () => {
+		const { dir, config } = project({
+			en: { title: "Title", unread: "Unread" },
+		});
+		writeSources(dir, {
+			"src/App.svelte": [
+				'<script lang="ts">',
+				'\timport { m } from "../out/messages.js";',
+				"\tconst items = [1, 2];",
+				"\tconst load = async (n: number) => n * 2;",
+				"</script>",
+				"",
+				"<h1>{m.title()}</h1>",
+				"",
+				"{#snippet panel()}",
+				'\t{@const { default: Panel } = await import("./Panel.svelte")}',
+				"\t<Panel />",
+				"{/snippet}",
+				"{@render panel()}",
+				"",
+				"{#each items as item}",
+				"\t<p>{await load(item)}</p>",
+				"{/each}",
+				"",
+			].join("\n"),
+			"src/Panel.svelte": "<p>panel</p>\n",
+		});
+
+		const { problems } = await check(config);
+
+		expect(problems.map(({ message }) => message)).toEqual([
+			'messages/en.json: "unread": no shipped code under . reads the key. Remove it from every catalog, or use it.',
+		]);
+	});
+});
+
 describe("grai check's reads of a project that installs grai", () => {
 	it("reads a project that imports the package's entries by its name", async () => {
 		const { dir, config } = project({

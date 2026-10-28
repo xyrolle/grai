@@ -3,9 +3,14 @@
  * template's expressions, each where Svelte found it, in code that opens the scopes the template
  * opens. Beside a module script, the instance script and the template are a block of their own, as
  * Svelte scopes them inside the module's: the instance's imports and re-exports go to the top, and
- * its own exports are its declarations, or reads of the names they export. An `{#each}` item, an `{:then}` value, a snippet's parameters and a `let:` directive's
- * names are parameters of a function around what they are visible in, `{@const}` a `const` in the
- * block it is in, and a snippet a function of the component, as Svelte scopes them.
+ * its own exports are its declarations, or reads of the names they export. An `{#each}` item, an
+ * `{:then}` value, a snippet's parameters and a `let:` directive's names are parameters of a
+ * function around what they are visible in, `{@const}` a `const` in the block it is in, and a
+ * snippet a function of the component, as Svelte scopes them. Each such function is `async`, as
+ * Svelte's async mode (`experimental.async`) lets any expression of the template `await`, in a
+ * scope as at the top. Outside that mode Svelte's compiler refuses every `await` of a template, at
+ * the top too, and its parse, which grai reads through, takes them all: the build then fails on
+ * Svelte's own error, not on grai's read.
  */
 
 import type { AST } from "svelte/compiler";
@@ -158,7 +163,7 @@ class Template {
 
 	private each(node: AST.EachBlock): void {
 		this.expression(node.expression);
-		this.writer.write("((");
+		this.writer.write("(async (");
 		// A block that names no item, `{#each list, index}`, binds its index alone: an empty pattern
 		// holds the item's place and declares nothing.
 		if (node.context === null) this.writer.write("[]");
@@ -173,7 +178,7 @@ class Template {
 
 	private snippet(node: AST.SnippetBlock): void {
 		const { start, end } = spanOf(node.expression);
-		this.writer.write("function ").piece(start, end).write("(");
+		this.writer.write("async function ").piece(start, end).write("(");
 		node.parameters.forEach((parameter, index) => {
 			if (index > 0) this.writer.write(",");
 			this.pattern(parameter);
@@ -200,7 +205,7 @@ class Template {
 			this.block(node.fragment);
 			return;
 		}
-		this.writer.write("((");
+		this.writer.write("(async (");
 		lets.forEach((directive, index) => {
 			if (index > 0) this.writer.write(",");
 			if (directive.expression === null) this.writer.write(directive.name);
@@ -220,7 +225,7 @@ class Template {
 
 	/** A fragment in a function of the names the patterns bind. */
 	private scoped(patterns: readonly (object | null)[], fragment: AST.Fragment) {
-		this.writer.write("((");
+		this.writer.write("(async (");
 		patterns.forEach((pattern, index) => {
 			if (index > 0) this.writer.write(",");
 			if (pattern !== null) this.pattern(pattern);
