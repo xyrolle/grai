@@ -1,7 +1,8 @@
 // One measurement of compile-time.mjs in a process of its own: `node compile-runs.mjs <json>`, which
 // prints what it timed as JSON on its last line. Each clock starts once the library's modules have
 // loaded.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { graiEntry, graiModule } from "./grai.mjs";
 
 /** The work's time in ms, and what it returned. */
@@ -78,6 +79,34 @@ const runs = {
 			}),
 		);
 		return { cold: cold.ms };
+	},
+
+	/**
+	 * Paraglide's Vite plugin, driven as a dev server drives it: its config hooks, its `buildStart`,
+	 * which compiles in the layout it takes in development, and after the edit is saved, its
+	 * `watchChange`, which compiles again from the compilation it kept, writing only the files
+	 * that changed, and then takes a digest of what it read.
+	 */
+	async "paraglide-plugin"(options) {
+		await forDeclarations(options);
+		const { paraglideVitePlugin } = await import("@inlang/paraglide-js");
+		const plugin = paraglideVitePlugin(paraglideOptions(options));
+		plugin.config.handler();
+		plugin.configResolved.handler({ root: dirname(options.project) });
+		// No bundler context: the plugin registers its watched files only where a bundler takes them.
+		const cold = await timed(() => plugin.buildStart.call({}));
+		const layout = join(
+			options.outdir,
+			"messages",
+			`${options.edit.locale}.js`,
+		);
+		if (!existsSync(layout))
+			throw new Error(
+				`Paraglide's plugin did not write locale modules: no ${layout}.`,
+			);
+		save(options.edit);
+		const edited = await timed(() => plugin.watchChange(options.edit.catalog));
+		return { cold: cold.ms, edit: edited.ms };
 	},
 };
 

@@ -4,15 +4,19 @@
 // - grai, from its build: a full compile; the same compile again with nothing changed; one message
 //   edited, compiled again by `recompile` from the build a compile before it kept, as its Vite
 //   plugin and `grai watch` compile an edit.
-// - Paraglide's compiler: a full compile in its production layout, message modules, without
-//   declarations, and with them, which it emits through TypeScript 6; and in its locale modules,
-//   with them. Its TypeScript 7 path is not what grai is compared against yet.
+// - Paraglide's compiler in its production layout, message modules: a full compile without
+//   declarations, and with them, which it emits through TypeScript 6. Its TypeScript 7 path is not
+//   what grai is compared against yet.
+// - Paraglide's Vite plugin as a dev server drives it, in the layout it takes in development, locale
+//   modules: its first compile, and one message edited, compiled again by its `watchChange` from
+//   the compilation it kept, writing only the files that changed; without declarations and with
+//   them through TypeScript 6.
 // - formatjs's CLI compiling one locale's ICU catalog to an AST, its process included.
 // The edit is the same each time: one message of plain words in the locale benches show beside the
 // base one, its text prefixed. The variants take turns in rounds whose order rotates (rounds.mjs),
 // every sample is kept with its round's load, and Paraglide's figures are paired with grai's of
 // the same round.
-//   node compile-time.mjs [app...]      ROUNDS=<multiple of 5> to change the rounds
+//   node compile-time.mjs [app...]      ROUNDS=<multiple of 6> to change the rounds
 import { execFileSync } from "node:child_process";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -34,11 +38,21 @@ import {
 const runner = new URL("compile-runs.mjs", import.meta.url).pathname;
 const formatjs = new URL("node_modules/.bin/formatjs", import.meta.url)
 	.pathname;
-/** How long one measurement may take: Paraglide's locale modules with declarations take minutes. */
+/**
+ * How long one measurement may take: Paraglide's plugin with declarations compiles twice, minutes
+ * each.
+ */
 const PATIENCE_MS = 30 * 60_000;
+/**
+ * Paraglide's plugin takes its development layout, and reports a failed compile, only outside
+ * production.
+ */
+const developmentEnv = Object.fromEntries(
+	Object.entries(process.env).filter(([name]) => name !== "NODE_ENV"),
+);
 
 const paraglide = "Paraglide, message modules";
-const localeModules = "Paraglide, locale modules";
+const plugin = "Paraglide's Vite plugin in dev, locale modules";
 const withDeclarations = "declarations through TypeScript 6";
 const withoutDeclarations = "without declarations";
 
@@ -55,9 +69,12 @@ const variants = {
 		outputStructure: "message-modules",
 		declarations: true,
 	},
-	[`${localeModules}, ${withDeclarations}`]: {
-		run: "paraglide-compiler",
-		outputStructure: "locale-modules",
+	[`${plugin}, ${withoutDeclarations}`]: {
+		run: "paraglide-plugin",
+		declarations: false,
+	},
+	[`${plugin}, ${withDeclarations}`]: {
+		run: "paraglide-plugin",
 		declarations: true,
 	},
 	formatjs: { run: "formatjs" },
@@ -140,6 +157,7 @@ function measure(app, setup, name) {
 		],
 		{
 			encoding: "utf8",
+			env: developmentEnv,
 			stdio: ["ignore", "pipe", "inherit"],
 			maxBuffer: 1 << 26,
 			timeout: PATIENCE_MS,
@@ -163,11 +181,11 @@ function summary(kept, name) {
 	return measured;
 }
 
-/** Each Paraglide variant's full compile over grai's of the same round. */
+/** Each Paraglide variant's figures over grai's of the same round: a full compile, and the edit. */
 function ratios(summaries) {
 	const paired = {};
 	for (const name of names.filter((each) => each.startsWith("Paraglide")))
-		for (const each of ["cold"]) {
+		for (const each of ["cold", "edit"]) {
 			const figures = summaries[name][each];
 			if (figures !== undefined)
 				paired[`${name}, ${each}`] = pairedRatio(
@@ -190,7 +208,7 @@ function print(app, rounds, summaries, paired) {
 		`\n### ${app.name}: compile time, each measurement a new Node ${process.versions.node} process, ${rounds} rounds in rotating order, medians (intervals)\n`,
 	);
 	console.log(
-		"| variant | full compile | nothing changed | one message edited | full compile, × grai's |\n|---|---|---|---|---|",
+		"| variant | full compile | nothing changed | one message edited | full compile, × grai's | edit, × grai's |\n|---|---|---|---|---|---|",
 	);
 	for (const name of names) {
 		const each = summaries[name];
@@ -199,7 +217,7 @@ function print(app, rounds, summaries, paired) {
 			return figure === undefined ? "" : ratioText(figure);
 		};
 		console.log(
-			`| ${name} | ${cell(each.cold)} | ${cell(each.noop)} | ${cell(each.edit)} | ${ratio("cold")} |`,
+			`| ${name} | ${cell(each.cold)} | ${cell(each.noop)} | ${cell(each.edit)} | ${ratio("cold")} | ${ratio("edit")} |`,
 		);
 	}
 }
@@ -223,6 +241,10 @@ for (const app of selectedApps()) {
 	const paired = ratios(summaries);
 	print(app, rounds, summaries, paired);
 	const medianOf = (name, each) => summaries[name][each].median;
+	const dev = (declarations) => ({
+		cold: medianOf(`${plugin}, ${declarations}`, "cold"),
+		edit: medianOf(`${plugin}, ${declarations}`, "edit"),
+	});
 	recorded.push({
 		app: app.name,
 		keys: Object.keys(app.messages[app.baseLocale]).length,
@@ -243,9 +265,13 @@ for (const app of selectedApps()) {
 				"cold",
 			),
 			"locale modules, with declarations": medianOf(
-				`${localeModules}, ${withDeclarations}`,
+				`${plugin}, ${withDeclarations}`,
 				"cold",
 			),
+		},
+		paraglideDev: {
+			[withoutDeclarations]: dev(withoutDeclarations),
+			[withDeclarations]: dev(withDeclarations),
 		},
 		formatjs: medianOf("formatjs", "cold"),
 		variants: summaries,
