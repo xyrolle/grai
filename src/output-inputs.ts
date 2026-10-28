@@ -7,13 +7,16 @@
 
 import { hash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { type CatalogSource, readCatalogSources } from "./catalog.ts";
 import { compilerIdentity } from "./compiler-identity.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
+import { readManifest } from "./manifest.ts";
 import { isUpToDate } from "./output.ts";
 import type { RuntimeSources } from "./output-modules.ts";
 import { type KeyGroups, savedGroups } from "./saved-groups.ts";
+import { stateDirectory } from "./state-directory.ts";
 
 const text = (url: URL): string => readFileSync(url, "utf8");
 
@@ -103,7 +106,8 @@ function collectionsAsLists(_key: string, value: unknown): unknown {
 
 /**
  * Whether the output is already that of the project's config and catalogs, which a compile would
- * leave as it is. A project that cannot be read has no such output.
+ * leave as it is. A project that cannot be read has no such output, and nor has an outdir without a
+ * manifest, as a fresh clone's: the catalogs are then not read.
  */
 export async function isCompiled(configFile: string): Promise<boolean> {
 	let config: Config;
@@ -113,6 +117,8 @@ export async function isCompiled(configFile: string): Promise<boolean> {
 		if (error instanceof GraiError) return false;
 		throw error;
 	}
+	if ((await readManifest(join(config.outdir, stateDirectory))) === undefined)
+		return false;
 	const { sources, errors } = await readCatalogSources(config);
 	if (errors.length > 0) return false;
 	return isUpToDate(
