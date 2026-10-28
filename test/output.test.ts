@@ -55,7 +55,8 @@ function modified(dir: string): Record<string, number> {
  * A copy of grai in the project, its source or its build (`dist`, which the gate builds before the
  * tests), for a test to change as a new version, a local build or a patch would, with its modules'
  * extension; the packages it imports resolve from the project. Each run of it is a process of its
- * own: a compile of the project, and what it wrote, each file by its name without the hash of its
+ * own, of a script given `grai`'s URL, the `config` and the `extension`, which prints its result as
+ * JSON: a compile of the project, and what it wrote, each file by its name without the hash of its
  * content; and a dev server's start, which takes up the saved build, compiles from it and saves its
  * build, and whether it took one up.
  */
@@ -99,7 +100,7 @@ const options = { pseudoLocale: true };
 const saved = await savedBuild(config, options);
 await saveBuild((await recompile(config, saved, options)).build);
 console.log(JSON.stringify(saved !== undefined));`) as boolean;
-	return { compiler, extension, compile, start };
+	return { compiler, extension, run, compile, start };
 }
 
 /** Whether a file of the output holds a text. */
@@ -199,19 +200,19 @@ it("writes the output again when grai itself changes, as an upgrade or a local b
 });
 
 it(
-	"compiles again when a module a compile runs changes, and not when another of grai's modules does",
+	"compiles again when a module a compile runs changes, and not when another of grai's modules does, as built",
 	processTest,
 	async () => {
 		const { dir, config } = project(catalogs);
-		const { compiler, compile } = graiCopy(dir, config);
+		const { compiler, compile } = graiCopy(dir, config, "dist");
 		const compiledFor = async () => {
 			compile();
 			return (await readManifest(join(dir, "out", ".grai")))?.inputs;
 		};
 		const first = await compiledFor();
-		appendFileSync(join(compiler, "cli.ts"), "\n");
+		appendFileSync(join(compiler, "cli.js"), "\n");
 		const afterCli = await compiledFor();
-		appendFileSync(join(compiler, "pattern.ts"), "\n");
+		appendFileSync(join(compiler, "pattern.js"), "\n");
 
 		expect(afterCli).toBe(first);
 		expect(await compiledFor()).not.toBe(first);
@@ -219,23 +220,22 @@ it(
 );
 
 it(
-	"compiles again when any of grai's modules changes, once a module a compile runs imports a path no literal gives",
+	"finds the compiler's modules no more once one imports a path no literal gives, which fails grai's build",
 	processTest,
-	async () => {
+	() => {
 		const { dir, config } = project(catalogs);
-		const { compiler, compile } = graiCopy(dir, config);
+		const { compiler, run } = graiCopy(dir, config);
+		const unfound = () =>
+			run(
+				'const { compilerModules } = await import(grai + "/compiler-modules" + extension); console.log(JSON.stringify((await compilerModules()) === undefined));',
+			);
+		const before = unfound();
 		appendFileSync(
 			join(compiler, "modules.ts"),
 			'\nexport const later = (name: string) => import("./" + name + ".ts");\n',
 		);
-		const compiledFor = async () => {
-			compile();
-			return (await readManifest(join(dir, "out", ".grai")))?.inputs;
-		};
-		const first = await compiledFor();
-		appendFileSync(join(compiler, "cli.ts"), "\n");
 
-		expect(await compiledFor()).not.toBe(first);
+		expect([before, unfound()]).toEqual([false, true]);
 	},
 );
 

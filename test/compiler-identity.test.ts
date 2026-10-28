@@ -3,10 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import {
-	compilerModules,
-	compilerModulesFile,
-} from "../src/compiler-identity.ts";
+import { compilerModulesFile } from "../src/compiler-identity.ts";
+import { compilerModules } from "../src/compiler-modules.ts";
 import { project } from "./project.ts";
 
 const source = fileURLToPath(new URL("../src/", import.meta.url));
@@ -69,24 +67,22 @@ it("is made of the modules a compile and its saved build load, every one and no 
 		),
 	);
 
-	expect(new Set(start(source, ".ts", config).loaded)).toEqual(modules);
+	const { loaded, parses } = start(source, ".ts", config);
+
+	expect(parses).toBe(false);
+	expect(new Set(loaded)).toEqual(modules);
 	expect(modules.has(join(source, "cli.ts"))).toBe(false);
 });
 
-it("is made, as built, of the modules its build lists, which a start hashes and parses none of", () => {
+it("is made, as built, of the modules its build lists, which a start hashes, parsing none", () => {
 	const { config } = project(catalogs);
 	const listed: Record<string, string> = JSON.parse(
 		readFileSync(join(built, compilerModulesFile), "utf8"),
 	);
-	const modules = new Set(
-		Object.keys(listed).map((module) => join(built, module)),
-	);
-	// The parser is one of them, as the module that finds them imports it, though a start that
-	// parses nothing does not load it.
-	const parser = join(built, "code", "parse.js");
 	const { loaded, parses } = start(built, ".js", config);
 
 	expect(parses).toBe(false);
-	expect(new Set([...loaded, parser])).toEqual(modules);
-	expect(loaded).not.toContain(parser);
+	expect(new Set(loaded)).toEqual(
+		new Set(Object.keys(listed).map((module) => join(built, module))),
+	);
 });
