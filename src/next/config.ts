@@ -94,25 +94,26 @@ async function startWatching(data: AppData, outdir: string): Promise<void> {
 	const read = existsSync(groupsFile(outdir))
 		? undefined
 		: startGroupRead(data);
-	// The watch runs grai's own modules, which take none of the process's flags, and a worker refuses
-	// some of them, such as `--input-type`. Its thread starts while the output is checked.
-	const worker = new Worker(watchWorker, {
-		workerData: {
-			...data,
-			...(read === undefined ? {} : { groups: read.port }),
-		} satisfies WatchData,
-		transferList: read === undefined ? [] : [read.port],
-		execArgv: [],
-	});
-	// Next's server holds its process. Other processes read the config for `next dev` too, as
-	// Next's telemetry flush does when the server stops, and must be free to exit.
-	worker.unref();
-	try {
-		await watchStarted(worker, () => isCompiled(data.configFile));
-	} finally {
-		// Next starts once the read has stopped, so that it never takes Next's CPU.
-		await read?.stop();
-	}
+	await watchStarted(
+		() => {
+			// The watch runs grai's own modules, which take none of the process's flags, and a worker
+			// refuses some of them, such as `--input-type`. Its thread starts while the output is checked.
+			const worker = new Worker(watchWorker, {
+				workerData: {
+					...data,
+					...(read === undefined ? {} : { groups: read.port }),
+				} satisfies WatchData,
+				transferList: read === undefined ? [] : [read.port],
+				execArgv: [],
+			});
+			// Next's server holds its process. Other processes read the config for `next dev` too, as
+			// Next's telemetry flush does when the server stops, and must be free to exit.
+			worker.unref();
+			return worker;
+		},
+		() => isCompiled(data.configFile),
+		read,
+	);
 }
 
 /** Refuses a Next `basePath` other than grai's, under the `url` strategy (`base-agreement.ts`). */
