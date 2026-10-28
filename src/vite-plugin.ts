@@ -328,14 +328,18 @@ export function graiPlugin(
 				// Until a compile succeeds, the output's files are the outdir's, as no build was served.
 				if (!("compilation" in compiled))
 					return output ? null : this.error(messagesOf(compiled));
-				if (output) return outputCode(id, compiled) ?? null;
+				// No source map: the module is the compiler's, or a file of its output, with no source of its
+				// own to map back to, and Vite would inline a map of every line it rewrites, several times
+				// the module's size.
+				if (output) {
+					const code = outputCode(id, compiled);
+					return code === undefined ? null : { code, map: { mappings: "" } };
+				}
 				const code = devCode(
 					id,
 					compiled,
 					this.environment.config.consumer === "client",
 				);
-				// No source map: the module is the compiler's, with no source of its own to map back to,
-				// and Vite would inline a map of every line it rewrites, several times the module's size.
 				return code === undefined
 					? null
 					: { code, moduleSideEffects: false, map: { mappings: "" } };

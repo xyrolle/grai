@@ -1803,6 +1803,30 @@ export const render = () => \`\${title()} \${footer()}\`;
 		expect(keys?.code).not.toContain("sourceMappingURL=data:");
 	});
 
+	it("serves the output's files with no source map, as it serves the dev module", async () => {
+		const { dir } = project(catalogs);
+		writeTitleRender(dir);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { ...loopback, watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		await server.listen();
+		const served = (path: string) =>
+			fetch(new URL(path, server.resolvedUrls?.local[0])).then((response) =>
+				response.text(),
+			);
+
+		for (const path of ["out/messages.js", "out/internal.js"]) {
+			const code = await served(path);
+			expect(code).toContain("export");
+			expect(code).not.toContain("sourceMappingURL=data:");
+		}
+	});
+
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
 		const { dir } = project(catalogs);
 		const server = await createServer({
