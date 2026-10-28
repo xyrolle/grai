@@ -1197,7 +1197,6 @@ export const render = () => {
 
 		await expect.poll(rendered, devWait).toBe("Heading");
 		await expect.poll(() => writtenWith(dir, '"Heading"'), devWait).toBe(true);
-		expect(writtenWith(dir, '"Title"')).toBe(false);
 
 		// And the next edit, patched as any edit is.
 		writeFileSync(

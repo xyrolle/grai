@@ -232,3 +232,68 @@ it("saves the build of a compile asked for to place the keys by groups saved sin
 	await restarted.close();
 	expect(statSync(saved).mtimeMs).toBe(mtimeMs);
 });
+
+/** A watcher that serves its first compile before it writes it, and the reports the test reads. */
+function servingWatcher(config: string) {
+	const reported: CompileResult[] = [];
+	const failures: unknown[] = [];
+	const served = Promise.withResolvers<void>();
+	const watcher = watch(
+		config,
+		(result) => reported.push(result),
+		(error) => failures.push(error),
+		{ serve: () => served.resolve() },
+	);
+	onTestFinished(async () => {
+		await watcher.close();
+		expect(failures).toEqual([]);
+	});
+	return { watcher, served: served.promise, reported };
+}
+
+it("reports an error only the write of the compile it served finds, as it closes before the process is quiet", async () => {
+	const { config } = project({
+		en: { title: "Title", listed: "{x :list}" },
+		de: { title: "Titel", listed: "{x :number}" },
+	});
+	const { watcher, served, reported } = servingWatcher(config);
+	await served;
+
+	await watcher.close();
+
+	expect(reported.map(({ errors }) => errors.map(String))).toEqual([
+		[
+			expect.stringContaining(
+				"x is formatted as a list in en and is formatted as a number in de",
+			),
+		],
+	]);
+});
+
+it("writes the compile it served when asked, while a catalog is mid-save, and compiles the save once it has settled", async () => {
+	const { dir, config } = project(catalogs);
+	const { watcher, served, reported } = servingWatcher(config);
+	await served;
+	const catalog = join(dir, "messages", "de.json");
+
+	writeFileSync(catalog, "");
+	const wrote = await watcher.write();
+
+	expect(wrote).toBe(true);
+	expect(reported.map(({ errors }) => errors)).toEqual([[]]);
+	expect(keysWith(dir, '"Titel"')).toBe(true);
+	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
+	await expect.poll(() => keysWith(dir, '"Überschrift"')).toBe(true);
+	expect(reported.flatMap(({ errors }) => errors)).toEqual([]);
+});
+
+/** Whether a module of the output's keys holds a text. */
+function keysWith(dir: string, text: string): boolean {
+	const keys = join(dir, "out", "keys");
+	return (
+		existsSync(keys) &&
+		readdirSync(keys).some((file) =>
+			readFileSync(join(keys, file), "utf8").includes(text),
+		)
+	);
+}

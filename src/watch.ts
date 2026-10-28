@@ -50,13 +50,15 @@ const developing = { pseudoLocale: true };
  * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
  * as an edit does. With `serve`, a first compile with no saved build to start from goes to `serve`
  * before its output is written (`compileProject`), as a dev server serves its first page from it,
- * and is neither reported nor ended: the next compile writes it, and runs once the process is quiet
- * (`whenQuiet`), on the next change, when `write` asks for it, or as the watcher closes. Every
- * other compile is reported once its output is written. Its first build written is saved for the
- * next start (`firstBuildSaver`), or the build of a compile `compileAgain` asked for, which placed
- * the keys anew. It watches until the process ends or `close` is called, whose promise settles once
- * the compile under way, if any, has finished, the output is written and the build is saved, so
- * the project can then be removed.
+ * and is neither reported nor ended. One task then writes what it served, its keys declared now:
+ * once the process is quiet (`whenQuiet`), on the next change, when `write` asks for it, or as the
+ * watcher closes. Its result is reported, closing or not, and ends the
+ * compile; a change since the first compile is compiled after it. Every other compile is reported
+ * once its output is written. Its first build written is saved for the next start
+ * (`firstBuildSaver`), or the build of a compile `compileAgain` asked for, which placed the keys
+ * anew. It watches until the process ends or `close` is called, whose promise settles once the
+ * compile under way, if any, has finished, the output is written and the build is saved, so the
+ * project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -74,14 +76,21 @@ export function watch(
 	let watchers: FSWatcher[] = [];
 	/** The last build written, which the next compile starts from. */
 	let build: Build | undefined;
-	/** The first compile, served before its output was written, which the next compile starts from and writes. */
-	let unwritten: CompiledProject | undefined;
+	/**
+	 * The first compile, served before its output was written, until its write (`writeServed`) has
+	 * ended, which every caller of `write` and `close` waits for.
+	 */
+	let unwritten:
+		| { compiled: CompiledProject; written: PromiseWithResolvers<void> }
+		| undefined;
+	/** Whether the write of what the first compile served is under way. */
+	let writingServed = false;
 	/** Whether the next compile is the first and defers its write: none if a saved build was taken up. */
 	let defersWrite = serve !== undefined;
 	/** The wait for the process to be quiet, to write the first compile's output. */
 	let stopWaiting = () => {};
-	/** Those `write` keeps waiting until a compile has written the first compile's output, or tried to. */
-	let writeWaiting: (() => void)[] = [];
+	/** Whether a followed file changed, or a compile was asked for, since the last compile read them. */
+	let changes = false;
 	let running: Promise<void> | undefined;
 	let again = false;
 	/** The wait for the files to be quiet, after a catalog that did not parse. */
@@ -128,6 +137,7 @@ export function watch(
 
 	/** A file's event: a compile now, or, while the files are settling, a longer wait for them. */
 	const changed = () => {
+		changes = true;
 		if (settling === undefined) {
 			run();
 			return;
@@ -141,42 +151,64 @@ export function watch(
 		run();
 	};
 
-	/** Answers those `write` keeps waiting: a compile has written the first compile's output, or tried to. */
-	const answerWriteWaiting = () => {
-		for (const answer of writeWaiting) answer();
-		writeWaiting = [];
+	/**
+	 * Writes what the first compile served (`unwritten`): as a compile from itself, as no key
+	 * changed since it was served, its keys declared now (`writeBuild`). Its result is reported even
+	 * as the watcher closes, so an error only the write finds always reaches the server, and every
+	 * caller waiting for it is answered.
+	 */
+	const writeServed = async (
+		{ compiled, written }: NonNullable<typeof unwritten>,
+		started: number,
+	) => {
+		writingServed = true;
+		stopWaiting();
+		try {
+			const unchanged = { ...compiled.compilation, changed: new Set<string>() };
+			const next = await writeBuild(
+				{ ...compiled, compilation: unchanged },
+				undefined,
+				developing,
+			);
+			if (next.build !== undefined) {
+				saver.took(next.build, build);
+				build = next.build;
+			}
+			const milliseconds = performance.now() - started;
+			report(next.result, milliseconds, next.build);
+			reportedBuild = next.build !== undefined;
+			return { result: next.result, milliseconds, build: next.build };
+		} finally {
+			unwritten = undefined;
+			writingServed = false;
+			written.resolve();
+		}
 	};
 
 	/**
-	 * Compiles what changed since the last compile and writes its output, or holds the first one
-	 * unwritten while it defers its write, to write once the process is quiet unless a compile does
-	 * first. The first build written is saved (`firstBuildSaver`).
+	 * Compiles what changed since the last compile and writes its output, or, for the first compile
+	 * when it defers its write, holds what it served unwritten, to write once the process is quiet.
+	 * The first build written is saved (`firstBuildSaver`).
 	 */
 	const compileOnce = async (): Promise<
 		{ result: CompileResult; build?: Build } | { served: CompiledProject }
 	> => {
+		changes = false;
 		const deferring = defersWrite && !closed;
 		// A compile served before its write leaves the keys' declarations to the write too.
-		const compiled = await compileProject(configFile, unwritten ?? build, {
+		const compiled = await compileProject(configFile, build, {
 			...developing,
 			declare: !deferring,
 		});
 		if ("errors" in compiled)
 			return { result: { written: [], errors: compiled.errors } };
 		if (deferring) {
-			unwritten = compiled;
+			unwritten = { compiled, written: Promise.withResolvers() };
 			stopWaiting = whenQuiet(run);
 			return { served: compiled };
 		}
-		// A compile from the first, unwritten, writes its output whole.
-		const next = await writeBuild(
-			compiled,
-			unwritten === undefined ? build : undefined,
-			developing,
-		);
+		const next = await writeBuild(compiled, build, developing);
 		if (next.build === undefined) return next;
-		stopWaiting();
-		unwritten = undefined;
 		saver.took(next.build, build);
 		build = next.build;
 		return next;
@@ -190,13 +222,19 @@ export function watch(
 			settled = false;
 			begun += 1;
 			const started = performance.now();
-			const writing = unwritten !== undefined;
 			try {
 				follow();
 				if (first) {
 					first = false;
 					build = await savedBuild(configFile, developing);
 					defersWrite &&= build === undefined;
+				}
+				if (unwritten !== undefined) {
+					const served = await writeServed(unwritten, started);
+					if (!changes) {
+						ended(served);
+						continue;
+					}
 				}
 				const next = await compileOnce();
 				if ("result" in next && !quiet && unparsed(next.result)) {
@@ -223,8 +261,6 @@ export function watch(
 				reportedBuild = false;
 				failed(error);
 				ended({ error });
-			} finally {
-				if (writing) answerWriteWaiting();
 			}
 		} while (again && !closed);
 	};
@@ -245,17 +281,22 @@ export function watch(
 		first: firstCompile,
 		compileAgain: async () => {
 			const compiled = nextCompile();
+			changes = true;
 			if (!closed) run();
 			const again = await compiled;
 			if ("build" in again && again.build !== undefined)
 				saver.retook(again.build);
 			return again;
 		},
-		write: () => {
-			if (unwritten === undefined) return Promise.resolve(false);
-			stopWaiting();
-			run();
-			return new Promise((resolve) => writeWaiting.push(() => resolve(true)));
+		write: async () => {
+			if (unwritten === undefined) return false;
+			const { written } = unwritten;
+			if (!writingServed) {
+				stopWaiting();
+				run();
+			}
+			await written.promise;
+			return true;
 		},
 		close: async () => {
 			closed = true;
@@ -294,8 +335,8 @@ export type Watch = {
 	 */
 	compileAgain: () => Promise<Compiled>;
 	/**
-	 * Writes the output of a first compile served before its write (`serve`) now, if it is not
-	 * written yet, and settles once a compile has written it or tried to, with whether there was one.
+	 * Writes what a first compile served before its write (`serve`) now, if it is not written yet,
+	 * and settles once that write has ended, written or failed, with whether there was one.
 	 */
 	write: () => Promise<boolean>;
 	close: () => Promise<void>;
