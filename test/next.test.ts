@@ -28,6 +28,7 @@ import {
 	vi,
 } from "vitest";
 import { withGrai } from "../src/next/config.ts";
+import { unresolvedImports } from "./output-files.ts";
 import { project } from "./project.ts";
 import { stopped } from "./stopped.ts";
 
@@ -186,17 +187,42 @@ setTimeout(() => {
 		expect(Number(output)).toBeLessThan(50);
 	}, 30_000);
 
-	it("comes back for next dev once an empty outdir is written, then compiles each edit", async () => {
+	it("comes back for next dev once an empty outdir's modules are written, whole, writes their declarations after, then compiles each edit", async () => {
 		const { dir } = project({ en: { title: "Your cart" } });
 		const dev = nextDev(dir);
 
 		await printed(dev, "configured");
 		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+		expect(unresolvedImports(join(dir, "out"))).toEqual([]);
+		await expect
+			.poll(() => existsSync(join(dir, "out", "keys.d.ts")), { timeout: 5000 })
+			.toBe(true);
 		writeFileSync(
 			join(dir, "messages", "en.json"),
 			JSON.stringify({ title: "Your basket" }),
 		);
 		await expect.poll(() => shards(dir)).toContain("Your basket");
+	});
+
+	it("prints an error only the declarations of an empty outdir's first compile find, once next dev has come back", async () => {
+		const { dir } = project({
+			en: { title: "Your cart", listed: "{x :list}" },
+			de: { title: "Ihr Warenkorb", listed: "{x :number}" },
+		});
+		const dev = nextDev(dir);
+		let printedErrors = "";
+		dev.stderr?.on("data", (chunk) => {
+			printedErrors += chunk;
+		});
+
+		await printed(dev, "configured");
+
+		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+		await expect
+			.poll(() => printedErrors, { timeout: 5000 })
+			.toContain(
+				"x is formatted as a list in en and is formatted as a number in de",
+			);
 	});
 
 	it("refuses a Next basePath that is not grai's, under the url strategy, which reads the locale after it", async () => {
