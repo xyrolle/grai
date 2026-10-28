@@ -15,6 +15,7 @@ import { isCompiled } from "../src/output-inputs.ts";
 import type { Placing } from "../src/placing.ts";
 import { savedBuild } from "../src/saved-build.ts";
 import { savedGroups } from "../src/saved-groups.ts";
+import { writeUndeclared } from "../src/undeclared.ts";
 import { watch } from "../src/watch.ts";
 import {
 	isDeclarations,
@@ -333,7 +334,7 @@ function declaringLater(config: string, placeFirst?: Placing) {
 		config,
 		(result) => reported.push(result),
 		(error) => failures.push(error),
-		{ declareLater: true, placeFirst },
+		{ declareLater: writeUndeclared, placeFirst },
 	);
 	onTestFinished(async () => {
 		await watcher.close();

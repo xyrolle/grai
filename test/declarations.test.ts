@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, it } from "vitest";
 import { check } from "../src/check.ts";
-import { compileProject, writeUndeclared } from "../src/compile.ts";
+import { compileProject } from "../src/compile.ts";
+import { writeUndeclared } from "../src/undeclared.ts";
 import { project } from "./project.ts";
 
 const tsc = fileURLToPath(new URL("../node_modules/.bin/tsc", import.meta.url));
