@@ -44,10 +44,7 @@ function save(catalog, key, text) {
 	return saved;
 }
 
-/**
- * When grai wrote the shard that holds `text`: its file's modification time. A shard's name carries
- * its content's hash, so an edit writes a new file rather than changing a watched one.
- */
+/** When grai wrote the module of keys that holds `text`: its file's modification time. */
 function writtenAt(outdir, text) {
 	const keys = join(outdir, "keys");
 	for (const name of readdirSync(keys)) {
