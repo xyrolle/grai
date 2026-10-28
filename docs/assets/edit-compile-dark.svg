@@ -1,31 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 299" width="480" height="299" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 363" width="480" height="363" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>One message edited, compiled again</title>
-<rect x="0.5" y="0.5" width="479" height="298" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
+<rect x="0.5" y="0.5" width="479" height="362" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">One message edited, compiled again</text>
 <text x="16" y="44" font-size="13" fill="#c3c2b7">Milliseconds until the output holds the edit; lower is better</text>
-<line x1="99" y1="65" x2="99" y2="253" stroke="#383835" stroke-width="1"/>
-<text x="99" y="270" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="171.3" y1="65" x2="171.3" y2="253" stroke="#2c2c2a" stroke-width="1"/>
-<text x="171.3" y="270" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2,000</text>
-<line x1="243.5" y1="65" x2="243.5" y2="253" stroke="#2c2c2a" stroke-width="1"/>
-<text x="243.5" y="270" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">4,000</text>
-<line x1="315.8" y1="65" x2="315.8" y2="253" stroke="#2c2c2a" stroke-width="1"/>
-<text x="315.8" y="270" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">6,000</text>
-<line x1="388" y1="65" x2="388" y2="253" stroke="#2c2c2a" stroke-width="1"/>
-<text x="388" y="270" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">8,000</text>
+<line x1="208" y1="65" x2="208" y2="317" stroke="#383835" stroke-width="1"/>
+<text x="208" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="268" y1="65" x2="268" y2="317" stroke="#2c2c2a" stroke-width="1"/>
+<text x="268" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">100,000</text>
+<line x1="328" y1="65" x2="328" y2="317" stroke="#2c2c2a" stroke-width="1"/>
+<text x="328" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">200,000</text>
+<line x1="388" y1="65" x2="388" y2="317" stroke="#2c2c2a" stroke-width="1"/>
+<text x="388" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">300,000</text>
 <text x="16" y="83" font-size="13" font-weight="600" fill="#c3c2b7">6,366 keys</text>
-<text x="89" y="114" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,102H99A1,1 0 0 1 100,103V115A1,1 0 0 1 99,116H99Z" fill="#3987e5"/>
-<text x="106" y="114" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">11 ms</text>
-<text x="89" y="146" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,134H255.8A4,4 0 0 1 259.8,138V144A4,4 0 0 1 255.8,148H99Z" fill="#898781"/>
-<text x="265.8" y="146" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.45 s</text>
-<text x="16" y="175" font-size="13" font-weight="600" fill="#c3c2b7">13,326 keys</text>
-<text x="89" y="206" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,194H99A1,1 0 0 1 100,195V207A1,1 0 0 1 99,208H99Z" fill="#3987e5"/>
-<text x="106" y="206" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">12 ms</text>
-<text x="89" y="238" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,226H323.5A4,4 0 0 1 327.5,230V236A4,4 0 0 1 323.5,240H99Z" fill="#898781"/>
-<text x="333.5" y="238" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">6.32 s</text>
-<text x="388" y="290" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
+<text x="198" y="114" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M208,102H208A1,1 0 0 1 209,103V115A1,1 0 0 1 208,116H208Z" fill="#3987e5"/>
+<path d="M208,109H208M208,105V113M208,105V113" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="215" y="114" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">17 ms</text>
+<text x="198" y="146" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
+<path d="M208,134H208A1.7,1.7 0 0 1 209.7,135.7V146.3A1.7,1.7 0 0 1 208,148H208Z" fill="#898781"/>
+<path d="M209.7,141H210.8M209.7,137V145M210.8,137V145" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="216.8" y="146" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.89 s</text>
+<text x="198" y="178" font-size="14" text-anchor="end" fill="#f0efec">Paraglide, declarations</text>
+<path d="M208,166H223.6A4,4 0 0 1 227.6,170V176A4,4 0 0 1 223.6,180H208Z" fill="#898781"/>
+<path d="M226,173H247.2M226,169V177M247.2,169V177" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="253.2" y="178" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">32.7 s</text>
+<text x="16" y="207" font-size="13" font-weight="600" fill="#c3c2b7">13,326 keys</text>
+<text x="198" y="238" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M208,226H208A1,1 0 0 1 209,227V239A1,1 0 0 1 208,240H208Z" fill="#3987e5"/>
+<path d="M208,233H208.1M208,229V237M208.1,229V237" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="215" y="238" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">26 ms</text>
+<text x="198" y="270" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
+<path d="M208,258H208A3.9,3.9 0 0 1 211.9,261.9V268.1A3.9,3.9 0 0 1 208,272H208Z" fill="#898781"/>
+<path d="M211.2,265H214.2M211.2,261V269M214.2,261V269" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="220.2" y="270" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">6.55 s</text>
+<text x="198" y="302" font-size="14" text-anchor="end" fill="#f0efec">Paraglide, declarations</text>
+<path d="M208,290H343.8A4,4 0 0 1 347.8,294V300A4,4 0 0 1 343.8,304H208Z" fill="#898781"/>
+<path d="M307.5,297H378.2M307.5,293V301M378.2,293V301" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="384.2" y="302" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">233.0 s</text>
+<text x="388" y="354" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
 </svg>

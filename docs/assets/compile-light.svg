@@ -1,36 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 380" width="480" height="380" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 397" width="480" height="397" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Compiling the catalogs</title>
-<rect x="0.5" y="0.5" width="479" height="379" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
+<rect x="0.5" y="0.5" width="479" height="396" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">Compiling the catalogs</text>
-<text x="16" y="44" font-size="13" fill="#52514e">Seconds for a full compile of three locales, in a new process;</text>
-<text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>
-<line x1="247" y1="82" x2="247" y2="334" stroke="#c3c2b7" stroke-width="1"/>
-<text x="247" y="351" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="294" y1="82" x2="294" y2="334" stroke="#e1e0d9" stroke-width="1"/>
-<text x="294" y="351" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">5</text>
-<line x1="341" y1="82" x2="341" y2="334" stroke="#e1e0d9" stroke-width="1"/>
-<text x="341" y="351" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">10</text>
-<line x1="388" y1="82" x2="388" y2="334" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="351" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">15</text>
-<text x="16" y="100" font-size="13" font-weight="600" fill="#52514e">6,366 keys</text>
-<text x="237" y="131" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M247,119H247A1.2,1.2 0 0 1 248.2,120.2V131.8A1.2,1.2 0 0 1 247,133H247Z" fill="#2a78d6"/>
-<text x="254.2" y="131" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">124 ms</text>
-<text x="237" y="163" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M247,151H284.8A4,4 0 0 1 288.8,155V161A4,4 0 0 1 284.8,165H247Z" fill="#898781"/>
-<text x="294.8" y="163" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.45 s</text>
-<text x="237" y="195" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide, with declarations</text>
-<path d="M247,183H332.2A4,4 0 0 1 336.2,187V193A4,4 0 0 1 332.2,197H247Z" fill="#898781"/>
-<text x="342.2" y="195" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">9.49 s</text>
-<text x="16" y="224" font-size="13" font-weight="600" fill="#52514e">13,326 keys</text>
-<text x="237" y="255" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M247,243H247A1.4,1.4 0 0 1 248.4,244.4V255.6A1.4,1.4 0 0 1 247,257H247Z" fill="#2a78d6"/>
-<text x="254.4" y="255" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">147 ms</text>
-<text x="237" y="287" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M247,275H302.4A4,4 0 0 1 306.4,279V285A4,4 0 0 1 302.4,289H247Z" fill="#898781"/>
-<text x="312.4" y="287" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">6.32 s</text>
-<text x="237" y="319" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide, with declarations</text>
-<path d="M247,307H367.2A4,4 0 0 1 371.2,311V317A4,4 0 0 1 367.2,321H247Z" fill="#898781"/>
-<text x="377.2" y="319" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">13.2 s</text>
-<text x="388" y="371" font-size="12" text-anchor="end" fill="#52514e">seconds</text>
+<text x="16" y="44" font-size="13" fill="#52514e">Seconds for a full compile of three locales from no output, in a</text>
+<text x="16" y="61" font-size="13" fill="#52514e">new process;</text>
+<text x="16" y="78" font-size="13" fill="#52514e">lower is better</text>
+<line x1="208" y1="99" x2="208" y2="351" stroke="#c3c2b7" stroke-width="1"/>
+<text x="208" y="368" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="253" y1="99" x2="253" y2="351" stroke="#e1e0d9" stroke-width="1"/>
+<text x="253" y="368" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">10</text>
+<line x1="298" y1="99" x2="298" y2="351" stroke="#e1e0d9" stroke-width="1"/>
+<text x="298" y="368" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">20</text>
+<line x1="343" y1="99" x2="343" y2="351" stroke="#e1e0d9" stroke-width="1"/>
+<text x="343" y="368" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">30</text>
+<line x1="388" y1="99" x2="388" y2="351" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="368" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">40</text>
+<text x="16" y="117" font-size="13" font-weight="600" fill="#52514e">6,366 keys</text>
+<text x="198" y="148" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M208,136H208A1,1 0 0 1 209,137V149A1,1 0 0 1 208,150H208Z" fill="#2a78d6"/>
+<path d="M208.5,143H208.9M208.5,139V147M208.9,139V147" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="215" y="148" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">159 ms</text>
+<text x="198" y="180" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M208,168H221.3A4,4 0 0 1 225.3,172V178A4,4 0 0 1 221.3,182H208Z" fill="#898781"/>
+<path d="M223.7,175H234.2M223.7,171V179M234.2,171V179" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="240.2" y="180" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.83 s</text>
+<text x="198" y="212" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide, declarations</text>
+<path d="M208,200H245.5A4,4 0 0 1 249.5,204V210A4,4 0 0 1 245.5,214H208Z" fill="#898781"/>
+<path d="M243.1,207H266.2M243.1,203V211M266.2,203V211" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="272.2" y="212" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">9.22 s</text>
+<text x="16" y="241" font-size="13" font-weight="600" fill="#52514e">13,326 keys</text>
+<text x="198" y="272" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M208,260H208A1.2,1.2 0 0 1 209.2,261.2V272.8A1.2,1.2 0 0 1 208,274H208Z" fill="#2a78d6"/>
+<path d="M208.8,267H210M208.8,263V271M210,263V271" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="216" y="272" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">259 ms</text>
+<text x="198" y="304" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M208,292H239.8A4,4 0 0 1 243.8,296V302A4,4 0 0 1 239.8,306H208Z" fill="#898781"/>
+<path d="M235,299H256.2M235,295V303M256.2,295V303" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="262.2" y="304" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">7.94 s</text>
+<text x="198" y="336" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide, declarations</text>
+<path d="M208,324H281.2A4,4 0 0 1 285.2,328V334A4,4 0 0 1 281.2,338H208Z" fill="#898781"/>
+<path d="M269.1,331H356.3M269.1,327V335M356.3,327V335" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="362.3" y="336" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">17.2 s</text>
+<text x="388" y="388" font-size="12" text-anchor="end" fill="#52514e">seconds</text>
 </svg>

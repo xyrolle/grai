@@ -1,28 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
-<title>A page of 2,000 messages: its JS</title>
-<rect x="0.5" y="0.5" width="479" height="259" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">A page of 2,000 messages: its JS</text>
-<text x="16" y="44" font-size="13" fill="#52514e">KB brotli, the page's own code and its messages included;</text>
-<text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>
-<line x1="99" y1="82" x2="99" y2="214" stroke="#c3c2b7" stroke-width="1"/>
-<text x="99" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="195.3" y1="82" x2="195.3" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="195.3" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">50</text>
-<line x1="291.7" y1="82" x2="291.7" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="291.7" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">100</text>
-<line x1="388" y1="82" x2="388" y2="214" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">150</text>
-<text x="89" y="103" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M99,91H138.5A4,4 0 0 1 142.5,95V101A4,4 0 0 1 138.5,105H99Z" fill="#2a78d6"/>
-<text x="148.5" y="103" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">22.6 KB</text>
-<text x="89" y="135" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M99,123H165.7A4,4 0 0 1 169.7,127V133A4,4 0 0 1 165.7,137H99Z" fill="#898781"/>
-<text x="175.7" y="135" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">36.7 KB</text>
-<text x="89" y="167" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
-<path d="M99,155H339.9A4,4 0 0 1 343.9,159V165A4,4 0 0 1 339.9,169H99Z" fill="#898781"/>
-<text x="349.9" y="167" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">127.1 KB</text>
-<text x="89" y="199" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
-<path d="M99,187H344A4,4 0 0 1 348,191V197A4,4 0 0 1 344,201H99Z" fill="#898781"/>
-<text x="354" y="199" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">129.2 KB</text>
-<text x="388" y="251" font-size="12" text-anchor="end" fill="#52514e">KB, brotli</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 361" width="480" height="361" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>A page of 2,000 message calls, 416 distinct keys: its JS</title>
+<rect x="0.5" y="0.5" width="479" height="360" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">A page of 2,000 message calls, 416 distinct keys:</text>
+<text x="16" y="44" font-size="16" font-weight="600" fill="#0b0b0b">its JS</text>
+<text x="16" y="64" font-size="13" fill="#52514e">KB brotli: every script the built page loads or holds inline, each</text>
+<text x="16" y="81" font-size="13" fill="#52514e">compressed on its own;</text>
+<text x="16" y="98" font-size="13" fill="#52514e">lower is better</text>
+<line x1="208" y1="119" x2="208" y2="315" stroke="#c3c2b7" stroke-width="1"/>
+<text x="208" y="332" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="268" y1="119" x2="268" y2="315" stroke="#e1e0d9" stroke-width="1"/>
+<text x="268" y="332" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">50</text>
+<line x1="328" y1="119" x2="328" y2="315" stroke="#e1e0d9" stroke-width="1"/>
+<text x="328" y="332" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">100</text>
+<line x1="388" y1="119" x2="388" y2="315" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="332" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">150</text>
+<text x="198" y="140" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M208,128H233.7A4,4 0 0 1 237.7,132V138A4,4 0 0 1 233.7,142H208Z" fill="#2a78d6"/>
+<text x="243.7" y="140" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">24.7 KB</text>
+<text x="198" y="172" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl, page's keys</text>
+<path d="M208,160H245A4,4 0 0 1 249,164V170A4,4 0 0 1 245,174H208Z" fill="#898781"/>
+<text x="255" y="172" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">34.2 KB</text>
+<text x="198" y="204" font-size="14" text-anchor="end" fill="#0b0b0b">i18next, page's keys</text>
+<path d="M208,192H247.4A4,4 0 0 1 251.4,196V202A4,4 0 0 1 247.4,206H208Z" fill="#898781"/>
+<text x="257.4" y="204" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">36.2 KB</text>
+<text x="198" y="236" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M208,224H248.1A4,4 0 0 1 252.1,228V234A4,4 0 0 1 248.1,238H208Z" fill="#898781"/>
+<text x="258.1" y="236" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">36.8 KB</text>
+<text x="198" y="268" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl, whole catalog</text>
+<path d="M208,256H356.5A4,4 0 0 1 360.5,260V266A4,4 0 0 1 356.5,270H208Z" fill="#898781"/>
+<text x="366.5" y="268" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">127.1 KB</text>
+<text x="198" y="300" font-size="14" text-anchor="end" fill="#0b0b0b">i18next, whole catalog</text>
+<path d="M208,288H359.2A4,4 0 0 1 363.2,292V298A4,4 0 0 1 359.2,302H208Z" fill="#898781"/>
+<text x="369.2" y="300" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">129.3 KB</text>
+<text x="388" y="352" font-size="12" text-anchor="end" fill="#52514e">KB, brotli</text>
 </svg>

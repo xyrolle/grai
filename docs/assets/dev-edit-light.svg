@@ -1,29 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 243" width="480" height="243" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
-<title>One message edited, until the page shows it</title>
-<rect x="0.5" y="0.5" width="479" height="242" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">One message edited, until the page shows it</text>
-<text x="16" y="44" font-size="13" fill="#52514e">Milliseconds in Vite's dev server; lower is better</text>
-<line x1="99" y1="65" x2="99" y2="197" stroke="#c3c2b7" stroke-width="1"/>
-<text x="99" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="171.3" y1="65" x2="171.3" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="171.3" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
-<line x1="243.5" y1="65" x2="243.5" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="243.5" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
-<line x1="315.8" y1="65" x2="315.8" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="315.8" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">3,000</text>
-<line x1="388" y1="65" x2="388" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
-<text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M99,74H99A1.1,1.1 0 0 1 100.1,75.1V86.9A1.1,1.1 0 0 1 99,88H99Z" fill="#2a78d6"/>
-<text x="106.1" y="86" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">15 ms</text>
-<text x="89" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
-<path d="M99,106H100.2A4,4 0 0 1 104.2,110V116A4,4 0 0 1 100.2,120H99Z" fill="#898781"/>
-<text x="110.2" y="118" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">72 ms</text>
-<text x="89" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
-<path d="M99,138H100.4A4,4 0 0 1 104.4,142V148A4,4 0 0 1 100.4,152H99Z" fill="#898781"/>
-<text x="110.4" y="150" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">74 ms</text>
-<text x="89" y="182" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M99,170H317.1A4,4 0 0 1 321.1,174V180A4,4 0 0 1 317.1,184H99Z" fill="#898781"/>
-<text x="327.1" y="182" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.07 s</text>
-<text x="388" y="234" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>One message edited, until the DOM is updated</title>
+<rect x="0.5" y="0.5" width="479" height="259" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">One message edited, until the DOM is updated</text>
+<text x="16" y="44" font-size="13" fill="#52514e">Milliseconds in Vite's dev server, from the catalog's save;</text>
+<text x="16" y="61" font-size="13" fill="#52514e">lower is better</text>
+<line x1="99" y1="82" x2="99" y2="214" stroke="#c3c2b7" stroke-width="1"/>
+<text x="99" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="171.3" y1="82" x2="171.3" y2="214" stroke="#e1e0d9" stroke-width="1"/>
+<text x="171.3" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
+<line x1="243.5" y1="82" x2="243.5" y2="214" stroke="#e1e0d9" stroke-width="1"/>
+<text x="243.5" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
+<line x1="315.8" y1="82" x2="315.8" y2="214" stroke="#e1e0d9" stroke-width="1"/>
+<text x="315.8" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">3,000</text>
+<line x1="388" y1="82" x2="388" y2="214" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="231" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
+<text x="89" y="103" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,91H99A1.3,1.3 0 0 1 100.3,92.3V103.7A1.3,1.3 0 0 1 99,105H99Z" fill="#2a78d6"/>
+<path d="M100.1,98H100.4M100.1,94V102M100.4,94V102" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="106.4" y="103" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">18 ms</text>
+<text x="89" y="135" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
+<path d="M99,123H100A4,4 0 0 1 104,127V133A4,4 0 0 1 100,137H99Z" fill="#898781"/>
+<path d="M103.7,130H104.2M103.7,126V134M104.2,126V134" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="110.2" y="135" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">69 ms</text>
+<text x="89" y="167" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
+<path d="M99,155H100.3A4,4 0 0 1 104.3,159V165A4,4 0 0 1 100.3,169H99Z" fill="#898781"/>
+<path d="M104.2,162H104.4M104.2,158V166M104.4,158V166" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="110.4" y="167" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">73 ms</text>
+<text x="89" y="199" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M99,187H375A4,4 0 0 1 379,191V197A4,4 0 0 1 375,201H99Z" fill="#898781"/>
+<path d="M372.8,194H384.9M372.8,190V198M384.9,190V198" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="390.9" y="199" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.88 s</text>
+<text x="388" y="251" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>
