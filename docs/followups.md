@@ -228,3 +228,9 @@ Done when: Rolldown leaves the placeholder's shape in a string's value alone, an
 The performance check's `dev` step had no runs on CI when it was added, so its baseline is its median on an M5 Pro times the ratio of CI's first compile to that machine's (`scripts/performance.ts`).
 
 Done when: the step's baseline is the median of ten runs on CI's runners, as every other step's is.
+
+## A first dev start still compiles every key before its page
+
+A first dev start serves its first page before it writes the output (`docs/design.md`), but the compile that page needs is every key's code in every locale: 45–57 ms of the synthetic catalog's start on the server's thread, the most of what keeps it behind i18next's, whose page needs a JSON object. Letting the server answer the page's first requests while that compile runs was tried, the compile in slices between which the event loop ran and the resolver waiting for it only for keys.js and a key's path: the server listened 84 ms sooner, and the page showed no sooner (−44.8 ms against main, where serving before the write alone was −55.1 ms, paired, 20 rounds), as the page asks for its messages right after its first requests, and the server's thread does the same work either way. What would cut it is less work for the page's module: one locale's code alone, which needs a key's kind, and the names of the formatters and plural rules its module imports, decided by that locale alone.
+
+Done when: the page's module of a first dev start is compiled from its locale's messages alone, the same code the full compile writes for it, and the dev-start bench measures it against i18next.
