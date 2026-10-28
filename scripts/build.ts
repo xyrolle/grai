@@ -28,6 +28,7 @@ const project = new URL("../tsconfig.build.json", import.meta.url);
 /**
  * The modules grai runs by their paths, beside the entries package.json names: the threads it
  * starts (`packageModule`), and Nuxt's runtime files, which its module adds to the app by path.
+ * And the parts the benches time (`bench.ts`), which the package does not ship.
  */
 const runByPath = [
 	"next/watch-worker",
@@ -35,6 +36,7 @@ const runByPath = [
 	"code/pool-worker",
 	"nuxt/runtime/plugin",
 	"nuxt/runtime/locale",
+	"bench",
 ];
 
 /** Each entry's name: its path in dist without `.js`, which is its source's in src without `.ts`. */

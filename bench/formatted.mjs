@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "./apps.mjs";
-import { graiModule } from "./grai.mjs";
+import { graiParts } from "./grai.mjs";
 
 const KEYS = 13_000;
 const self = new URL(import.meta.url).pathname;
@@ -75,7 +75,7 @@ async function timed(count, run, prepare = () => {}) {
 async function child(measure, config) {
 	const out = join(config, "..", "out");
 	const ru = join(config, "..", "messages", "ru.json");
-	const { compile, recompile } = await import(graiModule("compile.ts"));
+	const { check, compile, exportLocale, recompile } = await import(graiParts);
 	if (measure === "cold") {
 		const ms = await timed(
 			5,
@@ -85,13 +85,11 @@ async function child(measure, config) {
 		return console.log(JSON.stringify({ ms }));
 	}
 	if (measure === "check") {
-		const { check } = await import(graiModule("check.ts"));
 		return console.log(
 			JSON.stringify({ ms: await timed(3, () => check(config)) }),
 		);
 	}
 	if (measure === "export") {
-		const { exportLocale } = await import(graiModule("translations.ts"));
 		const ms = await timed(3, () =>
 			exportLocale(config, "ru", { json: false, untranslated: false }),
 		);

@@ -5,7 +5,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { editedCatalog } from "./catalog-edit.mjs";
 import { checkTexts } from "./compiled-texts.mjs";
-import { graiEntry, graiModule } from "./grai.mjs";
+import { graiEntry, graiParts } from "./grai.mjs";
 
 /** The work's time in ms, and what it returned. */
 async function timed(work) {
@@ -54,7 +54,7 @@ const runs = {
 	 */
 	async grai({ config, outdir, edit, reference }) {
 		const { compile } = await import(graiEntry("."));
-		const { recompile } = await import(graiModule("compile.ts"));
+		const { recompile } = await import(graiParts);
 		const cold = await timed(() => compile(config));
 		assertCompiled(cold.result);
 		const noop = await timed(() => compile(config));

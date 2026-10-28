@@ -11,7 +11,7 @@ import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { graiModule } from "./grai.mjs";
+import { graiParts } from "./grai.mjs";
 import { inlineTemplate } from "./template-inliner.mjs";
 
 const root = process.cwd();
@@ -20,11 +20,13 @@ const fromApp = (path) => import(pathToFileURL(path).href);
 const { createBuilder, minifySync, parseSync } = await fromApp(
 	createRequire(join(root, "package.json")).resolve("vite"),
 );
-const { readProject, parseCatalogs } = await import(graiModule("compile.ts"));
-const { compileCatalogs } = await import(graiModule("compilation.ts"));
-const { keyModulePrefix, textModulePrefix } = await import(
-	graiModule("locale-chunks.ts")
-);
+const {
+	compileCatalogs,
+	keyModulePrefix,
+	parseCatalogs,
+	readProject,
+	textModulePrefix,
+} = await import(graiParts);
 /**
  * The key a message module holds: a key's module, or @xyrolle/grai/svelte's string of a text key.
  */
