@@ -3,7 +3,8 @@
 // built CLI's compile from a fresh process on an empty outdir, then starts a Vite dev server with
 // grai's plugin in a fresh process on an empty outdir. It fails when a step takes more than
 // twice its baseline, the median of CI's runs, so it catches a regression and not the noise of a
-// shared runner.
+// shared runner. Then it parses a pattern of escapes alone and one of placeholders alone, each at
+// two sizes, and fails when the parser's time grows much faster than the pattern.
 //
 // usage: pnpm build && node scripts/performance.ts
 import { execFileSync } from "node:child_process";
@@ -12,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compile, recompile } from "../src/compile.ts";
+import { type Part, parsePattern } from "../src/pattern.ts";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 /** A script that times a process's first compile of the config it is given. */
@@ -200,7 +202,61 @@ try {
 			`${step.padEnd(7)} ${measured.toFixed(1).padStart(7)} ms   budget ${2 * baseline} ms${over ? "   over budget" : ""}`,
 		);
 	}
+	failed ||= !patternParsesLinearly();
 	if (failed) process.exitCode = 1;
 } finally {
 	rmSync(dir, { recursive: true, force: true });
+}
+
+/**
+ * Whether the pattern parser's time grows about as its pattern does: on a pattern of escapes alone
+ * and one of placeholders alone, each at two sizes eight times apart, each must parse to what it
+ * holds, and its time grow at most four times the sizes' ratio, 32 times. A parser that searched the
+ * rest of the pattern again at each escape or placeholder grew with the square, 64 times.
+ */
+function patternParsesLinearly(): boolean {
+	const sizes = [1 << 16, 1 << 19] as const;
+	const shapes: [
+		string,
+		(count: number) => string,
+		(count: number) => Part[],
+	][] = [
+		[
+			"escapes",
+			(count) => "\\\\".repeat(count),
+			(count) => [{ type: "text", value: "\\".repeat(count) }],
+		],
+		[
+			"placeholders",
+			(count) => "{x}".repeat(count),
+			(count) =>
+				Array.from({ length: count }, () => ({ type: "variable", name: "x" })),
+		],
+	];
+	let linear = true;
+	for (const [shape, pattern, parts] of shapes) {
+		const times = sizes.map((count) => {
+			const source = pattern(count);
+			let fastest = Number.POSITIVE_INFINITY;
+			for (let run = 0; run < 5; run++) {
+				const started = performance.now();
+				const parsed = parsePattern(source);
+				fastest = Math.min(fastest, performance.now() - started);
+				if (JSON.stringify(parsed) !== JSON.stringify(parts(count))) {
+					throw new Error(
+						`a pattern of ${count} ${shape} parsed to other parts`,
+					);
+				}
+			}
+			return fastest;
+		});
+		const [small = 0, large = 0] = times;
+		const growth = large / small;
+		const over = growth > 32;
+		linear &&= !over;
+		console.log(
+			`parse   ${shape.padEnd(12)} ${small.toFixed(1)} → ${large.toFixed(1)} ms, ${growth.toFixed(1)} times for 8 times the size   budget 32 times${over ? "   over budget" : ""}`,
+		);
+	}
+	return linear;
 }
