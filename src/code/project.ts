@@ -27,6 +27,7 @@ import { projectResolution, resolverFor } from "./resolution.ts";
 import { Resolutions, unnamed } from "./resolved.ts";
 import { type StateStore, stateFiles } from "./state-store.ts";
 import { TextTest } from "./text-test.ts";
+import { unwrittenOutput } from "./unwritten-output.ts";
 import { workspacePackages } from "./workspace.ts";
 
 /** A source file: the path the project shows, its text, and its facts. */
@@ -96,14 +97,6 @@ export async function readProjectCode(
 	const sources = new Map<string, SourceCode>();
 	const pool = new Pool();
 	const resolutions = new Resolutions(resolution, resolveFile, pool);
-	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
-	const resolve: Resolve = async (source, importer) => {
-		const path = resolutions.path(source, importer);
-		const module = moduleOf(source);
-		return path === output.keys && module.type === "key"
-			? `${keyModulePrefix}${module.key}`
-			: path;
-	};
 	const followed = new Map<string, Promise<FileFacts | undefined>>();
 	const factsOfPath = (path: string) => {
 		const source = sources.get(path);
@@ -127,6 +120,19 @@ export async function readProjectCode(
 		...seen.manifests.filter((each) => each !== manifest),
 	];
 	const mappings = projectMappings(resolution, manifests);
+	// An import of the output not written yet resolves to where its modules go.
+	const unwritten = existsSync(output.keys)
+		? undefined
+		: unwrittenOutput(output, mappings ?? []);
+	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
+	const resolve: Resolve = async (source, importer) => {
+		const path =
+			resolutions.path(source, importer) ?? unwritten?.(source, importer);
+		const module = moduleOf(source);
+		return path === output.keys && module.type === "key"
+			? `${keyModulePrefix}${module.key}`
+			: path;
+	};
 	const links = seen.links.map((path) => ({ path, real: realPath(path) }));
 	const packages = workspacePackages(config.root);
 	try {
