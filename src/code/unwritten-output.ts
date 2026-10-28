@@ -6,13 +6,15 @@
  * not there yet (`resolution.ts`): the first Vite alias that matches; a relative or absolute path;
  * the tsconfig's `paths` that apply, by the pattern that matches best, each target in turn; its
  * `baseUrl`; and the `imports` of the importing module's own package.json, by the key that matches
- * best, through the first of its conditions the resolver takes. One that lands on none of the
- * output's modules names nothing, as the resolver said. A module of a project the tsconfig references is left unresolved: whether the
+ * best, through the first of its conditions the resolver takes. Each file is taken by its real path,
+ * as the output's are. One that lands on none of the output's modules names nothing, as the
+ * resolver said. A module of a project the tsconfig references is left unresolved: whether the
  * resolver gives it that project's `paths` depends on the project's `include`.
  */
 
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { realPath } from "../real-path.ts";
 import { pathNames } from "./candidates.ts";
 import type { Output } from "./modules.ts";
 import { aliased, conditionNames, type Resolution } from "./resolution.ts";
@@ -26,8 +28,10 @@ export function unwrittenOutput(
 	resolution: Resolution,
 ): (source: string, importer: string) => string | undefined {
 	const modules = [output.keys, output.messages];
-	const landed = (path: string) =>
-		modules.find((module) => pathNames(path, module, entries));
+	const landed = (path: string) => {
+		const real = realPath(path);
+		return modules.find((module) => pathNames(real, module, entries));
+	};
 	const applied =
 		resolution.tsconfig === undefined
 			? { paths: [], baseUrl: undefined, references: [] }
