@@ -109,6 +109,38 @@ describe("reading a file's code", () => {
 		]);
 	});
 
+	it("reads a Svelte component that awaits in every scope its template opens, as Svelte's async mode lets it", async () => {
+		const text = [
+			'<script lang="ts">',
+			'\timport { m } from "$lib/i18n";',
+			"\tconst load = async (n: number) => n;",
+			"</script>",
+			"<h1>{await m.top()}</h1>",
+			"{#each [1] as m}<p>{await load(m.each)}</p>{/each}",
+			"{#await load(1) then m}{await m.then}{:catch m}{await m.caught}{/await}",
+			"{#snippet row(m)}{@const { default: Row } = await import('./Row.svelte')}<Row>{m.cell}</Row>{/snippet}",
+			"<List let:m>{await m.item}</List>",
+			"{#if true}{@const m = await load(1)}{m.inner}{/if}",
+			"{#key 1}{await m.keyed()}{/key}",
+			"<svelte:boundary>{await m.bounded()}{#snippet failed(m)}{await m.failure}{/snippet}</svelte:boundary>",
+			"<p>{m.after()}</p>",
+		].join("\n");
+
+		expect(await readsOf("src/App.svelte", text)).toEqual([
+			"top 5:14 import",
+			"each 6:34 local",
+			"then 7:33 local",
+			"caught 7:57 local",
+			"cell 8:82 local",
+			"item 9:22 local",
+			"inner 10:40 local",
+			"keyed 11:18 import",
+			"bounded 12:27 import",
+			"failure 12:66 local",
+			"after 13:7 import",
+		]);
+	});
+
 	it("reads a Svelte each block that names an index and no item, which binds the index alone", async () => {
 		const text = [
 			"<script>",
