@@ -1,18 +1,18 @@
-import { once } from "node:events";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Worker } from "node:worker_threads";
 import { expect, it, onTestFinished } from "vitest";
 import { readConfig } from "../src/config.ts";
+import type { AppData } from "../src/next/app-data.ts";
 import { firstGroups } from "../src/next/first-groups.ts";
+import { startGroupRead } from "../src/next/group-read.ts";
 import { nextKeyGroups } from "../src/next/key-groups.ts";
 import { freshApp } from "./next-fresh-app.ts";
 
-// The groups of a fresh app's keys read beside the first compile of its `next dev` start
-// (`first-groups.ts`): what the read answers, once the compile has written the output its first read
-// could not resolve, what a start gets from it, and that stopping it leaves nothing behind.
+// The groups of a fresh app's keys read beside the first compile of its `next dev` start, on the
+// thread withGrai starts (`group-read.ts`) and the watch hears on a port (`first-groups.ts`): what
+// the read answers, before the output is written, and that stopping it leaves nothing behind.
 
 /** A thread's script of the test's own, in a module file, removed after the test. */
 function script(code: string): URL {
@@ -21,42 +21,44 @@ function script(code: string): URL {
 	const file = join(dir, "read.mjs");
 	writeFileSync(
 		file,
-		`import { parentPort } from "node:worker_threads";\n${code}\n`,
+		`import { workerData } from "node:worker_threads";\nconst { port } = workerData;\n${code}\n`,
 	);
 	return pathToFileURL(file);
 }
 
+/** The read's thread on an app, or on a script of the test's own, and the watch's side of it. */
+function reading(data: AppData, code?: string) {
+	const thread = startGroupRead(
+		data,
+		code === undefined ? undefined : script(code),
+	);
+	onTestFinished(() => thread.stop());
+	return { thread, read: firstGroups(thread.port) };
+}
+
 it("reads the code before the output is written, and the groups from each key's weight, writing nothing", async () => {
 	const { dir, data, weights } = freshApp();
-	const worker = new Worker(
-		new URL("../src/next/group-worker.ts", import.meta.url),
-		{ workerData: data, execArgv: [] },
-	);
-	onTestFinished(async () => {
-		await worker.terminate();
-	});
+	const { read } = reading(data);
 
-	expect(await once(worker, "message")).toEqual(["read"]);
-	worker.postMessage(await weights());
-
-	expect(await once(worker, "message")).toEqual([[["about"], ["home"]]]);
+	expect(await read.read).toBe(true);
+	expect(await read.after(await weights())).toEqual([["about"], ["home"]]);
 	// The read kept the facts and the listing in memory: no file of the outdir is there.
 	expect(existsSync(join(dir, "out"))).toBe(false);
 });
 
 it("gives no groups once stopped before the code is read", async () => {
 	const { data, weights } = freshApp();
-	const reading = firstGroups(data);
-	await reading.stop();
+	const { thread, read } = reading(data);
+	await thread.stop();
 
-	expect(await reading.read).toBe(false);
-	expect(await reading.after(await weights())).toBeUndefined();
+	expect(await read.read).toBe(false);
+	expect(await read.after(await weights())).toBeUndefined();
 });
 
 it("leaves nothing on disk once stopped, and the read once the server is quiet still groups the keys", async () => {
 	const { dir, data, compiled } = freshApp();
-	const reading = firstGroups(data);
-	await reading.stop();
+	const { thread } = reading(data);
+	await thread.stop();
 
 	expect(existsSync(join(dir, "out"))).toBe(false);
 	const weights = await compiled();
@@ -68,26 +70,23 @@ it("leaves nothing on disk once stopped, and the read once the server is quiet s
 
 it("gives a start no groups, at once, when the read fails after reading the code", async () => {
 	const { data } = freshApp();
-	const reading = firstGroups(
+	const { read } = reading(
 		data,
-		script(
-			`parentPort.postMessage("read");\nparentPort.on("message", () => {\n\tthrow new Error("the read failed");\n});`,
-		),
+		`port.postMessage("read");\nport.on("message", () => {\n\tthrow new Error("the read failed");\n});`,
 	);
-	onTestFinished(() => reading.stop());
 
-	expect(await reading.read).toBe(true);
-	expect(await reading.after(new Map())).toBeUndefined();
+	expect(await read.read).toBe(true);
+	expect(await read.after(new Map())).toBeUndefined();
 });
 
 it("settles a stop once the read's thread has stopped, though it never yields", async () => {
 	const { data } = freshApp();
-	const reading = firstGroups(
+	const { thread, read } = reading(
 		data,
-		script(`parentPort.postMessage("read");\nfor (;;) {}`),
+		`port.postMessage("read");\nfor (;;) {}`,
 	);
 
-	expect(await reading.read).toBe(true);
-	await reading.stop();
-	expect(await reading.after(new Map())).toBeUndefined();
+	expect(await read.read).toBe(true);
+	await thread.stop();
+	expect(await read.after(new Map())).toBeUndefined();
 });

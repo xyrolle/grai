@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { type FirstGroups, firstGroups } from "../src/next/first-groups.ts";
+import { startGroupRead } from "../src/next/group-read.ts";
 import { startup } from "../src/next/startup.ts";
 import { savedBuild } from "../src/saved-build.ts";
 import { groupsFile, type KeyGroups } from "../src/saved-groups.ts";
@@ -19,7 +20,7 @@ import { freshApp } from "./next-fresh-app.ts";
 // A fresh `next dev` start whose first compile asks for the groups read beside it (`startup.ts`):
 // it places the keys by them in the one output it writes when they come in time, and the start is
 // released once the watch has started, that compile and those of the edits that came meanwhile
-// ended, and the read has stopped.
+// ended.
 
 /**
  * A read of the groups whose answer the test gives, once the compile has asked for it: its code read
@@ -41,9 +42,6 @@ function heldRead(read = true) {
 			events.push("asked");
 			asked();
 			return answered;
-		},
-		stop: async () => {
-			events.push("stopped");
 		},
 	};
 	return { reading, asking, answer, events };
@@ -85,7 +83,7 @@ it("places the keys by the groups that have come when the first compile asks, in
 
 	expect(grouped).toBe(true);
 	expect(reports).toHaveLength(1);
-	expect(held.events).toEqual(["asked", "stopped"]);
+	expect(held.events).toEqual(["asked"]);
 	expect(groupModules(dir)).toHaveLength(2);
 	expect("build" in compiled && compiled.build?.rendered.groups).toBe(
 		JSON.stringify([["about"], ["home"]]),
@@ -197,11 +195,11 @@ it("places the keys by their shards, and releases the start without waiting, whe
 
 	expect(grouped).toBe(false);
 	expect(reports).toHaveLength(1);
-	expect(held.events).toEqual(["asked", "stopped"]);
+	expect(held.events).toEqual(["asked"]);
 	expect(groupModules(dir)).toEqual([]);
 });
 
-it("releases the start once a first compile that met a catalog mid-save has read it again, its read stopped and never asked", async () => {
+it("releases the start once a first compile that met a catalog mid-save has read it again, never asking for the groups", async () => {
 	const { dir, config } = freshApp();
 	writeFileSync(join(dir, "messages", "en.json"), '{ "about": "Abo');
 	const held = heldRead();
@@ -217,7 +215,7 @@ it("releases the start once a first compile that met a catalog mid-save has read
 	]);
 	expect({ grouped, events: held.events }).toEqual({
 		grouped: false,
-		events: ["stopped"],
+		events: [],
 	});
 });
 
@@ -225,7 +223,9 @@ it("places a fresh app's keys by the groups its code's read gives, once that rea
 	// Catalogs large enough that rendering their keys by their shards, the time the groups have to
 	// come in, far outlasts grouping the app's few files once the weights come.
 	const { dir, config, data } = freshApp(20_000);
-	const reading = firstGroups(data);
+	const thread = startGroupRead(data);
+	onTestFinished(() => thread.stop());
+	const reading = firstGroups(thread.port);
 	expect(await reading.read).toBe(true);
 
 	const { release, reports } = started(config, join(dir, "out"), reading);
@@ -239,7 +239,7 @@ it("places a fresh app's keys by the groups its code's read gives, once that rea
 	expect(groupModules(dir)).toHaveLength(2);
 });
 
-it("places the keys by their shards, and stops the read at once, when Next does not wait for the first compile", async () => {
+it("places the keys by their shards when Next does not wait for the first compile", async () => {
 	const { dir, config } = freshApp();
 	const held = heldRead();
 	held.answer([["about"], ["home"]]);
@@ -248,6 +248,6 @@ it("places the keys by their shards, and stops the read at once, when Next does 
 	const { grouped } = await release;
 
 	expect(grouped).toBe(false);
-	expect(held.events).toEqual(["stopped", "stopped"]);
+	expect(held.events).toEqual([]);
 	expect(groupModules(dir)).toEqual([]);
 });
