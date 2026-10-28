@@ -69,7 +69,11 @@ function withPageLocale(
 	config: Config,
 	site: Site,
 ): { html: string; hashes: string[] } {
-	const script = localeScript(config, context.bundle !== undefined);
+	const built = context.bundle !== undefined;
+	const script = localeScript(config, {
+		minify: built,
+		copies: built && site.copies,
+	});
 	const chunks =
 		context.bundle === undefined
 			? undefined

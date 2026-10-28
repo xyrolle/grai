@@ -17,13 +17,16 @@ export type PageChunks = {
 /**
  * The page's locale script (`runtime/page-locale.js`), as an inline classic script's text:
  * `pickPageLocale` called with the project's settings and a reader of each place the config's
- * strategy reads in a page, in its order. A page holds the code of those places alone, and the
- * server's language matching (`localeReach` in `runtime/server.js`) only where a place matches a
- * language. It is the same for every page and every build of a project, so its hash in a Content
- * Security Policy stays valid until the config or grai changes; each page's chunks go in its
- * `data-grai-chunks`, which a hash does not cover.
+ * strategy reads in a page, in its order, then, with `copies`, `pointAtCopies`. A page holds the
+ * code of those places alone, and the server's language matching (`localeReach` in
+ * `runtime/server.js`) only where a place matches a language. It is the same for every page and
+ * every build of a project, so its hash in a Content Security Policy stays valid until the config
+ * or grai changes; each page's chunks go in its `data-grai-chunks`, which a hash does not cover.
  */
-export function localeScript(config: Config, minify: boolean): string {
+export function localeScript(
+	config: Config,
+	{ minify, copies }: { minify: boolean; copies: boolean },
+): string {
 	const read = config.strategy.flatMap((source) => places.get(source) ?? []);
 	const settings = Object.assign(
 		{
@@ -38,11 +41,15 @@ export function localeScript(config: Config, minify: boolean): string {
 		(place) =>
 			`(${place.reader})(settings${place.matches ? ", localeReach" : ""})`,
 	);
+	const steps = [
+		`(${pickPageLocale})(settings, [${readers.join(", ")}]);`,
+		...(copies ? [`(${pointAtCopies})();`] : []),
+	];
 	const parameters = matches ? "settings, localeReach" : "settings";
 	const values = matches
 		? `${inlineJson(settings)}, ${localeReach}`
 		: inlineJson(settings);
-	const call = `((${parameters}) => (${pickPageLocale})(settings, [${readers.join(", ")}]))(${values});`;
+	const call = `((${parameters}) => {\n${steps.join("\n")}\n})(${values});`;
 	return minify ? minifySync("grai-page-locale.js", call).code : call;
 }
 
@@ -64,6 +71,7 @@ function inlineJson(value: unknown): string {
 }
 
 const pickPageLocale = functionSource("page-locale.js", "pickPageLocale");
+const pointAtCopies = functionSource("page-locale.js", "pointAtCopies");
 const localeReach = functionSource("server.js", "localeReach");
 
 /**
