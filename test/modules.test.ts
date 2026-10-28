@@ -16,6 +16,7 @@ import { factsOfFiles, workerStart } from "../src/code/facts-pool.ts";
 import { Pool, workersFor } from "../src/code/pool.ts";
 import { type ProjectCode, readProjectCode } from "../src/code/project.ts";
 import { projectResolution, resolverFor } from "../src/code/resolution.ts";
+import { digestOf } from "../src/compiler-identity.ts";
 import { type Config, readConfig } from "../src/config.ts";
 import { GraiError } from "../src/error.ts";
 
@@ -345,15 +346,15 @@ describe("reading a project's facts", () => {
 	});
 
 	it("keys the facts on the reader's own code, so a change to it reads every file again, released or not", () => {
-		const { dir } = projectWith({
-			"reader/facts.js": "export const facts = 1;\n",
-			"reader/uses.js": "export const uses = 1;\n",
-		});
-		const reader = join(dir, "reader");
+		const digest = (text: string) => digestOf(Buffer.from(text));
+		const reader = new Map([
+			["facts.js", digest("export const facts = 1;\n")],
+			["uses.js", digest("export const uses = 1;\n")],
+		]);
 		const before = readerVersion(reader);
 
-		expect(readerVersion(reader)).toBe(before);
-		writeFileSync(join(reader, "uses.js"), "export const uses = 2;\n");
+		expect(readerVersion(new Map(reader))).toBe(before);
+		reader.set("uses.js", digest("export const uses = 2;\n"));
 		expect(readerVersion(reader)).not.toBe(before);
 	});
 

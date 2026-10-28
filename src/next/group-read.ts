@@ -3,9 +3,8 @@
 // check of the output: the earlier it starts, the likelier it is done when the watch's first
 // compile asks for the groups (`first-groups.ts`). The watch talks to it on a port of its own;
 // withGrai stops it, and waits for it to stop, before Next may start.
-import { extname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { MessageChannel, type MessagePort, Worker } from "node:worker_threads";
+import { packageModule } from "../package-files.ts";
 import type { AppData } from "./app-data.ts";
 
 /** The read's thread: the port the watch talks to it on, and its stop. */
@@ -15,11 +14,8 @@ export type GroupRead = {
 	stop(): Promise<void>;
 };
 
-/** The read's module, beside this one and in its form: TypeScript in the sources, JavaScript built. */
-const groupWorker = new URL(
-	`./group-worker${extname(fileURLToPath(import.meta.url))}`,
-	import.meta.url,
-);
+/** The read's module, in grai's form: TypeScript in the sources, JavaScript built. */
+const groupWorker = packageModule("next/group-worker");
 
 /** Starts reading the app's code for its groups, on a thread of its own running `script`. */
 export function startGroupRead(

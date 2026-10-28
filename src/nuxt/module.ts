@@ -11,6 +11,7 @@ import { baseDisagreement } from "../base-agreement.ts";
 import { type CompileResult, recompile } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
+import { packageModule } from "../package-files.ts";
 import { packageName } from "../package-name.ts";
 import { graiPlugin } from "../vite-plugin.ts";
 import { developing } from "../watch.ts";
@@ -68,7 +69,8 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 		);
 		reported(result, nuxt.options.dev);
 
-		const runtime = createResolver(import.meta.url).resolve;
+		// Nuxt's runtime files, beside this module, which grai's build keeps as modules of their own.
+		const runtime = createResolver(packageModule("nuxt/module")).resolve;
 		nuxt.options.alias[output] = config.outdir;
 		// Only the browser's build: Nuxt runs the server's dev modules in a runner of its own,
 		// which takes an edit when the output's files change, not through @xyrolle/grai/vite's patch. A

@@ -8,12 +8,19 @@ import {
 	realpathSync,
 	rmSync,
 	symlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { build } from "vite";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { compilerModulesFile, digestOf } from "../src/compiler-identity.ts";
+import {
+	type BuiltPart,
+	builtModulesFile,
+	digestOf,
+} from "../src/compiler-identity.ts";
+import { project } from "./project.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 /** The package manager running the tests, as it names itself to scripts; else pnpm on the PATH. */
@@ -81,10 +88,10 @@ afterAll(() => {
 });
 
 /**
- * Each TypeScript module but the runtime's, as dist holds it: compiled, with its declarations. A
- * declaration file is no module, and compiles to nothing.
+ * Each TypeScript module but the runtime's, by its path without `.ts`. A declaration file is no
+ * module, and compiles to nothing.
  */
-function compiledModules(): string[] {
+function sourceModules(): string[] {
 	return readdirSync(join(root, "src"), { recursive: true, encoding: "utf8" })
 		.map((file) => file.replaceAll("\\", "/"))
 		.filter(
@@ -93,10 +100,7 @@ function compiledModules(): string[] {
 				!file.endsWith(".d.ts") &&
 				!file.startsWith("runtime/"),
 		)
-		.flatMap((file) => {
-			const module = `dist/${file.replace(/\.ts$/, "")}`;
-			return [`${module}.d.ts`, `${module}.js`];
-		});
+		.map((file) => file.replace(/\.ts$/, ""));
 }
 
 /**
@@ -115,7 +119,19 @@ function text(dir: string, file: string): string {
 	return readFileSync(join(dir, file), "utf8");
 }
 
-it("packs each module compiled with its declarations, the list of the compiler's, and nothing else", () => {
+/** The packed bundle's modules: dist's JavaScript, but the runtime's, by its path in dist. */
+function bundled(): string[] {
+	return packed.files
+		.filter(
+			(file) =>
+				file.startsWith("dist/") &&
+				file.endsWith(".js") &&
+				!file.startsWith("dist/runtime/"),
+		)
+		.map((file) => file.slice("dist/".length));
+}
+
+it("packs the bundle, each module's declarations, the lists of the chunks grai's parts run, and nothing else", () => {
 	expect(packed.files).toEqual(
 		[
 			"CHANGELOG.md",
@@ -124,11 +140,26 @@ it("packs each module compiled with its declarations, the list of the compiler's
 			"SECURITY.md",
 			"config.schema.json",
 			"package.json",
-			`dist/${compilerModulesFile}`,
-			...compiledModules(),
+			`dist/${builtModulesFile}`,
+			...sourceModules().map((module) => `dist/${module}.d.ts`),
+			...bundled().map((file) => `dist/${file}`),
 			...runtimeFiles().map((file) => `dist/${file}`),
 		].sort(),
 	);
+});
+
+it("bundles each entry at its source's path, and the modules they share in chunks at dist's root", () => {
+	const modules = new Set(sourceModules());
+	const misplaced = bundled().filter(
+		(file) =>
+			!modules.has(file.replace(/\.js$/, "")) &&
+			!/^[\w-]+-[\w-]{8}\.js$/.test(file),
+	);
+
+	expect(misplaced).toEqual([]);
+	expect(bundled()).toContain("vite.js");
+	expect(bundled()).toContain("next/watch-worker.js");
+	expect(bundled()).toContain("nuxt/runtime/plugin.js");
 });
 
 it("packs the runtime's modules and the declarations' templates as they are written", () => {
@@ -143,18 +174,26 @@ it("packs the runtime's modules and the declarations' templates as they are writ
 	expect(shipped).toEqual(written);
 });
 
-it("lists the compiler's modules each with the hash of its bytes as packed, this module's among them", () => {
-	const listed: Record<string, string> = JSON.parse(
-		text(packed.dir, `dist/${compilerModulesFile}`),
+it("lists the chunks the compiler and the code reader run, each with the hash of its bytes as packed", () => {
+	const lists: Record<BuiltPart, Record<string, string>> = JSON.parse(
+		text(packed.dir, `dist/${builtModulesFile}`),
 	);
-	const packedDigests = Object.keys(listed).map((module) => [
-		module,
-		digestOf(readFileSync(join(packed.dir, "dist", module))),
-	]);
+	for (const listed of Object.values(lists)) {
+		const packedDigests = Object.keys(listed).map((chunk) => [
+			chunk,
+			digestOf(readFileSync(join(packed.dir, "dist", chunk))),
+		]);
 
-	expect(Object.entries(listed)).toEqual(packedDigests);
-	expect(Object.keys(listed)).toContain("compiler-identity.js");
-	expect(Object.keys(listed)).not.toContain("cli.js");
+		expect(Object.entries(listed)).toEqual(packedDigests);
+	}
+	// The module that finds grai's files is the compiler's: a list is of the directory it is in.
+	expect(
+		Object.keys(lists.compiler).filter((chunk) =>
+			chunk.startsWith("package-files-"),
+		),
+	).toHaveLength(1);
+	expect(Object.keys(lists.compiler)).not.toContain("cli.js");
+	expect(Object.keys(lists.reader).length).toBeGreaterThan(0);
 });
 
 it("packs every file the package's exports and bin name", () => {
@@ -170,3 +209,53 @@ it("packs every file the package's exports and bin name", () => {
 
 	expect(targets.filter((target) => !files.has(target))).toEqual([]);
 });
+
+/**
+ * The inline scripts of a page built by the Vite plugin of a module of grai's, `vite.ts` in the
+ * sources or `vite.js` in a build, with the config: its locale script, which takes the runtime's
+ * page functions as the module loaded them, and the copies' too.
+ */
+async function inlineScripts(
+	vite: string,
+	config: Record<string, unknown>,
+): Promise<string[]> {
+	const { dir } = project(
+		{ en: { title: "Title" }, ro: { title: "Titlu" } },
+		config,
+	);
+	writeFileSync(
+		join(dir, "index.html"),
+		`<!doctype html><html><head><script type="module" src="/main.js"></script></head><body></body></html>`,
+	);
+	writeFileSync(
+		join(dir, "main.js"),
+		`import { m } from "./out/messages.js";\ndocument.body.textContent = m.title();\n`,
+	);
+	const { grai } = await import(vite);
+	await build({
+		root: dir,
+		configFile: false,
+		logLevel: "silent",
+		plugins: [grai({ localeChunks: true })],
+		build: { outDir: join(dir, "dist") },
+	});
+	const html = readFileSync(join(dir, "dist", "index.html"), "utf8");
+	return [
+		...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g),
+	].map(([, code]) => code ?? "");
+}
+
+it("writes a page's locale script from the packed package as from the sources", async () => {
+	const packedVite = pathToFileURL(join(packed.dir, "dist", "vite.js")).href;
+	const sourceVite = new URL("../src/vite.ts", import.meta.url).href;
+	// The default strategy, and one that matches a language, whose script holds the server's code.
+	for (const config of [
+		{},
+		{ strategy: ["cookie", "preferredLanguage"], cookieName: "locale" },
+	]) {
+		const fromPacked = await inlineScripts(packedVite, config);
+
+		expect(fromPacked.join("")).toContain("document.documentElement");
+		expect(fromPacked).toEqual(await inlineScripts(sourceVite, config));
+	}
+}, 60_000);

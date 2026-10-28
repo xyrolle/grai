@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
-import { basename, extname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, relative, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { NextConfig } from "next";
 import {
@@ -12,6 +11,7 @@ import type { CompileResult } from "../compile.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { isCompiled } from "../output-inputs.ts";
+import { packageModule } from "../package-files.ts";
 import { packageName } from "../package-name.ts";
 import { groupsFile } from "../saved-groups.ts";
 import type { AppData } from "./app-data.ts";
@@ -76,11 +76,8 @@ function watching(data: AppData, outdir: string): Promise<void> {
 	return watched;
 }
 
-/** The watch's module, beside this one and in its form: TypeScript in the sources, JavaScript built. */
-const watchWorker = new URL(
-	`./watch-worker${extname(fileURLToPath(import.meta.url))}`,
-	import.meta.url,
-);
+/** The watch's module, in grai's form: TypeScript in the sources, JavaScript built. */
+const watchWorker = packageModule("next/watch-worker");
 
 /**
  * Watches on a thread of its own (`watch-worker.ts`), and settles once the output can be read
