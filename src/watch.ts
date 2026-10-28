@@ -5,7 +5,9 @@ import {
 	type CompiledProject,
 	type CompileResult,
 	compileProject,
+	type Undeclared,
 	writeBuild,
+	writeUndeclared,
 } from "./compile.ts";
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
@@ -53,7 +55,8 @@ const writeDeadline = 2000;
  * `first` settles once the watch has started: its first compile has ended, after its report and
  * after the read again a catalog in the middle of a save takes, and so has every compile of a change
  * that came meanwhile, and of one that came during those, so a caller that waits for it never sees
- * output the start is still to write. It settles with how the last of them ended. The first compile
+ * output the start is still to write, but for the declarations a first compile leaves to the write
+ * after it (`declareLater`). It settles with how the last of them ended. The first compile
  * that writes, and none after it, asks `placeFirst` for the groups to place the keys by
  * (`placing.ts`), as Next's watch does with the groups it reads beside it.
  *
@@ -64,11 +67,16 @@ const writeDeadline = 2000;
  * and is neither reported nor ended. One task then writes what it served, its keys declared now:
  * once the process is quiet (`whenQuiet`), or by `writeDeadline`, on the next change, when `write`
  * asks for it, or as the watcher closes. Its result is reported, closing or not, and ends the
- * compile; a change since the first compile is compiled after it. Every other compile is reported
- * once its output is written. The build the start ends with is saved for the next start
- * (`firstBuildSaver`). It watches until the process ends or `close` is called, whose promise settles once the
- * compile under way, if any, has finished, the output is written and the build is saved, so the
- * project can then be removed.
+ * compile; a change since the first compile is compiled after it. With `declareLater`, for a dev
+ * server that reads the output from the disk, as `next dev` does, a first compile with no saved
+ * build to start from writes every module now, whole, and leaves its keys' declarations and their
+ * maps to that one task (`writeUndeclared`): it is reported and ended once its modules are written,
+ * and the write of the rest is reported too, as an error only the declarations find reaches the
+ * server so. Every other compile is reported once its output is written. The build the start ends
+ * with is saved for the next start (`firstBuildSaver`), or, when it left the declarations to that
+ * task, the build that task writes. It watches until the process ends or `close` is called, whose
+ * promise settles once the compile under way, if any, has finished, the output is written and the
+ * build is saved, so the project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -80,9 +88,11 @@ export function watch(
 	failed: (error: unknown) => void,
 	{
 		serve,
+		declareLater = false,
 		placeFirst,
 	}: {
 		serve?: (compiled: CompiledProject, milliseconds: number) => void;
+		declareLater?: boolean;
 		placeFirst?: Placing | undefined;
 	} = {},
 ): Watch {
@@ -91,16 +101,21 @@ export function watch(
 	/** The last build written, which the next compile starts from. */
 	let build: Build | undefined;
 	/**
-	 * The first compile, served before its output was written, until its write (`writeServed`) has
-	 * ended, which every caller of `write` and `close` waits for.
+	 * The first compile, served before its output was written, or its modules written before its
+	 * declarations, with the groups they were placed by, until the write of the rest
+	 * (`writeServed`) has ended, which every caller of `write` and `close` waits for.
 	 */
 	let unwritten:
-		| { compiled: CompiledProject; written: PromiseWithResolvers<void> }
+		| {
+				compiled: CompiledProject;
+				undeclared?: Undeclared | undefined;
+				written: PromiseWithResolvers<void>;
+		  }
 		| undefined;
-	/** Whether the write of what the first compile served is under way. */
+	/** Whether the write of what the first compile served, or of its declarations, is under way. */
 	let writingServed = false;
 	/** Whether the next compile is the first and defers its write: none if a saved build was taken up. */
-	let defersWrite = serve !== undefined;
+	let defersWrite = serve !== undefined || declareLater;
 	/** The wait for the process to be quiet, to write the first compile's output. */
 	let stopWaiting = () => {};
 	/** Whether a followed file changed, or a compile was asked for, since the last compile read them. */
@@ -167,13 +182,13 @@ export function watch(
 	};
 
 	/**
-	 * Writes what the first compile served (`unwritten`): as a compile from itself, as no key
-	 * changed since it was served, its keys declared now (`writeBuild`). Its result is reported even
-	 * as the watcher closes, so an error only the write finds always reaches the server, and every
-	 * caller waiting for it is answered.
+	 * Writes what the first compile served (`unwritten`), or the rest of what it wrote without its
+	 * declarations: as a compile from itself, as no key changed since, its keys declared now
+	 * (`writeBuild`). Its result is reported even as the watcher closes, so an error only the write
+	 * finds always reaches the server, and every caller waiting for it is answered.
 	 */
 	const writeServed = async (
-		{ compiled, written }: NonNullable<typeof unwritten>,
+		{ compiled, undeclared, written }: NonNullable<typeof unwritten>,
 		started: number,
 	) => {
 		writingServed = true;
@@ -183,7 +198,7 @@ export function watch(
 			const next = await writeBuild(
 				{ ...compiled, compilation: unchanged },
 				undefined,
-				{ ...developing, placing: placing() },
+				{ ...developing, placing: placing(), undeclared },
 			);
 			if (next.build !== undefined) {
 				saver.took(next.build, build);
@@ -217,6 +232,16 @@ export function watch(
 		});
 		if ("errors" in compiled)
 			return { result: { written: [], errors: compiled.errors } };
+		if (deferring && declareLater) {
+			const { result, undeclared } = await writeUndeclared(compiled, {
+				...developing,
+				placing: placing(),
+			});
+			if (undeclared === undefined) return { result };
+			unwritten = { compiled, undeclared, written: Promise.withResolvers() };
+			stopWaiting = whenQuiet(run, { deadline: writeDeadline });
+			return { result };
+		}
 		if (deferring) {
 			unwritten = { compiled, written: Promise.withResolvers() };
 			stopWaiting = whenQuiet(run, { deadline: writeDeadline });
@@ -280,8 +305,14 @@ export function watch(
 				last = { error };
 			}
 		} while (again && !closed);
-		// The start ends with the last compile of the changes that came during it, written.
-		if (starting && !closed && unwritten === undefined && last !== undefined)
+		// The start ends with the last compile of the changes that came during it, written, but for the
+		// declarations a first compile left to the write after it.
+		if (
+			starting &&
+			!closed &&
+			(unwritten === undefined || unwritten.undeclared !== undefined) &&
+			last !== undefined
+		)
 			endStart(last);
 	};
 

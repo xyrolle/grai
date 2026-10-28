@@ -11,9 +11,15 @@ import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
+import { isCompiled } from "../src/output-inputs.ts";
 import { savedBuild } from "../src/saved-build.ts";
 import { savedGroups } from "../src/saved-groups.ts";
 import { watch } from "../src/watch.ts";
+import {
+	isDeclarations,
+	outputTexts,
+	unresolvedImports,
+} from "./output-files.ts";
 import { project } from "./project.ts";
 
 const catalogs = {
@@ -316,6 +322,95 @@ it("writes the compile it served when asked, while a catalog is mid-save, and co
 	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
 	await expect.poll(() => keysWith(dir, '"Überschrift"')).toBe(true);
 	expect(reported.flatMap(({ errors }) => errors)).toEqual([]);
+});
+
+/** A watcher that writes its first compile's modules before their declarations, and the reports the test reads. */
+function declaringLater(config: string) {
+	const reported: CompileResult[] = [];
+	const failures: unknown[] = [];
+	const watcher = watch(
+		config,
+		(result) => reported.push(result),
+		(error) => failures.push(error),
+		{ declareLater: true },
+	);
+	onTestFinished(async () => {
+		await watcher.close();
+		expect(failures).toEqual([]);
+	});
+	return { watcher, reported };
+}
+
+it("writes every module of its first compile whole before any declarations, then the declarations and their maps once the process is quiet, and no module again", async () => {
+	const { dir, config } = project(catalogs);
+	const out = join(dir, "out");
+	const { watcher, reported } = declaringLater(config);
+
+	await watcher.first;
+
+	const modules = outputTexts(out);
+	expect([...modules.keys()].filter(isDeclarations)).toEqual([]);
+	expect(unresolvedImports(out)).toEqual([]);
+	expect(await isCompiled(config)).toBe(false);
+	const times = [...modules.keys()].map(
+		(file) => statSync(join(out, file)).mtimeMs,
+	);
+	expect(reported).toHaveLength(1);
+
+	await expect.poll(() => reported.length, { timeout: 5000 }).toBe(2);
+
+	const [, declared] = reported;
+	expect(declared?.errors).toEqual([]);
+	expect(declared?.written).toContain("keys.d.ts");
+	expect(declared?.written.filter((file) => !isDeclarations(file))).toEqual([]);
+	expect(
+		[...modules.keys()].map((file) => statSync(join(out, file)).mtimeMs),
+	).toEqual(times);
+	expect(await isCompiled(config)).toBe(true);
+});
+
+it("writes its first compile's declarations ahead of an edit's compile, and that edit's output after, whole", async () => {
+	const { dir, config } = project(catalogs);
+	const out = join(dir, "out");
+	const { watcher, reported } = declaringLater(config);
+	await watcher.first;
+
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ title: "Überschrift" }),
+	);
+
+	await expect.poll(() => reported.length, { timeout: 5000 }).toBe(3);
+	expect(reported.map(({ errors }) => errors)).toEqual([[], [], []]);
+	expect(reported[1]?.written.filter((file) => !isDeclarations(file))).toEqual(
+		[],
+	);
+	expect(keysWith(dir, '"Überschrift"')).toBe(true);
+	expect(unresolvedImports(out)).toEqual([]);
+	expect(await isCompiled(config)).toBe(true);
+});
+
+it("reports an error only the declarations find once its first compile's modules are written, and writes no declarations", async () => {
+	const { dir, config } = project({
+		en: { title: "Title", listed: "{x :list}" },
+		de: { title: "Titel", listed: "{x :number}" },
+	});
+	const { watcher, reported } = declaringLater(config);
+	await watcher.first;
+
+	await watcher.close();
+
+	expect(reported.map(({ errors }) => errors.map(String))).toEqual([
+		[],
+		[
+			expect.stringContaining(
+				"x is formatted as a list in en and is formatted as a number in de",
+			),
+		],
+	]);
+	const out = join(dir, "out");
+	expect([...outputTexts(out).keys()].filter(isDeclarations)).toEqual([]);
+	expect(unresolvedImports(out)).toEqual([]);
 });
 
 /** Whether a module of the output's keys holds a text. */
