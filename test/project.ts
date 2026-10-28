@@ -139,7 +139,8 @@ export function project(
 
 /**
  * Compiles, and when the catalogs compile, checks that each key's code calls only the names it
- * records, so that every test's catalog checks the invariant a key's own binding rests on.
+ * records, and that a compile that leaves the declarations to the output's write, as a dev server's
+ * first does, gives every key the same code, so that every test's catalog checks both.
  */
 async function checkedCompile(config: string): Promise<CompileResult> {
 	const result = await compile(config);
@@ -151,6 +152,17 @@ async function checkedCompile(config: string): Promise<CompileResult> {
 	if (errors.length > 0) return result;
 	const { keys } = compileCatalogs(read.config, catalogs);
 	expect(unrecordedCalls(keys)).toEqual([]);
+	const undeclared = compileCatalogs(read.config, catalogs, undefined, {
+		declare: false,
+	});
+	expect(undeclared.keys).toEqual(
+		new Map(
+			[...keys].map(([key, { declared: _declared, ...compiled }]) => [
+				key,
+				compiled,
+			]),
+		),
+	);
 	return result;
 }
 
