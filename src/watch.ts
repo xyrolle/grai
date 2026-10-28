@@ -27,6 +27,14 @@ const settleMilliseconds = 20;
 const developing = { pseudoLocale: true };
 
 /**
+ * How long the write of a first compile served before it may wait for the process to be quiet:
+ * long enough for a first page's own requests, which take a fraction of a second, so that the
+ * write never runs in their way; short enough that a server kept busy still shows an error only the
+ * write finds, and writes the types, seconds after it starts.
+ */
+const writeDeadline = 2000;
+
+/**
  * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
  * whenever the config or a catalog changes, or `compileAgain` is called, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
@@ -51,8 +59,8 @@ const developing = { pseudoLocale: true };
  * as an edit does. With `serve`, a first compile with no saved build to start from goes to `serve`
  * before its output is written (`compileProject`), as a dev server serves its first page from it,
  * and is neither reported nor ended. One task then writes what it served, its keys declared now:
- * once the process is quiet (`whenQuiet`), on the next change, when `write` asks for it, or as the
- * watcher closes. Its result is reported, closing or not, and ends the
+ * once the process is quiet (`whenQuiet`), or by `writeDeadline`, on the next change, when `write`
+ * asks for it, or as the watcher closes. Its result is reported, closing or not, and ends the
  * compile; a change since the first compile is compiled after it. Every other compile is reported
  * once its output is written. Its first build written is saved for the next start
  * (`firstBuildSaver`), or the build of a compile `compileAgain` asked for, which placed the keys
@@ -187,8 +195,8 @@ export function watch(
 
 	/**
 	 * Compiles what changed since the last compile and writes its output, or, for the first compile
-	 * when it defers its write, holds what it served unwritten, to write once the process is quiet.
-	 * The first build written is saved (`firstBuildSaver`).
+	 * when it defers its write, holds what it served unwritten, to write once the process is quiet
+	 * or by `writeDeadline`. The first build written is saved (`firstBuildSaver`).
 	 */
 	const compileOnce = async (): Promise<
 		{ result: CompileResult; build?: Build } | { served: CompiledProject }
@@ -204,7 +212,7 @@ export function watch(
 			return { result: { written: [], errors: compiled.errors } };
 		if (deferring) {
 			unwritten = { compiled, written: Promise.withResolvers() };
-			stopWaiting = whenQuiet(run);
+			stopWaiting = whenQuiet(run, { deadline: writeDeadline });
 			return { served: compiled };
 		}
 		const next = await writeBuild(compiled, build, developing);
