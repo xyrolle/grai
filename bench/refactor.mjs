@@ -1,176 +1,163 @@
-// The refactoring commands on a whole app: check, find, rename and check --fix, each in a new
-// Node process, timed once grai's modules have loaded. They run on a project in the system's
-// temporary directory, removed after (refactor-project.mjs): a copy of app A or B, or a synthetic
-// project of app B's size that anyone can run. The output is compiled first, as a project's is, since the commands
-// follow imports to it. find and rename take the key the most files name; check --fix removes 50
-// unused keys added to each catalog, then checks, as the command does: it runs the command itself,
-// its output kept from the terminal. Each command is timed cold, without the facts kept on disk,
-// and warm, with them: medians of three runs.
-//   node refactor.mjs [app...]
-import { execFileSync } from "node:child_process";
+// The refactoring commands on a whole project (refactor-project.mjs), each through grai's CLI as a
+// user runs it, a new Node process timed from its launch until it exits: `check --json`, `find`
+// and `rename` on the key the most source files name, and `check --fix` after UNUSED keys no code
+// names are added at the top of each catalog. The output is compiled first, as a project's is,
+// since the commands follow imports to it. Each command runs cold and warm, the two interleaved in
+// rounds whose order rotates (rounds.mjs), every sample kept with its round's load. Cold keeps
+// nothing grai keeps between commands: the facts and the file listing in the outdir's .grai are
+// removed. The compiled output stays, and so do the file system's caches of the project's files.
+// Warm has the state the run before it left. Every run starts from the same project: a file the
+// run before changed is written back as it was, and the output compiled again. A run that fails
+// fails the bench: check and check --fix may exit 1, which is their verdict.
+//   node refactor.mjs [app...]      synthetic by default; a or b with GRAI_BENCH_A or _B
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { graiModule } from "./grai.mjs";
+import { graiCli } from "./grai.mjs";
+import { median, medianInterval } from "./medians.mjs";
 import {
 	busiestKey,
 	snapshot,
 	writeRefactorProject,
 } from "./refactor-project.mjs";
 import { recordResults } from "./results.mjs";
+import { inRounds, roundCount, roundsRecord } from "./rounds.mjs";
 
-const RUNS = 3;
 const UNUSED = 50;
-const self = new URL(import.meta.url).pathname;
-const commands = {
-	compile: ["compile.ts", "compile"],
-	check: ["check.ts", "check"],
-	find: ["find.ts", "find"],
-	rename: ["rename.ts", "rename"],
-	fix: ["cli/check.ts", "checkCommand"],
-};
+const unused = Array.from({ length: UNUSED }, (_, n) => `zz_unused_${n}`);
+const modes = ["cold", "warm"];
+const CLOCK =
+	"grai's CLI in a new Node process, from its launch until it exits";
+const COLD =
+	"the facts and the file listing grai keeps in the outdir's .grai removed; the compiled output and the file system's caches kept";
 
-/**
- * Runs in the child: one command, timed after its module loads, printed as milliseconds on the
- * last line. `check --fix` is the command's own run, which prints what it removed and checked, and
- * its exit code, the check's verdict, is on that line too.
- */
-async function child(command, config, ...args) {
-	const [file, name] = commands[command];
-	const exported = (await import(graiModule(file)))[name];
+/** One run of grai's CLI in the project, timed from the process's launch until it exits. */
+function cli(dir, args) {
 	const start = performance.now();
-	if (command === "fix") {
-		const code = await exported.run(["--fix", "--config", config]);
-		console.log(JSON.stringify({ ms: performance.now() - start, code }));
-		return;
-	}
-	const result = await exported(config, ...args);
+	const run = spawnSync(
+		process.execPath,
+		[graiCli, ...args, "--config", join(dir, "grai.config.json")],
+		{ cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 },
+	);
 	const ms = performance.now() - start;
-	if (command === "compile") {
-		if (result.errors.length > 0) throw result.errors[0];
-		return;
-	}
-	const errors = Array.isArray(result) ? result : result.errors;
-	// rename refuses a key a read by a computed name may reach, and that is its answer, not a failure.
-	if (command === "rename" && errors.length > 0) {
-		console.log(JSON.stringify({ ms, refused: true }));
-		return;
-	}
-	if (command !== "check" && errors.length > 0) throw errors[0];
-	console.log(JSON.stringify({ ms }));
+	if (run.error !== undefined) throw run.error;
+	return { ms, status: run.status, stdout: run.stdout, stderr: run.stderr };
 }
 
-/**
- * The median of the runs, each after its own setup and then its check of the run's result, in
- * milliseconds, or "refused" when the command refused a run.
- */
-function median(setup, args, after = () => {}) {
-	const runs = Array.from({ length: RUNS }, (_, run) => {
-		setup(run);
-		const output = execFileSync(
-			process.execPath,
-			[self, "--child", ...args(run)],
-			{
-				encoding: "utf8",
-			},
-		);
-		const result = JSON.parse(output.trim().split("\n").at(-1) ?? "");
-		after(result);
-		return result;
-	});
-	if (runs.some((run) => run.refused)) return "refused";
-	const ms = runs.map((run) => run.ms).toSorted((a, b) => a - b);
-	return ms[Math.floor(RUNS / 2)] ?? 0;
-}
-
-/** Adds unused keys at the top of each catalog, as text, so every other byte stays. */
-function addUnusedKeys(dir, catalogs, locales) {
-	for (const locale of locales) {
-		const path = join(dir, catalogs.replace("{locale}", locale));
+/** Adds the unused keys at the top of each catalog, as text, so every other byte stays. */
+function addUnusedKeys(dir, catalogs) {
+	for (const catalog of catalogs) {
+		const path = join(dir, catalog);
 		const text = readFileSync(path, "utf8");
 		const start = text.indexOf("\n") + 1;
-		const unused = Array.from(
-			{ length: UNUSED },
-			(_, n) => `\t"zz_unused_${n}": "unused",\n`,
-		);
-		writeFileSync(
-			path,
-			text.slice(0, start) + unused.join("") + text.slice(start),
-		);
+		const added = unused.map((key) => `\t"${key}": "unused",\n`).join("");
+		writeFileSync(path, text.slice(0, start) + added + text.slice(start));
 	}
+}
+
+/** Throws unless the run exited with one of `statuses`. */
+function assertExited(run, statuses) {
+	if (!statuses.includes(run.status))
+		throw new Error(`grai exited ${run.status}:\n${run.stderr}`);
+}
+
+/** The project and how each command runs on it. */
+function prepareProject(app, dir) {
+	const project = writeRefactorProject(app, dir);
+	const files = snapshot(dir, project);
+	const catalogs = project.locales.map((locale) =>
+		project.catalogs.replace("{locale}", locale),
+	);
+	const compiled = cli(dir, ["compile"]);
+	if (compiled.status !== 0) throw new Error(compiled.stderr);
+	const key = busiestKey(files, catalogs);
+	const commands = {
+		check: {
+			args: ["check", "--json"],
+			assert: (run) => assertExited(run, [0, 1]),
+		},
+		find: { args: ["find", key], assert: (run) => assertExited(run, [0]) },
+		rename: {
+			args: ["rename", key, `${key}_x`],
+			assert: (run) => assertExited(run, [0]),
+		},
+		"check --fix": {
+			args: ["check", "--fix"],
+			before: () => addUnusedKeys(dir, catalogs),
+			assert: (run) => assertExited(run, [0, 1]),
+		},
+	};
+	return { project, files, key, commands };
 }
 
 /**
- * Throws unless check --fix took the unused keys out of every catalog and then checked, which
- * gives its verdict as the exit code. Whether the check found problems the bench does not judge.
+ * Puts the project back as it was, its output compiled again, and for a cold run removes what grai
+ * keeps between commands.
  */
-function fixedAndChecked(dir, catalogs, locales, { code }) {
-	if (code !== 0 && code !== 1)
-		throw new Error(
-			"check --fix timed the removal alone: no check followed it",
-		);
-	for (const locale of locales) {
-		const path = join(dir, catalogs.replace("{locale}", locale));
-		if (readFileSync(path, "utf8").includes('"zz_unused_'))
-			throw new Error(`check --fix left unused keys in ${path}`);
-	}
+function restore(dir, { project, files }, mode) {
+	for (const [file, text] of files)
+		if (readFileSync(join(dir, file), "utf8") !== text)
+			writeFileSync(join(dir, file), text);
+	const compiled = cli(dir, ["compile"]);
+	if (compiled.status !== 0) throw new Error(compiled.stderr);
+	if (mode === "cold")
+		for (const kept of ["facts", "files"])
+			rmSync(join(dir, project.outdir, ".grai", kept), { force: true });
 }
 
-if (process.argv[2] === "--child") {
-	await child(...process.argv.slice(3));
-} else {
-	for (const app of process.argv.length > 2
-		? process.argv.slice(2)
-		: ["synthetic"]) {
-		const dir = mkdtempSync(join(tmpdir(), `grai-refactor-${app}-`));
-		try {
-			const project = writeRefactorProject(app, dir);
-			const { locales, catalogs, outdir } = project;
-			const config = join(dir, "grai.config.json");
-			execFileSync(process.execPath, [self, "--child", "compile", config]);
-			const facts = join(dir, outdir, ".grai", "facts");
-			const cold = () => rmSync(facts, { force: true });
-			const key = busiestKey(
-				snapshot(dir, project),
-				locales.map((locale) => catalogs.replace("{locale}", locale)),
+/** A command's runs, cold and warm, in rounds: each mode's median, its samples and the rounds. */
+async function timed(dir, prepared, command, rounds) {
+	const { args, before, assert } = prepared.commands[command];
+	const kept = await inRounds(modes, rounds, (mode) => {
+		restore(dir, prepared, mode);
+		before?.();
+		const run = cli(dir, args);
+		assert(run);
+		return run.ms;
+	});
+	const figures = { ran: `grai ${args.join(" ")}` };
+	for (const mode of modes) {
+		const samples = kept.map((round) => round.measured.get(mode));
+		figures[mode] = median(samples);
+		figures[`${mode}Samples`] = {
+			median: median(samples),
+			...medianInterval(samples),
+			samples,
+		};
+	}
+	figures.rounds = roundsRecord(kept);
+	return figures;
+}
+
+const rounds = roundCount(modes.length, 3);
+for (const app of process.argv.length > 2
+	? process.argv.slice(2)
+	: ["synthetic"]) {
+	const dir = mkdtempSync(join(tmpdir(), `grai-refactor-${app}-`));
+	try {
+		const prepared = prepareProject(app, dir);
+		const rows = {};
+		for (const command of Object.keys(prepared.commands))
+			rows[command] = await timed(dir, prepared, command, rounds);
+		const s = (ms) => `${(ms / 1000).toFixed(2)} s`;
+		const range = ({ median, low, high }) =>
+			`${s(median)} (${s(low)}–${s(high)})`;
+		console.log(
+			`\n### ${app}: grai's commands, each ${CLOCK}, ${rounds} rounds of a cold and a warm run in rotating order, medians (intervals); cold: ${COLD}\n`,
+		);
+		console.log("| command | cold | warm |\n|---|---|---|");
+		for (const figures of Object.values(rows))
+			console.log(
+				`| ${figures.ran} | ${range(figures.coldSamples)} | ${range(figures.warmSamples)} |`,
 			);
-			const none = () => {};
-			// The runs rename the key and back, so each renames the same call sites: counted across the
-			// cold runs and the warm ones, as an odd number of runs leaves the key renamed.
-			let renames = 0;
-			const names = () =>
-				renames++ % 2 === 0 ? [key, `${key}_x`] : [`${key}_x`, key];
-			const timed = (setup, args, after) => {
-				const coldly = median(
-					(run) => {
-						cold();
-						setup(run);
-					},
-					args,
-					after,
-				);
-				return { cold: coldly, warm: median(setup, args, after) };
-			};
-			const ms = {
-				check: timed(none, () => ["check", config]),
-				find: timed(none, () => ["find", config, key]),
-				rename: timed(none, () => ["rename", config, ...names()]),
-				"check --fix": timed(
-					() => addUnusedKeys(dir, catalogs, locales),
-					() => ["fix", config],
-					(result) => fixedAndChecked(dir, catalogs, locales, result),
-				),
-			};
-			const shown = (value) =>
-				typeof value === "number" ? `${value.toFixed(0)} ms` : value;
-			const times = Object.entries(ms).map(
-				([name, { cold, warm }]) =>
-					`${name} ${shown(cold)} (warm ${shown(warm)})`,
-			);
-			console.log(`${app}: ${times.join(", ")}`);
-			recordResults(`refactor-${app}`, ms, { runs: RUNS });
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
+		recordResults(`refactor-${app}`, rows, {
+			runs: rounds,
+			key: prepared.key,
+			clock: CLOCK,
+			cold: COLD,
+		});
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
 	}
 }
