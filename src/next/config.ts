@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { basename, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
@@ -12,10 +13,13 @@ import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { isCompiled } from "../output-inputs.ts";
 import { packageName } from "../package-name.ts";
+import { groupsFile } from "../saved-groups.ts";
 import type { AppData } from "./app-data.ts";
 import { count, reportErrors } from "./errors.ts";
 import { firstMessage } from "./first-message.ts";
+import { startGroupRead } from "./group-read.ts";
 import { defaultPageExtensions } from "./routes.ts";
+import type { WatchData } from "./watch-worker.ts";
 
 /**
  * The name @xyrolle/grai/next imports the project's compiled output by, in every layer Next
@@ -45,10 +49,15 @@ export function withGrai(
 		checkBasePath(nextConfig, config, configFile);
 		const { outdir } = config;
 		if (dev) {
-			await watching({
-				configFile,
-				pageExtensions: nextConfig.pageExtensions ?? [...defaultPageExtensions],
-			});
+			await watching(
+				{
+					configFile,
+					pageExtensions: nextConfig.pageExtensions ?? [
+						...defaultPageExtensions,
+					],
+				},
+				outdir,
+			);
 		} else {
 			// The compiler loads for a build alone: a dev server's start checks the output, and its
 			// watch compiles on a thread of its own.
@@ -62,8 +71,8 @@ export function withGrai(
 /** The watch of this process: Next asks for its config more than once, and it starts once. */
 let watched: Promise<void> | undefined;
 
-function watching(data: AppData): Promise<void> {
-	watched ??= startWatching(data);
+function watching(data: AppData, outdir: string): Promise<void> {
+	watched ??= startWatching(data, outdir);
 	return watched;
 }
 
@@ -80,19 +89,35 @@ const watchWorker = new URL(
  * their groups when the watch read them beside it in time (`first-groups.ts`). Either way the
  * catalogs compile once.
  */
-async function startWatching(data: AppData): Promise<void> {
+async function startWatching(data: AppData, outdir: string): Promise<void> {
+	// The read of the groups starts first, when none are saved, as on a fresh clone: the earlier it
+	// starts, the likelier it is done when the watch's first compile asks for them (`group-read.ts`).
+	const read = existsSync(groupsFile(outdir))
+		? undefined
+		: startGroupRead(data);
 	// The watch runs grai's own modules, which take none of the process's flags, and a worker refuses
-	// some of them, such as `--input-type`. Its thread starts while the output is checked, and what
-	// it starts first, the read of the groups on a fresh clone, is done the sooner (`watch-worker.ts`).
-	const worker = new Worker(watchWorker, { workerData: data, execArgv: [] });
+	// some of them, such as `--input-type`. Its thread starts while the output is checked.
+	const worker = new Worker(watchWorker, {
+		workerData: {
+			...data,
+			...(read === undefined ? {} : { groups: read.port }),
+		} satisfies WatchData,
+		transferList: read === undefined ? [] : [read.port],
+		execArgv: [],
+	});
 	// Next's server holds its process. Other processes read the config for `next dev` too, as
 	// Next's telemetry flush does when the server stops, and must be free to exit.
 	worker.unref();
-	const compiled = await isCompiled(data.configFile);
-	worker.postMessage(compiled ? "current" : "held");
-	// A watch that fails or stops before it has written the output fails Next's start, which would
-	// otherwise wait for it for ever.
-	if (!compiled) await firstMessage(worker, "grai's watch");
+	try {
+		const compiled = await isCompiled(data.configFile);
+		worker.postMessage(compiled ? "current" : "held");
+		// A watch that fails or stops before it has written the output fails Next's start, which would
+		// otherwise wait for it for ever.
+		if (!compiled) await firstMessage(worker, "grai's watch");
+	} finally {
+		// Next starts once the read has stopped, so that it never takes Next's CPU.
+		await read?.stop();
+	}
 	// A watch that stops on an error it did not expect says so, and Next serves on.
 	worker.on("error", (error) => console.error(error));
 }
