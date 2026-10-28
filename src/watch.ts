@@ -38,9 +38,10 @@ const settleMilliseconds = 20;
  *
  * The first compile starts from the build the project's last watcher saved, if this grai saved it
  * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
- * as an edit does. Its first build is saved for the next start (`firstBuildSaver`). It watches until
- * the process ends or `close` is called, whose promise settles once the compile under way, if any,
- * has finished and the build is saved, so the project can then be removed.
+ * as an edit does. Its first build is saved for the next start (`firstBuildSaver`), or the build of
+ * a compile `compileAgain` asked for, which placed the keys anew. It watches until the process ends
+ * or `close` is called, whose promise settles once the compile under way, if any, has finished and
+ * the build is saved, so the project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -171,7 +172,10 @@ export function watch(
 		compileAgain: async () => {
 			const compiled = nextCompile();
 			if (!closed) run();
-			return compiled;
+			const again = await compiled;
+			if ("build" in again && again.build !== undefined)
+				saver.retook(again.build);
+			return again;
 		},
 		close: async () => {
 			closed = true;

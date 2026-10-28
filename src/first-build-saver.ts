@@ -17,12 +17,15 @@ const quietShare = 0.1;
  * process exits, unless it is the build it started from (`from`) as that was saved: it compiled no
  * key, and placed the keys as that did (`rendered.groups`). One that placed them by groups saved
  * since is saved, so the next start does not place them again. The builds after
- * it are not saved, since the next start compiles what they changed as edits. The save at exit is
- * for a process that ends before it is quiet: a dev server stopped by SIGTERM, which Vite closes,
- * though in an app whose own SIGTERM handler exits at once it never closes.
+ * it are not saved, since the next start compiles what they changed as edits, but for a build its
+ * watcher compiled again to place the keys by groups saved since (`retook`), as a Next start that
+ * read its groups beside its first compile does: it is saved in place of the first, or after it. The
+ * save at exit is for a process that ends before it is quiet: a dev server stopped by SIGTERM, which
+ * Vite closes, though in an app whose own SIGTERM handler exits at once it never closes.
  */
 export function firstBuildSaver(): {
 	took: (build: Build, from: Build | undefined) => void;
+	retook: (build: Build) => void;
 	flush: () => Promise<void>;
 } {
 	let taken = false;
@@ -32,6 +35,7 @@ export function firstBuildSaver(): {
 	// A build that cannot be saved, as when the outdir was removed, costs only the next start its compile.
 	const save = () => {
 		clearInterval(timer);
+		timer = undefined;
 		process.off("exit", saveNow);
 		if (unsaved !== undefined) saving = saveBuild(unsaved).catch(() => {});
 		unsaved = undefined;
@@ -41,6 +45,19 @@ export function firstBuildSaver(): {
 		try {
 			saveBuildNow(unsaved);
 		} catch {}
+	};
+	/** Saves this build once the process is quiet, in place of any not saved yet. */
+	const keep = (build: Build) => {
+		unsaved = build;
+		if (timer !== undefined) return;
+		let since = performance.eventLoopUtilization();
+		timer = setInterval(() => {
+			const window = performance.eventLoopUtilization(since);
+			since = performance.eventLoopUtilization();
+			if (window.utilization < quietShare) save();
+		}, quietMilliseconds);
+		timer.unref();
+		process.once("exit", saveNow);
 	};
 	return {
 		took: (build, from) => {
@@ -52,15 +69,11 @@ export function firstBuildSaver(): {
 				build.rendered.groups === from?.rendered.groups
 			)
 				return;
-			unsaved = build;
-			let since = performance.eventLoopUtilization();
-			timer = setInterval(() => {
-				const window = performance.eventLoopUtilization(since);
-				since = performance.eventLoopUtilization();
-				if (window.utilization < quietShare) save();
-			}, quietMilliseconds);
-			timer.unref();
-			process.once("exit", saveNow);
+			keep(build);
+		},
+		retook: (build) => {
+			taken = true;
+			keep(build);
 		},
 		flush: async () => {
 			save();
