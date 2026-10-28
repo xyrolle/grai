@@ -77,15 +77,27 @@ function merged(sets: KeySet[], setCost: number): KeySet[] {
 		const order = new Map(live.map((set, at) => [set, at]));
 		const loading = setsOfContexts(live);
 		const gone = new Set<KeySet>();
+		/** The set each set was last weighed for, so a set that shares several contexts is weighed once. */
+		const weighedFor = new Map<KeySet, KeySet>();
 		for (const from of live) {
-			const sharing = new Set<KeySet>();
-			for (const context of members(from.contexts))
-				for (const set of loading.get(context) ?? []) sharing.add(set);
-			const candidates = [...sharing]
-				.filter((set) => !gone.has(set))
-				.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
-			const into = bestPartner(from, candidates, setCost);
-			if (into === undefined) continue;
+			let best: { into: KeySet; gain: number; at: number } | undefined;
+			for (const context of members(from.contexts)) {
+				for (const into of loading.get(context) ?? []) {
+					if (into === from || gone.has(into) || weighedFor.get(into) === from)
+						continue;
+					weighedFor.set(into, from);
+					const gain = gainOf(from, into, setCost);
+					const at = order.get(into) ?? 0;
+					// The most gain, and of equal gains the set first in the pass's order.
+					if (
+						gain > (best?.gain ?? 0) ||
+						(best !== undefined && gain === best.gain && at < best.at)
+					)
+						best = { into, gain, at };
+				}
+			}
+			if (best === undefined) continue;
+			const { into } = best;
 			for (const context of members(from.contexts)) {
 				if (!has(into.contexts, context)) loading.get(context)?.push(into);
 			}
@@ -114,22 +126,18 @@ function setsOfContexts(sets: readonly KeySet[]): Map<number, KeySet[]> {
 	return loading;
 }
 
-/** The set `from` gains most by merging into, if any gains. */
-function bestPartner(
-	from: KeySet,
-	sets: readonly KeySet[],
-	setCost: number,
-): KeySet | undefined {
-	let best: { into: KeySet; gain: number } | undefined;
-	for (const into of sets) {
-		if (into === from || into.firstPaint !== from.firstPaint) continue;
-		const both = sharedSize(from.contexts, into.contexts);
-		if (both === 0) continue;
-		const gain =
-			setCost * both -
-			(from.contextCount - both) * into.weight -
-			(into.contextCount - both) * from.weight;
-		if (gain > (best?.gain ?? 0)) best = { into, gain };
-	}
-	return best?.into;
+/**
+ * What merging `from` into `into` gains: `setCost` for every context that loads both, less the
+ * weight loaded in vain by the contexts that load only one; nothing for sets a first paint and a
+ * later import load apart, which never merge.
+ */
+function gainOf(from: KeySet, into: KeySet, setCost: number): number {
+	if (into.firstPaint !== from.firstPaint) return 0;
+	const both = sharedSize(from.contexts, into.contexts);
+	if (both === 0) return 0;
+	return (
+		setCost * both -
+		(from.contextCount - both) * into.weight -
+		(into.contextCount - both) * from.weight
+	);
 }
