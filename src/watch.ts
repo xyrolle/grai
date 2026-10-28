@@ -1,6 +1,11 @@
 import { type FSWatcher, watch as watchPath } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
-import type { Build, CompiledProject, CompileResult } from "./compile.ts";
+import type {
+	Build,
+	CompiledProject,
+	CompileResult,
+	Undeclared,
+} from "./compile.ts";
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { firstBuildSaver } from "./first-build-saver.ts";
@@ -24,6 +29,15 @@ const settleMilliseconds = 20;
  * from the saved build's index (`savedIndex`), and loads it only as it takes the build up.
  */
 const compiler = () => import("./compile.ts");
+
+/** A first compile whose modules were written before its declarations, and what that write placed. */
+type Declaring = { compiled: CompiledProject; undeclared: Undeclared };
+
+/** What a first page or compile left for the task that follows it (`watch`'s `early`). */
+type Early =
+	| { compiled: CompiledProject }
+	| { saved: SavedIndex }
+	| { declaring: Declaring };
 
 /** How a watcher compiles: for development, with the config's pseudo-locale. */
 export const developing = { pseudoLocale: true };
@@ -69,8 +83,12 @@ const followDeadline = 2000;
  * declared now; once the process is quiet (`whenQuiet`), or by `followDeadline`, on the next
  * change, when `write` asks for it, or as the watcher closes. It ends once its write has, written
  * or failed, as a catalog in the middle of a save holds it until the files have settled, and is
- * reported, closing or not; a change since what was served is compiled after it. Every other
- * compile is reported once its output is written. The build the start ends with is saved for the
+ * reported, closing or not; a change since what was served is compiled after it. With
+ * `declareLater`, for a dev server that reads the output from the disk, as `next dev` does, a first
+ * compile with no saved build to start from writes every module now, whole, and leaves its keys'
+ * declarations and their maps to that task (`writeUndeclared`): it is reported and ended once its
+ * modules are written, and the write of the rest is reported too, as an error only the declarations
+ * find reaches the server so. Every other compile is reported once its output is written. The build the start ends with is saved for the
  * next start (`firstBuildSaver`). It watches until the process ends or `close` is called, whose
  * promise settles once the compile under way, if any, has finished, the output is written and the
  * build is saved, so the project can then be removed.
@@ -85,9 +103,11 @@ export function watch(
 	failed: (error: unknown) => void,
 	{
 		serve,
+		declareLater = false,
 		placeFirst,
 	}: {
 		serve?: (served: Served, milliseconds: number) => void;
+		declareLater?: boolean;
 		placeFirst?: Placing | undefined;
 	} = {},
 ): Watch {
@@ -99,17 +119,19 @@ export function watch(
 	 * What the first page was served from early, until the task that follows it has ended, which
 	 * every caller of `write` and `close` waits for: the first compile, served before its output was
 	 * written, which the task writes (`writeServed`); or the saved build's index, after which the
-	 * task takes up the build of the same save.
+	 * task takes up the build of the same save; or the first compile whose modules were written
+	 * before its declarations (`declareLater`), which the task declares and writes the rest of.
 	 */
-	let early:
-		| (({ compiled: CompiledProject } | { saved: SavedIndex }) & {
-				followed: PromiseWithResolvers<void>;
-		  })
-		| undefined;
+	let early: (Early & { followed: PromiseWithResolvers<void> }) | undefined;
 	/** Whether the task that follows what was served early is under way. */
 	let following = false;
 	/** Whether the first page is served before the first compile has its build: with `serve`. */
 	let servesEarly = serve !== undefined;
+	/**
+	 * Whether the first compile writes its modules before its declarations: with `declareLater`, and
+	 * none if a saved build was taken up.
+	 */
+	let declaresLater = declareLater;
 	/** The wait for the process to be quiet, to run the task that follows what was served early. */
 	let stopWaiting = () => {};
 	/** Whether a followed file changed, or a compile was asked for, since the last compile read them. */
@@ -176,17 +198,22 @@ export function watch(
 	};
 
 	/**
-	 * Writes what the first compile served: as a compile from itself, as no key changed since it was
-	 * served, its keys declared now (`writeBuild`). Its result is reported even as the watcher
-	 * closes, so an error only the write finds always reaches the server.
+	 * Writes what the first compile served, or the rest of what it wrote without its declarations
+	 * (`undeclared`): as a compile from itself, as no key changed since, its keys declared now
+	 * (`writeBuild`). Its result is reported even as the watcher closes, so an error only the write
+	 * finds always reaches the server.
 	 */
-	const writeServed = async (compiled: CompiledProject, started: number) => {
+	const writeServed = async (
+		compiled: CompiledProject,
+		started: number,
+		undeclared?: Undeclared,
+	) => {
 		const unchanged = { ...compiled.compilation, changed: new Set<string>() };
 		const { writeBuild } = await compiler();
 		const next = await writeBuild(
 			{ ...compiled, compilation: unchanged },
 			undefined,
-			{ ...developing, placing: placing() },
+			{ ...developing, placing: placing(), undeclared },
 		);
 		if (next.build !== undefined) {
 			saver.took(next.build, build);
@@ -198,13 +225,18 @@ export function watch(
 		return { result: next.result, milliseconds, build: next.build };
 	};
 
+	/** Leaves the task that follows the first compile or page to wait for quiet. */
+	const followLater = (what: Early) => {
+		early = { ...what, followed: Promise.withResolvers() };
+		stopWaiting = whenQuiet(run, { deadline: followDeadline });
+	};
+
 	/** Serves the first page early, and has the task that follows it wait for quiet. */
 	const serveEarly = (
 		served: { compiled: CompiledProject } | { saved: SavedIndex },
 		started: number,
 	) => {
-		early = { ...served, followed: Promise.withResolvers() };
-		stopWaiting = whenQuiet(run, { deadline: followDeadline });
+		followLater(served);
 		const page = "saved" in served ? served.saved.index : served.compiled;
 		if (!closed) serve?.(page, performance.now() - started);
 	};
@@ -215,19 +247,30 @@ export function watch(
 	 * (`firstBuildSaver`).
 	 */
 	const compileOnce = async (): Promise<
-		{ result: CompileResult; build?: Build } | { served: CompiledProject }
+		| { result: CompileResult; build?: Build; declaring?: Declaring }
+		| { served: CompiledProject }
 	> => {
 		changes = false;
 		const serving = servesEarly && !closed;
-		const { compileProject, writeBuild } = await compiler();
-		// A compile served before its write leaves the keys' declarations to the write too.
+		const deferring = declaresLater && !closed;
+		const { compileProject, writeBuild, writeUndeclared } = await compiler();
+		// A compile served or written before its declarations leaves declaring the keys to the write.
 		const compiled = await compileProject(configFile, build, {
 			...developing,
-			declare: !serving,
+			declare: !serving && !deferring,
 		});
 		if ("errors" in compiled)
 			return { result: { written: [], errors: compiled.errors } };
 		if (serving) return { served: compiled };
+		if (deferring) {
+			const { result, undeclared } = await writeUndeclared(compiled, {
+				...developing,
+				placing: placing(),
+			});
+			return undeclared === undefined
+				? { result }
+				: { result, declaring: { compiled, undeclared } };
+		}
 		const next = await writeBuild(compiled, build, {
 			...developing,
 			placing: placing(),
@@ -264,18 +307,27 @@ export function watch(
 					}
 					build = await savedBuild(configFile, developing);
 					servesEarly &&= build === undefined;
+					declaresLater &&= build === undefined;
 				}
 				if (served !== undefined) {
 					following = true;
 					stopWaiting();
-					if ("compiled" in served) {
-						const written = await writeServed(served.compiled, started);
+					if ("saved" in served) build = await served.saved.build();
+					else {
+						const written =
+							"compiled" in served
+								? await writeServed(served.compiled, started)
+								: await writeServed(
+										served.declaring.compiled,
+										started,
+										served.declaring.undeclared,
+									);
 						followedUp = true;
 						if (!changes) {
 							last = written;
 							continue;
 						}
-					} else build = await served.saved.build();
+					}
 				}
 				// The watches afresh just before the files are read, so a change the old ones missed is
 				// read; a write of what was served reads none, and keeps them, which closing them would
@@ -292,6 +344,7 @@ export function watch(
 				}
 				followedUp = true;
 				servesEarly = false;
+				declaresLater = false;
 				const milliseconds = performance.now() - started;
 				// A compile served before its write ends with the compile that writes it.
 				if ("served" in next) {
@@ -307,6 +360,9 @@ export function watch(
 					reportedBuild = next.build !== undefined;
 				}
 				last = { result: next.result, milliseconds, build: next.build };
+				// Its declarations follow once the process is quiet.
+				if (next.declaring !== undefined)
+					followLater({ declaring: next.declaring });
 			} catch (error) {
 				followedUp = true;
 				reportedBuild = false;
@@ -321,8 +377,14 @@ export function watch(
 				}
 			}
 		} while (again && !closed);
-		// The start ends with the last compile of the changes that came during it, written.
-		if (starting && !closed && early === undefined && last !== undefined)
+		// The start ends with the last compile of the changes that came during it, written, but for the
+		// declarations a first compile left to the write after it.
+		if (
+			starting &&
+			!closed &&
+			(early === undefined || "declaring" in early) &&
+			last !== undefined
+		)
 			endStart(last);
 	};
 
