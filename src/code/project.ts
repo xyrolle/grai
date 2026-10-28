@@ -58,7 +58,11 @@ export type ReadingScope = { key?: string | undefined; every?: boolean };
 export async function readProjectCode(
 	given: Config,
 	roots: readonly string[],
-	{ key, every = false, store }: ReadingScope & { store?: StateStore } = {},
+	{
+		key,
+		every = false,
+		store,
+	}: ReadingScope & { store?: StateStore | undefined } = {},
 ): Promise<ProjectCode | GraiError> {
 	// Each module named by its real path, as the bundler names it and the resolver resolves it, so a
 	// project reached through a symlink, as macOS reaches its temporary directory, finds its sources

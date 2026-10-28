@@ -1,10 +1,13 @@
 // The read of a Next app's code for the groups of its keys, on a thread of its own, which the watch
 // starts beside its first compile when no groups are saved (`first-groups.ts`). It reads the code at
-// once, which caches each file's facts, and says so; once the watch has written the output and sent
-// each key's weight, it reads the code again, from that cache and now through the output, which the
-// first read could not resolve an import of, and answers with the groups.
+// once, which keeps each file's facts, and says so; once the watch has written the output and sent
+// each key's weight, it reads the code again, from those facts and now through the output, which the
+// first read could not resolve an import of, and answers with the groups. It keeps the facts in
+// memory and writes nothing: the watch may stop it at any point, and a file it was writing would be
+// left behind.
 import { parentPort, workerData } from "node:worker_threads";
 import { readProjectCode } from "../code/project.ts";
+import { memoryStore } from "../code/state-store.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { type AppData, isAppData } from "./app-data.ts";
@@ -33,12 +36,19 @@ async function readGroups({ configFile, pageExtensions }: AppData) {
 		if (error instanceof GraiError) return tell("failed");
 		throw error;
 	}
-	const code = await readProjectCode(config, [config.root], { every: true });
+	const store = memoryStore();
+	const code = await readProjectCode(config, [config.root], {
+		every: true,
+		store,
+	});
 	if (code instanceof GraiError) return tell("failed");
 	parentPort?.once("message", async (weights: unknown) => {
 		if (!isWeights(weights))
 			throw new TypeError("grai's read of the groups takes each key's weight");
-		const groups = await nextKeyGroups(config, weights, pageExtensions);
+		const groups = await nextKeyGroups(config, weights, {
+			extensions: pageExtensions,
+			store,
+		});
 		tell(groups instanceof GraiError ? "failed" : groups);
 	});
 	tell("read");

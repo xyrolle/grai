@@ -5,6 +5,7 @@
 
 import { readProjectCode } from "../code/project.ts";
 import { readingOf } from "../code/reads.ts";
+import type { StateStore } from "../code/state-store.ts";
 import type { Compilation } from "../compilation.ts";
 import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
@@ -18,6 +19,15 @@ import { defaultPageExtensions, nextRoutes } from "./routes.ts";
  * three locales, from the Next bench (6,366 keys; `bench/nextjs.mjs`).
  */
 const moduleCost = 12_000;
+
+/**
+ * How the groups are read: Next's page extensions, and where the reading keeps its caches, the
+ * outdir's state unless given (`readProjectCode`).
+ */
+export type GroupReading = {
+	extensions?: readonly string[];
+	store?: StateStore | undefined;
+};
 
 /** Each key's weight: the length of its compiled code, which a module that holds it compiles. */
 export function keyWeights(compilation: Compilation): Map<string, number> {
@@ -36,9 +46,12 @@ export function keyWeights(compilation: Compilation): Map<string, number> {
 export async function nextKeyGroups(
 	config: Config,
 	weights: ReadonlyMap<string, number>,
-	extensions: readonly string[] = defaultPageExtensions,
+	{ extensions = defaultPageExtensions, store }: GroupReading = {},
 ): Promise<string[][] | GraiError> {
-	const code = await readProjectCode(config, [config.root], { every: true });
+	const code = await readProjectCode(config, [config.root], {
+		every: true,
+		store,
+	});
 	if (code instanceof GraiError) return code;
 	const contexts = await keyContexts(
 		code,
