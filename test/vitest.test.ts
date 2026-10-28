@@ -63,6 +63,38 @@ test("one key mocked", () => {
 		expect(run.stdout).toContain("1 passed");
 	});
 
+	it("fails a run on a catalog error before any test takes the messages, as a dev server shows it only after its first page", async () => {
+		const { dir } = project({
+			en: { title: "Title", listed: "{x :list}" },
+			de: { title: "Titel", listed: "{x :number}" },
+		});
+		symlinkSync(nodeModules, join(dir, "node_modules"));
+		writeFileSync(
+			join(dir, "vitest.config.js"),
+			`import { grai } from ${JSON.stringify(plugin)};\nexport default { plugins: [grai()] };\n`,
+		);
+		writeFileSync(
+			join(dir, "title.test.js"),
+			`import { expect, test } from "vitest";
+import { m } from "./out/messages.js";
+test("the title", () => {
+	expect(m.title()).toBe("Title");
+});
+`,
+		);
+
+		const run = await promisify(execFile)(
+			process.execPath,
+			[vitest, "run", "--root", dir],
+			{ cwd: dir, env: ownEnvironment },
+		).catch((error: { stdout: string; stderr: string }) => error);
+
+		expect(`${run.stdout}${run.stderr}`).toContain(
+			"x is formatted as a list in en and is formatted as a number in de, and no value suits both.",
+		);
+		expect(run.stdout).not.toContain("1 passed");
+	});
+
 	it("mocks one key in a Next app, whose Vitest config lists grai's plugin as it has no Vite config", async () => {
 		// The Next example as an app has it, its packages installed, with a Vitest config and a test of
 		// its own: @xyrolle/grai/vite from the package, as the app imports it, which the build put in
