@@ -1,4 +1,4 @@
-import { hash } from "node:crypto";
+import { hash, randomUUID } from "node:crypto";
 import { basePositions, basePositionsMoved } from "./base-positions.ts";
 import { buildKey } from "./build-key.ts";
 import {
@@ -15,7 +15,7 @@ import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { type DeclaredKey, declareKeys } from "./key-declarations.ts";
-import { isUpToDate, writeOutput } from "./output.ts";
+import { isUpToDate, type Publication, writeOutput } from "./output.ts";
 import { hashesOf, inputsOf } from "./output-inputs.ts";
 import { type RenderedModules, renderModules } from "./output-modules.ts";
 import { cameBy, type Placing } from "./placing.ts";
@@ -221,7 +221,7 @@ function compiledFrom(
  * An output written without its keys' declarations (`writeUndeclared`): the groups its keys were
  * placed by, and its render, which the write of the rest keeps.
  */
-export type Undeclared = { groups: KeyGroups; rendered: Rendered };
+export type Undeclared = { id: string; groups: KeyGroups; rendered: Rendered };
 
 /**
  * The second half of `recompile`: declares the keys its compile left undeclared (`declareKeys`),
@@ -283,6 +283,7 @@ export async function writeBuild(
 		output,
 		inputsOf(config, compiled.hashes, localeCopies, placement),
 		placement !== saved ? placement : undefined,
+		{},
 	);
 	if (written instanceof GraiError)
 		return { result: { written: [], errors: [written] } };
@@ -296,9 +297,10 @@ export async function writeBuild(
  * Writes a compiled project's output without its keys' declarations, left undeclared by its
  * compile (`compileProject` with `declare` false), as a dev server that reads the output from the
  * disk needs only its modules before its first page: every module, whole, and none of the
- * declarations or their maps. The manifest records it as so written (`inputsOf`), and no check
- * takes it for the output of its config and catalogs until `writeBuild`, given what this returns,
- * has declared the keys and written the rest, which names the modules alike (`renderUndeclared`).
+ * declarations or their maps. The manifest records it as so written, by an id of its own
+ * (`Publication`), and no check takes it for the output of its config and catalogs until
+ * `writeBuild`, given what this returns, has declared the keys and written the rest, which names
+ * the modules alike (`renderUndeclared`).
  */
 export async function writeUndeclared(
 	compiled: CompiledProject,
@@ -320,17 +322,19 @@ export async function writeUndeclared(
 			),
 		undefined,
 	);
-	const written = await published(
+	const id = randomUUID();
+	const done = await published(
 		config.outdir,
 		output,
-		inputsOf(config, compiled.hashes, localeCopies, placement, false),
+		inputsOf(config, compiled.hashes, localeCopies, placement),
 		placement !== saved ? placement : undefined,
+		{ undeclared: id },
 	);
-	if (written instanceof GraiError)
-		return { result: { written: [], errors: [written] } };
+	if (done instanceof GraiError)
+		return { result: { written: [], errors: [done] } };
 	return {
-		result: { written, errors: [] },
-		undeclared: { groups: placement, rendered },
+		result: { written: done, errors: [] },
+		undeclared: { id, groups: placement, rendered },
 	};
 }
 
@@ -375,10 +379,11 @@ async function published(
 	output: Output,
 	inputs: string,
 	given: KeyGroups | undefined,
+	publication: Publication,
 ): Promise<string[] | GraiError> {
 	let written: string[];
 	try {
-		written = await writeOutput(outdir, output, inputs);
+		written = await writeOutput(outdir, output, inputs, publication);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
 		return error;

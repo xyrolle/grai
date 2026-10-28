@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, it } from "vitest";
+import { check } from "../src/check.ts";
+import { compileProject, writeUndeclared } from "../src/compile.ts";
 import { project } from "./project.ts";
 
 const tsc = fileURLToPath(new URL("../node_modules/.bin/tsc", import.meta.url));
@@ -428,4 +430,30 @@ console.log(texts);
 
 	// Line 3: a unit the select does not list.
 	expect(errors).toEqual(["3 TS2322"]);
+});
+
+it("has grai check write the declarations a dev server left out when it stopped, so a call is checked against them", async () => {
+	const { dir, config } = project({
+		en: { cart_count: "{count :number} items", cart_title: "Your cart" },
+	});
+	const compiled = await compileProject(config, undefined, { declare: false });
+	if ("errors" in compiled) throw compiled.errors[0];
+	await writeUndeclared(compiled);
+	writeFileSync(
+		join(dir, "app.ts"),
+		'import { m } from "./out/messages.js";\nm.cart_count({ count: 2 }); m.cart_title();\n',
+	);
+
+	expect((await check(config)).problems).toEqual([]);
+
+	expect(existsSync(join(dir, "out", "keys.d.ts"))).toBe(true);
+	const errors = await typeErrors(
+		dir,
+		"use.ts",
+		`import { m } from "./out/messages.js";
+m.cart_count({ count: "wrong" });
+`,
+	);
+	// Line 2: text given for a number.
+	expect(errors).toEqual(["2 TS2322"]);
 });

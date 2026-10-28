@@ -19,6 +19,12 @@ export type Manifest = {
 	mutable: Record<string, string>;
 	/** The files no output names any more, each with when it stopped being named, in ms. */
 	retired: Record<string, number>;
+	/**
+	 * The id of the write that left the keys' declarations out (`writeUndeclared`), until the write
+	 * that completes it, which no other write may be in its stead: no check takes the output for
+	 * whole meanwhile.
+	 */
+	undeclared?: string;
 };
 
 /** The manifest's file in the outdir's state directory. */
@@ -70,6 +76,7 @@ function isManifest(value: unknown): value is Manifest {
 		isRecord(value.mutable) &&
 		Object.values(value.mutable).every((hash) => typeof hash === "string") &&
 		isRecord(value.retired) &&
-		Object.values(value.retired).every((at) => typeof at === "number")
+		Object.values(value.retired).every((at) => typeof at === "number") &&
+		(value.undeclared === undefined || typeof value.undeclared === "string")
 	);
 }

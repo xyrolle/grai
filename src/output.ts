@@ -34,7 +34,8 @@ export async function isUpToDate(
 	inputs: string,
 ): Promise<boolean> {
 	const manifest = await readManifest(join(outdir, stateDirectory));
-	if (manifest?.inputs !== inputs) return false;
+	if (manifest?.inputs !== inputs || manifest.undeclared !== undefined)
+		return false;
 	const files = [...manifest.immutable, ...Object.keys(manifest.mutable)];
 	const present = await presentIn(outdir, files);
 	return files.every((file) => present.has(file));
@@ -50,12 +51,14 @@ export async function isUpToDate(
  * then the mutable files, as no file names one of the first two until an entry does. The outdir is
  * grai's: a file the output no longer names that the manifest records is retired, and removed once
  * it has been for `retention`, and any other is removed at once, as is a temporary file a compile
- * that stopped halfway left. The manifest goes last. Returns the files written.
+ * that stopped halfway left. The manifest goes last, recording the write if it leaves the
+ * declarations out (`publication`). Returns the files written.
  */
 export async function writeOutput(
 	outdir: string,
 	output: Output,
 	inputs: string,
+	{ undeclared }: Publication = {},
 ): Promise<string[]> {
 	const state = join(outdir, stateDirectory);
 	await assertOutdirIsGrais(outdir);
@@ -91,7 +94,8 @@ export async function writeOutput(
 		const replaced = [...changedModules, ...changed];
 		if (
 			missing.length + replaced.length + removed.length === 0 &&
-			manifest?.inputs === inputs
+			manifest?.inputs === inputs &&
+			manifest.undeclared === undeclared
 		)
 			return [];
 		const written = [...missing, ...replaced];
@@ -115,12 +119,19 @@ export async function writeOutput(
 			immutable: output.immutable.map(([file]) => file),
 			mutable: Object.fromEntries(hashes),
 			retired: Object.fromEntries(retired),
+			...(undeclared === undefined ? {} : { undeclared }),
 		});
 		return written.map(([file]) => file);
 	} finally {
 		await release();
 	}
 }
+
+/**
+ * How a write stands to an output written without its declarations (`writeUndeclared`): one, by
+ * its id (`undeclared`), which the manifest records until a write completes it.
+ */
+export type Publication = { undeclared?: string | undefined };
 
 /**
  * The files in the outdir that this output does not name: those the manifest records, retired,
