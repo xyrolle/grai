@@ -190,8 +190,8 @@ function attributesCode(part: MarkupPart): string {
 
 /** Text as it reads inside a template literal: JSON's escapes, plus the backtick and `${`. */
 function templateText(text: string): string {
-	return JSON.stringify(text)
-		.slice(1, -1)
-		.replaceAll("`", "\\`")
-		.replaceAll("${", "\\${");
+	const json = JSON.stringify(text).slice(1, -1);
+	return json.includes("`") || json.includes("${")
+		? json.replaceAll("`", "\\`").replaceAll("${", "\\${")
+		: json;
 }
