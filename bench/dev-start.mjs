@@ -3,7 +3,7 @@
 // messages, which draws the same texts from its own code. Two pages: 500 plain texts, and 500
 // calls in the catalog's own mix of texts, inputs, plurals and markup. And the start a developer
 // makes most, a restart: the page of plain texts again, in the directory a cold start just left,
-// with its output, its saved build and Vite's cache.
+// with its output, its saved build and Vite's cache, as far as that start wrote them.
 //
 // Each start is a new Node process. A cold one is in a new directory with no output and no cache,
 // Vite's own among them; a restart follows a cold start of its own library, untimed, which loaded
@@ -63,7 +63,9 @@ function fault(drawn, texts, errors) {
 
 /**
  * Runs in the child: one start of the design's page, printed as JSON. A cold start writes the page
- * into a new directory; a restart takes the directory as the last start left it, Vite's cache in it.
+ * into a new directory; a restart takes the directory as the last start left it. Vite writes its
+ * cache once it has optimized the page's dependencies, so a start that closed sooner, or a page
+ * with none, leaves none.
  */
 async function child(design, name, pageFile, restart) {
 	const [app] = selectedApps([name]);
@@ -71,13 +73,11 @@ async function child(design, name, pageFile, restart) {
 	const page = JSON.parse(readFileSync(pageFile, "utf8"));
 	const root = join(cacheDir, "dev-start", app.id);
 	const viteCache = join(root, ".vite");
-	if (!restart) writeFixture(root, app, locale, design, page);
-	if (existsSync(viteCache) !== restart)
-		throw new Error(
-			restart
-				? `Vite's cache ${viteCache} is not there for the restart`
-				: `Vite's cache ${viteCache} is there before the start`,
-		);
+	if (!restart) {
+		writeFixture(root, app, locale, design, page);
+		if (existsSync(viteCache))
+			throw new Error(`Vite's cache ${viteCache} is there before the start`);
+	}
 	const browser = await chromium.launch();
 	try {
 		const tab = await browser.newPage();
