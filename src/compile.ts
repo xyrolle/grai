@@ -24,7 +24,12 @@ import {
 import { type RenderedModules, renderModules } from "./output-modules.ts";
 import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
-import { type Rendered, renderOutput } from "./render.ts";
+import {
+	type Output,
+	type Rendered,
+	renderOutput,
+	renderUndeclared,
+} from "./render.ts";
 import { type KeyGroups, savedGroups, saveGroups } from "./saved-groups.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
@@ -217,16 +222,28 @@ function compiledFrom(
 }
 
 /**
+ * An output written without its keys' declarations (`writeUndeclared`): the groups its keys were
+ * placed by, and its render, which the write of the rest keeps.
+ */
+export type Undeclared = { groups: KeyGroups; rendered: Rendered };
+
+/**
  * The second half of `recompile`: declares the keys its compile left undeclared (`declareKeys`),
  * renders a compiled project's keys, placed by the groups saved for its outdir, and writes its
  * output, every file of it the outdir lacks or holds otherwise. `previous` is the build written
  * last, which the project was compiled from: with the same config, only what changed since is
  * rendered again, and with none, or another config, everything is. `localeCopies` is the compile's.
+ * With `undeclared`, the project's output written already without its declarations, the keys are
+ * placed as they were then, and only the declarations and their maps are rendered and written.
  */
 export async function writeBuild(
 	compiled: CompiledProject,
 	previous?: Build,
-	{ localeCopies = false, placing }: CompileOptions = {},
+	{
+		localeCopies = false,
+		placing,
+		undeclared,
+	}: CompileOptions & { undeclared?: Undeclared | undefined } = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
 	const { config, sources, parts, catalogs } = compiled;
 	const compilation = declareKeys(config, compiled.compilation);
@@ -236,7 +253,6 @@ export async function writeBuild(
 		previous !== undefined && sameConfig(previous.config, config)
 			? previous
 			: undefined;
-	const groups = savedGroups(config.outdir);
 	const baseIndex = config.locales.indexOf(config.baseLocale);
 	const moved = basePositionsMoved(
 		catalogs[baseIndex],
@@ -246,50 +262,133 @@ export async function writeBuild(
 		moved || before === undefined
 			? basePositions(sources, parts, config.baseLocale)
 			: before.positions;
-	const render = (by: KeyGroups, last: Rendered | undefined) =>
-		renderOutput(
-			config,
-			compiled.rendered,
-			compilation,
-			{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
-			by,
-			last,
-		);
+	const saved = undeclared?.groups ?? savedGroups(config.outdir);
+	const { output, rendered, placement } = await placedRender(
+		compilation,
+		saved,
+		undeclared === undefined ? placing : undefined,
+		(by, last) =>
+			renderOutput(
+				config,
+				compiled.rendered,
+				compilation,
+				{
+					paths: config.catalogs.get(config.baseLocale) ?? [],
+					positions,
+					moved,
+				},
+				by,
+				last,
+			),
+		undeclared?.rendered ?? before?.rendered,
+	);
+	const written = await published(
+		config.outdir,
+		output,
+		inputsOf(config, compiled.hashes, localeCopies, placement),
+		placement !== saved ? placement : undefined,
+	);
+	if (written instanceof GraiError)
+		return { result: { written: [], errors: [written] } };
+	return {
+		result: { written, errors: [] },
+		build: { ...compiled, compilation, positions, rendered },
+	};
+}
+
+/**
+ * Writes a compiled project's output without its keys' declarations, left undeclared by its
+ * compile (`compileProject` with `declare` false), as a dev server that reads the output from the
+ * disk needs only its modules before its first page: every module, whole, and none of the
+ * declarations or their maps. The manifest records it as so written (`inputsOf`), and no check
+ * takes it for the output of its config and catalogs until `writeBuild`, given what this returns,
+ * has declared the keys and written the rest, which names the modules alike (`renderUndeclared`).
+ */
+export async function writeUndeclared(
+	compiled: CompiledProject,
+	{ localeCopies = false, placing }: CompileOptions = {},
+): Promise<{ result: CompileResult; undeclared?: Undeclared }> {
+	const { config } = compiled;
+	const saved = savedGroups(config.outdir);
+	const { output, rendered, placement } = await placedRender(
+		compiled.compilation,
+		saved,
+		placing,
+		(by, last) =>
+			renderUndeclared(
+				config,
+				compiled.rendered,
+				compiled.compilation,
+				by,
+				last,
+			),
+		undefined,
+	);
+	const written = await published(
+		config.outdir,
+		output,
+		inputsOf(config, compiled.hashes, localeCopies, placement, false),
+		placement !== saved ? placement : undefined,
+	);
+	if (written instanceof GraiError)
+		return { result: { written: [], errors: [written] } };
+	return {
+		result: { written, errors: [] },
+		undeclared: { groups: placement, rendered },
+	};
+}
+
+/**
+ * The output rendered by the groups `placing` gives, if they come in time (`placing.ts`), else by
+ * those saved, and the groups it was placed by.
+ */
+async function placedRender(
+	compilation: Compilation,
+	saved: KeyGroups,
+	placing: Placing | undefined,
+	render: (
+		by: KeyGroups,
+		last: Rendered | undefined,
+	) => { output: Output; rendered: Rendered },
+	before: Rendered | undefined,
+): Promise<{ output: Output; rendered: Rendered; placement: KeyGroups }> {
 	const asked = await placing?.(compilation);
 	const early =
 		asked &&
 		(asked.waited
 			? await asked.groups.catch(() => undefined)
 			: await cameBy(asked.groups));
-	let placement = early ?? groups;
-	let { output, rendered } = render(placement, before?.rendered);
+	const placement = early ?? saved;
+	const first = render(placement, before);
 	const late =
 		asked && !asked.waited && early === undefined
 			? await cameBy(asked.groups)
 			: undefined;
-	if (late !== undefined) {
-		placement = late;
-		({ output, rendered } = render(late, rendered));
-	}
+	if (late === undefined) return { ...first, placement };
+	return { ...render(late, first.rendered), placement: late };
+}
+
+/**
+ * Writes the output, and gives the files written, or the error the outdir gave; then saves the
+ * groups `placing` gave, if the output was placed by them. They are the outdir's once that output is
+ * written, and not before: only a write of grai's own output, which refuses an outdir another tool
+ * fills, makes the state directory (`assertOutdirIsGrais`).
+ */
+async function published(
+	outdir: string,
+	output: Output,
+	inputs: string,
+	given: KeyGroups | undefined,
+): Promise<string[] | GraiError> {
 	let written: string[];
 	try {
-		written = await writeOutput(
-			config.outdir,
-			output,
-			inputsOf(config, compiled.hashes, localeCopies, placement),
-		);
+		written = await writeOutput(outdir, output, inputs);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
-		return { result: { written: [], errors: [error] } };
+		return error;
 	}
-	// Groups `placing` gave are the outdir's once the output placed by them is written, and not
-	// before: only a write of grai's own output, which refuses an outdir another tool fills, makes
-	// the state directory (`assertOutdirIsGrais`).
-	if (placement !== groups) await saveGroups(config.outdir, placement);
-	return {
-		result: { written, errors: [] },
-		build: { ...compiled, compilation, positions, rendered },
-	};
+	if (given !== undefined) await saveGroups(outdir, given);
+	return written;
 }
 
 /**

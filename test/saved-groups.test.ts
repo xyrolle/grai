@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
@@ -27,10 +27,14 @@ const reexported = (out: string) =>
 
 /** The keys a module of keys exports, from its file's text. */
 const exportedBy = (out: string, label: string) => {
-	const file = readdirSync(join(out, "keys")).find(
-		(name) =>
-			name.endsWith(".js") && withoutContentHash(name) === `${label}.js`,
-	);
+	// The module keys.js names now: one an edit replaced stays a while beside it.
+	const file = [
+		...readFileSync(join(out, "keys.js"), "utf8").matchAll(
+			/"\.\/keys\/([^"]+)"/g,
+		),
+	]
+		.map(([, name]) => name ?? "")
+		.find((name) => withoutContentHash(name) === `${label}.js`);
 	if (file === undefined) throw new Error(`no module ${label}`);
 	return [
 		...readFileSync(join(out, "keys", file), "utf8").matchAll(

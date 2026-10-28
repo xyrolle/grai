@@ -16,9 +16,20 @@ import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
-import { recompile } from "../src/compile.ts";
+import {
+	compileProject,
+	recompile,
+	writeBuild,
+	writeUndeclared,
+} from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { readManifest } from "../src/manifest.ts";
+import { isCompiled } from "../src/output-inputs.ts";
+import {
+	isDeclarations,
+	outputTexts,
+	unresolvedImports,
+} from "./output-files.ts";
 import { outputFile, project } from "./project.ts";
 import { messagesOf } from "./reader.ts";
 
@@ -127,7 +138,6 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"runtime.d.ts",
 		"plurals.js",
 		"keys/0.js",
-		"keys/0.d.ts",
 		".gitignore",
 		"package.json",
 		"internal.js",
@@ -140,6 +150,7 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"testing.d.ts",
 		"messages.js",
 		"messages.d.ts",
+		"keys/0.d.ts",
 		"keys/0.d.ts.map",
 		"keys.js",
 		"keys.d.ts",
@@ -156,6 +167,65 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"keys.js",
 		"keys.d.ts",
 	]);
+});
+
+/** A project's keys compiled without their declarations, as a dev server's first compile leaves them. */
+async function compiledUndeclared(config: string) {
+	const compiled = await compileProject(config, undefined, { declare: false });
+	if ("errors" in compiled) throw compiled.errors[0];
+	return compiled;
+}
+
+it("writes the same output in two steps, every module whole and then the declarations and their maps, as in one, and no module twice", async () => {
+	const many = {
+		en: {
+			...catalogs.en,
+			items: "{n :number} items",
+			link: "{#a}Open{/a}",
+		},
+		de: {
+			...catalogs.de,
+			items: "{n :number} Teile",
+			link: "{#a}Öffnen{/a}",
+		},
+	};
+	const once = project(many);
+	expect((await once.compile()).errors).toEqual([]);
+	const { dir, config } = project(many);
+	const compiled = await compiledUndeclared(config);
+	const out = join(dir, "out");
+
+	const first = await writeUndeclared(compiled);
+
+	expect(first.result.errors).toEqual([]);
+	expect(first.result.written.filter(isDeclarations)).toEqual([]);
+	expect([...outputTexts(out).keys()].filter(isDeclarations)).toEqual([]);
+	expect(unresolvedImports(out)).toEqual([]);
+	expect(await isCompiled(config)).toBe(false);
+
+	const then = await writeBuild(compiled, undefined, {
+		undeclared: first.undeclared,
+	});
+
+	expect(then.result.errors).toEqual([]);
+	expect(then.result.written.length).toBeGreaterThan(0);
+	expect(then.result.written.filter((file) => !isDeclarations(file))).toEqual(
+		[],
+	);
+	expect(outputTexts(out)).toEqual(outputTexts(join(once.dir, "out")));
+	expect(await isCompiled(config)).toBe(true);
+});
+
+it("takes no output written without its declarations for the output of its catalogs, so the next compile writes them, and them alone", async () => {
+	const { config, compile } = project(catalogs);
+	await writeUndeclared(await compiledUndeclared(config));
+
+	const { written, errors } = await compile();
+
+	expect(errors).toEqual([]);
+	expect(written.length).toBeGreaterThan(0);
+	expect(written.filter((file) => !isDeclarations(file))).toEqual([]);
+	expect(await isCompiled(config)).toBe(true);
 });
 
 it("has Git ignore the output, and nothing else", async () => {
