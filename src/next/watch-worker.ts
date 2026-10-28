@@ -4,10 +4,10 @@
 //
 // The groups of keys the app's routes read (`key-groups.ts`) are read once a session. When Next waits
 // for the first compile and none are saved, as on a fresh clone, they are read beside it, and the
-// keys placed by them before Next starts if that costs the start little (`first-groups.ts`).
-// Otherwise they are read once the process is quiet after the first compile, and saved for the next
-// start's compile; the output this server runs is left as it is, which Turbopack would otherwise
-// compile again.
+// keys placed by them before Next starts if they come in time (`first-groups.ts`): the start's
+// release alone (`startup.ts`) tells withGrai the output can be read. Otherwise they are read once
+// the process is quiet after Next has started, and saved for the next start's compile; the output
+// this server runs is left as it is, which Turbopack would otherwise compile again.
 import { existsSync } from "node:fs";
 import { parentPort, workerData } from "node:worker_threads";
 import type { Build } from "../compile.ts";
@@ -17,9 +17,10 @@ import { groupsFile, savedGroups, saveGroups } from "../saved-groups.ts";
 import { watch } from "../watch.ts";
 import { type AppData, isAppData } from "./app-data.ts";
 import { reportErrors } from "./errors.ts";
-import { type FirstGroups, firstGroups } from "./first-groups.ts";
+import { firstGroups } from "./first-groups.ts";
 import { keyWeights, nextKeyGroups } from "./key-groups.ts";
 import { whenQuiet } from "./quiet.ts";
+import { started } from "./startup.ts";
 
 /** What withGrai hands the watch: the app's, and whether Next waits for the first compile. */
 export type WatchData = AppData & { held: boolean };
@@ -35,66 +36,44 @@ const tell = () => {
 	parentPort?.postMessage("compiled");
 };
 
-/** The read of the groups beside the first compile, until that compile is done. */
-let first: FirstGroups | undefined = groupsWanted()
-	? firstGroups({ configFile, pageExtensions })
-	: undefined;
+/** Whether Next may start, which only the start's release decides (`startup.ts`). */
+let released = false;
 
 /** Whether this session's groups are read, or being read. */
 let grouped = false;
 
-const watcher = watch(
+const watching = watch(
 	configFile,
-	(result, milliseconds, build) => {
+	(result, _milliseconds, build) => {
 		reportErrors(result.errors);
-		const reading = first;
-		first = undefined;
-		if (reading === undefined || build === undefined) {
-			reading?.stop();
-			settled(build);
-			return;
-		}
-		placed(reading, build, milliseconds).catch((error: unknown) => {
-			console.error(error);
-			settled(build);
-		});
+		if (released && build !== undefined) regroupOnce(build);
 	},
 	// A compile that throws, as when the outdir cannot be written: the next save compiles again.
-	(error) => {
+	(error) => console.error(error),
+);
+
+started(
+	watching,
+	groupsWanted() ? firstGroups({ configFile, pageExtensions }) : undefined,
+).then(
+	({ compiled, grouped: placed }) => {
+		released = true;
+		grouped ||= placed;
+		tell();
+		if ("build" in compiled && compiled.build !== undefined)
+			regroupOnce(compiled.build);
+	},
+	// The groups could not be saved: Next starts on the shards.
+	(error: unknown) => {
 		console.error(error);
-		first?.stop();
-		first = undefined;
+		released = true;
 		tell();
 	},
 );
 
-/**
- * Places the keys by the groups read beside the first compile, if they come in time, by compiling
- * again with them saved; then tells withGrai.
- */
-async function placed(
-	reading: FirstGroups,
-	build: Build,
-	milliseconds: number,
-): Promise<void> {
-	const groups = await reading.after(
-		keyWeights(build.compilation),
-		milliseconds,
-	);
-	if (groups === undefined) {
-		settled(build);
-		return;
-	}
-	grouped = true;
-	await saveGroups(build.config.outdir, groups);
-	await watcher.compileAgain();
-	tell();
-}
-
-/** Tells withGrai the output can be read, and reads the groups once the process is quiet, once. */
-function settled(build: Build | undefined): void {
-	tell();
-	if (build === undefined || grouped) return;
+/** Reads the groups once the process is quiet, once a session. */
+function regroupOnce(build: Build): void {
+	if (grouped) return;
 	grouped = true;
 	whenQuiet(() => {
 		regroup(build).catch((error: unknown) => console.error(error));
@@ -106,7 +85,7 @@ async function regroup(build: Build): Promise<void> {
 	const groups = await nextKeyGroups(
 		build.config,
 		keyWeights(build.compilation),
-		pageExtensions,
+		{ extensions: pageExtensions },
 	);
 	if (groups instanceof GraiError) {
 		reportErrors([groups]);
