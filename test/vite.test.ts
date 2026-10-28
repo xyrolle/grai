@@ -19,6 +19,7 @@ import {
 	build,
 	createLogger,
 	createServer,
+	createServerModuleRunner,
 	type HotPayload,
 	isRunnableDevEnvironment,
 	type Plugin,
@@ -1794,6 +1795,49 @@ export const render = () => \`\${title()} \${footer()}\`;
 			expect(code).toContain("export");
 			expect(code).not.toContain("sourceMappingURL=data:");
 		}
+	});
+
+	it("keeps the file and line of the output's runtime in a server's stack trace", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "check.js"),
+			`import { assertIsLocale } from "./out/runtime.js";\nexport const check = (locale) => assertIsLocale(locale);\n`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		// Vitest takes Error.prepareStackTrace, which turns Node's own source maps off, so this runner
+		// reads the maps Vite gives each module itself, as Node does for a server outside a test.
+		const runner = createServerModuleRunner(server.environments.ssr, {
+			sourcemapInterceptor: "prepareStackTrace",
+		});
+		onTestFinished(() => runner.close());
+		const { check } = await runner.import("/check.js");
+
+		let stack = "";
+		try {
+			check("bad");
+		} catch (error) {
+			stack = String((error as Error).stack);
+		}
+		const frame = /\/out\/(runtime-\w+\.js):(\d+):(\d+)\)$/m.exec(
+			stack.split("\n").find((line) => line.includes("at assertIsLocale")) ??
+				"",
+		);
+		expect(frame, stack).not.toBeNull();
+		const [, file = "", line = "", column = ""] = frame ?? [];
+		await expect
+			.poll(() => existsSync(join(dir, "out", file)), devWait)
+			.toBe(true);
+		const thrown = readFileSync(join(dir, "out", file), "utf8").split("\n")[
+			Number(line) - 1
+		];
+		expect(thrown?.slice(Number(column) - 1)).toBe("unknownLocale(value);");
 	});
 
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {
