@@ -1,5 +1,4 @@
 import { hash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { serialize } from "node:v8";
 import { basePositions, basePositionsMoved } from "./base-positions.ts";
 import {
@@ -11,17 +10,18 @@ import {
 } from "./catalog.ts";
 import { localeCatalogs, type ParsedCatalogs } from "./catalog-parts.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
-import { compilerIdentity } from "./compiler-identity.ts";
 import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { type DeclaredKey, declareKeys } from "./key-declarations.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
 import {
-	type RenderedModules,
-	type RuntimeSources,
-	renderModules,
-} from "./output-modules.ts";
+	hashesOf,
+	hashOfCompiler,
+	inputsOf,
+	runtimeSources,
+} from "./output-inputs.ts";
+import { type RenderedModules, renderModules } from "./output-modules.ts";
 import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
@@ -58,52 +58,6 @@ export type Build = Omit<CompiledProject, "compilation" | "rendered"> & {
 	rendered: Rendered;
 };
 
-const text = (url: URL): string => readFileSync(url, "utf8");
-
-/**
- * The runtime's modules, which every output carries, their imports of each other pinned, and the
- * templates of the output's declarations.
- */
-const runtime: RuntimeSources = {
-	runtime: text(new URL("./runtime/runtime.js", import.meta.url)),
-	server: text(new URL("./runtime/server.js", import.meta.url)),
-	testing: text(new URL("./runtime/testing.js", import.meta.url)),
-	declarations: {
-		runtime: text(new URL("./runtime/runtime.d.ts.template", import.meta.url)),
-		server: text(new URL("./runtime/server.d.ts.template", import.meta.url)),
-		testing: text(new URL("./runtime/testing.d.ts.template", import.meta.url)),
-		setLocale: {
-			live: text(
-				new URL("./runtime/set-locale.live.d.ts.template", import.meta.url),
-			),
-			reload: text(
-				new URL("./runtime/set-locale.reload.d.ts.template", import.meta.url),
-			),
-		},
-	},
-};
-
-/**
- * The compiler's identity (`compilerIdentity`): what decides the output besides the config and the
- * catalogs. A new version of grai changes it, and so does a local build, which keeps its version,
- * so the output is written again after either. Taken on the first compile.
- */
-let compilerHash: string | undefined;
-
-function hashOfCompiler(): string {
-	compilerHash ??= compilerIdentity([
-		runtime.runtime,
-		runtime.server,
-		runtime.testing,
-		runtime.declarations.runtime,
-		runtime.declarations.server,
-		runtime.declarations.testing,
-		runtime.declarations.setLocale.live,
-		runtime.declarations.setLocale.reload,
-	]);
-	return compilerHash;
-}
-
 /**
  * Compiles a project's catalogs and writes its output, unless the output is already that of the
  * same config and catalogs. Never throws a `GraiError`: every one found is in the result.
@@ -125,28 +79,6 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	if ("errors" in compiled) return { written: [], errors: compiled.errors };
 	const { result } = await writeBuild(compiled);
 	return result;
-}
-
-/**
- * Whether the output is already that of the project's config and catalogs, which `compile` would
- * leave as it is. A project that cannot be read has no such output.
- */
-export async function isCompiled(configFile: string): Promise<boolean> {
-	const read = await readProject(configFile);
-	if ("errors" in read) return false;
-	return isUpToDate(
-		read.config.outdir,
-		inputsOf(
-			read.config,
-			hashesOf(read.sources),
-			false,
-			savedGroups(read.config.outdir),
-		),
-	);
-}
-
-function hashesOf(sources: readonly CatalogSource[]): string[] {
-	return sources.map((source) => hash("sha1", source.bytes));
 }
 
 /**
@@ -272,7 +204,7 @@ function compiledFrom(
 		compilation,
 		rendered: renderModules(
 			config,
-			runtime,
+			runtimeSources(),
 			compilation,
 			localeCopies,
 			previous?.rendered.formats,
@@ -399,31 +331,6 @@ function parsed(
 	if (old === undefined || catalog === undefined) return parseCatalog(source);
 	if (old.bytes.equals(source.bytes)) return catalog;
 	return parseEditedCatalog(source, catalog, old.bytes);
-}
-
-/**
- * What decides the output: the compiler, whether its build writes the locale copies, the config,
- * every catalog's bytes, and the groups of keys saved for it. The whole config, as no field is then
- * left out by mistake: the catalogs' paths are in the declaration maps.
- */
-function inputsOf(
-	config: Config,
-	hashes: readonly string[],
-	localeCopies: boolean,
-	groups: KeyGroups,
-): string {
-	return hash(
-		"sha1",
-		JSON.stringify(
-			[hashOfCompiler(), localeCopies, config, hashes, groups],
-			collectionsAsLists,
-		),
-	);
-}
-
-/** JSON of a config's maps and sets, as lists of their entries. */
-function collectionsAsLists(_key: string, value: unknown): unknown {
-	return value instanceof Map || value instanceof Set ? [...value] : value;
 }
 
 /**
