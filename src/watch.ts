@@ -137,8 +137,8 @@ export function watch(
 		return asked;
 	};
 	/**
-	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
-	 * saved by renaming another over it is a new file, and a change during the compile is seen.
+	 * Watches the config and the catalogs it names, afresh before each compile reads them: a file an
+	 * editor saved by renaming another over it is a new file, and a change during the compile is seen.
 	 */
 	const follow = () => {
 		for (const watcher of watchers) watcher.close();
@@ -240,7 +240,6 @@ export function watch(
 			settled = false;
 			const started = performance.now();
 			try {
-				follow();
 				if (first) {
 					first = false;
 					build = await savedBuild(configFile, developing);
@@ -253,6 +252,10 @@ export function watch(
 						continue;
 					}
 				}
+				// The watches afresh just before the files are read, so a change the old ones missed is
+				// read; a write of what was served reads none, and keeps them, which closing them would
+				// make miss a change in between.
+				follow();
 				const next = await compileOnce();
 				if ("result" in next && !quiet && unparsed(next.result)) {
 					again = false;
