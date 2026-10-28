@@ -1,27 +1,22 @@
 // The refactoring commands on a whole app: check, find, rename and check --fix, each in a new
-// Node process, timed once grai's modules have loaded. They run on a copy in the system's
-// temporary directory, removed after: app A's or B's src/, catalogs and the files its imports
-// resolve by (package.json and tsconfig), from the checkouts that GRAI_BENCH_A and GRAI_BENCH_B
-// name, or a synthetic project of app B's size (13,000 keys in three locales, 9,000 source files,
-// 68 MB) that anyone can run. The output is compiled first, as a project's is, since the commands
+// Node process, timed once grai's modules have loaded. They run on a project in the system's
+// temporary directory, removed after (refactor-project.mjs): a copy of app A or B, or a synthetic
+// project of app B's size that anyone can run. The output is compiled first, as a project's is, since the commands
 // follow imports to it. find and rename take the key the most files name; check --fix removes 50
 // unused keys added to each catalog, then checks, as the command does: it runs the command itself,
 // its output kept from the terminal. Each command is timed cold, without the facts kept on disk,
 // and warm, with them: medians of three runs.
 //   node refactor.mjs [app...]
 import { execFileSync } from "node:child_process";
-import {
-	cpSync,
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { graiModule } from "./grai.mjs";
+import {
+	busiestKey,
+	snapshot,
+	writeRefactorProject,
+} from "./refactor-project.mjs";
 import { recordResults } from "./results.mjs";
 
 const RUNS = 3;
@@ -88,136 +83,6 @@ function median(setup, args, after = () => {}) {
 	return ms[Math.floor(RUNS / 2)] ?? 0;
 }
 
-/**
- * A copy of an app's sources and catalogs, and what its imports resolve by, from its checkout or
- * made up. A Paraglide app imports its messages from its Paraglide output's path, so grai's output
- * goes there, and a key's path maps to its keys.js.
- */
-function copyOf(app, dir) {
-	if (app === "synthetic") return writeSynthetic(dir);
-	const root = process.env[`GRAI_BENCH_${app.toUpperCase()}`];
-	if (root === undefined)
-		throw new Error(`set GRAI_BENCH_${app.toUpperCase()}`);
-	const settings = JSON.parse(
-		readFileSync(join(root, "project.inlang/settings.json"), "utf8"),
-	);
-	const catalogs = settings["plugin.inlang.messageFormat"].pathPattern.replace(
-		/^\.\//,
-		"",
-	);
-	const filter = (path) => !path.includes("/paraglide");
-	cpSync(join(root, "src"), join(dir, "src"), { recursive: true, filter });
-	// The tsconfig SvelteKit generates, which the app's extends: in .svelte-kit/ up to SvelteKit 2,
-	// and as $app/tsconfig in node_modules from SvelteKit 3.
-	const tsconfigs = [
-		"tsconfig.json",
-		".svelte-kit/tsconfig.json",
-		"node_modules/$app/tsconfig.json",
-	];
-	for (const file of tsconfigs) {
-		try {
-			mkdirSync(dirname(join(dir, file)), { recursive: true });
-			cpSync(join(root, file), join(dir, file));
-		} catch {
-			// The app has no such file.
-		}
-	}
-	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-	writeFileSync(
-		join(dir, "package.json"),
-		JSON.stringify({
-			name: "bench",
-			type: "module",
-			imports: {
-				"#lib/paraglide/messages/*": "./src/lib/paraglide/keys.js",
-				...manifest.imports,
-			},
-		}),
-	);
-	for (const locale of settings.locales) {
-		const catalog = catalogs.replace("{locale}", locale);
-		mkdirSync(dirname(join(dir, catalog)), { recursive: true });
-		cpSync(join(root, catalog), join(dir, catalog));
-	}
-	return { locales: settings.locales, catalogs, outdir: "src/lib/paraglide" };
-}
-
-/** App B's size: per-key imports and namespace reads of 13,000 keys in 9,000 files. */
-function writeSynthetic(dir) {
-	const locales = ["en", "ro", "ru"];
-	const keys = Array.from(
-		{ length: 13_000 },
-		(_, n) => `area${n % 97}_label_${n}`,
-	);
-	mkdirSync(join(dir, "messages"));
-	mkdirSync(join(dir, "src/lib"), { recursive: true });
-	writeFileSync(
-		join(dir, "package.json"),
-		JSON.stringify({
-			name: "bench",
-			type: "module",
-			imports: {
-				"#lib/*": "./src/lib/*.ts",
-				"#i18n/messages/*": "./src/lib/grai/keys.js",
-			},
-		}),
-	);
-	writeFileSync(
-		join(dir, "src/lib/i18n.ts"),
-		'export { m } from "./grai/messages.js";\n',
-	);
-	for (const locale of locales) {
-		const catalog = Object.fromEntries(
-			keys.map((key) => [key, `${locale} ${key}`]),
-		);
-		writeFileSync(
-			join(dir, "messages", `${locale}.json`),
-			JSON.stringify(catalog, null, "\t"),
-		);
-	}
-	// Each line declares a name of its own, as code that compiles does.
-	const code = Array.from(
-		{ length: 110 },
-		(_, n) =>
-			`\tconst total${n} = items.reduce((sum, item) => sum + item.price, 0);\n`,
-	).join("");
-	for (let n = 0; n < 9_000; n++) {
-		const [a, b, c, d] = [0, 1, 2, 3].map(
-			(i) => keys[(n * 7 + i * 1931) % keys.length],
-		);
-		const file = join(dir, "src", `area${n % 97}`, `View${n}.svelte`);
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(
-			file,
-			`<script lang="ts">\n\timport { m } from "#lib/i18n";\n\timport { ${a} } from "#i18n/messages/${a}.js";\n${code}</script>\n\n<h1>{${a}()}</h1>\n<p>{m.${b}()} {m.${c}()} {m["${d}"]()}</p>\n`,
-		);
-	}
-	return {
-		locales,
-		catalogs: "messages/{locale}.json",
-		outdir: "src/lib/grai",
-	};
-}
-
-/** The key the most source files name. */
-function busiestKey(dir, catalog) {
-	const keys = new Set(Object.keys(JSON.parse(readFileSync(catalog, "utf8"))));
-	const files = new Map();
-	for (const path of readdirSync(join(dir, "src"), {
-		recursive: true,
-		encoding: "utf8",
-	})) {
-		if (!/\.(svelte|ts|tsx|js)$/.test(path)) continue;
-		const text = readFileSync(join(dir, "src", path), "utf8");
-		for (const name of new Set(text.match(/[A-Za-z_$][\w$]*/g))) {
-			if (keys.has(name)) files.set(name, (files.get(name) ?? 0) + 1);
-		}
-	}
-	return [...files].reduce((best, entry) =>
-		entry[1] > best[1] ? entry : best,
-	)[0];
-}
-
 /** Adds unused keys at the top of each catalog, as text, so every other byte stays. */
 function addUnusedKeys(dir, catalogs, locales) {
 	for (const locale of locales) {
@@ -259,18 +124,15 @@ if (process.argv[2] === "--child") {
 		: ["synthetic"]) {
 		const dir = mkdtempSync(join(tmpdir(), `grai-refactor-${app}-`));
 		try {
-			const { locales, catalogs, outdir } = copyOf(app, dir);
+			const project = writeRefactorProject(app, dir);
+			const { locales, catalogs, outdir } = project;
 			const config = join(dir, "grai.config.json");
-			writeFileSync(
-				config,
-				JSON.stringify({ locales, baseLocale: locales[0], catalogs, outdir }),
-			);
 			execFileSync(process.execPath, [self, "--child", "compile", config]);
 			const facts = join(dir, outdir, ".grai", "facts");
 			const cold = () => rmSync(facts, { force: true });
 			const key = busiestKey(
-				dir,
-				join(dir, catalogs.replace("{locale}", locales[0])),
+				snapshot(dir, project),
+				locales.map((locale) => catalogs.replace("{locale}", locale)),
 			);
 			const none = () => {};
 			// The runs rename the key and back, so each renames the same call sites: counted across the
