@@ -1,11 +1,8 @@
-// A message-heavy page as Svelte compiles it, for the render and hydration benches: a shell of 400
-// distinct labels, then a table of 100 rows, each with 16 message calls beside 8 data cells, so
-// 2,000 calls in all. Each variant takes its messages from somewhere else: Paraglide's output,
-// grai's server entry or per-locale module, or text inlined into the template at compile time.
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { compile } from "svelte/compiler";
-import { cacheDir } from "./apps.mjs";
+// A message-heavy Svelte page, for the render and hydration benches: a shell of 400 distinct
+// labels, then a table of 100 rows, each with 16 message calls beside 8 data cells, so 2,000 calls
+// of 416 keys in all. Each variant takes its messages from somewhere else: Paraglide's output,
+// grai's, a library's translator, or text inlined into the template at compile time. page-app.mjs
+// builds it as an app.
 import { sampleCalls, takesInputs } from "./calls.mjs";
 import { escapeText, keptSpaces, splitEdges } from "./svelte-text.mjs";
 
@@ -87,6 +84,13 @@ export function pageSource(app, { from, inline, translate }) {
 `;
 }
 
+/** The keys the page calls: its shell's and its rows', each once. */
+export const pageKeys = (app) => [
+	...new Set(
+		sampleCalls(app, SHELL_CALLS + CALLS_PER_ROW).map((call) => call.key),
+	),
+];
+
 /**
  * The page's text exactly as the DOM holds it, whitespace and all: its tags and Svelte's
  * hydration comments dropped, and the entities Svelte writes read back.
@@ -115,15 +119,4 @@ export function pageProps(app, values = (call) => call.inputs) {
 		),
 	}));
 	return { inputs: calls.map(values), rows };
-}
-
-/** Compiles a page for the server or the browser and writes it beside the others; returns its path. */
-export function writePage(app, name, source, generate) {
-	const directory = join(cacheDir, "page", app.id);
-	mkdirSync(directory, { recursive: true });
-	writeFileSync(join(directory, `${name}.svelte`), source);
-	const { js } = compile(source, { generate, filename: `${name}.svelte` });
-	const path = join(directory, `${name}.${generate}.js`);
-	writeFileSync(path, js.code);
-	return path;
 }

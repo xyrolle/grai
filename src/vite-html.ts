@@ -71,7 +71,13 @@ function withPageLocale(
 	config: Config,
 	site: Site,
 ): { html: string; hashes: string[] } {
-	const script = localeScript(config, context.bundle !== undefined);
+	const built = context.bundle !== undefined;
+	// The script points the page at its locale's modules in dev, keys.js, and in a build only with
+	// the message chunks' copies.
+	const script = localeScript(config, {
+		minify: built,
+		copies: !built || site.copies,
+	});
 	const chunks =
 		context.bundle === undefined
 			? {

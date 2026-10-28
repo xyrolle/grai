@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { build, type Rolldown } from "vite";
 import { describe, expect, it } from "vitest";
-import { requestBytes } from "../src/key-sets.ts";
+import { requestBytes } from "../src/page-chunks.ts";
 import { type GraiAdapter, graiPlugin } from "../src/vite-plugin.ts";
 import { project } from "./project.ts";
 

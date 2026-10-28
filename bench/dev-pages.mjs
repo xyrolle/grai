@@ -2,7 +2,7 @@
 // Vite's dev server, its catalogs, and the plugins that serve them. "grai's plugin" is grai's own
 // Vite plugin, as an app runs it; "whole", "patch" and "patch, fs.watch" are the designs it was
 // chosen from (hmr.mjs); "paraglide" is Paraglide's own Vite plugin; "i18next" and "use-intl"
-// import the locale's JSON; "no messages" draws the keys' names.
+// import the locale's JSON; "no messages" draws the same texts from its own code.
 import {
 	cpSync,
 	mkdirSync,
@@ -13,18 +13,15 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
-import { graiSource } from "./grai.mjs";
-import { libraryCatalogs } from "./libraries.mjs";
-import { writeProject } from "./paraglide.mjs";
+import { sampleCalls, takesInputs } from "./calls.mjs";
+import { graiEntry, graiVite } from "./grai.mjs";
+import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
+import { paraglideOutput, writeProject } from "./paraglide.mjs";
 import { messageFunction, pluralRuleOf } from "./prototype.mjs";
 
-const { grai } = await import(join(graiSource, "vite.ts"));
-// The dev server comes from the Vite grai's source imports, as an app has one Vite: grai's plugin
-// tells a server environment it can patch in place by Vite's own class, and the bench's copy of
-// Vite is another, so a server made by it would have its messages taken again on every edit.
-export const { createServer } = await import(
-	join(graiSource, "../node_modules/vite/dist/node/index.js")
-);
+const { grai } = await import(graiEntry("./vite"));
+// The dev server comes from the Vite grai's build imports (`graiVite`), as an app has one Vite.
+export const { createServer } = await import(graiVite);
 
 const SHOWN = 500;
 
@@ -184,61 +181,127 @@ function timingPlugin(catalogFile, timings) {
 	};
 }
 
-/** The page's module per design: it renders 500 messages and renders them again on an update. */
-function pageModule(design, locale, shown) {
+/**
+ * The page's module per design: it draws its calls' texts, the first into the target an edit
+ * changes, and draws them again on an update. Once they are in the DOM, it sets `window.ready`,
+ * and the time of that and of the frame drawn after it as `window.shown`, by the page's clock:
+ * `ready`, then `painted` once a task queued from that frame's animation callback runs, after the
+ * frame's style, layout and paint.
+ */
+function pageModule(design, locale, page) {
 	const lang = JSON.stringify(locale);
-	const render = (call) => `function render() {
-	document.getElementById("target").textContent = ${call("shown[0]")};
+	const calls = `const calls = ${JSON.stringify(page.calls)};`;
+	const render = (list, text) => `function render() {
+	const drawn = ${list}.map((c) => ${text});
+	document.getElementById("target").textContent = drawn[0];
 	const list = document.getElementById("list");
-	list.replaceChildren(...shown.slice(1).map((key) => Object.assign(document.createElement("li"), { textContent: ${call("key")} })));
+	list.replaceChildren(...drawn.slice(1).map((text) => Object.assign(document.createElement("li"), { textContent: text })));
 }
 render();`;
 	const accept = (specifier, update) =>
 		`if (import.meta.hot) import.meta.hot.accept(${JSON.stringify(specifier)}, (next) => { ${update}; render(); });`;
 	const pages = {
-		// Vite's client and the page alone, which draws the keys' names.
-		"no messages": render((key) => key),
+		// Vite's client and the page alone, which draws the same texts from its own code.
+		"no messages": `const texts = ${JSON.stringify(page.texts)};
+${render("texts", "c")}`,
 		// grai's plugin dispatches grai:change on window after an edit; the page draws again and
 		// cancels it, as a framework's adapter does, or the page would reload.
 		"grai's plugin": `import { m } from "./out/messages.js";
-${render((key) => `m[${key}]()`)}
+${calls}
+${render("calls", "m[c.key](c.inputs)")}
 addEventListener("grai:change", (event) => { event.preventDefault(); render(); });`,
 		grai: `import * as messages from "virtual:messages";
 let m = messages;
 m.setLocale(${lang});
-${render((key) => `m[${key}]()`)}
+${calls}
+${render("calls", "m[c.key](c.inputs)")}
 addEventListener("grai:change", render);
 ${accept("virtual:messages", `m = next; m.setLocale(${lang})`)}`,
 		paraglide: `import * as messages from "./paraglide/messages.js";
 let m = messages.m;
 const options = { locale: ${lang} };
-${render((key) => `m[${key}]({}, options)`)}
+${calls}
+${render("calls", "m[c.key](c.inputs ?? {}, options)")}
 ${accept("./paraglide/messages.js", "m = next.m")}`,
 		i18next: `import i18next from "i18next";
 import translation from "./messages/${locale}.json";
 const instance = i18next.createInstance();
 instance.init({ lng: ${lang}, resources: { ${lang}: { translation } }, initAsync: false, interpolation: { escapeValue: false } });
-${render((key) => `instance.t(${key})`)}
+${calls}
+${render("calls", "instance.t(c.key, c.i18next)")}
 ${accept(`./messages/${locale}.json`, `instance.addResourceBundle(${lang}, "translation", next.default, true, true)`)}`,
 		"use-intl": `import { createTranslator } from "use-intl/core";
 import messages from "./messages/${locale}.json";
 let t = createTranslator({ locale: ${lang}, messages });
-${render((key) => `t(${key})`)}
+${calls}
+${render("calls", "t(c.key, c.inputs)")}
 ${accept(`./messages/${locale}.json`, `t = createTranslator({ locale: ${lang}, messages: next.default })`)}`,
 	};
-	return `const shown = ${JSON.stringify(shown)};
-${pages[design] ?? pages.grai}
+	return `${pages[design] ?? pages.grai}
 new MutationObserver(() => { window.changed = { at: performance.timeOrigin + performance.now(), text: document.getElementById("target").textContent }; })
 	.observe(document.getElementById("target"), { childList: true, characterData: true, subtree: true });
 window.ready = true;
+const ready = performance.timeOrigin + performance.now();
+requestAnimationFrame(() => {
+	const after = new MessageChannel();
+	after.port1.onmessage = () => { window.shown = { ready, painted: performance.timeOrigin + performance.now() }; };
+	after.port2.postMessage(null);
+});
 `;
 }
 
 /**
- * The page and its catalogs: 500 messages of the locale, the first one the edited target. i18next
- * and use-intl edit their own format of the locale's catalog, which the page imports as JSON.
+ * The page of plain texts: the first 500 keys whose message is plain text in every locale, which
+ * the page calls without inputs, each text its catalog's own.
  */
-export function writeFixture(root, app, locale, design) {
+export function textPage(app, locale) {
+	const plain = (key) =>
+		app.locales.every(
+			(each) =>
+				typeof app.messages[each][key] === "string" &&
+				!app.messages[each][key].includes("{"),
+		);
+	const keys = Object.keys(app.messages[locale]).filter(plain).slice(0, SHOWN);
+	return {
+		calls: keys.map((key) => ({ key })),
+		texts: keys.map((key) => app.messages[locale][key]),
+	};
+}
+
+/**
+ * The page of mixed calls: 500 in the catalog's own mix of texts, inputs, plurals and markup
+ * (calls.mjs), each with its inputs, as i18next takes them too, and each text as Paraglide's
+ * output draws it in Node.
+ */
+export async function mixedPage(app, locale) {
+	const sample = sampleCalls(app, SHOWN);
+	const { m } = await import(join(await paraglideOutput(app), "messages.js"));
+	return {
+		calls: sample.map((call) =>
+			takesInputs(call)
+				? {
+						key: call.key,
+						inputs: call.inputs,
+						i18next: i18nextValues(app, call.key, call.inputs),
+					}
+				: { key: call.key },
+		),
+		texts: sample.map(({ key, inputs }) => m[key](inputs, { locale })),
+	};
+}
+
+/**
+ * The page and its catalogs: its calls in the locale, the first one the edited target, by default
+ * the page of plain texts. i18next and use-intl edit their own format of the locale's catalog,
+ * which the page imports as JSON. Returns the edited key.
+ */
+export function writeFixture(
+	root,
+	app,
+	locale,
+	design,
+	page = textPage(app, locale),
+) {
 	rmSync(root, { recursive: true, force: true });
 	mkdirSync(join(root, "messages"), { recursive: true });
 	for (const each of app.locales)
@@ -249,13 +312,6 @@ export function writeFixture(root, app, locale, design) {
 			join(root, "messages", `${locale}.json`),
 			JSON.stringify(libraryCatalogs(app, locale)[converted], null, "\t"),
 		);
-	const plain = (key) =>
-		app.locales.every(
-			(each) =>
-				typeof app.messages[each][key] === "string" &&
-				!app.messages[each][key].includes("{"),
-		);
-	const shown = Object.keys(app.messages[locale]).filter(plain).slice(0, SHOWN);
 	writeFileSync(
 		join(root, "index.html"),
 		`<!doctype html><html lang="${locale}"><meta charset="utf-8"><p id="target"></p><ul id="list"></ul><script type="module" src="/main.js"></script>`,
@@ -275,8 +331,8 @@ export function writeFixture(root, app, locale, design) {
 			`import { m } from "./out/messages.js";\nexport const render = (key, locale) => m[key]({}, { locale });\n`,
 		);
 	}
-	writeFileSync(join(root, "main.js"), pageModule(design, locale, shown));
-	return shown[0];
+	writeFileSync(join(root, "main.js"), pageModule(design, locale, page));
+	return page.calls[0].key;
 }
 
 /** The design's plugins: grai's dev plugin, or Paraglide's Vite plugin, or none but the timing. */

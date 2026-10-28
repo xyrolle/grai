@@ -9,11 +9,11 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { i18nextLibrary, icuLibrary } from "./fuzz-libraries.mjs";
+import { graiCli } from "./grai.mjs";
 import { generator } from "./synthetic.mjs";
 
-const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const [count = 2000, seed = 1] = process.argv.slice(2).map(Number);
 const locales = ["en", "ru"];
 const inputSets = [0, 1, 2, 5, 21, 1.5].flatMap((n) =>
@@ -116,10 +116,10 @@ async function importAll(format, messages) {
 		);
 		const report = execFileSync(
 			process.execPath,
-			[cli, "import", "--from", format, "source"],
+			[graiCli, "import", "--from", format, "source"],
 			{ cwd: dir, encoding: "utf8" },
 		);
-		execFileSync(process.execPath, [cli, "compile"], { cwd: dir });
+		execFileSync(process.execPath, [graiCli, "compile"], { cwd: dir });
 		const { m } = await import(
 			pathToFileURL(join(dir, "out", "messages.js")).href
 		);

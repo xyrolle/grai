@@ -114,8 +114,9 @@ export function watch(
 					settling = setTimeout(settle, settleMilliseconds);
 					return;
 				}
+				const from = build;
 				build = next.build ?? build;
-				if (next.build !== undefined) saver.took(next.build);
+				if (next.build !== undefined) saver.took(next.build, from);
 				if (closed || (reportedBuild && unchanged(next))) continue;
 				report(next.result, performance.now() - started, next.build);
 				reportedBuild = next.build !== undefined;

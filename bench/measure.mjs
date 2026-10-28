@@ -1,6 +1,9 @@
-// Timing: the median of many rounds, after a warm-up long enough for the JIT to finish tiering up
-// thousands of message functions. Every result's length is summed and checked, so the engine
-// cannot drop the work it measures.
+// Timing: batches of many runs, after a warm-up long enough for the JIT to finish tiering up
+// thousands of message functions, each batch kept as a sample of nanoseconds an operation. Every
+// result's length is summed and checked, so the engine cannot drop the work it measures. It imports
+// nothing but the medians, so that a page bundles it too.
+import { median } from "./medians.mjs";
+
 function runFor(run, repeat) {
 	let produced = 0;
 	const start = performance.now();
@@ -13,22 +16,29 @@ function runFor(run, repeat) {
 	return ms;
 }
 
-/** Median nanoseconds per operation of `run`, which does `operations` operations each time. */
-export function nanosecondsPer(
+/**
+ * Nanoseconds an operation of `run`, which does `operations` operations each time, in each of
+ * `samples` batches of at least `sampleMs`, taken after `warmupMs` of the same batches: every
+ * sample, in the order taken.
+ */
+export function nanosecondSamples(
 	run,
 	operations = 1,
-	{ rounds = 31, roundMs = 20, warmupMs = 1000 } = {},
+	{ samples = 31, sampleMs = 20, warmupMs = 1000 } = {},
 ) {
 	let repeat = 1;
-	while (runFor(run, repeat) < roundMs) repeat *= 2;
+	while (runFor(run, repeat) < sampleMs) repeat *= 2;
 	const warmupEnd = performance.now() + warmupMs;
 	while (performance.now() < warmupEnd) runFor(run, repeat);
-	const samples = [];
-	for (let round = 0; round < rounds; round++)
-		samples.push((runFor(run, repeat) * 1e6) / (repeat * operations));
-	samples.sort((a, b) => a - b);
-	return samples[Math.floor(samples.length / 2)];
+	return Array.from(
+		{ length: samples },
+		() => (runFor(run, repeat) * 1e6) / (repeat * operations),
+	);
 }
+
+/** The median of `nanosecondSamples`, for a bench that reports one figure. */
+export const nanosecondsPer = (run, operations, options) =>
+	median(nanosecondSamples(run, operations, options));
 
 export function formatNs(ns) {
 	return ns < 10

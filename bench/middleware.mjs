@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { compile as compileParaglide } from "@inlang/paraglide-js";
 import { createTestHarness } from "wrangler";
 import { cacheDir } from "./apps.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiEntry } from "./grai.mjs";
 import { formatNs } from "./measure.mjs";
 import { writeProject } from "./paraglide.mjs";
 
@@ -17,7 +17,7 @@ const catalogs = new URL("../examples/workers/messages/", import.meta.url)
 	.pathname;
 const locales = ["en", "ro", "ar"];
 const baseLocale = "en";
-const { compile } = await import(join(graiSource, "index.ts"));
+const { compile } = await import(graiEntry("."));
 
 /** An empty .cache/middleware/<name>. */
 function projectDirectory(name) {

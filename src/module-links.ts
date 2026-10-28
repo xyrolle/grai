@@ -233,7 +233,7 @@ function namedIn(own: readonly Resolved[]): ReadonlySet<string> {
  * `takes` from the re-export module: undefined when it passes none. An `export *` passes on those
  * `passes` says its source holds for it.
  */
-function takenThrough(
+export function takenThrough(
 	link: ModuleLink,
 	takes: ReadonlySet<string> | "*",
 	passes: (name: string) => boolean,
@@ -252,7 +252,8 @@ function takenThrough(
 	return names.includes("*") ? "*" : new Set(names);
 }
 
-function union(
+/** Every name any of these takes: `*` when one takes every name. */
+export function union(
 	all: readonly (ReadonlySet<string> | "*")[],
 ): ReadonlySet<string> | "*" {
 	const names = new Set<string>();

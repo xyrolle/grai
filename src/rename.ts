@@ -55,7 +55,9 @@ export async function rename(
 	if (named.length > 0) return unchanged(named);
 	const compiled = await compileOutputIfMissing(configFile, config);
 	if (compiled.length > 0) return unchanged([...compiled]);
-	const code = await readProjectCode(config, roots ?? [config.root], from);
+	const code = await readProjectCode(config, roots ?? [config.root], {
+		key: from,
+	});
 	if (code instanceof GraiError) return unchanged([code]);
 	const reading = await readingOf(code, from);
 	const unknown = readErrors(reading);

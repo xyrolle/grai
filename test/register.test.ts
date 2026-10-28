@@ -2,20 +2,28 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { saveGroups } from "../src/saved-groups.ts";
 import { project } from "./project.ts";
 
 const register = new URL("../src/register.ts", import.meta.url).href;
 
 /**
  * A compiled project whose package.json maps each key's path to keys.js, as an app does, with
- * `files` beside it by path.
+ * `files` beside it by path, and its keys in the `groups` saved for its output.
  */
-async function app(files: Record<string, string>) {
+async function app(
+	files: Record<string, string>,
+	groups: readonly (readonly string[])[] = [],
+) {
 	const { dir, compile } = project({
 		en: { title: "Title", greeting: "Hello {name}" },
 		de: { title: "Titel", greeting: "Hallo {name}" },
 	});
 	expect((await compile()).errors).toEqual([]);
+	if (groups.length > 0) {
+		await saveGroups(join(dir, "out"), groups);
+		expect((await compile()).errors).toEqual([]);
+	}
 	writeFileSync(
 		join(dir, "package.json"),
 		JSON.stringify({
@@ -75,6 +83,28 @@ console.log(JSON.stringify([Object.keys(title), Object.keys(greeting), Object.ke
 		expect(
 			JSON.parse(node(dir, ["main.js"], { hooked: false }).stdout)[0],
 		).toEqual(["greeting", "title"]);
+	});
+
+	it("gives a grouped key's path a module of that key alone, as a shard's", async () => {
+		const dir = await app(
+			{
+				"main.js": `import * as title from "#i18n/messages/title.js";
+import * as keys from "./out/keys.js";
+console.log(JSON.stringify([Object.keys(title), Object.keys(keys), title.title({}, { locale: "de" }), title.title === keys.title]));
+`,
+			},
+			[["title"]],
+		);
+
+		const hooked = node(dir, ["main.js"]);
+
+		expect(hooked.status, hooked.output).toBe(0);
+		expect(JSON.parse(hooked.stdout)).toEqual([
+			["title"],
+			["greeting", "title"],
+			"Titel",
+			true,
+		]);
 	});
 
 	it.runIf(mocksThroughHooks)(

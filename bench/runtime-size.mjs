@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { rolldown } from "rolldown";
 import { cacheDir, selectedApps } from "./apps.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
+import { graiEntry, writeGraiProject } from "./grai.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 
 const SURFACE = [
@@ -77,7 +77,7 @@ async function graiRuntime(strategy) {
 		{ ...app, compilerOptions: { ...app.compilerOptions, strategy } },
 		`runtime-size-${strategy[0]}`,
 	);
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	const { errors } = await compile(config);
 	if (errors.length > 0) throw new Error(errors[0].message);
 	return join(config, "..", "out", "runtime.js");

@@ -25,8 +25,8 @@ import {
 import { describe, expect, it, onTestFinished } from "vitest";
 import { recompile } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
-import { requestBytes } from "../src/key-sets.ts";
 import { localeCopies } from "../src/locale-copies.ts";
+import { requestBytes } from "../src/page-chunks.ts";
 import { isDevKeys } from "../src/page-keys.ts";
 import { grai, graiModules } from "../src/vite.ts";
 import { fixtures, type Messages, outputFile, project } from "./project.ts";
@@ -685,9 +685,10 @@ describe("@xyrolle/grai/vite's module kinds", () => {
 			),
 		);
 
+		// The anchor, internal.js, only re-exports the runtime, so the build leaves it out, as the
+		// outdir's package.json says no module of it but server.js has effects of its own.
 		expect(placed).toEqual({
 			"page.js": [undefined, "page"],
-			"out/internal.js": ["runtime", "grai-runtime"],
 			"out/runtime.js": ["runtime", "grai-runtime"],
 			"out/config.js": ["config", "grai-runtime"],
 			"out/plurals.js": ["plurals", "grai-runtime"],

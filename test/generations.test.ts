@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it, onTestFinished, vi } from "vitest";
+import { saveGroups } from "../src/saved-groups.ts";
 import { type Messages, project } from "./project.ts";
 import { loadedCopy, outputReader } from "./reader.ts";
 
@@ -134,6 +135,30 @@ it("loads one runtime for the middleware and the messages, though the config cha
 
 it("refuses keys compiled for other locales than the runtime it loaded, as when the locales changed while it loaded", async () => {
 	const { dir, config, compile } = project(catalogs, cookieServer);
+	await compile();
+
+	const rendered = renderedAcross(dir, async () => {
+		writeFileSync(
+			join(dir, "messages", "fr.json"),
+			JSON.stringify({ title: "Titre", greeting: "Salut {name}" }),
+		);
+		writeFileSync(
+			config,
+			JSON.stringify({
+				...JSON.parse(readFileSync(config, "utf8")),
+				locales: ["en", "de", "fr"],
+			}),
+		);
+		expect((await compile()).errors).toEqual([]);
+	});
+
+	await expect(rendered).rejects.toMatchObject({ code: "output-changed" });
+});
+
+it("refuses a group's keys compiled for other locales than the runtime it loaded, as a shard's", async () => {
+	const { dir, config, compile } = project(catalogs, cookieServer);
+	await compile();
+	await saveGroups(join(dir, "out"), [["title"]]);
 	await compile();
 
 	const rendered = renderedAcross(dir, async () => {

@@ -4,7 +4,6 @@ import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { keyExports } from "./key-exports.ts";
 import { type KeyLinks, keyReach, type ModuleGraph } from "./key-reach.ts";
-import { pageChunks } from "./key-sets.ts";
 import {
 	besideDirectory,
 	inDirectory,
@@ -19,6 +18,7 @@ import { localeCopies } from "./locale-copies.ts";
 import { localeDirectory, messageDirectory } from "./message-directories.ts";
 import { runtimeKindIn } from "./module-kinds.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
+import { pageChunks } from "./page-chunks.ts";
 
 /** keys.js in a build: each key from its own module, so a chunk holds only the keys its code uses. */
 export function keysModule(build: Build): string {
@@ -49,9 +49,9 @@ export function keyModule(
 }
 
 /**
- * A text key's string module. In a client build, its text in the page's locale, chosen once; its
- * variants are the key's, so each locale's copy of its chunk keeps only that locale's words. On a
- * server, an object whose `text` calls the key, in the request's locale, each time it is read.
+ * A text key's string module, its variants the key's. In a client build, its text in the page's
+ * locale, chosen once, so each locale's copy of its chunk keeps only that locale's words. On a
+ * server, an object whose `text` is the key's text in the request's locale, read each time.
  */
 export function textModule(
 	build: Build,
@@ -61,12 +61,9 @@ export function textModule(
 	const name = id.slice(textModulePrefix.length);
 	const key = build.compilation.keys.get(name);
 	if (key?.kind !== "text") return undefined;
-	if (consumer === "server") {
-		const message = `grai_${name}`;
-		return `import { ${name} as ${message} } from "${keyPrefix}${name}";\nexport const ${name} = { get text() { return ${message}(); } };\n`;
-	}
-	const names = calledNames([key], ["pageText"]);
-	const value = `/*#__PURE__*/ pageText(${key.variants.join(", ")})`;
+	const read = consumer === "server" ? "requestText" : "pageText";
+	const names = calledNames([key], [read]);
+	const value = `/*#__PURE__*/ ${read}(${key.variants.join(", ")})`;
 	return `${outputImports(names, outputModule, build.rendered.modules)}\n${keyExports([{ name, value }], everyName(names))}`;
 }
 

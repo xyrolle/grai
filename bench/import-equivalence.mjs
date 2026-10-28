@@ -13,11 +13,10 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import i18next from "i18next";
 import { IntlMessageFormat } from "intl-messageformat";
-import { graiSource } from "./grai.mjs";
+import { graiCli, graiModule } from "./grai.mjs";
 
-const { importCatalogs } = await import(join(graiSource, "import.ts"));
+const { importCatalogs } = await import(graiModule("import.ts"));
 
-const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const locales = ["en", "ru", "ar"];
 const counts = [0, 1, 2, 3, 5, 11, 12, 21, 22, 25, 100, 101, 1000, 1.5];
 const genders = ["male", "female", "other"];
@@ -49,7 +48,7 @@ for (const format of ["i18next", "icu"]) {
 				.filter(({ detail }) => detail.startsWith("i18next escapes"))
 				.map(({ key }) => key),
 		);
-		execFileSync(process.execPath, [cli, "compile"], { cwd: dir });
+		execFileSync(process.execPath, [graiCli, "compile"], { cwd: dir });
 		const { m } = await import(
 			pathToFileURL(join(dir, "out", "messages.js")).href
 		);

@@ -51,7 +51,7 @@ export async function fullReadingIn(
 	key?: string,
 ): Promise<{ read: string[]; reads: string[]; reaches: string[] }> {
 	const config = readConfig(join(dir, "grai.config.json"));
-	const code = await readProjectCode(config, [join(dir, "src")], key);
+	const code = await readProjectCode(config, [join(dir, "src")], { key });
 	if (code instanceof GraiError) throw code;
 	const { reads, reaches } = await readingOf(code);
 	return {

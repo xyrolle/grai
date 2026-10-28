@@ -36,18 +36,24 @@ function commit() {
 	}).trim();
 }
 
-/** A fraction to a tenth, past which a time, a size or a load is the clock's noise. */
-const tenths = (_, value) =>
-	typeof value === "number" && !Number.isInteger(value)
-		? Math.round(value * 10) / 10
-		: value;
+/**
+ * A fraction to a tenth, past which a time, a size or a load is the clock's noise; under ten, to
+ * three significant digits, so that a ratio such as 1.07 keeps what tells it from 1.
+ */
+const rounded = (_, value) =>
+	typeof value !== "number" || Number.isInteger(value)
+		? value
+		: Math.abs(value) < 10
+			? Number(value.toPrecision(3))
+			: Math.round(value * 10) / 10;
 
 /** The one-minute load when a bench starts, which `recordResults` writes beside the end's. */
 const loadAtStart = loadavg()[0];
 
 /**
  * Writes a bench's results, `results/<name>.json`: `rows` as the bench measured them, and what
- * they were measured on. `extra` adds what only that bench knows, such as Chromium's version.
+ * they were measured on. `extra` adds what only that bench knows, such as Chromium's version, or
+ * its rounds, each with the load it started at and its order (rounds.mjs).
  */
 export function recordResults(name, rows, extra = {}) {
 	mkdirSync(directory, { recursive: true });
@@ -72,6 +78,6 @@ export function recordResults(name, rows, extra = {}) {
 	};
 	writeFileSync(
 		join(directory, `${name}.json`),
-		`${JSON.stringify(recorded, tenths, "\t")}\n`,
+		`${JSON.stringify(recorded, rounded, "\t")}\n`,
 	);
 }

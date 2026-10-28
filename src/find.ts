@@ -57,7 +57,7 @@ export async function find(
 	const { config } = read;
 	const compiled = await compileOutputIfMissing(configFile, config);
 	if (compiled.length > 0) return { ...found, errors: [...compiled] };
-	const code = await readProjectCode(config, roots ?? [config.root], key);
+	const code = await readProjectCode(config, roots ?? [config.root], { key });
 	if (code instanceof GraiError) return { ...found, errors: [code] };
 	const reading = await readingOf(code, key);
 	found.errors.push(...readErrors(reading));
