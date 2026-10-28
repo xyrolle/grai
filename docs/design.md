@@ -138,9 +138,9 @@ A static site, an Electron app or a browser extension has no server to pick the 
 ### A dev page loads its own locale's words
 
 A dev server serves keys.js from memory, and a page in one locale loads its own words alone, as a built page loads its locale's copies:
-- **A page's keys.js is the dev module by an id per locale, `\0grai:keys/<locale>`,** whose table holds that locale's variants alone. A server's runner takes `\0grai:keys`, every locale's, as it renders any locale.
+- **A page's keys.js is the dev module by an id per locale, `\0grai:keys/<locale>`,** whose table holds that locale's variants alone.
 - **The page's import map points keys.js's dev URL at its locale's, and a preload fetches it,** first in the page, ahead of every module it loads, where its locale is picked: the locale script on a page Vite serves (`@xyrolle/grai/vite`, `/svelte`, and a server render that keeps Vite's template, as the Vue example's), `handleLocale` for SvelteKit, the middleware for Astro, the plugin's head hook for Nuxt. The preload has the dev server make the module while the page loads the modules that import it: without it, the module was made only once the page asked for it, and the page was 20 ms slower.
-- **A page without the map still loads its own locale's words.** For a page, `\0grai:keys` takes the locale's module by `<html lang>`, as the runtime reads the locale, with a top-level `await import()`. It holds no words, so it costs little where Vite makes it ahead of a page, as it makes every module a page's modules import.
+- **keys.js itself, `\0grai:keys`, holds every locale's words, as it did,** for what no import map reaches: a server's runner, which renders any locale, a module worker, as a worker takes no import map, and a page no adapter writes a map into. Vite still makes it ahead of a page, as it makes every module a page's modules import, but the page does not load it.
 - **Every locale is compiled and checked before any page is served.** A message wrong in a locale no page loads still stops the start, as it did when every page loaded every locale.
 - **A key keeps one variant per locale, the others none,** so a call in another locale throws `locale-not-loaded` naming the key, as it did. An edit's patch holds every locale, and each page's table takes its own.
 

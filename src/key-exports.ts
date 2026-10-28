@@ -24,34 +24,6 @@ export function keyExports(
 		.join("");
 }
 
-/**
- * The keys' exports, each destructured from `object` under its own name, unless the module's code
- * takes that name: such a key is destructured under a name of its own, `$` and the key, and
- * exported under the key.
- */
-export function destructuredExports(
-	object: string,
-	keys: readonly string[],
-	taken: ReadonlySet<string>,
-): string {
-	const own = keys.filter((key) => !taken.has(key));
-	const exports = [`export const { ${own.join(", ")} } = ${object};\n`];
-	const bound = new Set([...taken, ...keys]);
-	const renamed = keys
-		.filter((key) => taken.has(key))
-		.map((key) => {
-			const name = freshName(`$${key}`, bound);
-			bound.add(name);
-			return { key, name };
-		});
-	if (renamed.length > 0)
-		exports.push(
-			`const { ${renamed.map(({ key, name }) => `${key}: ${name}`).join(", ")} } = ${object};\n`,
-			`export { ${renamed.map(({ key, name }) => `${name} as ${key}`).join(", ")} };\n`,
-		);
-	return exports.join("");
-}
-
 /** `name`, or `$` before it, again while that is bound too: the first of them `bound` lacks. */
 export function freshName(name: string, bound: ReadonlySet<string>): string {
 	let fresh = name;
