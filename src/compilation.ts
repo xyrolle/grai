@@ -6,6 +6,7 @@ import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { caseCollisions, isCompilable, keyProblems } from "./key-checks.ts";
 import { declarationOf, type KeyDeclaration } from "./key-declarations.ts";
 import { parseMessages } from "./key-messages.ts";
+import { type LocaleMessage, markupNames } from "./message.ts";
 import {
 	type KeyModule,
 	keyModule,
@@ -35,6 +36,13 @@ export type CompiledKey = Pick<
 	/** The globals the key's code calls, such as `String`. */
 	globals: KeyModule["globals"];
 	markup: boolean;
+	/**
+	 * What a call of the key passes and gets, as its code takes them, without its words: its kind
+	 * (text, message or markup), the inputs its messages read and the names of their markup. A
+	 * module of keys is named by its keys' (`renderShard`), so a reader that loaded another module
+	 * before an edit that changes one never calls a key by its old inputs beside another by its new.
+	 */
+	signature: string;
 };
 
 /** Every key compiled, or the errors that stop the output from being written. */
@@ -167,7 +175,7 @@ function compileKey(
 	// compile that leaves the declarations to the output's write, which parses every key, need not
 	// parse it, which a dev server's first page waits for.
 	if (!declare && values.every(isPlainMessage))
-		return compiledKey(key, values, textModule(values), false);
+		return compiledKey(key, values, textModule(values), plainTexts);
 	const messages = parseMessages(key, catalogs, sources, values, errors);
 	if (messages === undefined) return undefined;
 	const declared = declare
@@ -177,14 +185,11 @@ function compileKey(
 		errors.push(declared);
 		return undefined;
 	}
-	return compiledKey(
-		key,
-		values,
-		keyModule(key, messages),
-		messages.some((message) => message.markup),
-		declared,
-	);
+	return compiledKey(key, values, keyModule(key, messages), messages, declared);
 }
+
+/** A plain text's messages, as its signature takes them: it reads no input and has no markup. */
+const plainTexts: readonly LocaleMessage[] = [];
 
 /** Whether a catalog's raw message is a pattern that is its text alone (`isPlainText`). */
 function isPlainMessage(value: unknown): value is string {
@@ -195,7 +200,7 @@ function compiledKey(
 	key: string,
 	values: readonly unknown[],
 	module: KeyModule,
-	markup: boolean,
+	messages: readonly LocaleMessage[],
 	declared?: KeyDeclaration,
 ): CompiledKey {
 	const compiled: CompiledKey = {
@@ -211,10 +216,27 @@ function compiledKey(
 		kind: module.kind,
 		variants: module.variants,
 		parts: module.parts,
-		markup,
+		markup: messages.some((message) => message.markup),
+		signature: keySignature(module.kind, messages),
 	};
 	if (declared !== undefined) compiled.declared = declared;
 	return compiled;
+}
+
+/**
+ * A key's signature (`CompiledKey.signature`), such as `markup(count name) <link>`. A text, which
+ * most keys are, reads no input and has no markup, so its kind is all of it.
+ */
+function keySignature(
+	kind: KeyModule["kind"],
+	messages: readonly LocaleMessage[],
+): string {
+	if (kind === "text") return kind;
+	const inputs = new Set<string>();
+	for (const message of messages)
+		for (const input of message.inputs) inputs.add(input);
+	const tags = markupNames(messages).map((name) => ` <${name}>`);
+	return `${kind}(${[...inputs].sort().join(" ")})${tags.join("")}`;
 }
 
 /**

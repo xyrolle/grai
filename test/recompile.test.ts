@@ -67,6 +67,24 @@ describe("a recompile after an edit", () => {
 		expect([...(second.build?.compilation.changed ?? [])]).toEqual(["title"]);
 	});
 
+	it("replaces a module of keys in place when an edit changes the base locale's words, which its declarations show", async () => {
+		const { dir, config } = project(catalogs);
+		const first = await recompile(config, undefined);
+		writeFileSync(
+			join(dir, "messages", "en.json"),
+			laidOut({ ...catalogs.en, greeting: "Hi {name}" }),
+		);
+		const second = await recompile(config, first.build);
+
+		const shard = first.result.written.filter((file) =>
+			/^keys\/0-.*\.(js|d\.ts)$/.test(file),
+		);
+		expect(second.result.written).toEqual(shard);
+		expect(readFileSync(join(dir, "out", shard[1] ?? ""), "utf8")).toContain(
+			"/** Hi {name} */",
+		);
+	});
+
 	it("renames a module of keys, and the entries naming it, when an edit adds a key to it", async () => {
 		const { dir, config } = project(catalogs);
 		const first = await recompile(config, undefined);

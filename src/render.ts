@@ -191,15 +191,16 @@ function importsRenamed(
 }
 
 /**
- * A place's module and declarations, named by their shape: the keys they declare, and the head of
- * each, which names what they import and the locales they were compiled for. An edit that changes
- * only messages keeps the name, so the compile replaces the two files in place, each renamed over
- * the old one at once, and the entries that name them stay as they are: a bundler watching the
- * outdir then compiles that module again and nothing else. A change of shape renames them, and
- * keys.js with them, so a reader loads one compile's layout. They share the name so that
- * TypeScript reads the declarations rather than the module, as it does any `.js` beside its
- * `.d.ts`, and leaves the module out of a project that type-checks JavaScript; the declarations
- * name their map by the place's label.
+ * A place's module and declarations, named by their shape: the keys they declare, each with its
+ * signature (the inputs and markup a call passes and gets), and the head of each file, which names
+ * what they import and the locales they were compiled for. An edit that changes only the words of
+ * messages keeps the name, so the compile replaces the two files in place, each renamed over the
+ * old one at once, and the entries that name them stay as they are: a bundler watching the outdir
+ * then compiles that module again and nothing else. A change of shape renames them, and keys.js
+ * with them, so a reader loads one compile's layout, and calls each key as that layout's keys.js
+ * has it. They share the name so that TypeScript reads the declarations rather than the module, as
+ * it does any `.js` beside its `.d.ts`, and leaves the module out of a project that type-checks
+ * JavaScript; the declarations name their map by the place's label.
  */
 function renderShard(
 	label: string,
@@ -220,7 +221,9 @@ function renderShard(
 		label,
 		module.head,
 		types.head,
-		[...compiled.keys()].join("\n"),
+		[...compiled]
+			.map(([key, { signature }]) => `${key} ${signature}`)
+			.join("\n"),
 	);
 	const text = `${module.head}${module.body}`;
 	return {
