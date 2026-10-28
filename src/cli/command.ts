@@ -6,12 +6,6 @@ import type { CompileResult } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import type { GraiError } from "../error.ts";
 
-/** A command: its lines of the usage, and what it does with its arguments, returning the exit code. */
-export type Command = {
-	usage: string;
-	run: (args: string[]) => Promise<number>;
-};
-
 /** A command line the command cannot take; the CLI prints it with the usage and exits with 2. */
 export class UsageError extends Error {}
 
