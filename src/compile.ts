@@ -42,8 +42,8 @@ export type CompiledProject = ParsedCatalogs & {
 	rendered: RenderedModules;
 	/**
 	 * What a saved build must match to be taken up again: `buildKey` of the config as read, made
-	 * when it is first asked for, as the build is saved. The compiler's identity it holds reads the
-	 * compiler's modules, which a dev server's first page need not wait for.
+	 * when it is first asked for, as the build is saved, with the compiler's identity taken as the
+	 * project was compiled (`compileProject`).
 	 */
 	key: () => string;
 };
@@ -183,7 +183,11 @@ export async function compileProject(
 	previous: CompiledProject | undefined,
 	options: CompileOptions & { declare?: boolean } = {},
 ): Promise<CompiledProject | { errors: GraiError[] }> {
-	const read = await readProject(configFile);
+	const reading = readProject(configFile);
+	// The compiler's identity, taken while the catalogs are read and before anything is compiled: a
+	// build saved later is this process's compiler's, whatever changes on disk meanwhile.
+	hashOfCompiler();
+	const read = await reading;
 	if ("errors" in read) return read;
 	const before =
 		previous !== undefined && sameConfig(previous.config, read.config)
