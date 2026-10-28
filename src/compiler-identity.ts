@@ -10,17 +10,43 @@ const self = fileURLToPath(import.meta.url);
 const root = dirname(self);
 
 /**
- * The compiler's identity: a hash of its modules (`compilerModules`), each by its path in grai's
- * directory and with its bytes as they are on disk, and of `copied`, the texts the output copies,
- * which are the runtime's modules and the templates of its declarations. A new version of grai
- * changes it, and so does a local change to any of them, which keeps the version. Where an import
- * is one the modules' finding cannot follow, it is the hash of every module of grai's, as no list
- * of them is then sure.
+ * The compiler a compile runs: its identity, and the modules it is the hash of, each by its path in
+ * grai's directory. Without them, the identity is the hash of every module of grai's.
  */
-export async function compilerIdentity(
+export type Compiler = { identity: string; modules?: readonly string[] };
+
+/**
+ * The compiler a compile runs. Its identity is a hash of its modules, each by its path and with its
+ * bytes as they are on disk, and of `copied`, the texts the output copies, which are the runtime's
+ * modules and the templates of its declarations. A new version of grai changes it, and so does a
+ * local change to any of them, which keeps the version.
+ *
+ * `known`, the compiler an outdir's manifest records, is taken as it is when its modules hold this
+ * one and still hash to its identity: finding the modules reads nothing but their bytes, so it
+ * would find the same again. Otherwise they are found by parsing them (`compilerModules`), which
+ * costs a start about 20 ms, against about 1 ms to hash them. Where an import is one they cannot
+ * follow, the identity is of every module of grai's, as no list of them is then sure.
+ */
+export async function compilerOf(
 	copied: readonly string[],
-): Promise<string> {
-	return identityOf((await compilerModules()) ?? everyModule(), copied);
+	known?: Compiler,
+): Promise<Compiler> {
+	const remembered =
+		known?.modules?.includes(relative(root, self)) === true
+			? bytesOf(known.modules)
+			: undefined;
+	if (
+		remembered !== undefined &&
+		identityOf(remembered, copied) === known?.identity
+	)
+		return known;
+	const modules = await compilerModules();
+	if (modules === undefined)
+		return { identity: identityOf(everyModule(), copied) };
+	return {
+		identity: identityOf(modules, copied),
+		modules: [...modules.keys()],
+	};
 }
 
 /** The hash of modules by their paths and bytes, in the order of their paths, and of `copied`. */
@@ -34,6 +60,20 @@ function identityOf(
 		digest.update(file).update("\0").update(bytes).update("\0");
 	for (const text of copied) digest.update(text).update("\0");
 	return digest.digest("hex");
+}
+
+/** The bytes of grai's modules at these paths, or undefined if one is not a file of grai's. */
+function bytesOf(paths: readonly string[]): Map<string, Buffer> | undefined {
+	const modules = new Map<string, Buffer>();
+	for (const path of paths) {
+		if (isAbsolute(path) || path.split(sep).includes("..")) return undefined;
+		try {
+			modules.set(path, readFileSync(join(root, path)));
+		} catch {
+			return undefined;
+		}
+	}
+	return modules;
 }
 
 /**
@@ -57,9 +97,7 @@ function everyModule(): Map<string, Buffer> {
  * a module of Node's or of another package. Undefined when a module does not parse, imports a path
  * no literal gives, or imports one that is none of the files of grai's directory.
  */
-export async function compilerModules(): Promise<
-	Map<string, Buffer> | undefined
-> {
+async function compilerModules(): Promise<Map<string, Buffer> | undefined> {
 	const { parse } = await import("./code/parse.ts");
 	const modules = new Map<string, Buffer>();
 	const unread = [join(root, `saved-build${extname(self)}`)];
