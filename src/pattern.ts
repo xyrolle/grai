@@ -39,11 +39,19 @@ const literalCall =
 const escapable = new Set(["{", "}", "\\"]);
 
 /**
+ * Whether a pattern is its text alone: it has no placeholder or markup, which a `{` opens, and no
+ * escape, which a `\` starts, so its text is the pattern as written.
+ */
+export function isPlainText(source: string): boolean {
+	return !source.includes("{") && !source.includes("\\");
+}
+
+/**
  * Parses the inlang message format's pattern syntax. `\{`, `\}` and `\\` are escapes, a `{` that
  * is never closed is text, and anything in braces that is not a placeholder or markup is an error.
  */
 export function parsePattern(source: string): Part[] {
-	if (!source.includes("{") && !source.includes("\\")) {
+	if (isPlainText(source)) {
 		return source === "" ? [] : [{ type: "text", value: source }];
 	}
 	const parts: Part[] = [];
