@@ -254,6 +254,8 @@ export function serveMessages(
 			shown(messagesOf(result.errors));
 		},
 		failed,
+		// What a page is served early is no output known to be written: the index's output may have
+		// lost a file since, which its take-up writes and Vite is told of then.
 		servesFirst ? { serve: (next) => serve(next, false) } : {},
 	);
 	/** Writes the first compile's output now, if it is not written yet, and tells Vite of its files. */

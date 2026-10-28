@@ -1,8 +1,10 @@
 import { spawnSync } from "node:child_process";
 import {
+	chmodSync,
 	existsSync,
 	readFileSync,
 	renameSync,
+	rmSync,
 	statSync,
 	writeFileSync,
 } from "node:fs";
@@ -353,6 +355,20 @@ it("saves one whole build when two watchers of an outdir close at once, so no st
 	});
 });
 
+/** A watcher that serves before its first compile, as a dev server's does: what it serves, and its first report's build. */
+function serving(file: string) {
+	const served: Served[] = [];
+	const reported = Promise.withResolvers<Build | undefined>();
+	const watcher = watch(
+		file,
+		(_result, _milliseconds, build) => reported.resolve(build),
+		reported.reject,
+		{ serve: (each) => served.push(each) },
+	);
+	onTestFinished(() => watcher.close());
+	return { served, watcher, reported: reported.promise };
+}
+
 /** Each key's code in each locale, as a dev server serves it. */
 const codeOf = (served: Served | undefined) =>
 	[...(served?.compilation.keys ?? [])].map(([key, { kind, variants }]) => [
@@ -360,6 +376,37 @@ const codeOf = (served: Served | undefined) =>
 		kind,
 		variants,
 	]);
+
+it("serves a restart from the saved build's index, the build's own code, and takes the build up after", async () => {
+	const { config: file } = project(catalogs, config);
+	const before = await started(file);
+
+	const { served, watcher, reported } = serving(file);
+	await expect.poll(() => served.length).toBe(1);
+	// The index: the build's code, without its catalogs or its output's keys.
+	expect("sources" in (served[0] ?? {})).toBe(false);
+	expect(codeOf(served[0])).toEqual(codeOf(before.build));
+
+	expect(await watcher.write()).toBe(true);
+	const build = await reported;
+	expect(build?.compilation.changed.size).toBe(0);
+	expect(build?.compilation.keys).toStrictEqual(before.build?.compilation.keys);
+});
+
+it("serves no index of a saved build whose catalogs changed since, and compiles the change from the build", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
+	);
+
+	const { served, reported } = serving(file);
+	const build = await reported;
+
+	expect(served).toEqual([]);
+	expect([...(build?.compilation.changed ?? [])]).toEqual(["title"]);
+});
 
 it("reads a saved build's index alone, the build's own code, while the catalogs are as it was compiled from", async () => {
 	const { dir, config: file } = project(catalogs, config);
@@ -377,6 +424,58 @@ it("reads a saved build's index alone, the build's own code, while the catalogs 
 	);
 	expect(await savedIndex(file, { pseudoLocale: true })).toBeUndefined();
 	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
+});
+
+it("writes a file of the output gone since the last start, as it takes up the build after serving its index", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	rmSync(join(dir, "out", "messages.js"));
+
+	const { served, watcher } = serving(file);
+	await expect.poll(() => served.length).toBe(1);
+	expect(await watcher.write()).toBe(true);
+
+	expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+});
+
+/** The saved file's sections, where they are in its bytes: after the key's and the lengths' lines. */
+function sectionsOf(file: string): { index: number; build: number } {
+	const bytes = readFileSync(file);
+	const start = bytes.indexOf("\n", bytes.indexOf("\n") + 1) + 1;
+	const [indexLength = 0] = bytes
+		.subarray(bytes.indexOf("\n") + 1, start - 1)
+		.toString()
+		.split(" ")
+		.map(Number);
+	return { index: start, build: start + indexLength };
+}
+
+/** Changes one byte of a saved file at or after an offset, a text's first letter, keeping its length. */
+function corrupted(file: string, from: number, text: string): void {
+	const bytes = readFileSync(file);
+	const at = bytes.indexOf(text, from);
+	expect(at).toBeGreaterThan(-1);
+	bytes[at] = "X".charCodeAt(0);
+	writeFileSync(file, bytes);
+}
+
+it("takes up no section of a saved build whose bytes changed, at the same length, and compiles anew", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	const saved = savedFile(dir);
+
+	// The index's text of a message, and then the build's.
+	corrupted(saved, sectionsOf(saved).index, "Titel");
+	expect(await savedIndex(file, { pseudoLocale: true })).toBeUndefined();
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
+	corrupted(saved, sectionsOf(saved).build, "Titel");
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeUndefined();
+
+	const { served, reported } = serving(file);
+	const build = await reported;
+	expect(served.map(codeOf)).toEqual([codeOf(build)]);
+	expect(JSON.stringify(codeOf(build))).toContain("Titel");
+	expect(JSON.stringify(codeOf(build))).not.toContain("Xitel");
 });
 
 /**
@@ -416,3 +515,107 @@ it("reads the build of the save it read the index of, whatever another process s
 	expect(JSON.stringify(codeOf(build))).toContain("Titel");
 	expect(JSON.stringify(codeOf(build))).not.toContain("Überschrift");
 });
+
+/** A watcher that serves before its first compile, as a dev server's does: everything it tells. */
+function servingAll(file: string) {
+	const served: Served[] = [];
+	const reported: { result: CompileResult; build: Build | undefined }[] = [];
+	const failures: unknown[] = [];
+	const firstServed = Promise.withResolvers<void>();
+	const watcher = watch(
+		file,
+		(result, _milliseconds, build) => reported.push({ result, build }),
+		(error) => failures.push(error),
+		{
+			serve: (each) => {
+				served.push(each);
+				firstServed.resolve();
+			},
+		},
+	);
+	onTestFinished(() => watcher.close());
+	return {
+		served,
+		reported,
+		failures,
+		watcher,
+		firstServed: firstServed.promise,
+	};
+}
+
+it("takes up the build of the save it served the index of, and compiles from it an edit another process saved a build of since", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	const other = await anotherSave(dir, file, "Überschrift");
+	const { firstServed, reported } = servingAll(file);
+	await firstServed;
+
+	// In one turn, before the watcher hears of the edit: the other save, then the edit it was of.
+	replaceSave(dir, other);
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
+	);
+
+	await expect.poll(() => reported.length).toBeGreaterThan(0);
+	expect([...(reported[0]?.build?.compilation.changed ?? [])]).toEqual([
+		"title",
+	]);
+});
+
+it("holds a write after an index, while a catalog is in the middle of a save, until the files have settled and the take-up wrote or reported", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	rmSync(join(dir, "out", "messages.js"));
+	const { firstServed, reported, watcher } = servingAll(file);
+	await firstServed;
+	const catalog = join(dir, "messages", "de.json");
+
+	writeFileSync(catalog, "");
+	await watcher.write();
+
+	// The settled read of the catalog, still cut short, is reported: no write ended before it.
+	expect(
+		reported.flatMap(({ result }) => result.errors.map(({ code }) => code)),
+	).toEqual(["catalog-invalid"]);
+	writeFileSync(catalog, JSON.stringify(catalogs.de));
+	await expect
+		.poll(() => existsSync(join(dir, "out", "messages.js")))
+		.toBe(true);
+});
+
+it("writes a file of the output gone since, as it closes right after serving the index", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	rmSync(join(dir, "out", "messages.js"));
+	const { firstServed, reported, watcher } = servingAll(file);
+	await firstServed;
+
+	await watcher.close();
+
+	expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
+	expect(reported.map(({ result }) => result.errors)).toEqual([[]]);
+});
+
+// No mode on Windows takes away a directory's writes.
+it.skipIf(process.platform === "win32")(
+	"reports a take-up that cannot write the output, as it closes right after serving the index",
+	async () => {
+		const { dir, config: file } = project(catalogs, config);
+		await started(file);
+		rmSync(join(dir, "out", "messages.js"));
+		const { firstServed, reported, failures, watcher } = servingAll(file);
+		await firstServed;
+		const out = join(dir, "out");
+		chmodSync(out, 0o555);
+		onTestFinished(() => chmodSync(out, 0o755));
+
+		await watcher.close();
+
+		const told = [
+			...failures,
+			...reported.flatMap(({ result }) => result.errors),
+		];
+		expect(told).not.toEqual([]);
+	},
+);
