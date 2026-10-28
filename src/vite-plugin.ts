@@ -2,7 +2,7 @@ import { basename, join, relative, resolve } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import type { BuildReading } from "./code/build-reading.ts";
-import { type Build, type CompiledProject, recompile } from "./compile.ts";
+import { type Build, recompile } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { devModule, pageKeysShell } from "./dev-module.ts";
 import { GraiError, messagesOf } from "./error.ts";
@@ -21,6 +21,7 @@ import {
 	pageKeysLocale,
 } from "./page-keys.ts";
 import { realPath } from "./real-path.ts";
+import type { Served } from "./served.ts";
 import type { Bundling } from "./vite-bundling.ts";
 import {
 	devKeysId,
@@ -108,9 +109,9 @@ export function graiPlugin(
 	let first: Promise<Build | readonly Error[]> | undefined;
 	let build: Build | undefined;
 	/** The dev server's first compile: its build, or the errors that kept it from one. */
-	let firstServed: Promise<CompiledProject | readonly Error[]> | undefined;
+	let firstServed: Promise<Served | readonly Error[]> | undefined;
 	/** The build the dev server serves, its last compile's. */
-	let served: CompiledProject | undefined;
+	let served: Served | undefined;
 	let devModuleOf: (id: string) => string | undefined = () => undefined;
 	let missingKeyImport = (
 		_key: string,
@@ -129,7 +130,7 @@ export function graiPlugin(
 	 * the module of the page's locale, or in a worker of every locale (`pageKeysShell`). A test
 	 * holds every locale through any of them, as `useLocale` switches between them.
 	 */
-	const devCode = (id: string, compiled: CompiledProject, client: boolean) => {
+	const devCode = (id: string, compiled: Served, client: boolean) => {
 		if (id === devKeysId || id === files.keysFile)
 			return client && !testing
 				? pageKeysShell(compiled)
@@ -153,7 +154,7 @@ export function graiPlugin(
 	 * may serve before the output is written: a page then never takes a file of another compile
 	 * that the outdir still holds.
 	 */
-	const outputCode = (id: string, compiled: CompiledProject) =>
+	const outputCode = (id: string, compiled: Served) =>
 		compiled.rendered.files.get(relative(files.outdir, id));
 
 	const plugin: Plugin = {
@@ -233,8 +234,7 @@ export function graiPlugin(
 			},
 		},
 		configureServer(server) {
-			let ready: (compiled: CompiledProject | readonly Error[]) => void =
-				() => {};
+			let ready: (compiled: Served | readonly Error[]) => void = () => {};
 			firstServed = new Promise((resolve) => {
 				ready = resolve;
 			});

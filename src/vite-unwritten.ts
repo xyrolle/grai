@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { Plugin } from "vite";
-import type { CompiledProject } from "./compile.ts";
+import type { Served } from "./served.ts";
 import { devKeysId, type ProjectFiles } from "./vite-dev.ts";
 
 /**
@@ -11,7 +11,7 @@ import { devKeysId, type ProjectFiles } from "./vite-dev.ts";
  */
 export type UnwrittenOutput = {
 	files: () => ProjectFiles;
-	served: () => CompiledProject | undefined;
+	served: () => Served | undefined;
 	write: () => Promise<boolean>;
 };
 
