@@ -1351,6 +1351,37 @@ export const render = () => modules["./out/messages.js"].m.title();
 		expect(await rendered()).toBe("Title");
 	});
 
+	it("writes the output an edit made while no server ran changes, before an import with a query reads one of its files", async () => {
+		const { dir } = project(catalogs);
+		writeTitleRender(dir);
+		const first = await devServerOf(dir);
+		expect(await first.rendered()).toBe("Title");
+		await first.server.close();
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import source from "./out/keys.js?raw";\nexport const render = () => source;\n`,
+		);
+		// The same project compiled afresh elsewhere: the keys.js it writes.
+		const fresh = project({
+			en: { ...catalogs.en, title: "Heading" },
+			de: catalogs.de,
+		}).dir;
+		await recompile(join(fresh, "grai.config.json"), undefined, {
+			pseudoLocale: true,
+		});
+
+		const { rendered } = await appServerOf(dir);
+
+		expect(await rendered()).toBe(
+			readFileSync(join(fresh, "out", "keys.js"), "utf8"),
+		);
+	});
+
 	it("leaves the output out of the dependency scan before it is written, which finds the page's dependencies", async () => {
 		const { dir } = project(catalogs);
 		const release = heldOutput(dir);

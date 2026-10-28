@@ -329,54 +329,64 @@ export function graiPlugin(
 				return serving ? devKeysId : resolved;
 			},
 		},
-		async load(id) {
-			if (serving) {
-				const patch = devModuleOf(id);
-				if (patch !== undefined) return patch;
-				const devModuleId =
-					isDevKeys(id) || id === files.keysFile || isMessageModule(id);
-				const output = !devModuleId && id.startsWith(`${files.outdir}/`);
-				if (!devModuleId && !output) return null;
-				const compiled = await servedBuild();
-				if (compiled === undefined) return null;
-				// Until a compile succeeds, the output's files are the outdir's, as no build was served.
-				if (!("compilation" in compiled))
-					return output ? null : this.error(messagesOf(compiled));
-				const client = this.environment.config.consumer === "client";
-				// No source map for a page: a file of the output has no source of its own to map back to, and
-				// Vite would inline a map of it into the page at several times its size. A server keeps the
-				// map Vite makes, from which its module runner names the file and line of each frame of a
-				// stack trace.
-				if (output) {
-					const code = outputCode(id, compiled);
-					if (code === undefined) return null;
-					return client ? { code, map: { mappings: "" } } : code;
+		load: {
+			// Ahead of Vite's own loaders, as of `?raw`, which read a file of the output from the disk:
+			// that file is read once the output is written.
+			order: "pre",
+			async handler(id) {
+				if (serving) {
+					const patch = devModuleOf(id);
+					if (patch !== undefined) return patch;
+					const devModuleId =
+						isDevKeys(id) || id === files.keysFile || isMessageModule(id);
+					const output = !devModuleId && id.startsWith(`${files.outdir}/`);
+					if (!devModuleId && !output) return null;
+					const compiled = await servedBuild();
+					if (compiled === undefined) return null;
+					// Until a compile succeeds, the output's files are the outdir's, as no build was served.
+					if (!("compilation" in compiled))
+						return output ? null : this.error(messagesOf(compiled));
+					const client = this.environment.config.consumer === "client";
+					// No source map for a page: a file of the output has no source of its own to map back to, and
+					// Vite would inline a map of it into the page at several times its size. A server keeps the
+					// map Vite makes, from which its module runner names the file and line of each frame of a
+					// stack trace.
+					if (output) {
+						const code = outputCode(id, compiled);
+						if (code !== undefined)
+							return client ? { code, map: { mappings: "" } } : code;
+						// A file the plugin does not serve, or one with a query: Vite's loaders read it from
+						// the disk, once the output is written.
+						await writeServed();
+						return null;
+					}
+					// No source map: the module is the compiler's, with no source of its own to map back to,
+					// and Vite would inline a map of every line it rewrites, several times the module's size.
+					const code = devCode(id, compiled, client);
+					return code === undefined
+						? null
+						: { code, moduleSideEffects: false, map: { mappings: "" } };
 				}
-				// No source map: the module is the compiler's, with no source of its own to map back to,
-				// and Vite would inline a map of every line it rewrites, several times the module's size.
-				const code = devCode(id, compiled, client);
-				return code === undefined
-					? null
-					: { code, moduleSideEffects: false, map: { mappings: "" } };
-			}
-			if (id === join(files.outdir, "testing.js")) {
-				return this.error(
-					"The output's testing.js binds a test's locale, so a build refuses it: import it from test files alone.",
+				if (id === join(files.outdir, "testing.js")) {
+					return this.error(
+						"The output's testing.js binds a test's locale, so a build refuses it: import it from test files alone.",
+					);
+				}
+				if (id !== files.keysFile && !isMessageModule(id)) return null;
+				const compiled = build ?? (await first);
+				if (compiled === undefined) return null;
+				if (!("compilation" in compiled))
+					return this.error(messagesOf(compiled));
+				const code = bundling?.moduleCode(
+					id,
+					compiled,
+					this.environment.config.consumer,
 				);
-			}
-			if (id !== files.keysFile && !isMessageModule(id)) return null;
-			const compiled = build ?? (await first);
-			if (compiled === undefined) return null;
-			if (!("compilation" in compiled)) return this.error(messagesOf(compiled));
-			const code = bundling?.moduleCode(
-				id,
-				compiled,
-				this.environment.config.consumer,
-			);
-			// Without side effects, a build leaves out every key a chunk's code does not use, so a key
-			// lands in the chunks of the entries that use it. A build keeps its maps, which tools read
-			// to tell what each chunk holds.
-			return code === undefined ? null : { code, moduleSideEffects: false };
+				// Without side effects, a build leaves out every key a chunk's code does not use, so a key
+				// lands in the chunks of the entries that use it. A build keeps its maps, which tools read
+				// to tell what each chunk holds.
+				return code === undefined ? null : { code, moduleSideEffects: false };
+			},
 		},
 		hotUpdate({ file }) {
 			// The plugin follows the catalogs and the config itself, and its output is its own.
