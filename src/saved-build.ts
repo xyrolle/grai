@@ -7,6 +7,7 @@ import type { Compilation } from "./compilation.ts";
 import { type Build, buildKey, type CompileOptions } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
+import type { DeclaredKey } from "./key-declarations.ts";
 import { stateDirectory } from "./state-directory.ts";
 import { ignoreMissing, saveState, savingFile } from "./state-saves.ts";
 
@@ -20,7 +21,7 @@ import { ignoreMissing, saveState, savingFile } from "./state-saves.ts";
 type Saved = Omit<Build, "key" | "parts" | "catalogs" | "compilation"> & {
 	parts: readonly SavedCatalog[];
 	catalogs: readonly SavedCatalog[];
-	compilation: Omit<Compilation, "catalogs"> & {
+	compilation: Omit<Compilation<DeclaredKey>, "catalogs"> & {
 		catalogs: readonly SavedCatalog[];
 	};
 };
