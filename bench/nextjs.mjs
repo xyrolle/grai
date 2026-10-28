@@ -3,29 +3,23 @@
 // - Bytes: each app is built (`next build`, Turbopack) and started, Chromium loads the page, and
 //   every response the page downloads is compressed with brotli at quality 11. "Beyond plain" is
 //   what the page costs more than the same page with its words written in.
-// - Start: `next dev` from its launch until it is ready, and until the page's first response is
-//   complete, from an empty .next and from the one the last run left. grai's share is withGrai's
-//   work when `next dev` asks for its config, in a process of its own, from an empty outdir and
-//   from one already up to date: how long it holds Next back, and its CPU until the watch's first
-//   compile is done.
-// - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
-//   message in the server component and one in the client component, on grai and on next-intl
-//   with and without the client component's keys picked; the median of EDITS saves. For grai,
-//   also until it wrote the edited shard: the rest is Next's.
+// - grai's share of a start: withGrai's work when `next dev` asks for its config, in a process of
+//   its own, from an empty outdir and from one already up to date: how long it holds Next back,
+//   and its CPU until the watch's first compile is done.
+// - Edit to page: one message edited in its catalog until the page in `next dev` shows it, in the
+//   server component and in the client component, on grai and on next-intl with and without the
+//   client component's keys picked, in sessions that take turns, each page checked whole after
+//   every edit and its restoration (next-edits.mjs). For grai, also until it wrote the edited shard:
+//   the rest is Next's. grai's app starts them with the output its watch leaves after a session,
+//   its groups of keys saved. Each session's dev server is timed from its launch until ready and
+//   until the page's first response, from an empty .next and from the one it left.
 // - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
 //   is complete, with the CPU of Next's processes until then, and until the page is hydrated, of
 //   which the time after the document's first byte is the page's in Chromium, COLD_ROUNDS times for
 //   each app in rotating order, with each round's paired differences (next-cold.mjs).
 // Every first response and hydrated page is checked to list each of the page's messages.
 import { spawnSync } from "node:child_process";
-import {
-	existsSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	statSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { chromium } from "playwright-core";
@@ -39,11 +33,9 @@ import {
 	printCold,
 } from "./next-cold.mjs";
 import { devStart, next, nextEnv, nextVersion, started } from "./next-dev.mjs";
+import { editRounds } from "./next-edits.mjs";
 import { recordResults } from "./results.mjs";
 import { stopServer } from "./servers.mjs";
-
-const EDITS = 7;
-const SAVE_INTERVAL_MS = 1500;
 
 const brotli = (bytes) =>
 	brotliCompressSync(bytes, {
@@ -52,7 +44,6 @@ const brotli = (bytes) =>
 const kb = (bytes) => (bytes / 1024).toFixed(1);
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-const now = () => performance.timeOrigin + performance.now();
 
 /** The page's downloads in a built app, brotli-compressed: its document, its scripts, the rest. */
 async function pageBytes(browser, root, path) {
@@ -154,68 +145,6 @@ async function prepared(root, path, words) {
 	return JSON.parse(readFileSync(groups, "utf8")).map((group) => group.length);
 }
 
-/** A message's text in its catalog, as the page shows it, edited and saved; returns when saved. */
-function save(catalogFile, key, text) {
-	const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
-	catalog[key] = text;
-	writeFileSync(catalogFile, JSON.stringify(catalog, null, "\t"));
-	return now();
-}
-
-/**
- * When grai wrote the shard that holds `text`: its file's modification time. A shard's name carries
- * its content's hash, so an edit writes a new file rather than changing a watched one.
- */
-function writtenAt(outdir, text) {
-	const keys = join(outdir, "keys");
-	for (const name of readdirSync(keys)) {
-		const file = join(keys, name);
-		if (
-			name.endsWith(".js") &&
-			readFileSync(file, "utf8").includes(JSON.stringify(text))
-		)
-			return statSync(file).mtimeMs;
-	}
-	throw new Error(`No shard of ${outdir} holds ${JSON.stringify(text)}.`);
-}
-
-/**
- * One message edited EDITS times until the dev page shows it: the median, ms, and for grai the
- * median until it wrote the edited shard.
- */
-async function editToPage(browser, url, catalogFile, key, target, outdir) {
-	const page = await browser.newPage();
-	await page.goto(url);
-	await page.waitForFunction(() => "changes" in window);
-	const original = JSON.parse(readFileSync(catalogFile, "utf8"))[key];
-	const latencies = [];
-	const writes = [];
-	for (let edit = 0; edit < EDITS + 2; edit++) {
-		await new Promise((resolve) => setTimeout(resolve, SAVE_INTERVAL_MS));
-		const text = `Edit ${edit}: ${original}`;
-		const written = save(catalogFile, key, text);
-		const shown = await page
-			.waitForFunction(
-				({ id, text }) =>
-					window.changes[id]?.text === text && window.changes[id].at,
-				{ id: `${target}-target`, text },
-				{ timeout: 60_000 },
-			)
-			.then((handle) => handle.jsonValue());
-		// The first two warm the dev server's compiles of the edited module.
-		if (edit >= 2) {
-			latencies.push(shown - written);
-			if (outdir) writes.push(writtenAt(outdir, text) - written);
-		}
-	}
-	save(catalogFile, key, original);
-	await page.close();
-	return {
-		shown: median(latencies),
-		written: writes.length > 0 ? median(writes) : undefined,
-	};
-}
-
 const browser = await chromium.launch();
 for (const app of selectedApps()) {
 	const locale = app.locales.find((other) => other !== app.baseLocale);
@@ -245,47 +174,12 @@ for (const app of selectedApps()) {
 		`\ngrai's share of \`next dev\`'s start (withGrai in a fresh process, its import included): it holds Next back ${share.cold.call.toFixed(0)} ms from an empty outdir and ${share.warm.call.toFixed(0)} ms with the outdir up to date, and uses ${share.cold.cpu.toFixed(0)} and ${share.warm.cpu.toFixed(0)} ms of CPU until the watch's first compile is done.\n`,
 	);
 
-	console.log(
-		"`next dev`: from its launch until ready and until the page's first response, from an empty .next and from the last run's; then one message edited until the page shows it, and until grai wrote it, ms\n",
-	);
-	console.log(
-		"| app | ready, empty .next | page | ready, .next kept | page | edit, server component | edit, client component |",
-	);
-	console.log("|---|---|---|---|---|---|---|");
-	for (const name of ["grai", "next-intl", "next-intl, client keys picked"]) {
-		const root = apps[name];
-		const empty = await devStart(root, path, words, [".next"]);
-		const catalogFile = join(root, "messages", `${locale}.json`);
-		const outdir = name === "grai" ? join(root, "src/i18n") : undefined;
-		const edits = {};
-		for (const target of ["server", "client"]) {
-			edits[target] = await editToPage(
-				browser,
-				empty.url,
-				catalogFile,
-				keys.targets[target],
-				target,
-				outdir,
-			);
-		}
-		await stopServer(empty.server.child);
-		const kept = await devStart(root, path, words);
-		await stopServer(kept.server.child);
-		const edit = ({ shown, written }) =>
-			written === undefined
-				? shown.toFixed(0)
-				: `${shown.toFixed(0)} (written in ${written.toFixed(1)})`;
-		console.log(
-			`| ${name} | ${empty.ready.toFixed(0)} | ${empty.page.toFixed(0)} | ${kept.ready.toFixed(0)} | ${kept.page.toFixed(0)} | ${edit(edits.server)} | ${edit(edits.client)} |`,
-		);
-		recorded.dev[name] = {
-			empty: { ready: empty.ready, page: empty.page },
-			kept: { ready: kept.ready, page: kept.page },
-			edits,
-		};
-	}
-
 	const groups = await prepared(apps.grai, path, words);
+	const edits = await editRounds(browser, apps, { path, locale, keys, words });
+	recorded.dev = edits.dev;
+	recorded.editPairs = edits.pairs;
+	recorded.editRounds = edits.rounds;
+
 	const cold = coldApps(apps, emptyOutputCopy(apps.grai));
 	const runs = await coldRounds(browser, cold, path, words, COLD_ROUNDS);
 	const summary = coldSummary(runs, cold.length);
@@ -302,7 +196,7 @@ for (const app of selectedApps()) {
 		app: app.name,
 		locale,
 		keys: { server: keys.server.length, client: keys.client.length },
-		edits: EDITS,
+		edits: edits.edits,
 		chromium: browser.version(),
 		// The output grai's cold rounds start from: the groups its watch saved, by their keys.
 		prepared: { groups },
