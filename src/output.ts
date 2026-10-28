@@ -52,14 +52,15 @@ export async function isUpToDate(
  * grai's: a file the output no longer names that the manifest records is retired, and removed once
  * it has been for `retention`, and any other is removed at once, as is a temporary file a compile
  * that stopped halfway left. The manifest goes last, recording the write if it leaves the
- * declarations out (`publication`). Returns the files written.
+ * declarations out (`publication`). Returns the files written, or that the write completed nothing,
+ * as the output it was to complete had been replaced: checked under the lock, before any file.
  */
 export async function writeOutput(
 	outdir: string,
 	output: Output,
 	inputs: string,
-	{ undeclared }: Publication = {},
-): Promise<string[]> {
+	{ undeclared, completes }: Publication = {},
+): Promise<Published> {
 	const state = join(outdir, stateDirectory);
 	await assertOutdirIsGrais(outdir);
 	const release = await lockOutput(state);
@@ -68,6 +69,9 @@ export async function writeOutput(
 			readManifest(state),
 			outdirContents(outdir),
 		]);
+		// Another write replaced the output this one was to complete: what is there is its.
+		if (completes !== undefined && manifest?.undeclared !== completes)
+			return { superseded: true };
 		const present = contents.files;
 		const hashes = new Map(
 			[...output.keyModules, ...output.mutable].map(([file, text, sha1]) => [
@@ -97,7 +101,7 @@ export async function writeOutput(
 			manifest?.inputs === inputs &&
 			manifest.undeclared === undeclared
 		)
-			return [];
+			return { written: [] };
 		const written = [...missing, ...replaced];
 		const [temporaries] = await Promise.all([
 			writeTemporaries(written, state),
@@ -121,7 +125,7 @@ export async function writeOutput(
 			retired: Object.fromEntries(retired),
 			...(undeclared === undefined ? {} : { undeclared }),
 		});
-		return written.map(([file]) => file);
+		return { written: written.map(([file]) => file) };
 	} finally {
 		await release();
 	}
@@ -129,9 +133,17 @@ export async function writeOutput(
 
 /**
  * How a write stands to an output written without its declarations (`writeUndeclared`): one, by
- * its id (`undeclared`), which the manifest records until a write completes it.
+ * its id (`undeclared`), which the manifest records until it is completed; or the write that
+ * completes the one of an id (`completes`), which writes nothing once another write has replaced
+ * that output, as another watcher's of the outdir may.
  */
-export type Publication = { undeclared?: string | undefined };
+export type Publication = {
+	undeclared?: string | undefined;
+	completes?: string | undefined;
+};
+
+/** What a write did: the files it wrote, or nothing, as the output it was to complete was replaced. */
+export type Published = { written: string[] } | { superseded: true };
 
 /**
  * The files in the outdir that this output does not name: those the manifest records, retired,

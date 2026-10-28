@@ -12,6 +12,7 @@ import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { isCompiled } from "../src/output-inputs.ts";
+import type { Placing } from "../src/placing.ts";
 import { savedBuild } from "../src/saved-build.ts";
 import { savedGroups } from "../src/saved-groups.ts";
 import { watch } from "../src/watch.ts";
@@ -325,14 +326,14 @@ it("writes the compile it served when asked, while a catalog is mid-save, and co
 });
 
 /** A watcher that writes its first compile's modules before their declarations, and the reports the test reads. */
-function declaringLater(config: string) {
+function declaringLater(config: string, placeFirst?: Placing) {
 	const reported: CompileResult[] = [];
 	const failures: unknown[] = [];
 	const watcher = watch(
 		config,
 		(result) => reported.push(result),
 		(error) => failures.push(error),
-		{ declareLater: true },
+		{ declareLater: true, placeFirst },
 	);
 	onTestFinished(async () => {
 		await watcher.close();
@@ -388,6 +389,41 @@ it("writes its first compile's declarations ahead of an edit's compile, and that
 	expect(keysWith(dir, '"Überschrift"')).toBe(true);
 	expect(unresolvedImports(out)).toEqual([]);
 	expect(await isCompiled(config)).toBe(true);
+});
+
+/** Each module of the output, with its text and when it was last written. */
+function modulesIn(out: string): Map<string, [string, number]> {
+	return new Map(
+		[...outputTexts(out)]
+			.filter(([file]) => file.endsWith(".js"))
+			.map(([file, text]) => [file, [text, statSync(join(out, file)).mtimeMs]]),
+	);
+}
+
+it("leaves another watcher's output as it is when that watcher replaced the modules its first compile wrote before their declarations, whichever writes its declarations first", async () => {
+	for (const replacedFirst of [false, true]) {
+		const { dir, config } = project(catalogs);
+		const out = join(dir, "out");
+		const shards = declaringLater(config);
+		await shards.watcher.first;
+		const grouped = declaringLater(config, async () => ({
+			groups: Promise.resolve([["title"]]),
+			waited: true,
+		}));
+		await grouped.watcher.first;
+
+		if (!replacedFirst) await grouped.watcher.write();
+		const before = modulesIn(out);
+		await shards.watcher.write();
+		expect(modulesIn(out)).toEqual(before);
+		if (replacedFirst) await grouped.watcher.write();
+
+		expect(
+			[...modulesIn(out).keys()].some((file) => /^keys\/g0-.+\.js$/.test(file)),
+		).toBe(true);
+		expect(existsSync(join(out, "keys.d.ts"))).toBe(true);
+		expect(await isCompiled(config)).toBe(true);
+	}
 });
 
 it("reports an error only the declarations find once its first compile's modules are written, and writes no declarations", async () => {
