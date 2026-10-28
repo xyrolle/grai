@@ -16,7 +16,7 @@ import { pathToFileURL } from "node:url";
 import { rolldown } from "rolldown";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { sampleCalls } from "./calls.mjs";
-import { graiModule, writeGraiProject } from "./grai.mjs";
+import { graiParts, writeGraiProject } from "./grai.mjs";
 import { nanosecondsPer } from "./measure.mjs";
 import { otherLocale } from "./request.mjs";
 import { pageCode } from "./server-page.mjs";
@@ -29,11 +29,8 @@ const CALLS = 2000;
 /** Each shape's module and how a page calls it, from the compiler's model of every key. */
 async function shapes(app) {
 	const config = writeGraiProject(app, "server-shapes");
-	const { recompile } = await import(graiModule("compile.ts"));
-	const { calledNames, everyName, outputImports } = await import(
-		graiModule("output-imports.ts")
-	);
-	const { keyExports } = await import(graiModule("key-exports.ts"));
+	const { calledNames, everyName, keyExports, outputImports, recompile } =
+		await import(graiParts);
 	const { build, result } = await recompile(config, undefined);
 	if (build === undefined) throw new Error(result.errors[0].message);
 	const outdir = join(config, "..", "out");

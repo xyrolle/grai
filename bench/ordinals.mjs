@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { rolldown } from "rolldown";
 import { cacheDir, selectedApps } from "./apps.mjs";
-import { graiModule } from "./grai.mjs";
+import { graiParts } from "./grai.mjs";
 import { formatNs, nanosecondSamples } from "./measure.mjs";
 import { median } from "./medians.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
@@ -56,11 +56,11 @@ const variants = {
 	},
 	[graiName]: {
 		select: async (locale) => {
-			const { pluralName } = await import(graiModule("plurals.ts"));
+			const { pluralName } = await import(graiParts);
 			return (await import(plurals))[pluralName(locale, "ordinal")];
 		},
 		source: async (locale) => {
-			const { pluralName } = await import(graiModule("plurals.ts"));
+			const { pluralName } = await import(graiParts);
 			return `export { ${pluralName(locale, "ordinal")} } from "./plurals.js";\n`;
 		},
 	},
@@ -112,7 +112,7 @@ async function child(name, registryFile) {
 if (process.argv[2] === "--child") {
 	await child(process.argv[3], process.argv[4]);
 } else {
-	const { pluralModule } = await import(graiModule("plurals.ts"));
+	const { pluralModule } = await import(graiParts);
 	mkdirSync(directory, { recursive: true });
 	writeFileSync(plurals, pluralModule(locales));
 	const [app] = selectedApps(["synthetic"]);

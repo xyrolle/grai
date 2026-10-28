@@ -27,12 +27,7 @@ import { build } from "vite";
 import { cacheDir, selectedApps } from "./apps.mjs";
 import { sampleCalls, takesInputs } from "./calls.mjs";
 import { benchPage } from "./chromium.mjs";
-import {
-	graiEntry,
-	graiModule,
-	graiOutput,
-	writeGraiProject,
-} from "./grai.mjs";
+import { graiEntry, graiOutput, graiParts, writeGraiProject } from "./grai.mjs";
 import {
 	i18nextValues,
 	libraryCatalogs,
@@ -77,7 +72,7 @@ async function bundle(source, external = () => false) {
 }
 
 const { grai } = await import(graiEntry("./vite"));
-const { localeDirectory } = await import(graiModule("message-directories.ts"));
+const { localeDirectory } = await import(graiParts);
 
 /** The locale's copies of the message chunks a client build writes for a page naming every key. */
 async function graiBuiltMessages(config, locale) {

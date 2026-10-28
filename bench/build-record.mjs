@@ -5,11 +5,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
-import { graiModule } from "./grai.mjs";
+import { graiParts } from "./grai.mjs";
 
-const { keyModulePrefix, textModulePrefix } = await import(
-	graiModule("locale-chunks.ts")
-);
+const { keyModulePrefix, textModulePrefix } = await import(graiParts);
 
 /** Code's size, raw and brotli at the quality a host precompresses with. */
 export function sizes(code) {
