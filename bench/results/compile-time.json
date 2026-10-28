@@ -1,6 +1,6 @@
 {
 	"bench": "compile-time",
-	"date": "2026-10-27T15:14:59.822Z",
+	"date": "2026-10-28T11:08:31.893Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,11 +8,11 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 31.8,
-		"end": 10.5
+		"start": 18.5,
+		"end": 18.9
 	},
 	"node": "24.16.0",
-	"grai": "cee60fe2",
+	"grai": "1253e02",
 	"versions": {
 		"@inlang/paraglide-js": "2.29.1",
 		"i18next": "26.4.7",
@@ -23,37 +23,681 @@
 		"rolldown": "1.2.15",
 		"playwright-core": "1.64.1"
 	},
-	"runs": 3,
+	"runs": 6,
 	"rows": [
 		{
 			"app": "synthetic, 6,366 keys",
 			"keys": 6366,
+			"edited": {
+				"locale": "ru",
+				"key": "area14_part5_message1760"
+			},
 			"grai": {
-				"cold": 123.7,
-				"noop": 2,
-				"edit": 11.1
+				"cold": 158.8,
+				"noop": 1.86,
+				"edit": 17.2
 			},
 			"paraglide": {
-				"message modules, without declarations": 4449.9,
-				"message modules, with declarations": 9490.9,
-				"locale modules, with declarations": 55638.4
+				"message modules, without declarations": 3834.5,
+				"message modules, with declarations": 9217.7,
+				"locale modules, with declarations": 42887.8
 			},
-			"formatjs": 62.7
+			"paraglideDev": {
+				"without declarations": {
+					"cold": 3493.9,
+					"edit": 2894.6
+				},
+				"declarations through TypeScript 6": {
+					"cold": 42887.8,
+					"edit": 32740.8
+				}
+			},
+			"formatjs": 91.6,
+			"variants": {
+				"grai": {
+					"cold": {
+						"median": 158.8,
+						"low": 115.1,
+						"high": 199.8,
+						"confidence": 0.969,
+						"samples": [
+							166.9,
+							158.7,
+							156.6,
+							199.8,
+							115.1,
+							158.8
+						]
+					},
+					"noop": {
+						"median": 1.86,
+						"low": 1.38,
+						"high": 2.15,
+						"confidence": 0.969,
+						"samples": [
+							1.89,
+							2.03,
+							1.77,
+							2.15,
+							1.38,
+							1.84
+						]
+					},
+					"edit": {
+						"median": 17.2,
+						"low": 13.1,
+						"high": 26,
+						"confidence": 0.969,
+						"samples": [
+							24.4,
+							14.6,
+							13.1,
+							26,
+							13.7,
+							19.8
+						]
+					}
+				},
+				"Paraglide, message modules, without declarations": {
+					"cold": {
+						"median": 3834.5,
+						"low": 3488.3,
+						"high": 5812.9,
+						"confidence": 0.969,
+						"samples": [
+							5812.9,
+							3820.5,
+							3848.6,
+							4226.5,
+							3488.3,
+							3618.4
+						]
+					}
+				},
+				"Paraglide, message modules, declarations through TypeScript 6": {
+					"cold": {
+						"median": 9217.7,
+						"low": 7793.4,
+						"high": 12931.6,
+						"confidence": 0.969,
+						"samples": [
+							12931.6,
+							7793.4,
+							11233.7,
+							9096,
+							9339.5,
+							8085.9
+						]
+					}
+				},
+				"Paraglide's Vite plugin in dev, locale modules, without declarations": {
+					"cold": {
+						"median": 3493.9,
+						"low": 3433.1,
+						"high": 5100.5,
+						"confidence": 0.969,
+						"samples": [
+							5100.5,
+							3512.4,
+							3827.5,
+							3475.4,
+							3445.6,
+							3433.1
+						]
+					},
+					"edit": {
+						"median": 2894.6,
+						"low": 2790.9,
+						"high": 4686.4,
+						"confidence": 0.969,
+						"samples": [
+							4686.4,
+							2865.5,
+							3336.2,
+							2862.2,
+							2923.7,
+							2790.9
+						]
+					}
+				},
+				"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6": {
+					"cold": {
+						"median": 42887.8,
+						"low": 35298,
+						"high": 70836.4,
+						"confidence": 0.969,
+						"samples": [
+							70836.4,
+							42664.1,
+							35298,
+							36738.8,
+							48226.3,
+							43111.4
+						]
+					},
+					"edit": {
+						"median": 32740.8,
+						"low": 30009.8,
+						"high": 65278.4,
+						"confidence": 0.969,
+						"samples": [
+							34063.7,
+							65278.4,
+							43049.9,
+							30009.8,
+							31418,
+							30332.7
+						]
+					}
+				},
+				"formatjs": {
+					"cold": {
+						"median": 91.6,
+						"low": 80.3,
+						"high": 123.8,
+						"confidence": 0.969,
+						"samples": [
+							88.8,
+							123.8,
+							94.4,
+							123.7,
+							80.3,
+							85.4
+						]
+					}
+				}
+			},
+			"ratios": {
+				"Paraglide, message modules, without declarations, cold": {
+					"median": 24.3,
+					"low": 21.2,
+					"high": 34.8,
+					"confidence": 0.969,
+					"rounds": [
+						34.8,
+						24.1,
+						24.6,
+						21.2,
+						30.3,
+						22.8
+					]
+				},
+				"Paraglide, message modules, declarations through TypeScript 6, cold": {
+					"median": 61.3,
+					"low": 45.5,
+					"high": 81.1,
+					"confidence": 0.969,
+					"rounds": [
+						77.5,
+						49.1,
+						71.7,
+						45.5,
+						81.1,
+						50.9
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, without declarations, cold": {
+					"median": 23.3,
+					"low": 17.4,
+					"high": 30.6,
+					"confidence": 0.969,
+					"rounds": [
+						30.6,
+						22.1,
+						24.4,
+						17.4,
+						29.9,
+						21.6
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, without declarations, edit": {
+					"median": 194.5,
+					"low": 110.2,
+					"high": 253.7,
+					"confidence": 0.969,
+					"rounds": [
+						192.3,
+						196.7,
+						253.7,
+						110.2,
+						213.3,
+						140.6
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6, cold": {
+					"median": 270.1,
+					"low": 183.9,
+					"high": 424.3,
+					"confidence": 0.969,
+					"rounds": [
+						424.3,
+						268.8,
+						225.4,
+						183.9,
+						418.8,
+						271.4
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6, edit": {
+					"median": 1910.4,
+					"low": 1155.1,
+					"high": 4480.6,
+					"confidence": 0.969,
+					"rounds": [
+						1397.8,
+						4480.6,
+						3273.9,
+						1155.1,
+						2292.5,
+						1528.3
+					]
+				}
+			},
+			"rounds": [
+				{
+					"load": 18.3,
+					"order": [
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs"
+					]
+				},
+				{
+					"load": 19.1,
+					"order": [
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai"
+					]
+				},
+				{
+					"load": 22.3,
+					"order": [
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations"
+					]
+				},
+				{
+					"load": 16.2,
+					"order": [
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6"
+					]
+				},
+				{
+					"load": 11.5,
+					"order": [
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations"
+					]
+				},
+				{
+					"load": 12.1,
+					"order": [
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6"
+					]
+				}
+			]
 		},
 		{
 			"app": "synthetic, 13,326 keys",
 			"keys": 13326,
+			"edited": {
+				"locale": "ru",
+				"key": "area95_part5_message3684"
+			},
 			"grai": {
-				"cold": 147.4,
-				"noop": 2,
-				"edit": 11.9
+				"cold": 259.4,
+				"noop": 2.46,
+				"edit": 26
 			},
 			"paraglide": {
-				"message modules, without declarations": 6324.1,
-				"message modules, with declarations": 13211.2,
-				"locale modules, with declarations": 225494
+				"message modules, without declarations": 7944.5,
+				"message modules, with declarations": 17152.1,
+				"locale modules, with declarations": 237719.4
 			},
-			"formatjs": 86.7
+			"paraglideDev": {
+				"without declarations": {
+					"cold": 7319.9,
+					"edit": 6545.4
+				},
+				"declarations through TypeScript 6": {
+					"cold": 237719.4,
+					"edit": 233039.4
+				}
+			},
+			"formatjs": 121.1,
+			"variants": {
+				"grai": {
+					"cold": {
+						"median": 259.4,
+						"low": 172.9,
+						"high": 453.6,
+						"confidence": 0.969,
+						"samples": [
+							230,
+							453.6,
+							172.9,
+							204.1,
+							301.7,
+							288.8
+						]
+					},
+					"noop": {
+						"median": 2.46,
+						"low": 1.83,
+						"high": 4.03,
+						"confidence": 0.969,
+						"samples": [
+							2.62,
+							4.03,
+							1.83,
+							2.1,
+							2.31,
+							3.77
+						]
+					},
+					"edit": {
+						"median": 26,
+						"low": 17,
+						"high": 128.8,
+						"confidence": 0.969,
+						"samples": [
+							22.4,
+							128.8,
+							17.2,
+							17,
+							29.6,
+							31.7
+						]
+					}
+				},
+				"Paraglide, message modules, without declarations": {
+					"cold": {
+						"median": 7944.5,
+						"low": 5999.8,
+						"high": 10705.9,
+						"confidence": 0.969,
+						"samples": [
+							7740,
+							7146.9,
+							5999.8,
+							8445.7,
+							8149.1,
+							10705.9
+						]
+					}
+				},
+				"Paraglide, message modules, declarations through TypeScript 6": {
+					"cold": {
+						"median": 17152.1,
+						"low": 13586.7,
+						"high": 32966.6,
+						"confidence": 0.969,
+						"samples": [
+							17270.5,
+							17033.7,
+							32966.6,
+							15360.2,
+							13586.7,
+							18758.4
+						]
+					}
+				},
+				"Paraglide's Vite plugin in dev, locale modules, without declarations": {
+					"cold": {
+						"median": 7319.9,
+						"low": 5599.8,
+						"high": 9560.6,
+						"confidence": 0.969,
+						"samples": [
+							7251.5,
+							7388.3,
+							9560.6,
+							5599.8,
+							7406.6,
+							6297.6
+						]
+					},
+					"edit": {
+						"median": 6545.4,
+						"low": 5321.9,
+						"high": 10382.5,
+						"confidence": 0.969,
+						"samples": [
+							6951.3,
+							6139.4,
+							9864.7,
+							5321.9,
+							10382.5,
+							5614.4
+						]
+					}
+				},
+				"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6": {
+					"cold": {
+						"median": 237719.4,
+						"low": 146165.5,
+						"high": 416315.5,
+						"confidence": 0.969,
+						"samples": [
+							263554.3,
+							248497.8,
+							416315.5,
+							146165.5,
+							226941,
+							180295.7
+						]
+					},
+					"edit": {
+						"median": 233039.4,
+						"low": 165762.3,
+						"high": 283743.8,
+						"confidence": 0.969,
+						"samples": [
+							249330.2,
+							283743.8,
+							210639.8,
+							217194.3,
+							165762.3,
+							248884.4
+						]
+					}
+				},
+				"formatjs": {
+					"cold": {
+						"median": 121.1,
+						"low": 86.6,
+						"high": 173,
+						"confidence": 0.969,
+						"samples": [
+							104.5,
+							173,
+							86.6,
+							126.7,
+							115.5,
+							138.3
+						]
+					}
+				}
+			},
+			"ratios": {
+				"Paraglide, message modules, without declarations, cold": {
+					"median": 34.2,
+					"low": 15.8,
+					"high": 41.4,
+					"confidence": 0.969,
+					"rounds": [
+						33.7,
+						15.8,
+						34.7,
+						41.4,
+						27,
+						37.1
+					]
+				},
+				"Paraglide, message modules, declarations through TypeScript 6, cold": {
+					"median": 70,
+					"low": 37.6,
+					"high": 190.7,
+					"confidence": 0.969,
+					"rounds": [
+						75.1,
+						37.6,
+						190.7,
+						75.2,
+						45,
+						65
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, without declarations, cold": {
+					"median": 26,
+					"low": 16.3,
+					"high": 55.3,
+					"confidence": 0.969,
+					"rounds": [
+						31.5,
+						16.3,
+						55.3,
+						27.4,
+						24.5,
+						21.8
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, without declarations, edit": {
+					"median": 311.9,
+					"low": 47.7,
+					"high": 574.7,
+					"confidence": 0.969,
+					"rounds": [
+						310.6,
+						47.7,
+						574.7,
+						313.1,
+						350.8,
+						176.9
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6, cold": {
+					"median": 734.1,
+					"low": 547.8,
+					"high": 2407.8,
+					"confidence": 0.969,
+					"rounds": [
+						1146,
+						547.8,
+						2407.8,
+						716,
+						752.2,
+						624.3
+					]
+				},
+				"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6, edit": {
+					"median": 9491.9,
+					"low": 2202.9,
+					"high": 12778,
+					"confidence": 0.969,
+					"rounds": [
+						11141,
+						2202.9,
+						12271.2,
+						12778,
+						5600.8,
+						7842.8
+					]
+				}
+			},
+			"rounds": [
+				{
+					"load": 9.14,
+					"order": [
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs"
+					]
+				},
+				{
+					"load": 8.96,
+					"order": [
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai"
+					]
+				},
+				{
+					"load": 37.9,
+					"order": [
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations"
+					]
+				},
+				{
+					"load": 6.76,
+					"order": [
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6"
+					]
+				},
+				{
+					"load": 8.04,
+					"order": [
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6",
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations"
+					]
+				},
+				{
+					"load": 10.4,
+					"order": [
+						"formatjs",
+						"grai",
+						"Paraglide, message modules, without declarations",
+						"Paraglide, message modules, declarations through TypeScript 6",
+						"Paraglide's Vite plugin in dev, locale modules, without declarations",
+						"Paraglide's Vite plugin in dev, locale modules, declarations through TypeScript 6"
+					]
+				}
+			]
 		}
 	]
 }
