@@ -43,18 +43,21 @@ export type Output = {
 
 /**
  * A place's files as rendered (`key-placement.ts`): the name of its module and declarations,
- * `<label>-<hash>` within `keys/`, the module and the declarations, each with the hash of its text,
- * their map, `<label>.d.ts.map`, and the line of the declarations each key is on.
+ * `<label>-<hash>` within `keys/`, the module with the hash of its text, and, once its keys are
+ * declared, the declarations with the hash of theirs, their map, `<label>.d.ts.map`, and the line
+ * of the declarations each key is on.
  */
-type ShardFiles = {
-	name: string;
-	module: string;
-	moduleHash: string;
-	declarations: string;
-	declarationsHash: string;
-	map: string;
-	lines: readonly DeclarationLine[];
+type ShardFiles = ModuleFiles & {
+	declared?: {
+		declarations: string;
+		declarationsHash: string;
+		map: string;
+		lines: readonly DeclarationLine[];
+	};
 };
+
+/** A place's module, its name, and the hash of its text. */
+type ModuleFiles = { name: string; module: string; moduleHash: string };
 
 /** The whole output rendered: the modules beside the keys, and each place's keys and files. */
 export type Rendered = RenderedModules & {
@@ -67,11 +70,13 @@ export type Rendered = RenderedModules & {
 };
 
 /**
- * Renders the output: the modules beside the keys, as rendered, and the keys. Each key's module is its group's, when the saved groups hold it, else its
- * shard's, by a hash of its name, so a key stays in its place while others come and go
- * (`key-placement.ts`). Only the places whose keys changed are rendered again, and those that
- * import a module renamed: every place for the runtime, and for the plural rules or the formatters,
- * the places whose keys call them. Other groups place every key anew.
+ * Renders the output: the modules beside the keys, as rendered, and the keys. Each key's module is
+ * its group's, when the saved groups hold it, else its shard's, by a hash of its name, so a key stays
+ * in its place while others come and go (`key-placement.ts`). Only the places whose keys changed
+ * are rendered again, and those that import a module renamed: every place for the runtime, and for
+ * the plural rules or the formatters, the places whose keys call them. Other groups place every key
+ * anew. A place whose module was rendered without its declarations (`renderUndeclared`) is declared
+ * now, its module kept.
  */
 export function renderOutput(
 	config: Config,
@@ -81,7 +86,145 @@ export function renderOutput(
 	groups: KeyGroups,
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
-	const { modules, moduleFiles } = rendered;
+	const places = placed(config, rendered, compilation, groups, previous);
+	const shardFiles = new Map<number, Required<ShardFiles>>();
+	for (const { index, label, keys, module, kept, before } of places.modules) {
+		const declared =
+			kept?.declared ??
+			shardDeclarations(label, keysOf(keys, compilation), rendered.modules);
+		const map = shardMap(
+			`${module.name}.d.ts`,
+			declared.lines,
+			base,
+			config.outdir,
+			before?.declared === undefined
+				? undefined
+				: { ...before.declared, file: `${before.name}.d.ts` },
+		);
+		shardFiles.set(index, { ...module, declared: { ...declared, map } });
+	}
+	const files = [...shardFiles.values()];
+	const keysIndex = indexOf(files);
+	const output: Output = {
+		immutable: rendered.moduleFiles.immutable,
+		keyModules: files.flatMap((shard): OutputFile[] => [
+			[`keys/${shard.name}.js`, shard.module, shard.moduleHash],
+			[
+				`keys/${shard.name}.d.ts`,
+				shard.declared.declarations,
+				shard.declared.declarationsHash,
+			],
+		]),
+		mutable: [
+			...rendered.moduleFiles.mutable,
+			...[...shardFiles].map(
+				([index, { declared }]): OutputFile => [
+					`keys/${places.placement.label(index)}.d.ts.map`,
+					declared.map,
+				],
+			),
+			["keys.js", keysIndex],
+			["keys.d.ts", keysIndex],
+		],
+	};
+	return {
+		output,
+		rendered: renderedWith(rendered, output, places, shardFiles),
+	};
+}
+
+/**
+ * The output as `renderOutput` renders it, but without any declarations or their maps, for keys
+ * compiled but not declared yet: every module the output's modules import, whole, as a dev server
+ * starting from it needs, its declarations left to the write after (`writeBuild`). A module is
+ * named by its shape, which its declarations do not change, so the write after names it alike and
+ * writes no module again.
+ */
+export function renderUndeclared(
+	config: Config,
+	rendered: RenderedModules,
+	compilation: Compilation,
+	groups: KeyGroups,
+	previous?: Rendered,
+): { output: Output; rendered: Rendered } {
+	const places = placed(config, rendered, compilation, groups, previous);
+	const shardFiles = new Map<number, ShardFiles>();
+	for (const { index, module } of places.modules) {
+		const { name, module: text, moduleHash } = module;
+		shardFiles.set(index, { name, module: text, moduleHash });
+	}
+	const files = [...shardFiles.values()];
+	const undeclared = ([path]: OutputFile) => !isDeclarations(path);
+	const output: Output = {
+		immutable: rendered.moduleFiles.immutable.filter(undeclared),
+		keyModules: files.map(
+			(shard): OutputFile => [
+				`keys/${shard.name}.js`,
+				shard.module,
+				shard.moduleHash,
+			],
+		),
+		mutable: [
+			...rendered.moduleFiles.mutable.filter(undeclared),
+			["keys.js", indexOf(files)],
+		],
+	};
+	return {
+		output,
+		rendered: renderedWith(rendered, output, places, shardFiles),
+	};
+}
+
+/** Whether an output's file is declarations or their map, which a dev server never imports. */
+function isDeclarations(path: string): boolean {
+	return path.endsWith(".d.ts") || path.endsWith(".d.ts.map");
+}
+
+/** keys.js, which re-exports every place's module. */
+function indexOf(files: readonly ShardFiles[]): string {
+	return files
+		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
+		.join("");
+}
+
+/** The keys a place holds, compiled. */
+function keysOf<Key extends CompiledKey>(
+	keys: readonly string[],
+	compilation: Compilation<Key>,
+): Map<string, Key> {
+	const compiled = new Map<string, Key>();
+	for (const key of keys) {
+		const compiledKey = compilation.keys.get(key);
+		if (compiledKey !== undefined) compiled.set(key, compiledKey);
+	}
+	return compiled;
+}
+
+/**
+ * A place that holds keys: its index and label, its keys, its module, its files rendered before,
+ * and those again if its module is the one rendered then.
+ */
+type Place = {
+	index: number;
+	label: string;
+	keys: readonly string[];
+	module: ModuleFiles;
+	before: ShardFiles | undefined;
+	kept: ShardFiles | undefined;
+};
+
+/**
+ * Each place's keys and module: the module rendered again for a place whose keys changed or that
+ * imports a module renamed, else the one rendered before.
+ */
+function placed(
+	config: Config,
+	rendered: RenderedModules,
+	compilation: Compilation,
+	groups: KeyGroups,
+	previous: Rendered | undefined,
+) {
+	const { modules } = rendered;
 	const placement = placementOf(groups, compilation.keys.keys());
 	const before =
 		previous?.shards.length === placement.count &&
@@ -108,62 +251,39 @@ export function renderOutput(
 						? replaced(keys, index, placement, compilation)
 						: keys,
 				);
-	const shardFiles = new Map<number, ShardFiles>();
+	const places: Place[] = [];
 	shards.forEach((keys, index) => {
 		if (keys.length === 0) return;
 		const previousFiles = before?.shardFiles.get(index);
-		const shard =
-			dirty.has(index) || previousFiles === undefined
-				? renderShard(
-						placement.label(index),
-						keys,
-						compilation,
-						modules,
-						config.locales,
-					)
-				: previousFiles;
-		const map = shardMap(
-			`${shard.name}.d.ts`,
-			shard.lines,
-			base,
-			config.outdir,
-			previousFiles === undefined
-				? undefined
-				: { ...previousFiles, file: `${previousFiles.name}.d.ts` },
-		);
-		shardFiles.set(index, { ...shard, map });
+		const kept = dirty.has(index) ? undefined : previousFiles;
+		const label = placement.label(index);
+		places.push({
+			index,
+			label,
+			keys,
+			module:
+				kept ??
+				renderShard(label, keysOf(keys, compilation), modules, config.locales),
+			before: previousFiles,
+			kept,
+		});
 	});
-	const files = [...shardFiles.values()];
-	const keysIndex = files
-		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
-		.join("");
-	const output: Output = {
-		immutable: moduleFiles.immutable,
-		keyModules: files.flatMap((shard): OutputFile[] => [
-			[`keys/${shard.name}.js`, shard.module, shard.moduleHash],
-			[`keys/${shard.name}.d.ts`, shard.declarations, shard.declarationsHash],
-		]),
-		mutable: [
-			...moduleFiles.mutable,
-			...[...shardFiles].map(
-				([index, { map }]): OutputFile => [
-					`keys/${placement.label(index)}.d.ts.map`,
-					map,
-				],
-			),
-			["keys.js", keysIndex],
-			["keys.d.ts", keysIndex],
-		],
-	};
+	return { placement, shards, modules: places };
+}
+
+/** The rendered output, for the next render to start from. */
+function renderedWith(
+	rendered: RenderedModules,
+	output: Output,
+	places: ReturnType<typeof placed>,
+	shardFiles: ReadonlyMap<number, ShardFiles>,
+): Rendered {
 	return {
-		output,
-		rendered: {
-			...rendered,
-			files: textsByPath(output.immutable, output.keyModules, output.mutable),
-			groups: placement.groups,
-			shards,
-			shardFiles,
-		},
+		...rendered,
+		files: textsByPath(output.immutable, output.keyModules, output.mutable),
+		groups: places.placement.groups,
+		shards: places.shards,
+		shardFiles,
 	};
 }
 
@@ -191,49 +311,34 @@ function importsRenamed(
 }
 
 /**
- * A place's module and declarations, named by their shape: the keys they declare, each with its
- * signature (the inputs and markup a call passes and gets), and the head of each file, which names
- * what they import and the locales they were compiled for. An edit that changes only the words of
- * messages keeps the name, so the compile replaces the two files in place, each renamed over the
- * old one at once, and the entries that name them stay as they are: a bundler watching the outdir
- * then compiles that module again and nothing else. A change of shape renames them, and keys.js
- * with them, so a reader loads one compile's layout, and calls each key as that layout's keys.js
- * has it. They share the name so that TypeScript reads the declarations rather than the module, as
- * it does any `.js` beside its `.d.ts`, and leaves the module out of a project that type-checks
- * JavaScript; the declarations name their map by the place's label.
+ * A place's module, named by its shape: the keys it holds, each with its signature (the inputs and
+ * markup a call passes and gets), and the head of the module and of its declarations, which name
+ * what they import and the locales the keys were compiled for. Its declarations share the name, and
+ * their text does not change it, so a module written before its declarations is named alike
+ * (`renderUndeclared`). An edit that changes only the words of messages keeps the name, so the
+ * compile replaces the module and the declarations in place, each renamed over the old one at once,
+ * and the entries that name them stay as they are: a bundler watching the outdir then compiles that
+ * module again and nothing else. A change of shape renames them, and keys.js with them, so a reader
+ * loads one compile's layout, and calls each key as that layout's keys.js has it. They share the
+ * name so that TypeScript reads the declarations rather than the module, as it does any `.js` beside
+ * its `.d.ts`, and leaves the module out of a project that type-checks JavaScript; the declarations
+ * name their map by the place's label.
  */
 function renderShard(
 	label: string,
-	keys: readonly string[],
-	compilation: Compilation<DeclaredKey>,
+	keys: ReadonlyMap<string, CompiledKey>,
 	modules: OutputModules,
 	locales: readonly string[],
-): Omit<ShardFiles, "map"> {
-	const compiled = new Map<string, DeclaredKey>();
-	for (const key of keys) {
-		const compiledKey = compilation.keys.get(key);
-		if (compiledKey !== undefined) compiled.set(key, compiledKey);
-	}
-	const module = shardModule([...compiled.values()], modules, locales);
-	const types = shardDeclarations(compiled, modules);
-	const declarations = `${types.head}${types.body}//# sourceMappingURL=${label}.d.ts.map\n`;
+): ModuleFiles {
+	const module = shardModule([...keys.values()], modules, locales);
 	const name = contentName(
 		label,
 		module.head,
-		types.head,
-		[...compiled]
-			.map(([key, { signature }]) => `${key} ${signature}`)
-			.join("\n"),
+		declarationsHead(keys.values(), modules),
+		[...keys].map(([key, { signature }]) => `${key} ${signature}`).join("\n"),
 	);
 	const text = `${module.head}${module.body}`;
-	return {
-		name,
-		module: text,
-		moduleHash: hash("sha1", text),
-		declarations,
-		declarationsHash: hash("sha1", declarations),
-		lines: types.lines,
-	};
+	return { name, module: text, moduleHash: hash("sha1", text) };
 }
 
 /**
@@ -258,17 +363,19 @@ function shardModule(
 }
 
 /**
- * A shard's declarations: their head, which imports the types they name, and their body, but the
- * line naming their map, with the line each key's is on.
+ * A place's declarations, the line naming their map last, with the hash of their text and the line
+ * each key's is on.
  */
 function shardDeclarations(
+	label: string,
 	keys: ReadonlyMap<string, DeclaredKey>,
 	modules: OutputModules,
-): { head: string; body: string; lines: DeclarationLine[] } {
-	const types = [...keys.values()].some((key) => key.markup)
-		? "MarkupMessage, Message"
-		: "Message";
-	const parts: string[] = [];
+): {
+	declarations: string;
+	declarationsHash: string;
+	lines: DeclarationLine[];
+} {
+	const parts = [declarationsHead(keys.values(), modules)];
 	const lines: DeclarationLine[] = [];
 	let line = 2;
 	for (const [name, key] of keys) {
@@ -276,9 +383,18 @@ function shardDeclarations(
 		lines.push([name, line - 1]);
 		parts.push(key.declared.text);
 	}
-	return {
-		head: `import type { ${types} } from "../${modules.runtime}";\n\n`,
-		body: parts.join(""),
-		lines,
-	};
+	parts.push(`//# sourceMappingURL=${label}.d.ts.map\n`);
+	const declarations = parts.join("");
+	return { declarations, declarationsHash: hash("sha1", declarations), lines };
+}
+
+/** The head of a place's declarations, which imports the types they name, whether declared or not. */
+function declarationsHead(
+	keys: Iterable<CompiledKey>,
+	modules: OutputModules,
+): string {
+	const types = [...keys].some((key) => key.markup)
+		? "MarkupMessage, Message"
+		: "Message";
+	return `import type { ${types} } from "../${modules.runtime}";\n\n`;
 }
