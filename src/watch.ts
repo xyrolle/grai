@@ -18,7 +18,7 @@ const settleMilliseconds = 20;
 
 /**
  * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
- * whenever the config or a catalog changes, and nothing else.
+ * whenever the config or a catalog changes, or `compileAgain` is called, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. A change is compiled on its first event. A compile that finds a catalog that does not
  * parse, as a read in the middle of a save does, is not reported: the files are read again once
@@ -45,7 +45,7 @@ export function watch(
 		build: Build | undefined,
 	) => void,
 	failed: (error: unknown) => void,
-): { close: () => Promise<void> } {
+): { close: () => Promise<void>; compileAgain: () => Promise<void> } {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
 	let build: Build | undefined;
@@ -139,6 +139,12 @@ export function watch(
 
 	run();
 	return {
+		// For an input no followed file changes, such as the groups an adapter saved; it settles once
+		// that compile is done.
+		compileAgain: () => {
+			if (!closed) run();
+			return running ?? Promise.resolve();
+		},
 		close: async () => {
 			closed = true;
 			clearTimeout(settling);
