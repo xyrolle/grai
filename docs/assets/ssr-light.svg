@@ -1,29 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 243" width="480" height="243" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
-<title>A server render of a page of 2,000 messages</title>
-<rect x="0.5" y="0.5" width="479" height="242" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">A server render of a page of 2,000 messages</text>
-<text x="16" y="44" font-size="13" fill="#52514e">Milliseconds a render, in Svelte on Node; lower is better</text>
-<line x1="99" y1="65" x2="99" y2="197" stroke="#c3c2b7" stroke-width="1"/>
-<text x="99" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="171.3" y1="65" x2="171.3" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="171.3" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2</text>
-<line x1="243.5" y1="65" x2="243.5" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="243.5" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4</text>
-<line x1="315.8" y1="65" x2="315.8" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="315.8" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">6</text>
-<line x1="388" y1="65" x2="388" y2="197" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="214" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">8</text>
-<text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M99,74H102.4A4,4 0 0 1 106.4,78V84A4,4 0 0 1 102.4,88H99Z" fill="#2a78d6"/>
-<text x="112.4" y="86" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.21 ms</text>
-<text x="89" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M99,106H106.4A4,4 0 0 1 110.4,110V116A4,4 0 0 1 106.4,120H99Z" fill="#898781"/>
-<text x="116.4" y="118" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.32 ms</text>
-<text x="89" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
-<path d="M99,138H276.9A4,4 0 0 1 280.9,142V148A4,4 0 0 1 276.9,152H99Z" fill="#898781"/>
-<text x="286.9" y="150" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">5.0 ms</text>
-<text x="89" y="182" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
-<path d="M99,170H363.8A4,4 0 0 1 367.8,174V180A4,4 0 0 1 363.8,184H99Z" fill="#898781"/>
-<text x="373.8" y="182" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">7.4 ms</text>
-<text x="388" y="234" font-size="12" text-anchor="end" fill="#52514e">milliseconds a render</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 263" width="480" height="263" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>A warm server render of a page of 2,000 message calls</title>
+<rect x="0.5" y="0.5" width="479" height="262" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">A warm server render of a page of 2,000 message</text>
+<text x="16" y="44" font-size="16" font-weight="600" fill="#0b0b0b">calls</text>
+<text x="16" y="64" font-size="13" fill="#52514e">Milliseconds a render, in Svelte on Node, in ru; lower is better</text>
+<line x1="99" y1="85" x2="99" y2="217" stroke="#c3c2b7" stroke-width="1"/>
+<text x="99" y="234" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="156.8" y1="85" x2="156.8" y2="217" stroke="#e1e0d9" stroke-width="1"/>
+<text x="156.8" y="234" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2</text>
+<line x1="214.6" y1="85" x2="214.6" y2="217" stroke="#e1e0d9" stroke-width="1"/>
+<text x="214.6" y="234" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4</text>
+<line x1="272.4" y1="85" x2="272.4" y2="217" stroke="#e1e0d9" stroke-width="1"/>
+<text x="272.4" y="234" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">6</text>
+<line x1="330.2" y1="85" x2="330.2" y2="217" stroke="#e1e0d9" stroke-width="1"/>
+<text x="330.2" y="234" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">8</text>
+<line x1="388" y1="85" x2="388" y2="217" stroke="#e1e0d9" stroke-width="1"/>
+<text x="388" y="234" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">10</text>
+<text x="89" y="106" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
+<path d="M99,94H99A3.9,3.9 0 0 1 102.9,97.9V104.1A3.9,3.9 0 0 1 99,108H99Z" fill="#2a78d6"/>
+<path d="M102.2,101H103.4M102.2,97V105M103.4,97V105" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="109.4" y="106" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.14 ms</text>
+<text x="89" y="138" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
+<path d="M99,126H100.5A4,4 0 0 1 104.5,130V136A4,4 0 0 1 100.5,140H99Z" fill="#898781"/>
+<path d="M103.1,133H105.5M103.1,129V137M105.5,129V137" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="111.5" y="138" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.19 ms</text>
+<text x="89" y="170" font-size="14" text-anchor="end" fill="#0b0b0b">i18next</text>
+<path d="M99,158H222.5A4,4 0 0 1 226.5,162V168A4,4 0 0 1 222.5,172H99Z" fill="#898781"/>
+<path d="M195.2,165H277M195.2,161V169M277,161V169" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="283" y="170" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.4 ms</text>
+<text x="89" y="202" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl</text>
+<path d="M99,190H308.1A4,4 0 0 1 312.1,194V200A4,4 0 0 1 308.1,204H99Z" fill="#898781"/>
+<path d="M259.5,197H339.1M259.5,193V201M339.1,193V201" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="345.1" y="202" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">7.4 ms</text>
+<text x="388" y="254" font-size="12" text-anchor="end" fill="#52514e">milliseconds a render</text>
 </svg>

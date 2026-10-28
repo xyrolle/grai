@@ -1,31 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 243" width="480" height="243" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>A page's 2,000 message calls on a server</title>
-<rect x="0.5" y="0.5" width="479" height="242" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
+<rect x="0.5" y="0.5" width="479" height="259" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">A page's 2,000 message calls on a server</text>
-<text x="16" y="44" font-size="13" fill="#c3c2b7">Nanoseconds a call, in the page's mix of kinds; lower is better</text>
-<line x1="99" y1="65" x2="99" y2="197" stroke="#383835" stroke-width="1"/>
-<text x="99" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="156.8" y1="65" x2="156.8" y2="197" stroke="#2c2c2a" stroke-width="1"/>
-<text x="156.8" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1,000</text>
-<line x1="214.6" y1="65" x2="214.6" y2="197" stroke="#2c2c2a" stroke-width="1"/>
-<text x="214.6" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2,000</text>
-<line x1="272.4" y1="65" x2="272.4" y2="197" stroke="#2c2c2a" stroke-width="1"/>
-<text x="272.4" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">3,000</text>
-<line x1="330.2" y1="65" x2="330.2" y2="197" stroke="#2c2c2a" stroke-width="1"/>
-<text x="330.2" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">4,000</text>
-<line x1="388" y1="65" x2="388" y2="197" stroke="#2c2c2a" stroke-width="1"/>
-<text x="388" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">5,000</text>
-<text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,74H99A3.3,3.3 0 0 1 102.3,77.3V84.7A3.3,3.3 0 0 1 99,88H99Z" fill="#3987e5"/>
-<text x="108.3" y="86" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">57 ns</text>
-<text x="89" y="118" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,106H102.3A4,4 0 0 1 106.3,110V116A4,4 0 0 1 102.3,120H99Z" fill="#898781"/>
-<text x="112.3" y="118" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">126 ns</text>
-<text x="89" y="150" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
-<path d="M99,138H244.4A4,4 0 0 1 248.4,142V148A4,4 0 0 1 244.4,152H99Z" fill="#898781"/>
-<text x="254.4" y="150" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2,584 ns</text>
-<text x="89" y="182" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
-<path d="M99,170H362.4A4,4 0 0 1 366.4,174V180A4,4 0 0 1 362.4,184H99Z" fill="#898781"/>
-<text x="372.4" y="182" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4,627 ns</text>
-<text x="388" y="234" font-size="12" text-anchor="end" fill="#c3c2b7">nanoseconds a call</text>
+<text x="16" y="44" font-size="13" fill="#c3c2b7">Nanoseconds a call: the page's mix, warm in-request batch average;</text>
+<text x="16" y="61" font-size="13" fill="#c3c2b7">lower is better</text>
+<line x1="99" y1="82" x2="99" y2="214" stroke="#383835" stroke-width="1"/>
+<text x="99" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="195.3" y1="82" x2="195.3" y2="214" stroke="#2c2c2a" stroke-width="1"/>
+<text x="195.3" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2,000</text>
+<line x1="291.7" y1="82" x2="291.7" y2="214" stroke="#2c2c2a" stroke-width="1"/>
+<text x="291.7" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">4,000</text>
+<line x1="388" y1="82" x2="388" y2="214" stroke="#2c2c2a" stroke-width="1"/>
+<text x="388" y="231" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">6,000</text>
+<text x="89" y="103" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M99,91H99A1.6,1.6 0 0 1 100.6,92.6V103.4A1.6,1.6 0 0 1 99,105H99Z" fill="#3987e5"/>
+<path d="M100,98H101.9M100,94V102M101.9,94V102" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="107.9" y="103" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">34 ns</text>
+<text x="89" y="135" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
+<path d="M99,123H99A4,4 0 0 1 103,127V133A4,4 0 0 1 99,137H99Z" fill="#898781"/>
+<path d="M101.9,130H103.3M101.9,126V134M103.3,126V134" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="109.3" y="135" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">84 ns</text>
+<text x="89" y="167" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
+<path d="M99,155H203.6A4,4 0 0 1 207.6,159V165A4,4 0 0 1 203.6,169H99Z" fill="#898781"/>
+<path d="M184.5,162H230.3M184.5,158V166M230.3,158V166" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="236.3" y="167" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2,255 ns</text>
+<text x="89" y="199" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
+<path d="M99,187H291.5A4,4 0 0 1 295.5,191V197A4,4 0 0 1 291.5,201H99Z" fill="#898781"/>
+<path d="M267.3,194H349.2M267.3,190V198M349.2,190V198" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="355.2" y="199" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4,080 ns</text>
+<text x="388" y="251" font-size="12" text-anchor="end" fill="#c3c2b7">nanoseconds a call</text>
 </svg>

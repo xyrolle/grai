@@ -1,44 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 500" width="480" height="500" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 551" width="480" height="551" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>grai's commands on 13,000 keys and 9,000 files</title>
-<rect x="0.5" y="0.5" width="479" height="499" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
+<rect x="0.5" y="0.5" width="479" height="550" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
 <text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">grai's commands on 13,000 keys and 9,000 files</text>
-<text x="16" y="44" font-size="13" fill="#c3c2b7">Seconds, with no facts kept and with the last run's;</text>
-<text x="16" y="61" font-size="13" fill="#c3c2b7">lower is better</text>
-<line x1="122" y1="82" x2="122" y2="454" stroke="#383835" stroke-width="1"/>
-<text x="122" y="471" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="210.7" y1="82" x2="210.7" y2="454" stroke="#2c2c2a" stroke-width="1"/>
-<text x="210.7" y="471" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1</text>
-<line x1="299.3" y1="82" x2="299.3" y2="454" stroke="#2c2c2a" stroke-width="1"/>
-<text x="299.3" y="471" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2</text>
-<line x1="388" y1="82" x2="388" y2="454" stroke="#2c2c2a" stroke-width="1"/>
-<text x="388" y="471" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">3</text>
-<text x="16" y="100" font-size="13" font-weight="600" fill="#c3c2b7">grai check</text>
-<text x="112" y="131" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
-<path d="M122,119H333.2A4,4 0 0 1 337.2,123V129A4,4 0 0 1 333.2,133H122Z" fill="#3987e5"/>
-<text x="343.2" y="131" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.43 s</text>
-<text x="112" y="163" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
-<path d="M122,151H162.6A4,4 0 0 1 166.6,155V161A4,4 0 0 1 162.6,165H122Z" fill="#3987e5"/>
-<text x="172.6" y="163" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.50 s</text>
-<text x="16" y="192" font-size="13" font-weight="600" fill="#c3c2b7">grai check --fix</text>
-<text x="112" y="223" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
-<path d="M122,211H322.8A4,4 0 0 1 326.8,215V221A4,4 0 0 1 322.8,225H122Z" fill="#3987e5"/>
-<text x="332.8" y="223" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.31 s</text>
-<text x="112" y="255" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
-<path d="M122,243H165.4A4,4 0 0 1 169.4,247V253A4,4 0 0 1 165.4,257H122Z" fill="#3987e5"/>
-<text x="175.4" y="255" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.54 s</text>
-<text x="16" y="284" font-size="13" font-weight="600" fill="#c3c2b7">grai find</text>
-<text x="112" y="315" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
-<path d="M122,303H364.6A4,4 0 0 1 368.6,307V313A4,4 0 0 1 364.6,317H122Z" fill="#3987e5"/>
-<text x="374.6" y="315" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.78 s</text>
-<text x="112" y="347" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
-<path d="M122,335H159.4A4,4 0 0 1 163.4,339V345A4,4 0 0 1 159.4,349H122Z" fill="#3987e5"/>
-<text x="169.4" y="347" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.47 s</text>
-<text x="16" y="376" font-size="13" font-weight="600" fill="#c3c2b7">grai rename</text>
-<text x="112" y="407" font-size="14" text-anchor="end" fill="#f0efec">nothing kept</text>
-<path d="M122,395H370.4A4,4 0 0 1 374.4,399V405A4,4 0 0 1 370.4,409H122Z" fill="#3987e5"/>
-<text x="380.4" y="407" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.85 s</text>
-<text x="112" y="439" font-size="14" text-anchor="end" fill="#f0efec">facts kept</text>
-<path d="M122,427H168.9A4,4 0 0 1 172.9,431V437A4,4 0 0 1 168.9,441H122Z" fill="#3987e5"/>
-<text x="178.9" y="439" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.57 s</text>
-<text x="388" y="491" font-size="12" text-anchor="end" fill="#c3c2b7">seconds</text>
+<text x="16" y="44" font-size="13" fill="#c3c2b7">Seconds from the CLI's launch until it exits, in a new Node</text>
+<text x="16" y="61" font-size="13" fill="#c3c2b7">process;</text>
+<text x="16" y="78" font-size="13" fill="#c3c2b7">cold: no facts or file listing kept;</text>
+<text x="16" y="95" font-size="13" fill="#c3c2b7">warm: what the run before left;</text>
+<text x="16" y="112" font-size="13" fill="#c3c2b7">lower is better</text>
+<line x1="60" y1="133" x2="60" y2="505" stroke="#383835" stroke-width="1"/>
+<text x="60" y="522" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="125.6" y1="133" x2="125.6" y2="505" stroke="#2c2c2a" stroke-width="1"/>
+<text x="125.6" y="522" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">1</text>
+<line x1="191.2" y1="133" x2="191.2" y2="505" stroke="#2c2c2a" stroke-width="1"/>
+<text x="191.2" y="522" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2</text>
+<line x1="256.8" y1="133" x2="256.8" y2="505" stroke="#2c2c2a" stroke-width="1"/>
+<text x="256.8" y="522" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">3</text>
+<line x1="322.4" y1="133" x2="322.4" y2="505" stroke="#2c2c2a" stroke-width="1"/>
+<text x="322.4" y="522" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">4</text>
+<line x1="388" y1="133" x2="388" y2="505" stroke="#2c2c2a" stroke-width="1"/>
+<text x="388" y="522" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">5</text>
+<text x="16" y="151" font-size="13" font-weight="600" fill="#c3c2b7">grai check</text>
+<text x="50" y="182" font-size="14" text-anchor="end" fill="#f0efec">cold</text>
+<path d="M60,170H276.8A4,4 0 0 1 280.8,174V180A4,4 0 0 1 276.8,184H60Z" fill="#3987e5"/>
+<path d="M244.2,177H327.5M244.2,173V181M327.5,173V181" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="333.5" y="182" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.37 s</text>
+<text x="50" y="214" font-size="14" text-anchor="end" fill="#f0efec">warm</text>
+<path d="M60,202H106.8A4,4 0 0 1 110.8,206V212A4,4 0 0 1 106.8,216H60Z" fill="#3987e5"/>
+<path d="M99.5,209H129.4M99.5,205V213M129.4,205V213" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="135.4" y="214" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.78 s</text>
+<text x="16" y="243" font-size="13" font-weight="600" fill="#c3c2b7">grai find</text>
+<text x="50" y="274" font-size="14" text-anchor="end" fill="#f0efec">cold</text>
+<path d="M60,262H290.1A4,4 0 0 1 294.1,266V272A4,4 0 0 1 290.1,276H60Z" fill="#3987e5"/>
+<path d="M266.3,269H316M266.3,265V273M316,265V273" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="322" y="274" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.57 s</text>
+<text x="50" y="306" font-size="14" text-anchor="end" fill="#f0efec">warm</text>
+<path d="M60,294H102A4,4 0 0 1 106,298V304A4,4 0 0 1 102,308H60Z" fill="#3987e5"/>
+<path d="M100.6,301H109.2M100.6,297V305M109.2,297V305" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="115.2" y="306" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.70 s</text>
+<text x="16" y="335" font-size="13" font-weight="600" fill="#c3c2b7">grai rename</text>
+<text x="50" y="366" font-size="14" text-anchor="end" fill="#f0efec">cold</text>
+<path d="M60,354H273.6A4,4 0 0 1 277.6,358V364A4,4 0 0 1 273.6,368H60Z" fill="#3987e5"/>
+<path d="M262.9,361H361.7M262.9,357V365M361.7,357V365" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="367.7" y="366" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.32 s</text>
+<text x="50" y="398" font-size="14" text-anchor="end" fill="#f0efec">warm</text>
+<path d="M60,386H103.7A4,4 0 0 1 107.7,390V396A4,4 0 0 1 103.7,400H60Z" fill="#3987e5"/>
+<path d="M100.9,393H110.7M100.9,389V397M110.7,389V397" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="116.7" y="398" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.73 s</text>
+<text x="16" y="427" font-size="13" font-weight="600" fill="#c3c2b7">grai check --fix</text>
+<text x="50" y="458" font-size="14" text-anchor="end" fill="#f0efec">cold</text>
+<path d="M60,446H269.2A4,4 0 0 1 273.2,450V456A4,4 0 0 1 269.2,460H60Z" fill="#3987e5"/>
+<path d="M259.9,453H285.9M259.9,449V457M285.9,449V457" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="291.9" y="458" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3.25 s</text>
+<text x="50" y="490" font-size="14" text-anchor="end" fill="#f0efec">warm</text>
+<path d="M60,478H114.5A4,4 0 0 1 118.5,482V488A4,4 0 0 1 114.5,492H60Z" fill="#3987e5"/>
+<path d="M109,485H120.2M109,481V489M120.2,481V489" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="126.2" y="490" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.89 s</text>
+<text x="388" y="542" font-size="12" text-anchor="end" fill="#c3c2b7">seconds</text>
 </svg>
