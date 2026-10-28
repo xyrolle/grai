@@ -1,8 +1,9 @@
 // One measurement of compile-time.mjs in a process of its own: `node compile-runs.mjs <json>`, which
 // prints what it timed as JSON on its last line. Each clock starts once the library's modules have
 // loaded; the output's texts are checked once every clock has stopped (compiled-texts.mjs).
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { editedCatalog } from "./catalog-edit.mjs";
 import { checkTexts } from "./compiled-texts.mjs";
 import { graiEntry, graiModule } from "./grai.mjs";
 
@@ -15,9 +16,7 @@ async function timed(work) {
 
 /** Saves the edit into its catalog, as an editor saves it, outside every clock. */
 function save({ catalog, key, text }) {
-	const parsed = JSON.parse(readFileSync(catalog, "utf8"));
-	parsed[key] = text;
-	writeFileSync(catalog, JSON.stringify(parsed, null, "\t"));
+	writeFileSync(catalog, editedCatalog(catalog, key, text));
 }
 
 function assertCompiled({ errors }) {
