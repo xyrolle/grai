@@ -64,7 +64,6 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"keys/0.d.ts",
 		".gitignore",
 		"package.json",
-		"keys/0.d.ts.map",
 		"internal.js",
 		"internal.d.ts",
 		"runtime.js",
@@ -73,10 +72,11 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		"server.d.ts",
 		"testing.js",
 		"testing.d.ts",
-		"keys.js",
-		"keys.d.ts",
 		"messages.js",
 		"messages.d.ts",
+		"keys/0.d.ts.map",
+		"keys.js",
+		"keys.d.ts",
 	]);
 
 	writeFileSync(

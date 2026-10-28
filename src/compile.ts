@@ -17,7 +17,11 @@ import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
-import type { RuntimeSources } from "./output-modules.ts";
+import {
+	type RenderedModules,
+	type RuntimeSources,
+	renderModules,
+} from "./output-modules.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
 import { type KeyGroups, savedGroups } from "./saved-groups.ts";
@@ -25,18 +29,26 @@ import { type KeyGroups, savedGroups } from "./saved-groups.ts";
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
 export type CompileResult = { written: string[]; errors: GraiError[] };
 
-/** Everything a compile read and made, kept so the next compile redoes only what changed. */
-export type Build = ParsedCatalogs & {
+/**
+ * A project compiled, its output not yet written: what it read, its keys compiled, and the output's
+ * modules beside the keys rendered, which a dev server serves its first page from before it writes.
+ */
+export type CompiledProject = ParsedCatalogs & {
 	config: Config;
 	/** Each catalog file read, as `parts` has its catalog. */
 	sources: readonly CatalogSource[];
 	hashes: readonly string[];
 	compilation: Compilation;
+	rendered: RenderedModules;
+	/** What a saved build must match to be taken up again: `buildKey` of the config as read. */
+	key: string;
+};
+
+/** Everything a compile read, made and wrote, kept so the next compile redoes only what changed. */
+export type Build = CompiledProject & {
 	/** Where each key is in the base locale's catalog, for the declaration maps. */
 	positions: ReadonlyMap<string, Position>;
 	rendered: Rendered;
-	/** What a saved build must match to be taken up again: `buildKey` of the config as read. */
-	key: string;
 };
 
 const text = (url: URL): string => readFileSync(url, "utf8");
@@ -109,7 +121,9 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	) {
 		return { written: [], errors: [] };
 	}
-	const { result } = await build(read.config, read.sources, hashes, groups);
+	const compiled = compiledFrom(read.config, read.sources, hashes);
+	if ("errors" in compiled) return { written: [], errors: compiled.errors };
+	const { result } = await writeBuild(compiled);
 	return result;
 }
 
@@ -152,8 +166,25 @@ export async function recompile(
 	previous: Build | undefined,
 	options: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
+	const compiled = await compileProject(configFile, previous, options);
+	if ("errors" in compiled)
+		return { result: { written: [], errors: compiled.errors } };
+	return writeBuild(compiled, previous, options);
+}
+
+/**
+ * The first half of `recompile`: compiles from `previous` as it does, and renders the modules
+ * beside the keys, but neither renders the keys nor writes anything. `previous` may be a project
+ * compiled so and not written yet. Returns every error found, or the project compiled, for
+ * `writeBuild` to write.
+ */
+export async function compileProject(
+	configFile: string,
+	previous: CompiledProject | undefined,
+	options: CompileOptions = {},
+): Promise<CompiledProject | { errors: GraiError[] }> {
 	const read = await readProject(configFile);
-	if ("errors" in read) return { result: { written: [], errors: read.errors } };
+	if ("errors" in read) return read;
 	const before =
 		previous !== undefined && sameConfig(previous.config, read.config)
 			? previous
@@ -167,14 +198,7 @@ export async function recompile(
 			? oldHash
 			: hash("sha1", source.bytes);
 	});
-	return build(
-		read.config,
-		read.sources,
-		hashes,
-		savedGroups(read.config.outdir),
-		before,
-		options,
-	);
+	return compiledFrom(read.config, read.sources, hashes, before, options);
 }
 
 function sameConfig(a: Config, b: Config): boolean {
@@ -207,49 +231,80 @@ export async function readProject(
 		: { config, sources };
 }
 
-async function build(
+/** Parses and compiles what was read, and renders the modules beside the keys, or returns every error. */
+function compiledFrom(
 	configured: Config,
 	sources: readonly CatalogSource[],
 	hashes: readonly string[],
-	groups: KeyGroups,
-	previous?: Build,
+	previous?: CompiledProject,
 	{ pseudoLocale = false, localeCopies = false }: CompileOptions = {},
-): Promise<{ result: CompileResult; build?: Build }> {
+): CompiledProject | { errors: GraiError[] } {
 	const parsed = parseCatalogs(sources, previous);
-	if (parsed.errors.length > 0) {
-		return { result: { written: [], errors: parsed.errors } };
-	}
-	const { parts } = parsed;
+	if (parsed.errors.length > 0) return { errors: parsed.errors };
 	const { config, catalogs } = pseudoLocale
 		? withPseudoLocale(configured, parsed.catalogs, previous?.catalogs)
 		: { config: configured, catalogs: parsed.catalogs };
 	const compilation = compileCatalogs(config, catalogs, previous?.compilation);
-	if (compilation.errors.length > 0) {
-		return { result: { written: [], errors: [...compilation.errors] } };
-	}
+	if (compilation.errors.length > 0) return { errors: [...compilation.errors] };
+	return {
+		config,
+		sources,
+		hashes,
+		parts: parsed.parts,
+		catalogs,
+		compilation,
+		rendered: renderModules(
+			config,
+			runtime,
+			compilation,
+			localeCopies,
+			previous?.rendered.formats,
+		),
+		key: buildKey(configured, { pseudoLocale, localeCopies }),
+	};
+}
+
+/**
+ * The second half of `recompile`: renders a compiled project's keys, placed by the groups saved
+ * for its outdir, and writes its output, every file of it the outdir lacks or holds otherwise.
+ * `previous` is the build written last, which the project was compiled from: with the same config,
+ * only what changed since is rendered again, and with none, or another config, everything is.
+ * `localeCopies` is the compile's.
+ */
+export async function writeBuild(
+	compiled: CompiledProject,
+	previous?: Build,
+	{ localeCopies = false }: CompileOptions = {},
+): Promise<{ result: CompileResult; build?: Build }> {
+	const { config, sources, parts, catalogs, compilation } = compiled;
+	const before =
+		previous !== undefined && sameConfig(previous.config, config)
+			? previous
+			: undefined;
+	const groups = savedGroups(config.outdir);
 	const baseIndex = config.locales.indexOf(config.baseLocale);
 	const moved = basePositionsMoved(
 		catalogs[baseIndex],
-		previous?.catalogs[baseIndex],
+		before?.catalogs[baseIndex],
 	);
 	const positions =
-		moved || previous === undefined
+		moved || before === undefined
 			? basePositions(sources, parts, config.baseLocale)
-			: previous.positions;
+			: before.positions;
 	const { output, rendered } = renderOutput(
 		config,
-		runtime,
+		compiled.rendered,
 		compilation,
 		{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
-		{ localeCopies, groups },
-		previous?.rendered,
+		groups,
+		before?.rendered,
 	);
 	let written: string[];
 	try {
 		written = await writeOutput(
 			config.outdir,
 			output,
-			inputsOf(config, hashes, localeCopies, groups),
+			inputsOf(config, compiled.hashes, localeCopies, groups),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
@@ -257,17 +312,7 @@ async function build(
 	}
 	return {
 		result: { written, errors: [] },
-		build: {
-			config,
-			sources,
-			hashes,
-			parts,
-			catalogs,
-			compilation,
-			positions,
-			rendered,
-			key: buildKey(configured, { pseudoLocale, localeCopies }),
-		},
+		build: { ...compiled, positions, rendered },
 	};
 }
 
@@ -278,7 +323,7 @@ async function build(
  */
 export function parseCatalogs(
 	sources: readonly CatalogSource[],
-	previous?: Build,
+	previous?: CompiledProject,
 ): { parts: Catalog[]; catalogs: Catalog[]; errors: GraiError[] } {
 	const errors: GraiError[] = [];
 	const parsedParts = sources.map((source, index) => {
@@ -303,7 +348,7 @@ export function parseCatalogs(
 function parsed(
 	source: CatalogSource,
 	index: number,
-	previous?: Build,
+	previous?: CompiledProject,
 ): Catalog {
 	const old = previous?.sources[index];
 	const catalog = previous?.parts[index];
