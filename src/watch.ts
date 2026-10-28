@@ -10,6 +10,7 @@ import {
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { firstBuildSaver } from "./first-build-saver.ts";
+import type { Placing } from "./placing.ts";
 import { whenQuiet } from "./quiet.ts";
 import { savedBuild } from "./saved-build.ts";
 
@@ -36,7 +37,7 @@ const writeDeadline = 2000;
 
 /**
  * Compiles for development, with the config's pseudo-locale if it names one, then compiles again
- * whenever the config or a catalog changes, or `compileAgain` is called, and nothing else.
+ * whenever the config or a catalog changes, and nothing else.
  * Each compile after the first builds on the last one that succeeded, so it redoes only what
  * changed. A change is compiled on its first event. A compile that finds a catalog that does not
  * parse, as a read in the middle of a save does, is not reported: the files are read again once
@@ -49,10 +50,11 @@ const writeDeadline = 2000;
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
  * the outdir cannot be written, goes to `failed`, and the next change compiles again.
  *
- * `first` settles once the first compile has ended, and `compileAgain` once a compile it starts,
- * or the one after the compile under way, has: with how it ended, after its report, and after the
- * read again a catalog in the middle of a save takes, so a caller that waits for it never sees
- * output that compile is still to write.
+ * `first` settles once the first compile has ended: with how it ended, after its report, and
+ * after the read again a catalog in the middle of a save takes, so a caller that waits for it never
+ * sees output that compile is still to write. That compile, and none after it, asks `placeFirst`
+ * for the groups to place the keys by (`placing.ts`), as Next's watch does with the groups it reads
+ * beside it.
  *
  * The first compile starts from the build the project's last watcher saved, if this grai saved it
  * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
@@ -63,8 +65,7 @@ const writeDeadline = 2000;
  * asks for it, or as the watcher closes. Its result is reported, closing or not, and ends the
  * compile; a change since the first compile is compiled after it. Every other compile is reported
  * once its output is written. Its first build written is saved for the next start
- * (`firstBuildSaver`), or the build of a compile `compileAgain` asked for, which placed the keys
- * anew. It watches until the process ends or `close` is called, whose promise settles once the
+ * (`firstBuildSaver`). It watches until the process ends or `close` is called, whose promise settles once the
  * compile under way, if any, has finished, the output is written and the build is saved, so the
  * project can then be removed.
  */
@@ -78,7 +79,11 @@ export function watch(
 	failed: (error: unknown) => void,
 	{
 		serve,
-	}: { serve?: (compiled: CompiledProject, milliseconds: number) => void } = {},
+		placeFirst,
+	}: {
+		serve?: (compiled: CompiledProject, milliseconds: number) => void;
+		placeFirst?: Placing | undefined;
+	} = {},
 ): Watch {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
@@ -121,6 +126,8 @@ export function watch(
 		const done = waiting.filter(({ after }) => after < begun);
 		waiting = waiting.filter(({ after }) => after >= begun);
 		for (const waiter of done) waiter.ended(compiled);
+		// No compile after the first asks for the groups to place the keys by.
+		placeFirst = undefined;
 	};
 	/** How the next compile begun from now ends. */
 	const nextCompile = () =>
@@ -176,7 +183,7 @@ export function watch(
 			const next = await writeBuild(
 				{ ...compiled, compilation: unchanged },
 				undefined,
-				developing,
+				{ ...developing, placing: placeFirst },
 			);
 			if (next.build !== undefined) {
 				saver.took(next.build, build);
@@ -215,7 +222,10 @@ export function watch(
 			stopWaiting = whenQuiet(run, { deadline: writeDeadline });
 			return { served: compiled };
 		}
-		const next = await writeBuild(compiled, build, developing);
+		const next = await writeBuild(compiled, build, {
+			...developing,
+			placing: placeFirst,
+		});
 		if (next.build === undefined) return next;
 		saver.took(next.build, build);
 		build = next.build;
@@ -287,15 +297,6 @@ export function watch(
 	run();
 	return {
 		first: firstCompile,
-		compileAgain: async () => {
-			const compiled = nextCompile();
-			changes = true;
-			if (!closed) run();
-			const again = await compiled;
-			if ("build" in again && again.build !== undefined)
-				saver.retook(again.build);
-			return again;
-		},
 		write: async () => {
 			if (unwritten === undefined) return false;
 			const { written } = unwritten;
@@ -337,11 +338,6 @@ export type Compiled =
 export type Watch = {
 	/** How the first compile ends. */
 	first: Promise<Compiled>;
-	/**
-	 * Compiles again, for an input no followed file changes, such as the groups an adapter saved,
-	 * and settles with how that compile ends.
-	 */
-	compileAgain: () => Promise<Compiled>;
 	/**
 	 * Writes what a first compile served before its write (`serve`) now, if it is not written yet,
 	 * and settles once that write has ended, written or failed, with whether there was one.

@@ -15,7 +15,6 @@ import type { AppData } from "./app-data.ts";
 import { count, reportErrors } from "./errors.ts";
 import { firstMessage } from "./first-message.ts";
 import { defaultPageExtensions } from "./routes.ts";
-import type { WatchData } from "./watch-worker.ts";
 
 /**
  * The name @xyrolle/grai/next imports the project's compiled output by, in every layer Next
@@ -73,20 +72,18 @@ const watchWorker = new URL(
  * once when it is current, so that Next starts while the watch's first compile builds what each
  * edit after it starts from, and else once that compile has written it, with the keys placed by
  * their groups when the watch read them beside it in time (`first-groups.ts`). Either way the
- * catalogs compile once. The check comes first: started beside it, the watch's compile would hold
- * it back.
+ * catalogs compile once.
  */
 async function startWatching(data: AppData): Promise<void> {
-	const compiled = await isCompiled(data.configFile);
 	// The watch runs grai's own modules, which take none of the process's flags, and a worker refuses
-	// some of them, such as `--input-type`.
-	const worker = new Worker(watchWorker, {
-		workerData: { ...data, held: !compiled } satisfies WatchData,
-		execArgv: [],
-	});
+	// some of them, such as `--input-type`. Its thread starts while the output is checked, and what
+	// it starts first, the read of the groups on a fresh clone, is done the sooner (`watch-worker.ts`).
+	const worker = new Worker(watchWorker, { workerData: data, execArgv: [] });
 	// Next's server holds its process. Other processes read the config for `next dev` too, as
 	// Next's telemetry flush does when the server stops, and must be free to exit.
 	worker.unref();
+	const compiled = await isCompiled(data.configFile);
+	worker.postMessage(compiled ? "current" : "held");
 	// A watch that fails or stops before it has written the output fails Next's start, which would
 	// otherwise wait for it for ever.
 	if (!compiled) await firstMessage(worker, "grai's watch");

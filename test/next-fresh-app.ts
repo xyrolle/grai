@@ -9,14 +9,15 @@ import { writeSources } from "./sources.ts";
 
 /**
  * A fresh Next app, its output not written yet: two routes that each read a key, and keys none
- * reads, `unread` and `more` others. It gives the data withGrai hands its threads, and a compile of
- * its catalogs that writes the output and gives each key's weight.
+ * reads, `unread` and `more` others. It gives the data withGrai hands its threads, and each key's
+ * weight, from a compile of its catalogs that writes the output or from one that does not.
  */
 export function freshApp(more = 0): {
 	dir: string;
 	config: string;
 	data: AppData;
 	compiled: () => Promise<Map<string, number>>;
+	weights: () => Promise<Map<string, number>>;
 } {
 	const others = Object.fromEntries(
 		Array.from({ length: more }, (_, index) => [`key${index}`, `Key ${index}`]),
@@ -30,16 +31,21 @@ export function freshApp(more = 0): {
 		"app/page.jsx": `import * as m from "../out/keys.js";\n\nexport default function Page() {\n\treturn <p>{m.home()}</p>;\n}\n`,
 		"app/about/page.jsx": `import * as m from "../../out/keys.js";\n\nexport default function About() {\n\treturn <p>{m.about()}</p>;\n}\n`,
 	});
+	/** Each key's weight, from its catalogs compiled without writing the output. */
+	const weights = async (): Promise<Map<string, number>> => {
+		const read = await readProject(config);
+		if ("errors" in read) throw read.errors[0];
+		const { catalogs } = parseCatalogs(read.sources);
+		return keyWeights(compileCatalogs(read.config, catalogs));
+	};
 	return {
 		dir,
 		config,
 		data: { configFile: config, pageExtensions: [...defaultPageExtensions] },
-		compiled: async (): Promise<Map<string, number>> => {
+		compiled: async () => {
 			expect((await compile()).errors).toEqual([]);
-			const read = await readProject(config);
-			if ("errors" in read) throw read.errors[0];
-			const { catalogs } = parseCatalogs(read.sources);
-			return keyWeights(compileCatalogs(read.config, catalogs));
+			return weights();
 		},
+		weights,
 	};
 }
