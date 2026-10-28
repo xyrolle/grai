@@ -126,8 +126,10 @@ export function cited(): Record<string, string> {
 		return nanoseconds(spread(row.rounds.plural).median);
 	};
 	const { date, machine } = read(lastInWindow);
+	// The results the charts draw from, which the window wrote: not another bench's that shares the
+	// directory.
 	const recorded = readdirSync(new URL("../../bench/results/", import.meta.url))
-		.filter((file) => file.endsWith(".json"))
+		.filter((file) => file.slice(0, -".json".length) in measured)
 		.map((file) => {
 			const name = file.slice(0, -".json".length);
 			return { name, ...(read(name) as Run) };
