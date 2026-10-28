@@ -214,11 +214,26 @@ describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
 		if (app) await stopped(app.server);
 	});
 
-	/** Writes `text` as the Romanian title, and puts the catalog back after the test. */
+	/**
+	 * Writes `text` as the Romanian title, and puts the catalog back after the test, once the server's
+	 * render has it back too: the server takes an edit's patch apart from the pages, so the next
+	 * test's page would otherwise hydrate over the edited words.
+	 */
 	function editTitle(text: string): void {
 		const file = join(example, "messages/ro.json");
 		const catalog = readFileSync(file, "utf8");
-		onTestFinished(() => writeFileSync(file, catalog));
+		onTestFinished(async () => {
+			writeFileSync(file, catalog);
+			await expect
+				.poll(
+					() =>
+						fetch(`${origin}/`, { headers: { cookie: "lang=ro" } }).then(
+							(response) => response.text(),
+						),
+					{ timeout: 20_000 },
+				)
+				.not.toContain(text);
+		});
 		writeFileSync(
 			file,
 			JSON.stringify({ ...JSON.parse(catalog), title: text }, null, "\t"),
