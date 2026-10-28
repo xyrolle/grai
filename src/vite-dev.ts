@@ -5,11 +5,11 @@ import {
 	isRunnableDevEnvironment,
 	type ViteDevServer,
 } from "vite";
-import type { CompiledProject } from "./compile.ts";
 import { patchedEvent, sinceEvent, updateEvent } from "./dev-events.ts";
 import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import { devKeysId, everyLocale, pageKeysId } from "./page-keys.ts";
+import type { Served } from "./served.ts";
 import { watch } from "./watch.ts";
 
 /** Where a project's grai files are, for the plugin. */
@@ -58,7 +58,7 @@ export function serveMessages(
 		reloadOnEdit,
 		servesFirst,
 	}: { reloadOnEdit: boolean; servesFirst: boolean },
-	compiled: (result: CompiledProject | readonly Error[]) => void,
+	compiled: (result: Served | readonly Error[]) => void,
 ): {
 	module: (id: string) => string | undefined;
 	missingKeyImport: (key: string, importer: string) => string | undefined;
@@ -79,7 +79,7 @@ export function serveMessages(
 	});
 	/** Each key imported by its path, with the modules that import it so. */
 	const importers = new Map<string, Set<string>>();
-	let previous: CompiledProject | undefined;
+	let previous: Served | undefined;
 	/** The page's word that a server has an edit, from its runner or once it takes the messages again. */
 	const patched: HotPayload = { type: "custom", event: patchedEvent };
 	for (const environment of Object.values(server.environments)) {
@@ -98,7 +98,7 @@ export function serveMessages(
 		});
 	}
 
-	const update = async (before: CompiledProject, next: CompiledProject) => {
+	const update = async (before: Served, next: Served) => {
 		const changed = [...next.compilation.changed];
 		// A change of config or of grai rewrites the runtime's anchor: a page that took the new
 		// runtime beside the old would hold two, each with its own locale.
@@ -205,7 +205,7 @@ export function serveMessages(
 	 * the first compile's output was written, left Vite's resolver a lookup that found nothing, and
 	 * the next import comes before the watcher catches up.
 	 */
-	const created = (build: CompiledProject) =>
+	const created = (build: Served) =>
 		Promise.all(
 			Object.values(server.environments).flatMap((environment) =>
 				[...build.rendered.files.keys()]
@@ -232,7 +232,7 @@ export function serveMessages(
 	 * Serves a compile's build, its output written or not yet: the open pages and servers take it as
 	 * an update of the last one.
 	 */
-	const serve = (next: CompiledProject, written: boolean) => {
+	const serve = (next: Served, written: boolean) => {
 		const before = previous;
 		previous = next;
 		compiled(next);
@@ -294,7 +294,7 @@ export function serveMessages(
 /** Whether a file is the plugin's to follow, so Vite's own update leaves it alone. */
 export function followedFile(
 	files: ProjectFiles,
-	build: CompiledProject | undefined,
+	build: Served | undefined,
 	file: string,
 ): boolean {
 	const catalogs = [...(build?.config.catalogs.values() ?? [])].flat();
@@ -306,10 +306,7 @@ export function followedFile(
 }
 
 /** The key a per-key path names by its last segment, `…/<key>.js`, if the build has that key. */
-export function pathKey(
-	build: CompiledProject,
-	id: string,
-): string | undefined {
+export function pathKey(build: Served, id: string): string | undefined {
 	const key = /([^/]+)\.js$/.exec(id)?.[1];
 	return key !== undefined && build.compilation.keys.has(key) ? key : undefined;
 }

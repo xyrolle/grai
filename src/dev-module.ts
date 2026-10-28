@@ -1,6 +1,4 @@
 import { join } from "node:path";
-import type { CompiledKey } from "./compilation.ts";
-import type { CompiledProject } from "./compile.ts";
 import {
 	changeEvent,
 	patchedEvent,
@@ -12,6 +10,7 @@ import { destructuredExports } from "./key-exports.ts";
 import { identifierKey } from "./literal-key.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import { everyLocale } from "./page-keys.ts";
+import type { Served, ServedKey } from "./served.ts";
 
 /**
  * The dev module's table: its text keys' rows as one JSON string, and the other keys' rows. A
@@ -109,7 +108,7 @@ const devWords = new Set(
  */
 export function devModule(
 	outdir: string,
-	build: CompiledProject,
+	build: Served,
 	version: number,
 	locale?: string,
 ): string {
@@ -167,7 +166,7 @@ const keys = await import(/* @vite-ignore */ url.href);
 const shellWords = new Set(shellCode([], "").match(/[A-Za-z_$][\w$]*/g));
 
 /** keys.js for the client in dev (`shellCode`). */
-export function pageKeysShell(build: CompiledProject): string {
+export function pageKeysShell(build: Served): string {
 	const { locales, baseLocale } = build.config;
 	return `${shellCode(locales, baseLocale)}${destructuredExports(
 		"keys",
@@ -195,7 +194,7 @@ export { missing as ${key} };
 /** An edit's patch: the changed keys' rows, which the page writes into its table. */
 export function patchModule(
 	outdir: string,
-	build: CompiledProject,
+	build: Served,
 	changed: readonly string[],
 ): string {
 	const keys = changed.flatMap((key) => build.compilation.keys.get(key) ?? []);
@@ -208,7 +207,7 @@ export function patchModule(
 
 /** A key's row in the dev table: the variants `held` keeps of its locales', and their parts for markup. */
 function row(
-	compiled: CompiledKey | undefined,
+	compiled: ServedKey | undefined,
 	held: (variants: readonly string[]) => readonly (string | undefined)[],
 ): string {
 	if (compiled === undefined) return "{}";

@@ -18,7 +18,7 @@ export type CalledNames = {
  * the formatters and the globals they call. A key's code refers to nothing else.
  */
 export function calledNames(
-	keys: Iterable<CompiledKey>,
+	keys: Iterable<Pick<CompiledKey, "uses" | "plurals" | "formats" | "globals">>,
 	functions?: Iterable<string>,
 ): CalledNames {
 	const runtime = new Set(functions);
