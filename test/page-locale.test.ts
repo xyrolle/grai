@@ -397,7 +397,7 @@ describe("a page the dev server serves", () => {
 		]).toEqual([true, false, false]);
 	});
 
-	it("takes every locale's words through keys.js itself when no import map points it at its locale's", async () => {
+	it("takes its locale's words alone through keys.js itself, with no import map, by its <html lang>", async () => {
 		const dir = site(
 			{ strategy: ["preferredLanguage"] },
 			page.replace("<html>", '<html lang="ar">'),
@@ -411,7 +411,7 @@ describe("a page the dev server serves", () => {
 		await tab.waitForFunction(`document.body.textContent !== ""`);
 
 		expect(await tab.evaluate("window.holds()")).toBe("ar ar سلتك");
-		expect(keys).toEqual(["/@id/__x00__grai:keys"]);
+		expect(keys).toEqual(["/@id/__x00__grai:keys", "/@id/__x00__grai:keys/ar"]);
 	});
 
 	it("gives a module worker every locale's words, as a worker has no import map and no <html lang>", async () => {

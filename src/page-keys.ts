@@ -11,6 +11,12 @@ export function pageKeysId(locale: string): string {
 	return `${devKeysId}/${locale}`;
 }
 
+/**
+ * What names every locale in place of one, in the id of keys.js with every locale's words, which a
+ * worker takes: `*`, which no locale is.
+ */
+export const everyLocale = "*";
+
 /** Whether an id is keys.js's in dev, every locale's or a page's. */
 export function isDevKeys(id: string): boolean {
 	return id === devKeysId || id.startsWith(`${devKeysId}/`);
