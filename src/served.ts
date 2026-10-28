@@ -45,7 +45,11 @@ export function servedIndex(build: Build): ServedIndex {
 		compilation: { keys, changed: new Set() },
 		rendered: {
 			modules,
-			files: new Map([...moduleFiles.immutable, ...moduleFiles.mutable]),
+			files: new Map(
+				[...moduleFiles.immutable, ...moduleFiles.mutable].map(
+					([path, text]) => [path, text],
+				),
+			),
 		},
 		hashes: build.hashes,
 	};

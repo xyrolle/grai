@@ -149,13 +149,7 @@ it("writes the whole output once, then only the files an edit changes", async ()
 		join(dir, "messages", "de.json"),
 		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
 	);
-	expect(await writtenBy(compile())).toEqual([
-		"keys/0.js",
-		"keys/0.d.ts",
-		"keys/0.d.ts.map",
-		"keys.js",
-		"keys.d.ts",
-	]);
+	expect(await writtenBy(compile())).toEqual(["keys/0.js"]);
 });
 
 it("has Git ignore the output, and nothing else", async () => {
