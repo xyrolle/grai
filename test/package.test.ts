@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
 	cpSync,
 	mkdirSync,
@@ -11,7 +11,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "vite";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -119,19 +119,19 @@ function text(dir: string, file: string): string {
 	return readFileSync(join(dir, file), "utf8");
 }
 
-/** The packed bundle's modules: dist's JavaScript, but the runtime's, by its path in dist. */
-function bundled(): string[] {
+/** The packed bundle's files with an extension: dist's, but the runtime's, by its path in dist. */
+function bundled(extension = ".js"): string[] {
 	return packed.files
 		.filter(
 			(file) =>
 				file.startsWith("dist/") &&
-				file.endsWith(".js") &&
+				file.endsWith(extension) &&
 				!file.startsWith("dist/runtime/"),
 		)
 		.map((file) => file.slice("dist/".length));
 }
 
-it("packs the bundle, each module's declarations, the lists of the chunks grai's parts run, and nothing else", () => {
+it("packs the bundle with its maps, each module's declarations, the lists of the chunks grai's parts run, and nothing else", () => {
 	expect(packed.files).toEqual(
 		[
 			"CHANGELOG.md",
@@ -143,9 +143,35 @@ it("packs the bundle, each module's declarations, the lists of the chunks grai's
 			`dist/${builtModulesFile}`,
 			...sourceModules().map((module) => `dist/${module}.d.ts`),
 			...bundled().map((file) => `dist/${file}`),
+			...bundled(".js.map").map((file) => `dist/${file}`),
 			...runtimeFiles().map((file) => `dist/${file}`),
 		].sort(),
 	);
+});
+
+it("maps each module of the bundle that holds code to its sources, which its map holds", () => {
+	for (const file of bundled()) {
+		const code = text(packed.dir, `dist/${file}`);
+		const mapping = code.match(/\n\/\/# sourceMappingURL=(\S+)\n?$/)?.[1];
+		if (mapping === undefined) {
+			// A module of re-exports alone, whose every line is an import or an export.
+			expect(
+				code
+					.split("\n")
+					.filter((line) => line !== "" && !/^(import|export) /.test(line)),
+				file,
+			).toEqual([]);
+			continue;
+		}
+		const map: { sources: string[]; sourcesContent: string[] } = JSON.parse(
+			text(packed.dir, join("dist", dirname(file), mapping)),
+		);
+		expect(map.sourcesContent, file).toHaveLength(map.sources.length);
+		for (const [index, source] of map.sources.entries())
+			expect(map.sourcesContent[index], `${file}: ${source}`).toBe(
+				text(packed.dir, join("dist", dirname(file), source)),
+			);
+	}
 });
 
 it("bundles each entry at its source's path, and the modules they share in chunks at dist's root", () => {
@@ -259,3 +285,40 @@ it("writes a page's locale script from the packed package as from the sources", 
 		expect(fromPacked).toEqual(await inlineScripts(sourceVite, config));
 	}
 }, 60_000);
+
+it("names a source's file and line in a stack trace through the packed package, under --enable-source-maps", () => {
+	const directory = temp ?? "";
+	const installed = join(directory, "installed");
+	mkdirSync(installed);
+	const [tarball = ""] = readdirSync(join(directory, "tarball"));
+	execFileSync("tar", [
+		"-xzf",
+		join(directory, "tarball", tarball),
+		"-C",
+		installed,
+	]);
+	const entry = pathToFileURL(join(installed, "package", "dist", "index.js"));
+	// A config that is not there: the compile's error comes from the config's reader.
+	const run = spawnSync(
+		process.execPath,
+		[
+			"--enable-source-maps",
+			"--input-type=module",
+			"-e",
+			`const { compile } = await import(${JSON.stringify(entry.href)}); const { errors } = await compile(process.argv[1]); console.log(errors[0].stack);`,
+			join(installed, "missing", "grai.config.json"),
+		],
+		{ encoding: "utf8" },
+	);
+	const frame = /at readConfig \(.+[/\\]src[/\\]config\.ts:(\d+):(\d+)\)/.exec(
+		run.stdout,
+	);
+
+	expect(frame, run.stdout + run.stderr).not.toBeNull();
+	const [, line = "", column = ""] = frame ?? [];
+	expect(
+		text(root, "src/config.ts")
+			.split("\n")
+			[Number(line) - 1]?.slice(Number(column) - 1),
+	).toMatch(/^readText\(/);
+});
