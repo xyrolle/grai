@@ -87,14 +87,21 @@ export function parsePattern(source: string): Part[] {
 	return parts;
 }
 
-/** The index of the next `{` or `\` from an index on, or -1 when there is none. */
+/**
+ * The index of the next `{` or `\` from an index on, or -1 when there is none: one scan forward,
+ * which the parser starts where the last one ended, so it reads the text between them once, however
+ * many escapes and placeholders the pattern holds.
+ */
 function nextSpecial(source: string, from: number): number {
-	const brace = source.indexOf("{", from);
-	const slash = source.indexOf("\\", from);
-	if (brace === -1) return slash;
-	if (slash === -1) return brace;
-	return Math.min(brace, slash);
+	for (let index = from; index < source.length; index++) {
+		const char = source.charCodeAt(index);
+		if (char === braceCode || char === slashCode) return index;
+	}
+	return -1;
 }
+
+const braceCode = "{".charCodeAt(0);
+const slashCode = "\\".charCodeAt(0);
 
 /**
  * The index of the `}` that closes the placeholder or markup a `{` opens, or -1 when none does. A
