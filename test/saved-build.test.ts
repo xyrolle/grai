@@ -1,11 +1,18 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readFileSync,
+	renameSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
-import { savedBuild } from "../src/saved-build.ts";
+import { savedBuild, savedIndex } from "../src/saved-build.ts";
 import { saveGroups } from "../src/saved-groups.ts";
+import type { Served } from "../src/served.ts";
 import { savingFile } from "../src/state-saves.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
@@ -344,4 +351,68 @@ it("saves one whole build when two watchers of an outdir close at once, so no st
 		written: [],
 		files: start.build?.rendered.files,
 	});
+});
+
+/** Each key's code in each locale, as a dev server serves it. */
+const codeOf = (served: Served | undefined) =>
+	[...(served?.compilation.keys ?? [])].map(([key, { kind, variants }]) => [
+		key,
+		kind,
+		variants,
+	]);
+
+it("reads a saved build's index alone, the build's own code, while the catalogs are as it was compiled from", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	const { build } = await started(file);
+
+	const saved = await savedIndex(file, { pseudoLocale: true });
+	await saved?.close();
+	expect(codeOf(saved?.index)).toEqual(codeOf(build));
+	expect(saved?.index.rendered.modules).toEqual(build?.rendered.modules);
+	expect("sources" in (saved?.index ?? {})).toBe(false);
+
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
+	);
+	expect(await savedIndex(file, { pseudoLocale: true })).toBeUndefined();
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
+});
+
+/**
+ * Saves the build of the project's catalogs with `edited` as its German title, as another process
+ * would, its bytes then kept and the project put back as it was, catalogs, output and save.
+ */
+async function anotherSave(dir: string, file: string, edited: string) {
+	const catalog = join(dir, "messages", "de.json");
+	const before = readFileSync(catalog, "utf8");
+	const save = savedFile(dir);
+	const kept = readFileSync(save);
+	writeFileSync(catalog, JSON.stringify({ ...catalogs.de, title: edited }));
+	await started(file);
+	const other = readFileSync(save);
+	writeFileSync(catalog, before);
+	writeFileSync(save, kept);
+	await recompile(file, undefined, { pseudoLocale: true });
+	return other;
+}
+
+/** Puts a save in place as a process saves it: whole, renamed over the last. */
+function replaceSave(dir: string, bytes: Buffer): void {
+	const save = savedFile(dir);
+	writeFileSync(`${save}.next`, bytes);
+	renameSync(`${save}.next`, save);
+}
+
+it("reads the build of the save it read the index of, whatever another process saves since", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	await started(file);
+	const other = await anotherSave(dir, file, "Überschrift");
+
+	const saved = await savedIndex(file, { pseudoLocale: true });
+	replaceSave(dir, other);
+	const build = await saved?.build();
+
+	expect(JSON.stringify(codeOf(build))).toContain("Titel");
+	expect(JSON.stringify(codeOf(build))).not.toContain("Überschrift");
 });
