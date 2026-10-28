@@ -1,8 +1,9 @@
 // One measurement of compile-time.mjs in a process of its own: `node compile-runs.mjs <json>`, which
 // prints what it timed as JSON on its last line. Each clock starts once the library's modules have
-// loaded.
+// loaded; the output's texts are checked once every clock has stopped (compiled-texts.mjs).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { checkTexts } from "./compiled-texts.mjs";
 import { graiEntry, graiModule } from "./grai.mjs";
 
 /** The work's time in ms, and what it returned. */
@@ -52,7 +53,7 @@ const runs = {
 	 * edited, compiled again by `recompile` from the build of a compile before it, as its Vite
 	 * plugin and `grai watch` compile an edit.
 	 */
-	async grai({ config, edit }) {
+	async grai({ config, outdir, edit, reference }) {
 		const { compile } = await import(graiEntry("."));
 		const { recompile } = await import(graiModule("compile.ts"));
 		const cold = await timed(() => compile(config));
@@ -65,6 +66,7 @@ const runs = {
 		save(edit);
 		const edited = await timed(() => recompile(config, build));
 		assertCompiled(edited.result.result);
+		await checkTexts(outdir, reference, edit);
 		return { cold: cold.ms, noop: noop.ms, edit: edited.ms };
 	},
 
@@ -78,6 +80,7 @@ const runs = {
 				outputStructure: options.outputStructure,
 			}),
 		);
+		await checkTexts(options.outdir, options.reference);
 		return { cold: cold.ms };
 	},
 
@@ -85,7 +88,8 @@ const runs = {
 	 * Paraglide's Vite plugin, driven as a dev server drives it: its config hooks, its `buildStart`,
 	 * which compiles in the layout it takes in development, and after the edit is saved, its
 	 * `watchChange`, which compiles again from the compilation it kept, writing only the files
-	 * that changed, and then takes a digest of what it read.
+	 * that changed, and then takes a digest of what it read. In development the plugin reports a
+	 * failed compile rather than throw, so the output's texts tell whether it compiled.
 	 */
 	async "paraglide-plugin"(options) {
 		await forDeclarations(options);
@@ -106,6 +110,7 @@ const runs = {
 			);
 		save(options.edit);
 		const edited = await timed(() => plugin.watchChange(options.edit.catalog));
+		await checkTexts(options.outdir, options.reference, options.edit);
 		return { cold: cold.ms, edit: edited.ms };
 	},
 };
