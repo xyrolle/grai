@@ -1,6 +1,6 @@
 // A cold `next dev`'s first page: each app started from an empty .next, ROUNDS times, timed from the
 // process's launch until its first response is complete and, in a start of its own, until Chromium
-// has hydrated it. grai starts twice: with its output prepared, as its watch leaves it after a
+// has hydrated it, of which the time after the document's first byte is the page's in Chromium. grai starts twice: with its output prepared, as its watch leaves it after a
 // session (the groups of keys its routes read saved), and from an empty outdir in a copy of its app,
 // compiling the catalogs as Next starts. next-intl starts twice: with its provider
 // passing the client component every message, as by default, and only its keys, as its docs
@@ -73,7 +73,7 @@ async function round(browser, apps, first, path, words) {
 		samples[name] = { ready, page, cpu };
 	}
 	for (const { name, root, cleared } of order) {
-		const { server, hydrated } = await hydratedStart(
+		const { server, hydrated, document } = await hydratedStart(
 			browser,
 			root,
 			path,
@@ -82,13 +82,15 @@ async function round(browser, apps, first, path, words) {
 		);
 		await stopServer(server.child);
 		samples[name].hydrated = hydrated;
+		samples[name].browser = hydrated - document;
 	}
 	return samples;
 }
 
 /**
  * Each app's samples, by name, one per round: until ready, until the first response and the CPU
- * of Next's processes until then, and, from a start of its own, until hydrated. A first round is
+ * of Next's processes until then, and, from a start of its own, until hydrated and how much of that
+ * came after the document's first byte (`browser`). A first round is
  * not counted: whichever app starts first in it pays for the disk's and Node's caches, and for any
  * edit the bench left in the catalogs.
  */
@@ -111,7 +113,7 @@ export async function coldRounds(browser, apps, path, words, rounds) {
 
 /** Each app's medians and ranges, and the pairs' differences, overall and by block. */
 export function coldSummary(runs, blockSize) {
-	const measures = ["ready", "page", "hydrated", "cpu"];
+	const measures = ["ready", "page", "hydrated", "browser", "cpu"];
 	const apps = Object.fromEntries(
 		Object.entries(runs).map(([name, samples]) => [
 			name,
@@ -133,7 +135,13 @@ export function coldSummary(runs, blockSize) {
 				blocks.push(median(values.slice(start, start + blockSize)));
 			return { ...spread(values), blocks, values };
 		};
-		return { first, second, page: of("page"), hydrated: of("hydrated") };
+		return {
+			first,
+			second,
+			page: of("page"),
+			hydrated: of("hydrated"),
+			browser: of("browser"),
+		};
 	});
 	return { apps, pairs };
 }
@@ -145,29 +153,31 @@ const range = ({ min, max }) => `${whole(min)}–${whole(max)}`;
 /** Prints the summary as two tables: the apps, then the pairs. */
 export function printCold({ apps, pairs }, rounds) {
 	console.log(
-		`\n\`next dev\` from an empty .next, from its launch until the page's first response is complete and, in a start of its own, until Chromium has hydrated it; ${rounds} rounds in rotating order, medians and ranges, ms\n`,
+		`\n\`next dev\` from an empty .next, from its launch until the page's first response is complete and, in a start of its own, until Chromium has hydrated it, and of that the time after the document's first byte; ${rounds} rounds in rotating order, medians and ranges, ms\n`,
 	);
 	console.log(
-		"| app | ready | first page | range | hydrated | range | CPU until the first page |",
+		"| app | ready | first page | range | hydrated | range | after the first byte | CPU until the first page |",
 	);
-	console.log("|---|---|---|---|---|---|---|");
-	for (const [name, { ready, page, hydrated, cpu }] of Object.entries(apps)) {
+	console.log("|---|---|---|---|---|---|---|---|");
+	for (const [name, { ready, page, hydrated, browser, cpu }] of Object.entries(
+		apps,
+	)) {
 		console.log(
-			`| ${name} | ${whole(ready.median)} | ${whole(page.median)} | ${range(page)} | ${whole(hydrated.median)} | ${range(hydrated)} | ${whole(cpu.median)} |`,
+			`| ${name} | ${whole(ready.median)} | ${whole(page.median)} | ${range(page)} | ${whole(hydrated.median)} | ${range(hydrated)} | ${whole(browser.median)} | ${whole(cpu.median)} |`,
 		);
 	}
 	console.log(
 		"\nPaired by round, the first app's time less the second's: medians, ranges and each block's median, ms\n",
 	);
 	console.log(
-		"| pair | first page | range | blocks | hydrated | range | blocks |",
+		"| pair | first page | range | blocks | hydrated | range | blocks | after the first byte | range | blocks |",
 	);
-	console.log("|---|---|---|---|---|---|---|");
+	console.log("|---|---|---|---|---|---|---|---|---|---|");
 	const differences = ({ median, min, max, blocks }) =>
 		`${signed(median)} | ${signed(min)} to ${signed(max)} | ${blocks.map(signed).join(", ")}`;
-	for (const { first, second, page, hydrated } of pairs) {
+	for (const { first, second, page, hydrated, browser } of pairs) {
 		console.log(
-			`| ${first} − ${second} | ${differences(page)} | ${differences(hydrated)} |`,
+			`| ${first} − ${second} | ${differences(page)} | ${differences(hydrated)} | ${differences(browser)} |`,
 		);
 	}
 }
