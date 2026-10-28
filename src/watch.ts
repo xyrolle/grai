@@ -24,7 +24,7 @@ import { savedBuild } from "./saved-build.ts";
 const settleMilliseconds = 20;
 
 /** How a watcher compiles: for development, with the config's pseudo-locale. */
-const developing = { pseudoLocale: true };
+export const developing = { pseudoLocale: true };
 
 /**
  * How long the write of a first compile served before it may wait for the process to be quiet:
