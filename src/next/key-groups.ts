@@ -6,7 +6,6 @@
 import { readProjectCode } from "../code/project.ts";
 import { readingOf } from "../code/reads.ts";
 import type { StateStore } from "../code/state-store.ts";
-import type { Compilation } from "../compilation.ts";
 import type { Config } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { keySets } from "../key-sets.ts";
@@ -29,16 +28,9 @@ export type GroupReading = {
 	store?: StateStore | undefined;
 };
 
-/** Each key's weight: the length of its compiled code, which a module that holds it compiles. */
-export function keyWeights(compilation: Compilation): Map<string, number> {
-	return new Map(
-		[...compilation.keys].map(([key, { value }]) => [key, value.length]),
-	);
-}
-
 /**
  * The groups of the keys the app's routes read, each sorted, in the order of their first key, from
- * each key's weight (`keyWeights`). A key's contexts are the sides of the routes that read it
+ * each key's weight (`key-weights.ts`). A key's contexts are the sides of the routes that read it
  * (`keyContexts`): keys the same contexts read are a group, and two groups are one when the modules
  * that saves, in the contexts that read both, outweigh the code compiled for nothing in those that
  * read one. A key no route reads is in none.
