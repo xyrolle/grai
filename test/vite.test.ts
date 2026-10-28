@@ -6,6 +6,7 @@ import {
 	readdirSync,
 	readFileSync,
 	realpathSync,
+	renameSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -1350,6 +1351,53 @@ console.log(new MagicString(m.title()).toString());
 		expect(errors).toEqual([]);
 		expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
 		release();
+	});
+
+	it("writes a file of the output gone since the last start for an import of it with a query, on a restart from the saved index", async () => {
+		const { dir } = project(catalogs);
+		writeTitleRender(dir);
+		const first = await devServerOf(dir);
+		expect(await first.rendered()).toBe("Title");
+		await first.server.close();
+		rmSync(join(dir, "out", "messages.js"));
+		writeFileSync(
+			join(dir, "render.js"),
+			`import source from "./out/messages.js?raw";\nexport const render = () => String(source.includes("export"));\n`,
+		);
+
+		const { rendered } = await devServerOf(dir);
+
+		expect(await rendered()).toBe("true");
+	});
+
+	it("patches an evaluated server render with an edit another process saved a build of, after its restart served the index of the save before", async () => {
+		const { dir } = project(catalogs);
+		writeTitleRender(dir);
+		const save = join(dir, "out", ".grai", "build");
+		const catalog = join(dir, "messages", "en.json");
+		const words = readFileSync(catalog, "utf8");
+		const edited = words.replace('"Title"', '"Heading"');
+		const first = await devServerOf(dir);
+		expect(await first.rendered()).toBe("Title");
+		await first.server.close();
+		// Another process's save of the edit, kept, and the project's save and words put back.
+		const kept = readFileSync(save);
+		writeFileSync(catalog, edited);
+		const other = await devServerOf(dir);
+		expect(await other.rendered()).toBe("Heading");
+		await other.server.close();
+		const saved = readFileSync(save);
+		writeFileSync(catalog, words);
+		writeFileSync(save, kept);
+		const { rendered } = await devServerOf(dir);
+		expect(await rendered()).toBe("Title");
+
+		// In one turn, before the server hears of the edit: the other save in place, then the edit.
+		writeFileSync(`${save}.next`, saved);
+		renameSync(`${save}.next`, save);
+		writeFileSync(catalog, edited);
+
+		await expect.poll(rendered, devWait).toBe("Heading");
 	});
 
 	it("writes the output before a test run takes it, and fails the import when the write fails", async () => {
