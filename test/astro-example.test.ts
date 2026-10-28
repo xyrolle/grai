@@ -545,7 +545,10 @@ describe("the Astro example in dev, a first start with an error only the output'
 
 	it("renders the first page in its locale, then shows the error in Vite's overlay", async () => {
 		await page.goto(`${origin}/ro/despre/`);
-		expect(await text("h1")).toBe("Despre acest exemplu");
+		// The page's own heading: the overlay, which may already be open, has one too.
+		expect(await page.locator("h1").first().textContent()).toBe(
+			"Despre acest exemplu",
+		);
 		await page
 			.locator("vite-error-overlay")
 			.getByText(conflictingInputError)
