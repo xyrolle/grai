@@ -1,15 +1,19 @@
-// Every section of charts, strongest first, and the numbers the README's text cites, each from
-// the results a bench recorded (bench/results.mjs).
+// Every section of charts, strongest first, the rows of the table at a glance where grai is behind,
+// and the numbers the README's text cites, each from the results a bench recorded
+// (bench/results.mjs).
 
 import { readdirSync } from "node:fs";
 import { nextColdSection, nextEditSection } from "./nextjs.ts";
 import {
 	and,
+	duration,
 	type Glance,
 	nanoseconds,
 	read,
 	type Section,
 	seconds,
+	spread,
+	verdict,
 	whole,
 } from "./results.ts";
 import {
@@ -31,12 +35,12 @@ import {
 	typesSection,
 } from "./tooling.ts";
 
-/** How many times grai's figure the other's is: above 1, grai is ahead. */
-export const ratio = ({ grai, other }: Glance): number => other.value / grai;
-
-/** A section's strongest row of the at-a-glance table, or none. */
+/** A section's strongest row of the table at a glance, or none. */
 const strongest = (section: Section) =>
-	Math.max(...section.glance.map(ratio), Number.NEGATIVE_INFINITY);
+	Math.max(
+		...section.glance.map((glance) => verdict(glance).strength),
+		Number.NEGATIVE_INFINITY,
+	);
 
 /** Every section, its strongest measure first; a section with nothing to compare goes last. */
 export function sections(): Section[] {
@@ -60,8 +64,12 @@ export function sections(): Section[] {
 	].toSorted((a, b) => strongest(b) - strongest(a));
 }
 
-const capitalized = (text: string) =>
-	`${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
+/** The rows of the table at a glance where grai is behind, its interval clear of level. */
+export function behind(all: Section[]): Glance[] {
+	return all
+		.flatMap((section) => section.glance)
+		.filter((glance) => verdict(glance).text.endsWith(", behind"));
+}
 
 /** What a recorded result's file holds about its run. */
 type Run = {
@@ -75,39 +83,49 @@ const lastInWindow = "nextjs-synthetic";
 
 /** What each bench measured, as the README says it when the bench was run on its own. */
 const measured: Record<string, string> = {
+	"build-added": "the production build",
 	"compile-time": "the compile times",
-	"dev-start-synthetic": "the dev server's cold start",
+	"dev-start-synthetic": "the dev server's first start",
+	"dev-start-mixed-synthetic": "the dev server's first start on the mixed page",
+	"dev-start-restart-synthetic": "the dev server's restart",
+	"hmr-synthetic": "the dev server's edits",
+	"hydrate-synthetic": "the page",
+	"library-bytes-synthetic": "the runtime",
+	"nextjs-synthetic": "Next.js",
+	ordinals: "the ordinal forms",
+	plurals: "the plural forms",
 	"refactor-synthetic": "the refactoring commands",
 	"server-synthetic": "the server's calls",
 	"ssr-synthetic": "the server render",
-	plurals: "the plural forms",
-	ordinals: "the ordinal forms",
 	"types-synthetic": "the editor's completions at 6,366 keys",
 	"types-synthetic-13326": "the editor's completions at 13,326 keys",
-	"hydrate-synthetic": "the page",
-	"hmr-synthetic": "the dev server's edits",
-	"library-bytes-synthetic": "the runtime's size",
-	"build-added": "the production build",
 };
+
+const capitalized = (text: string) =>
+	`${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
 
 /** The numbers the README's text cites, by name, each from the results it was measured in. */
 export function cited(): Record<string, string> {
-	const shown = (section: Section, label: string) =>
-		section.figures[0]?.chart.groups[0]?.bars.find(
-			(each) => each.label === label,
-		)?.shown ?? "";
+	const shown = (section: Section, label: string) => {
+		const bar = section.figures[0]?.chart.groups
+			.flatMap((group) => group.bars)
+			.find((each) => each.label === label);
+		if (bar === undefined)
+			throw new Error(`${section.id} has no bar for ${label}`);
+		return bar.shown;
+	};
 	const page = pageSection();
 	const dev = devSection();
-	const start = devStartSection().glance[0];
 	const runtime = runtimeSection();
 	const refactor = read("refactor-synthetic").rows;
 	const server = read("server-synthetic").rows;
-	const plural = (variant: string) =>
-		nanoseconds(
-			server.findLast((row: { variant: string }) => row.variant === variant).ns
-				.plural,
+	const plural = (variant: string) => {
+		const row = server.findLast(
+			(each: { variant: string }) => each.variant === variant,
 		);
-	const { date, machine } = read("build-added");
+		return nanoseconds(spread(row.rounds.plural).median);
+	};
+	const { date, machine } = read(lastInWindow);
 	const recorded = readdirSync(new URL("../../bench/results/", import.meta.url))
 		.filter((file) => file.endsWith(".json"))
 		.map((file) => {
@@ -143,17 +161,12 @@ export function cited(): Record<string, string> {
 		"runtime-use-intl": shown(runtime, "use-intl"),
 		"page-grai": shown(page, "grai"),
 		"page-paraglide": shown(page, "Paraglide"),
-		"page-i18next": shown(page, "i18next"),
+		"page-i18next": shown(page, "i18next, page's keys"),
 		"dev-grai": shown(dev, "grai"),
-		"start-grai": start === undefined ? "" : start.shown(start.grai),
-		"start-best":
-			start === undefined
-				? ""
-				: `${start.shown(start.other.value)} on ${start.other.name}`,
 		"dev-paraglide": shown(dev, "Paraglide"),
 		"plural-grai": plural("grai `m.key()`"),
 		"plural-paraglide": plural("Paraglide `m.key()`"),
-		"check-warm": seconds(refactor.check.warm),
-		"check-cold": seconds(refactor.check.cold),
+		"check-warm": seconds(refactor.check.warmSamples.median),
+		"check-cold": duration(refactor.check.coldSamples.median),
 	};
 }
