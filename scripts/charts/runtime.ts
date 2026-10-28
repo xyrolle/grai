@@ -1,27 +1,34 @@
 // The charts of what a message costs where it runs: a call on a server, a server render, a plural
-// or an ordinal chosen, what a page downloads and how long it hydrates, and the runtime's size.
+// or an ordinal chosen, what a page downloads and how long it hydrates, and the runtime a page
+// needs.
 
 import {
 	and,
 	barsOf,
+	best,
+	between,
 	found,
 	glanceOf,
+	type Interval,
 	kilobytes,
+	milliseconds,
 	nanoseconds,
 	read,
 	type Section,
-	tenths,
+	spread,
+	times,
 	whole,
 } from "./results.ts";
+
+const kinds = ["text", "inputs", "plural", "markup"] as const;
+type Kind = (typeof kinds)[number] | "page";
 
 type ServerRow = {
 	variant: string;
 	locale: string;
-	ns: Record<string, number | undefined>;
+	ratio: Partial<Record<Kind, Interval>>;
+	rounds: Partial<Record<Kind, number[]>>;
 };
-
-const kinds = ["text", "inputs", "plural", "markup"] as const;
-type Kind = (typeof kinds)[number];
 
 const graiCall = "grai `m.key()`";
 const paraglideCall = "Paraglide `m.key()`";
@@ -34,93 +41,87 @@ const callers: [string, string][] = [
 	["use-intl", "use-intl `t(key, values)`, `t.markup`"],
 ];
 
-/** The server's rows, by variant and locale; the charts take the last locale measured. */
-function serverRows() {
-	const recorded = read("server-synthetic");
-	const locales = [
-		...new Set(recorded.rows.map((row: ServerRow) => row.locale)),
-	] as string[];
-	const locale = locales.at(-1) ?? "";
-	const of = (variant: string, at = locale): ServerRow["ns"] =>
-		recorded.rows.find(
-			(row: ServerRow) => row.locale === at && row.variant === variant,
-		).ns;
-	return {
-		versions: recorded.versions,
-		calls: recorded.calls as number,
-		mix: recorded.mix as Record<Kind, number>,
-		locales,
-		locale,
-		of,
-	};
-}
+/** How a ratio's interval reads beside 1: theirs over grai's. */
+const side = (ratio: Interval) =>
+	ratio.low > 1 ? "ahead" : ratio.high < 1 ? "behind" : "level";
+
+/** A ratio with its interval, as a table cell writes it: "2.2× (1.9× to 2.6×)". */
+const ratioCell = (ratio: Interval | undefined) =>
+	ratio === undefined
+		? "—"
+		: `${times(ratio.median)} (${between(ratio, times)})`;
 
 export function serverSection(): Section {
-	const { versions, calls, mix, locales, of } = serverRows();
-	const given: [string, string][] = [
-		["grai, given `{ locale }`", graiGiven],
-		["Paraglide, given `{ locale }`", paraglideGiven],
+	const { rows, calls, mix, versions } = read("server-synthetic");
+	const locales: string[] = [
+		...new Set<string>(rows.map((row: ServerRow) => row.locale)),
 	];
-	const entries = callers.map(([label, variant]): [string, number] => [
-		label,
-		of(variant).page ?? 0,
-	]);
-	const bars = barsOf(entries, (ns) => ns, nanoseconds);
-	/** The kinds on which grai is faster than Paraglide in every locale, slower in every one, or neither. */
-	const compared = (grai: string, paraglide: string) => {
-		const faster = (kind: Kind) =>
-			locales.map(
-				(at) => (of(grai, at)[kind] ?? 0) < (of(paraglide, at)[kind] ?? 0),
-			);
-		return {
-			ahead: kinds.filter((kind) => faster(kind).every(Boolean)),
-			behind: kinds.filter((kind) => !faster(kind).some(Boolean)),
-			even: kinds.filter((kind) => new Set(faster(kind)).size > 1),
-		};
+	const locale = locales.at(-1) ?? "";
+	const of = (variant: string, at = locale): ServerRow => {
+		const row = rows.find(
+			(each: ServerRow) => each.locale === at && each.variant === variant,
+		);
+		if (row === undefined) throw new Error(`server has no ${variant} in ${at}`);
+		return row;
 	};
-	const called = compared(graiCall, paraglideCall);
-	const forced = compared(graiGiven, paraglideGiven);
-	const named: Record<Kind, string> = {
+	const figure = (variant: string, kind: Kind, at = locale): Interval =>
+		spread(of(variant, at).rounds[kind] ?? []);
+	const entries = callers.map(([label, variant]): [string, Interval] => [
+		label,
+		figure(variant, "page"),
+	]);
+	const groups = [{ bars: barsOf(entries, (ns) => ns, nanoseconds) }];
+	/** Each kind's side in every locale: ahead, behind or level, where they all agree. */
+	const sides = (variant: string) =>
+		kinds.map((kind) => {
+			const each = locales.map((at) => {
+				const ratio = of(variant, at).ratio[kind];
+				return ratio === undefined ? "level" : side(ratio);
+			});
+			return { kind, side: new Set(each).size === 1 ? each[0] : "mixed" };
+		});
+	const named: Record<(typeof kinds)[number], string> = {
 		text: "plain text",
 		inputs: "messages with inputs",
 		plural: "plurals",
 		markup: "markup",
 	};
-	const said = (list: Kind[]) => and(list.map((kind) => named[kind]));
-	const lead = [
-		`In a page's mix of ${whole(calls)} calls, grai takes ${nanoseconds(of(graiCall).page ?? 0)} a call against Paraglide's ${nanoseconds(of(paraglideCall).page ?? 0)}.`,
-		`Measured kind by kind in ${and(locales.map((each) => `\`${each}\``))}:`,
-		called.ahead.length > 0
-			? `grai is ahead in each on ${said(called.ahead)}.`
-			: "",
-		called.behind.length > 0
-			? `Paraglide is ahead in each on ${said(called.behind)}.`
-			: "",
-		called.even.length > 0
-			? `On ${said(called.even)}, the lead changes hands from one locale to the other.`
-			: "",
-		forced.behind.length > 0
-			? `Given each call's locale, Paraglide is ahead in each on ${said(forced.behind)}.`
-			: "",
-	]
-		.filter(Boolean)
-		.join(" ");
-	const cell = (value: number | undefined) =>
-		value === undefined ? "—" : whole(value);
+	const said = (
+		list: { kind: (typeof kinds)[number]; side: string | undefined }[],
+		wanted: string,
+	) =>
+		and(
+			list
+				.filter((each) => each.side === wanted)
+				.map((each) => named[each.kind]),
+		);
+	const sentence = (variant: string, who: string) => {
+		const list = sides(variant);
+		return [
+			said(list, "ahead") && `${who} grai is ahead on ${said(list, "ahead")}`,
+			said(list, "level") && `level on ${said(list, "level")}`,
+			said(list, "behind") && `behind on ${said(list, "behind")}`,
+			said(list, "mixed") &&
+				`ahead in one locale and not the other on ${said(list, "mixed")}`,
+		]
+			.filter(Boolean)
+			.join("; ");
+	};
+	const pageRatio = of(paraglideCall).ratio.page;
+	if (pageRatio === undefined) throw new Error("server has no page ratio");
 	const title = `A page's ${whole(calls)} message calls on a server`;
-	const groups = [{ bars }];
 	return {
 		id: "server",
 		heading: "A message call on a server",
 		readme: true,
-		lead,
+		lead: `Kind by kind against Paraglide, in ${and(locales.map((each) => `\`${each}\``))}, each ratio's interval taken from rounds: ${sentence(paraglideCall, "as an app calls them,")}. ${sentence(paraglideGiven, "With each call given its locale,")}.`,
 		figures: [
 			{
 				id: "server-page",
 				chart: {
 					title,
 					subtitle:
-						"Nanoseconds a call, in the page's mix of kinds; lower is better",
+						"Nanoseconds a call: the page's mix, warm in-request batch average; lower is better",
 					axis: "nanoseconds a call",
 					groups,
 				},
@@ -128,49 +129,77 @@ export function serverSection(): Section {
 			},
 		],
 		table: [
-			["", "locale", "page's mix", ...kinds],
+			[
+				"",
+				"locale",
+				"page's mix, ns",
+				...kinds.map((kind) => `${kind}, theirs over grai's`),
+			],
 			...locales.flatMap((at) =>
-				[...callers, ...given].map(([label, variant]) => {
-					const ns = of(variant, at);
-					return [
-						label,
-						at,
-						cell(ns.page),
-						...kinds.map((kind) => cell(ns[kind])),
-					];
-				}),
+				[
+					...callers,
+					["Paraglide, given `{ locale }`", paraglideGiven],
+					["grai, given `{ locale }`", graiGiven],
+				].map(([label = "", variant = ""]) => [
+					label,
+					at,
+					whole(figure(variant, "page", at).median),
+					...kinds.map((kind) =>
+						variant === graiCall || variant === graiGiven
+							? ""
+							: ratioCell(of(variant, at).ratio[kind]),
+					),
+				]),
 			),
 		],
-		note: `Nanoseconds a call in Node, inside a request, on the synthetic catalog (\`bench/server.mjs\`). The page's mix is ${and(
-			Object.entries(mix).map(([kind, count]) => `${whole(count)} ${kind}`),
-		)} calls, each made as an app makes it, a message with markup called for its text; the markup column draws its parts, which i18next has none of. Paraglide ${versions["@inlang/paraglide-js"]}, i18next ${versions.i18next}, use-intl ${versions["use-intl"]}.`,
+		note: `Each variant makes the same ${whole(calls)} calls inside a request in Node, built as an app's server build has them with its library's own plugins, its text checked against Paraglide's (\`bench/server.mjs\`). The clock is a warm batch inside one request: each run of the calls, divided by their number, after a warm-up. The page's mix is ${and(
+			Object.entries(mix as Record<string, number>).map(
+				([kind, count]) => `${whole(count)} ${kind}`,
+			),
+		)} calls. Each variant runs in a process of its own once a round, in an order that rotates; a ratio is the variant's calls over grai's of the same shape in the same round, given \`{ locale }\` against grai given it too. i18next draws no markup parts. Paraglide ${versions["@inlang/paraglide-js"]}, i18next ${versions.i18next}, use-intl ${versions["use-intl"]}.`,
 		glance: [
-			glanceOf(`Server: a message call, a page's mix`, entries, nanoseconds),
+			glanceOf(
+				"Server: a message call, the page's mix, warm",
+				figure(graiCall, "page"),
+				["Paraglide", figure(paraglideCall, "page")],
+				nanoseconds,
+				{ kind: "ratio", ratio: pageRatio },
+			),
 		],
 	};
 }
 
-type SsrRow = { variant: string; locale: string; ns: number };
+type SsrRow = {
+	variant: string;
+	locale: string;
+	ratio: Interval;
+	rounds: number[];
+};
 
 export function ssrSection(): Section {
 	const { rows, calls, versions } = read("ssr-synthetic");
-	const locales = [
-		...new Set(rows.map((row: SsrRow) => row.locale)),
-	] as string[];
+	const locales: string[] = [
+		...new Set<string>(rows.map((row: SsrRow) => row.locale)),
+	];
 	const locale = locales.at(-1) ?? "";
-	const of = (variant: string, at = locale) =>
-		rows.find((row: SsrRow) => row.locale === at && row.variant === variant)
-			.ns / 1e6;
+	const of = (variant: string, at = locale): SsrRow => {
+		const row = rows.find(
+			(each: SsrRow) => each.locale === at && each.variant === variant,
+		);
+		if (row === undefined) throw new Error(`ssr has no ${variant} in ${at}`);
+		return row;
+	};
+	const rendered = (variant: string, at = locale): Interval =>
+		spread(of(variant, at).rounds.map((ns) => ns / 1e6));
 	const libraries = ["grai", "Paraglide", "i18next", "use-intl"];
 	const inlined = "prototype, inlined into the template";
-	const entries = libraries.map((label): [string, number] => [
+	const entries = libraries.map((label): [string, Interval] => [
 		label,
-		of(label),
+		rendered(label),
 	]);
-	const ms = (value: number) =>
-		`${value < 1 ? value.toFixed(2) : tenths(value)} ms`;
-	const groups = [{ bars: barsOf(entries, (value) => value, ms) }];
-	const title = `A server render of a page of ${whole(calls)} messages`;
+	const groups = [{ bars: barsOf(entries, (ms) => ms, milliseconds) }];
+	const [name, figure] = best(entries);
+	const title = `A warm server render of a page of ${whole(calls)} message calls`;
 	return {
 		id: "ssr",
 		heading: "A server render",
@@ -180,7 +209,11 @@ export function ssrSection(): Section {
 				id: "ssr",
 				chart: {
 					title,
-					subtitle: "Milliseconds a render, in Svelte on Node; lower is better",
+					subtitle:
+						`Milliseconds a render, in Svelte on Node, in \`${locale}\`; lower is better`.replaceAll(
+							"`",
+							"",
+						),
 					axis: "milliseconds a render",
 					groups,
 				},
@@ -188,129 +221,183 @@ export function ssrSection(): Section {
 			},
 		],
 		table: [
-			["", ...locales.map((at) => `${at}, ms`)],
+			[
+				"",
+				...locales.flatMap((at) => [`${at}, ms`, `${at}, theirs over grai's`]),
+			],
 			...[...libraries, inlined].map((label) => [
 				label === inlined ? "the words written into the page" : label,
-				...locales.map((at) => ms(of(label, at))),
+				...locales.flatMap((at) => [
+					milliseconds(rendered(label, at).median),
+					label === "grai" ? "" : ratioCell(of(label, at).ratio),
+				]),
 			]),
 		],
-		note: `Svelte renders one page of ${whole(calls)} message calls inside a request, its messages from each library (\`bench/ssr.mjs\`); the last row has the words written into the page, the floor of a render with no message calls. Paraglide ${versions["@inlang/paraglide-js"]}, i18next ${versions.i18next}, use-intl ${versions["use-intl"]}.`,
-		glance: [glanceOf(`Server render, ${whole(calls)} messages`, entries, ms)],
+		note: `Svelte renders one page of ${whole(calls)} message calls inside a request already open, as an app built with Vite renders it, its messages from each library built with its own plugins (\`bench/ssr.mjs\`). The clock is a warm render, \`render(Page, { props })\` after a warm-up; compiling, imports, the libraries' setup and the middleware are outside it. Each variant renders in a process of its own once a round, in an order that rotates; medians of the rounds with the interval that holds each, and each variant's ratio to grai's in the same round. The last row writes each message without a selector into the template. Paraglide ${versions["@inlang/paraglide-js"]}, i18next ${versions.i18next}, use-intl ${versions["use-intl"]}.`,
+		glance: [
+			glanceOf(
+				`Server render, ${whole(calls)} message calls, warm, \`${locale}\``,
+				rendered("grai"),
+				[name, figure],
+				milliseconds,
+				{ kind: "ratio", ratio: of(name).ratio },
+			),
+		],
 	};
 }
 
-type SelectionRow = { variant: string; ns: Record<string, number> };
+type SelectionRow = {
+	variant: string;
+	ratio: Record<string, Interval>;
+	rounds: Record<string, number[]>;
+};
 
 /** A section of the plural or ordinal benches, which choose a form for 0 to 999. */
 function selectionSection(
 	bench: "plurals" | "ordinals",
-	variants: Record<string, string>,
+	variants: [string, string][],
 ): Section {
-	const { rows, versions, counts } = read(bench);
-	const locales = Object.keys(rows[0].ns);
+	const { rows, versions, counts, reference } = read(bench);
 	const locale = "ru";
-	const of = (variant: string, at = locale): number =>
-		rows.find((row: SelectionRow) => row.variant === variant).ns[at];
-	const labels = Object.keys(variants);
-	const entries = labels.map((label): [string, number] => [
+	const of = (variant: string): SelectionRow => {
+		const row = rows.find((each: SelectionRow) => each.variant === variant);
+		if (row === undefined) throw new Error(`${bench} has no ${variant}`);
+		return row;
+	};
+	const chosen = (variant: string, at = locale): Interval =>
+		spread(of(variant).rounds[at] ?? []);
+	const locales = Object.keys(of(reference).rounds);
+	const entries = variants.map(([label, variant]): [string, Interval] => [
 		label,
-		of(variants[label] ?? ""),
+		chosen(variant),
 	]);
 	const groups = [{ bars: barsOf(entries, (ns) => ns, nanoseconds) }];
-	const noun = bench === "plurals" ? "plural" : "ordinal";
-	const title = `Choosing ${noun === "plural" ? "a plural" : "an ordinal"} form in \`${locale}\``;
-	const plain = title.replaceAll("`", "");
+	const noun = bench === "plurals" ? "a plural" : "an ordinal";
+	const title = `Choosing ${noun} form in ${locale}`;
+	const paraglide =
+		variants.find(([label]) => label === "Paraglide")?.[1] ?? "";
+	const ratio = of(paraglide).ratio[locale];
+	if (ratio === undefined)
+		throw new Error(`${bench} has no ratio in ${locale}`);
 	return {
 		id: bench,
-		heading: noun === "plural" ? "Choosing a plural" : "Choosing an ordinal",
+		heading: bench === "plurals" ? "Choosing a plural" : "Choosing an ordinal",
 		readme: false,
 		figures: [
 			{
 				id: bench,
 				chart: {
-					title: plain,
+					title,
 					subtitle: `Nanoseconds a choice, for each count from 0 to ${whole(counts - 1)}; lower is better`,
 					axis: "nanoseconds a choice",
 					groups,
 				},
-				alt: found(plain, groups),
+				alt: found(title, groups),
 			},
 		],
 		table: [
-			["", ...locales.map((at) => `${at}, ns`)],
-			...labels.map((label) => [
+			[
+				"",
+				...locales.flatMap((at) => [`${at}, ns`, `${at}, theirs over grai's`]),
+			],
+			...variants.map(([label, variant]) => [
 				label,
-				...locales.map((at) => nanoseconds(of(variants[label] ?? "", at))),
+				...locales.flatMap((at) => [
+					nanoseconds(chosen(variant, at).median),
+					variant === reference ? "" : ratioCell(of(variant).ratio[at]),
+				]),
 			]),
 		],
-		note: `Each way of choosing ${noun === "plural" ? "a plural" : "an ordinal"} form is checked against \`Intl.PluralRules\` on 0 to 10,000 and on fractions, then timed on 0 to ${whole(counts - 1)} in Node (\`bench/${bench}.mjs\`). grai's rule is the one its compiler writes; Paraglide ${versions["@inlang/paraglide-js"]}'s is its \`registry.plural\`.`,
+		note: `Each way of choosing ${noun} form is checked against \`Intl.PluralRules\` on 0 to 10,000 and on fractions, then timed on 0 to ${whole(counts - 1)} in Node, in a process of its own once a round, in an order that rotates (\`bench/${bench}.mjs\`). grai's rule is the one its compiler writes; Paraglide ${versions["@inlang/paraglide-js"]}'s is its \`registry.plural\`; a cached \`Intl.PluralRules\` is what a library that calls Intl at best does.`,
 		glance: [
 			glanceOf(
-				`${noun === "plural" ? "Plural" : "Ordinal"} form chosen, \`${locale}\``,
-				entries,
+				`${noun === "a plural" ? "A plural" : "An ordinal"} form chosen, \`${locale}\``,
+				chosen(reference),
+				["Paraglide", chosen(paraglide)],
 				nanoseconds,
+				{ kind: "ratio", ratio },
 			),
 		],
 	};
 }
 
 export const pluralsSection = (): Section =>
-	selectionSection("plurals", {
-		grai: "grai's rules, as plurals.js has them",
-		Paraglide: "Paraglide registry.plural",
-		"Intl.PluralRules, cached": "Intl.PluralRules cached per locale",
-	});
+	selectionSection("plurals", [
+		["grai", "grai's rules, as plurals.js has them"],
+		["Paraglide", "Paraglide registry.plural"],
+		["Intl.PluralRules, cached", "Intl.PluralRules cached per locale"],
+	]);
 
 export const ordinalsSection = (): Section =>
-	selectionSection("ordinals", {
-		grai: "grai, compiled",
-		Paraglide: "Paraglide registry.plural",
-		"Intl.PluralRules, cached": "Intl.PluralRules cached per locale",
-	});
+	selectionSection("ordinals", [
+		["grai", "grai, compiled"],
+		["Paraglide", "Paraglide registry.plural"],
+		["Intl.PluralRules, cached", "Intl.PluralRules cached per locale"],
+	]);
 
 type HydrateRow = {
 	variant: string;
 	locale: string;
 	slowdown: number;
 	bytes: { brotli: number; raw: number };
-	ms: { hydrates: number };
+	ratio: { hydrates: Interval };
+	loads: { evaluated: number; hydrated: number }[];
 };
 
-/** The hydrate bench's page in its last locale, unthrottled, by library. */
+/** The page's variants: grai's, and each other library in the setup its docs advise, then the rest. */
+const recommended: [string, string][] = [
+	["grai", "grai, the locale's copies"],
+	["Paraglide", "Paraglide"],
+	["i18next, page's keys", "i18next"],
+	["use-intl, page's keys", "use-intl"],
+];
+const others: [string, string][] = [
+	["i18next, whole catalog", "i18next, the locale's whole catalog"],
+	["use-intl, whole catalog", "use-intl, the locale's whole catalog"],
+];
+
+/** The hydrate bench's page in its last locale, unthrottled, by variant. */
 function hydrated() {
 	const recorded = read("hydrate-synthetic");
-	const locale = recorded.rows.at(-1).locale;
-	const libraries: [string, string][] = [
-		["grai", "grai, the locale's copies"],
-		["Paraglide", "Paraglide"],
-		["i18next", "i18next"],
-		["use-intl", "use-intl"],
-	];
-	const of = (variant: string): HydrateRow =>
-		recorded.rows.find(
-			(row: HydrateRow) =>
-				row.locale === locale && row.slowdown === 1 && row.variant === variant,
+	const locale: string = recorded.rows.at(-1).locale;
+	const of = (variant: string): HydrateRow => {
+		const row = recorded.rows.find(
+			(each: HydrateRow) =>
+				each.locale === locale &&
+				each.slowdown === 1 &&
+				each.variant === variant,
 		);
+		if (row === undefined) throw new Error(`hydrate has no ${variant}`);
+		return row;
+	};
 	return {
 		calls: recorded.calls as number,
+		keys: recorded.keys as number,
 		runs: recorded.runs as number,
 		chromium: recorded.chromium as string,
-		locale: locale as string,
-		libraries,
+		locale,
 		of,
 	};
 }
 
 export function pageSection(): Section {
-	const { calls, locale, libraries, of } = hydrated();
-	const entries = libraries.map(([label, variant]): [string, number] => [
-		label,
-		of(variant).bytes.brotli,
-	]);
+	const { calls, keys, locale, of } = hydrated();
+	const entries = (list: [string, string][]) =>
+		list.map(([label, variant]): [string, number] => [
+			label,
+			of(variant).bytes.brotli,
+		]);
 	const groups = [
-		{ bars: barsOf(entries, (bytes) => bytes / 1024, kilobytes) },
+		{
+			bars: barsOf(
+				entries([...recommended, ...others]),
+				(bytes) => bytes / 1024,
+				kilobytes,
+			),
+		},
 	];
-	const title = `A page of ${whole(calls)} messages: its JS`;
+	const [name, figure] = best(entries(recommended));
+	const title = `A page of ${whole(calls)} message calls, ${whole(keys)} distinct keys: its JS`;
 	return {
 		id: "page",
 		heading: "What a page downloads",
@@ -321,7 +408,7 @@ export function pageSection(): Section {
 				chart: {
 					title,
 					subtitle:
-						"KB brotli, the page's own code and its messages included; lower is better",
+						"KB brotli: every script the built page loads or holds inline, each compressed on its own; lower is better",
 					axis: "KB, brotli",
 					groups,
 				},
@@ -330,31 +417,46 @@ export function pageSection(): Section {
 		],
 		table: [
 			["", "JS, KB brotli", "JS, KB"],
-			...libraries.map(([label, variant]) => {
-				const row = of(variant);
-				return [
-					label,
-					tenths(row.bytes.brotli / 1024),
-					whole(row.bytes.raw / 1024),
-				];
-			}),
+			...[...recommended, ...others].map(([label, variant]) => [
+				label,
+				(of(variant).bytes.brotli / 1024).toFixed(1),
+				whole(of(variant).bytes.raw / 1024),
+			]),
 		],
-		note: `One Svelte page, server-rendered and hydrated in Chromium, in \`${locale}\` (\`bench/hydrate.mjs\`). grai's row loads its locale's copies of the message chunks, as \`@xyrolle/grai/sveltekit\` serves them.`,
+		note: `One Svelte page built with Vite, each library's build with its own plugins, served as the build wrote it with the server's render drawn in, loaded in Chromium in \`${locale}\` (\`bench/hydrate.mjs\`). Its JS is every script it loads, each compressed on its own with brotli, and those its index.html holds inline. grai's page loads its locale's copies of the message chunks, as \`@xyrolle/grai/sveltekit\` serves them; i18next and use-intl load the page's own keys, as both advise, or the locale's whole catalog.`,
 		glance: [
-			glanceOf(`Page JS, ${whole(calls)} messages, brotli`, entries, kilobytes),
+			glanceOf(
+				`Page JS, ${whole(calls)} message calls, ${whole(keys)} distinct keys, brotli`,
+				of("grai, the locale's copies").bytes.brotli,
+				[name, figure],
+				kilobytes,
+				{ kind: "exact" },
+			),
 		],
 	};
 }
 
 export function hydrateSection(): Section {
-	const { calls, runs, chromium, locale, libraries, of } = hydrated();
-	const entries = libraries.map(([label, variant]): [string, number] => [
-		label,
-		of(variant).ms.hydrates,
-	]);
-	const ms = (value: number) => `${tenths(value)} ms`;
-	const groups = [{ bars: barsOf(entries, (value) => value, ms) }];
-	const title = `Hydrating a page of ${whole(calls)} messages`;
+	const { calls, runs, chromium, locale, of } = hydrated();
+	const hydration = (variant: string): Interval =>
+		spread(of(variant).loads.map((load) => load.hydrated - load.evaluated));
+	const entries = (list: [string, string][]) =>
+		list.map(([label, variant]): [string, Interval] => [
+			label,
+			hydration(variant),
+		]);
+	const groups = [
+		{
+			bars: barsOf(
+				entries([...recommended, ...others]),
+				(ms) => ms,
+				milliseconds,
+			),
+		},
+	];
+	const [name, figure] = best(entries(recommended));
+	const variant = recommended.find(([label]) => label === name)?.[1] ?? name;
+	const title = `Hydrating a page of ${whole(calls)} message calls`;
 	return {
 		id: "hydrate",
 		heading: "Hydrating a page",
@@ -365,7 +467,7 @@ export function hydrateSection(): Section {
 				chart: {
 					title,
 					subtitle:
-						"Milliseconds from the script's evaluation to the page hydrated; lower is better",
+						"Milliseconds after module evaluation: props decoding + synchronous hydration; lower is better",
 					axis: "milliseconds",
 					groups,
 				},
@@ -373,11 +475,25 @@ export function hydrateSection(): Section {
 			},
 		],
 		table: [
-			["", "hydrates, ms"],
-			...entries.map(([label, value]) => [label, tenths(value)]),
+			["", "hydrates, ms", "theirs over grai's"],
+			...[...recommended, ...others].map(([label, each]) => [
+				label,
+				milliseconds(hydration(each).median),
+				each === "grai, the locale's copies"
+					? ""
+					: ratioCell(of(each).ratio.hydrates),
+			]),
 		],
-		note: `The page of the chart above, in Chromium ${chromium}, no CPU slowdown, in \`${locale}\`; medians of ${runs} loads (\`bench/hydrate.mjs\`). Its rows at a fourfold CPU slowdown are in \`bench/results/hydrate-synthetic.json\`.`,
-		glance: [glanceOf(`Hydration, ${whole(calls)} messages`, entries, ms)],
+		note: `The page of the chart above, in Chromium ${chromium}, no CPU slowdown, in \`${locale}\` (\`bench/hydrate.mjs\`): \`hydrate\` timed from when every module has been evaluated until it returns, Svelte's recovery off. Each variant loads in a browser of its own once a round, in an order that rotates, ${runs} rounds; ratios are each variant's over grai's in the same round. Its rows at a fourfold CPU slowdown are in \`bench/results/hydrate-synthetic.json\`.`,
+		glance: [
+			glanceOf(
+				`Hydration, ${whole(calls)} message calls`,
+				hydration("grai, the locale's copies"),
+				[name, figure],
+				milliseconds,
+				{ kind: "ratio", ratio: of(variant).ratio.hydrates },
+			),
+		],
 	};
 }
 
@@ -388,22 +504,40 @@ type LibraryBytesRow = {
 
 export function runtimeSection(): Section {
 	const { rows, locale } = read("library-bytes-synthetic");
-	const libraries: [string, string][] = [
+	const of = (name: string): { brotli: number; raw: number } => {
+		const runtime = rows.find(
+			(row: LibraryBytesRow) => row.library === name,
+		)?.runtime;
+		if (runtime === undefined) throw new Error(`library-bytes has no ${name}`);
+		return runtime;
+	};
+	const inPage: [string, string][] = [
 		["grai", "grai, as its build writes the locale's copies"],
 		["Paraglide", "Paraglide, every locale"],
 		["i18next", "i18next"],
 		["use-intl", "use-intl"],
 	];
-	const of = (name: string) =>
-		rows.find((row: LibraryBytesRow) => row.library === name).runtime;
-	const entries = libraries.map(([label, name]): [string, number] => [
-		label,
-		of(name).brotli,
-	]);
-	const groups = [
-		{ bars: barsOf(entries, (bytes) => bytes / 1024, kilobytes) },
+	const alone: [string, string][] = [
+		["grai", "grai, runtime.js with every export, alone"],
+		["Paraglide", "Paraglide, runtime.js with every export, alone"],
+		["i18next", "i18next, init and t, alone"],
+		["use-intl", "use-intl, createTranslator, alone"],
 	];
-	const title = "The runtime in a page";
+	const entries = (list: [string, string][]) =>
+		list.map(([label, name]): [string, number] => [label, of(name).brotli]);
+	const groups = [
+		{
+			heading: "In a page that shows a text, an input and a plural",
+			bars: barsOf(entries(inPage), (bytes) => bytes / 1024, kilobytes),
+		},
+		{
+			heading: "Every export, bundled alone",
+			bars: barsOf(entries(alone), (bytes) => bytes / 1024, kilobytes),
+		},
+	];
+	const [name, figure] = best(entries(inPage));
+	const title =
+		"The runtime a page needs to show a text, an input and a plural";
 	return {
 		id: "runtime",
 		heading: "The runtime",
@@ -413,8 +547,7 @@ export function runtimeSection(): Section {
 				id: "runtime",
 				chart: {
 					title,
-					subtitle:
-						"KB brotli, bundled and minified, messages not counted; lower is better",
+					subtitle: "KB brotli; lower is better",
 					axis: "KB, brotli",
 					groups,
 				},
@@ -423,13 +556,21 @@ export function runtimeSection(): Section {
 		],
 		table: [
 			["", "KB brotli", "KB"],
-			...libraries.map(([label, name]) => [
-				label,
-				tenths(of(name).brotli / 1024),
-				tenths(of(name).raw / 1024),
+			...[...inPage, ...alone].map(([, row]) => [
+				row,
+				(of(row).brotli / 1024).toFixed(1),
+				(of(row).raw / 1024).toFixed(1),
 			]),
 		],
-		note: `Bundled and minified by Rolldown, messages not counted (\`bench/library-bytes.mjs\`, in \`${locale}\`): grai's and Paraglide's runtime modules with every export, i18next as a page sets it up (\`i18next.init\` and \`t\`), and use-intl's \`createTranslator\`.`,
-		glance: [glanceOf("Runtime in a page, brotli", entries, kilobytes)],
+		note: `The runtime is what a library adds to a page that shows three messages, a plain text, a text with an input and a plural: the page's JS, built as an app's client build makes it with the library's own plugins and loaded in Chromium, less the same page's with the three texts written in (\`bench/library-bytes.mjs\`, in \`${locale}\`). Below it, the modules this figure once stood for, each bundled alone by Rolldown for the browser: grai's and Paraglide's runtime modules with every export, i18next set up with \`init\` and \`t\`, and use-intl's \`createTranslator\`.`,
+		glance: [
+			glanceOf(
+				"Runtime a page needs to show a text, an input and a plural, brotli",
+				of("grai, as its build writes the locale's copies").brotli,
+				[name, figure],
+				kilobytes,
+				{ kind: "exact" },
+			),
+		],
 	};
 }

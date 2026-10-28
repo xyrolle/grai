@@ -1,8 +1,9 @@
 // The charts of grai's measurements, drawn from the benches' results (bench/results/*.json), never
 // by hand: each one an SVG in docs/assets in a light and a dark theme. docs/benchmarks.md shows
 // every section between `<!-- charts:all -->` and `<!-- /charts:all -->`; the README shows those
-// marked for it between `<!-- charts:readme -->` and `<!-- /charts:readme -->`, and the table of
-// every measure at a glance between `<!-- glance -->` and `<!-- /glance -->`. Each section has
+// marked for it between `<!-- charts:readme -->` and `<!-- /charts:readme -->`, the table of every
+// measure at a glance between `<!-- glance -->` and `<!-- /glance -->`, and the measures where grai
+// is behind, in its limitations, between `<!-- behind -->` and `<!-- /behind -->`. Each section has
 // its heading, its pictures and a table of the same numbers; a number the README's text cites
 // stands between `<!-- value:<name> -->` and `<!-- /value -->`. Rerunning the benches, then
 // this, updates them all.
@@ -11,8 +12,8 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { barChart, themes } from "./charts/bars.ts";
-import { cited, ratio, sections } from "./charts/figures.ts";
-import type { Glance, Section } from "./charts/results.ts";
+import { behind, cited, sections } from "./charts/figures.ts";
+import { type Glance, type Section, verdict } from "./charts/results.ts";
 
 const root = new URL("../", import.meta.url);
 const assets = new URL("docs/assets/", root);
@@ -69,36 +70,47 @@ ${links(note)}
 	].join("\n\n");
 }
 
-/** The other's figure over grai's, as a multiple: "390×", "1.6×", "0.98×". */
-function multiple(glance: Glance): string {
-	const value = ratio(glance);
-	const digits = value >= 10 ? 0 : value >= 1 ? 1 : 2;
-	return `${value.toLocaleString("en", { maximumFractionDigits: digits, minimumFractionDigits: digits })}×`;
-}
-
 /** A figure kept on one line, its number and unit joined by a no-break space. */
 const unbroken = (figure: string) => figure.replaceAll(" ", "\u00a0");
+
+/** Where a section's charts are: the README's own, or docs/benchmarks.md. */
+const linked = (section: Section) =>
+	section.readme
+		? `#${anchor(section.heading)}`
+		: `docs/benchmarks.md#${anchor(section.heading)}`;
 
 /** Every measure's row, the strongest first, each linked to its chart on the page that shows it. */
 function glanceTable(all: Section[]): string {
 	const rows = all
 		.flatMap((section) => section.glance.map((glance) => ({ glance, section })))
-		.toSorted((a, b) => ratio(b.glance) - ratio(a.glance))
-		.map(({ glance, section }) => {
-			const target = section.readme
-				? `#${anchor(section.heading)}`
-				: `docs/benchmarks.md#${anchor(section.heading)}`;
-			return [
-				`[${glance.measure}](${target})`,
-				unbroken(glance.shown(glance.grai)),
-				`${unbroken(glance.shown(glance.other.value))} (${glance.other.name})`,
-				ratio(glance) >= 1 ? multiple(glance) : `${multiple(glance)}, behind`,
-			];
-		});
+		.toSorted((a, b) => verdict(b.glance).strength - verdict(a.glance).strength)
+		.map(({ glance, section }) => [
+			`[${glance.measure}](${linked(section)})`,
+			unbroken(glance.shown(glance.grai)),
+			`${unbroken(glance.shown(glance.other.value))} (${glance.other.name})`,
+			verdict(glance).text,
+		]);
 	return markdownTable([
-		["Measure", "grai", "Best of the others", "Ratio"],
+		["Measure", "grai", "Best of the others", "Compared"],
 		...rows,
 	]);
+}
+
+/** The rows where grai is behind, each a line of the README's limitations. */
+function behindList(all: Section[]): string {
+	const where = new Map(
+		all.flatMap((section) =>
+			section.glance.map((glance): [Glance, Section] => [glance, section]),
+		),
+	);
+	return behind(all)
+		.map((glance) => {
+			const section = where.get(glance);
+			const link =
+				section === undefined ? "" : ` ([chart](${linked(section)}))`;
+			return `- **${glance.measure}:** ${glance.shown(glance.grai)} on grai against ${glance.shown(glance.other.value)} on ${glance.other.name}; ${verdict(glance).text}${link}.`;
+		})
+		.join("\n");
 }
 
 /** The text between a pair of markers, replaced; a marker missing from the page is an error. */
@@ -139,11 +151,17 @@ const values = cited();
 rewrite(readme, (text) =>
 	replaced(
 		replaced(
-			text,
+			replaced(
+				text,
+				readme,
+				"<!-- glance -->",
+				"<!-- /glance -->",
+				glanceTable(all),
+			),
 			readme,
-			"<!-- glance -->",
-			"<!-- /glance -->",
-			glanceTable(all),
+			"<!-- behind -->",
+			"<!-- /behind -->",
+			behindList(all),
 		),
 		readme,
 		"<!-- charts:readme -->",
