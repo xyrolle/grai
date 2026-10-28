@@ -17,6 +17,7 @@ import vue from "@vitejs/plugin-vue";
 import { chromium } from "playwright-core";
 import {
 	build,
+	createLogger,
 	createServer,
 	type HotPayload,
 	isRunnableDevEnvironment,
@@ -1263,6 +1264,47 @@ export const render = () => \`\${source.includes("export")} \${m.title()}\`;
 		const page =
 			await server.environments.client.transformRequest("/render.js");
 		expect(page?.code).toContain('"/out/messages.js?raw"');
+	});
+
+	it("leaves the output out of the dependency scan before it is written, which finds the page's dependencies", async () => {
+		const { dir } = project(catalogs);
+		const release = heldOutput(dir);
+		symlinkSync(
+			new URL("../node_modules", import.meta.url),
+			join(dir, "node_modules"),
+		);
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><script type="module" src="/main.js"></script>`,
+		);
+		writeFileSync(
+			join(dir, "main.js"),
+			`import MagicString from "magic-string";
+import { m } from "./out/messages.js";
+console.log(new MagicString(m.title()).toString());
+`,
+		);
+		const errors: string[] = [];
+		const logger = createLogger("silent");
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			cacheDir: join(dir, ".vite"),
+			customLogger: { ...logger, error: (message) => errors.push(message) },
+			server: { ...loopback, watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		await server.listen();
+
+		const optimizer = server.environments.client.depsOptimizer;
+		await optimizer?.scanProcessing;
+		expect(Object.keys(optimizer?.metadata.discovered ?? {})).toEqual([
+			"magic-string",
+		]);
+		expect(errors).toEqual([]);
+		expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
+		release();
 	});
 
 	it("writes the output before a test run takes it, and fails the import when the write fails", async () => {
