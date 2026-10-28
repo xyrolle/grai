@@ -8,10 +8,11 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
 import { recompile } from "../src/compile.ts";
@@ -51,31 +52,64 @@ function modified(dir: string): Record<string, number> {
 }
 
 /**
- * A copy of grai's source in the project, for a test to change as a new version or a local build
- * would, and its compile of the project in a process of its own: what it wrote, each file by its
- * name without the hash of its content.
+ * A copy of grai in the project, its source or its build (`dist`, which the gate builds before the
+ * tests), for a test to change as a new version, a local build or a patch would, with its modules'
+ * extension; the packages it imports resolve from the project. Each run of it is a process of its
+ * own: a compile of the project, and what it wrote, each file by its name without the hash of its
+ * content; and a dev server's start, which takes up the saved build, compiles from it and saves its
+ * build, and whether it took one up.
  */
-function graiCopy(dir: string, config: string) {
+function graiCopy(dir: string, config: string, layout: "src" | "dist" = "src") {
 	const compiler = join(dir, "grai");
-	cpSync(fileURLToPath(new URL("../src", import.meta.url)), compiler, {
+	cpSync(fileURLToPath(new URL(`../${layout}`, import.meta.url)), compiler, {
 		recursive: true,
 	});
-	const compile = () => {
-		const run = spawnSync(
+	symlinkSync(
+		fileURLToPath(new URL("../node_modules", import.meta.url)),
+		join(dir, "node_modules"),
+		"junction",
+	);
+	const extension = layout === "src" ? ".ts" : ".js";
+	const run = (script: string): unknown => {
+		const ran = spawnSync(
 			process.execPath,
 			[
 				"--input-type=module",
 				"-e",
-				"const { compile } = await import(process.argv[1]); console.log(JSON.stringify((await compile(process.argv[2])).written));",
-				join(compiler, "index.ts"),
+				`const [grai, config, extension] = process.argv.slice(1);\n${script}`,
+				pathToFileURL(compiler).href,
 				config,
+				extension,
 			],
 			{ encoding: "utf8" },
 		);
-		const written: string[] = JSON.parse(run.stdout);
-		return written.map(withoutContentHash);
+		expect(ran.stderr).toBe("");
+		return JSON.parse(ran.stdout);
 	};
-	return { compiler, compile };
+	const compile = () =>
+		(
+			run(
+				'const { compile } = await import(grai + "/index" + extension); console.log(JSON.stringify((await compile(config)).written));',
+			) as string[]
+		).map(withoutContentHash);
+	const start = () =>
+		run(`const { recompile } = await import(\`\${grai}/compile\${extension}\`);
+const { saveBuild, savedBuild } = await import(\`\${grai}/saved-build\${extension}\`);
+const options = { pseudoLocale: true };
+const saved = await savedBuild(config, options);
+await saveBuild((await recompile(config, saved, options)).build);
+console.log(JSON.stringify(saved !== undefined));`) as boolean;
+	return { compiler, extension, compile, start };
+}
+
+/** Whether a file of the output holds a text. */
+function outputHolds(dir: string, text: string): boolean {
+	const out = join(dir, "out");
+	return readdirSync(out, { recursive: true, encoding: "utf8" }).some(
+		(file) =>
+			statSync(join(out, file)).isFile() &&
+			readFileSync(join(out, file), "utf8").includes(text),
+	);
 }
 
 /** What a compile wrote, each file by its name without the hash of its content. */
@@ -183,6 +217,61 @@ it(
 		expect(await compiledFor()).not.toBe(first);
 	},
 );
+
+it(
+	"compiles again when any of grai's modules changes, once a module a compile runs imports a path no literal gives",
+	processTest,
+	async () => {
+		const { dir, config } = project(catalogs);
+		const { compiler, compile } = graiCopy(dir, config);
+		appendFileSync(
+			join(compiler, "modules.ts"),
+			'\nexport const later = (name: string) => import("./" + name + ".ts");\n',
+		);
+		const compiledFor = async () => {
+			compile();
+			return (await readManifest(join(dir, "out", ".grai")))?.inputs;
+		};
+		const first = await compiledFor();
+		appendFileSync(join(compiler, "cli.ts"), "\n");
+
+		expect(await compiledFor()).not.toBe(first);
+	},
+);
+
+for (const layout of ["src", "dist"] as const) {
+	it(
+		`takes up no saved build once a module a compile imports changes, however its import is written, in grai's ${layout}`,
+		processTest,
+		() => {
+			const { dir, config } = project(catalogs);
+			const { compiler, extension, start } = graiCopy(dir, config, layout);
+			// The import of the compiler's generator in single quotes, as a patch may write it.
+			const modules = join(compiler, `modules${extension}`);
+			const imported = `from "./locale-function${extension}"`;
+			expect(readFileSync(modules, "utf8")).toContain(imported);
+			writeFileSync(
+				modules,
+				readFileSync(modules, "utf8").replace(
+					imported,
+					`from './locale-function${extension}'`,
+				),
+			);
+			const taken = [start(), start()];
+			// The generator alone changes: each locale's arrow function opens with a comment.
+			const generator = join(compiler, `locale-function${extension}`);
+			const arrow = ") => $";
+			expect(readFileSync(generator, "utf8").split(arrow)).toHaveLength(2);
+			writeFileSync(
+				generator,
+				readFileSync(generator, "utf8").replace(arrow, ") => /* patched */ $"),
+			);
+
+			expect([...taken, start()]).toEqual([false, true, false]);
+			expect(outputHolds(dir, "/* patched */")).toBe(true);
+		},
+	);
+}
 
 it("writes the declaration maps again when the config moves the catalog they point to", async () => {
 	const { dir, config, compile } = project(catalogs);
