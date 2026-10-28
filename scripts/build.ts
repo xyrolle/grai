@@ -25,9 +25,11 @@ cpSync(new URL("../src/runtime/", import.meta.url), new URL("runtime/", dist), {
 	filter: (source) => !source.endsWith(".d.ts"),
 });
 
-const identity = new URL("compiler-identity.js", dist);
-const { compilerModules, compilerModulesFile, digestOf } = await import(
-	identity.href
+const { compilerModulesFile, digestOf } = await import(
+	new URL("compiler-identity.js", dist).href
+);
+const { compilerModules } = await import(
+	new URL("compiler-modules.js", dist).href
 );
 const modules: Map<string, Buffer> | undefined = await compilerModules();
 if (modules === undefined)
