@@ -2,7 +2,7 @@ import { basename, join, relative, resolve } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import type { BuildReading } from "./code/build-reading.ts";
-import { type Build, recompile } from "./compile.ts";
+import type { Build } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { devModule, pageKeysShell } from "./dev-module.ts";
 import { GraiError, messagesOf } from "./error.ts";
@@ -222,12 +222,17 @@ export function graiPlugin(
 		},
 		async buildStart() {
 			if (serving) return;
-			first ??= recompile(files.configFile, undefined, {
-				localeCopies: options.localeChunks === true,
-			}).then(({ result, build: next }) => {
-				build = next;
-				return next ?? result.errors;
-			});
+			// The compiler, loaded as a build starts: a dev server loads it once its watcher compiles.
+			first ??= import("./compile.ts")
+				.then(({ recompile }) =>
+					recompile(files.configFile, undefined, {
+						localeCopies: options.localeChunks === true,
+					}),
+				)
+				.then(({ result, build: next }) => {
+					build = next;
+					return next ?? result.errors;
+				});
 			const compiled = await first;
 			if (!("compilation" in compiled)) this.error(messagesOf(compiled));
 			bundling?.start(this, compiled);
