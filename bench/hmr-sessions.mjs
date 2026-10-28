@@ -5,8 +5,8 @@
 //   one message saved into its catalog with a text of its own, until the page's MutationObserver
 //   saw the target's text change. The page's heap, once collected, is taken at load and after the
 //   edits.
-//   On grai's plugin, each edit is also timed until a server render through Vite's module runner,
-//   polled each millisecond, shows it.
+// - The server render session runs grai's plugin with no page open: each edit timed until a server
+//   render through Vite's module runner, polled each millisecond, shows it.
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -81,28 +81,6 @@ function save(catalogFile, key, text) {
 }
 
 /**
- * For grai's plugin: once its server's program is evaluated, as a dev server has it before an edit,
- * a function that resolves when a server render shows `text` for the key, polled each millisecond.
- */
-async function serverRendering(server, locale, key) {
-	const renderer = server.environments.ssr.runner;
-	const rendered = async () =>
-		(await renderer.import("/render.js")).render(key, locale);
-	await rendered();
-	return async (text) => {
-		const until = performance.now() + PATIENCE_MS;
-		while ((await rendered()) !== text) {
-			if (performance.now() > until)
-				throw new Error(
-					`no server render showed "${text}" in ${PATIENCE_MS} ms`,
-				);
-			await delay(1);
-		}
-		return now();
-	};
-}
-
-/**
  * A page session of `design` in round `round`, `timed` edits timed after the warm-up edits: its
  * load, heap and edits.
  */
@@ -116,10 +94,6 @@ export async function pageSession(browser, app, design, round, timed = EDITS) {
 		const server = await serve(app, root, design, locale, timings);
 		const { context, tab, load } = await opened(browser, server);
 		try {
-			const untilRendered =
-				design === "grai's plugin"
-					? await serverRendering(server, locale, key)
-					: undefined;
 			const cdp = await context.newCDPSession(tab);
 			const retained = async () => {
 				await cdp.send("HeapProfiler.collectGarbage");
@@ -133,21 +107,17 @@ export async function pageSession(browser, app, design, round, timed = EDITS) {
 				await delay(SAVE_INTERVAL_MS);
 				const text = `Edit ${round}.${edit}: ${original}`;
 				const written = save(catalogFile, key, text);
-				const [changed, serverAt] = await Promise.all([
-					tab
-						.waitForFunction(
-							(text) => window.changed?.text === text && window.changed,
-							text,
-							{ timeout: PATIENCE_MS },
-						)
-						.then((handle) => handle.jsonValue()),
-					untilRendered?.(text),
-				]);
+				const changed = await tab
+					.waitForFunction(
+						(text) => window.changed?.text === text && window.changed,
+						text,
+						{ timeout: PATIENCE_MS },
+					)
+					.then((handle) => handle.jsonValue());
 				const reached = timings.edits.at(-1);
 				if (edit >= WARMUPS)
 					samples.push({
 						total: changed.at - written,
-						server: serverAt === undefined ? undefined : serverAt - written,
 						watcher: reached && reached.reached - written,
 						plugin: reached && reached.answered - reached.reached,
 						browser: reached && changed.at - reached.answered,
@@ -160,6 +130,41 @@ export async function pageSession(browser, app, design, round, timed = EDITS) {
 			await server.close();
 		}
 	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+}
+
+/** The server render session of round `round`: grai's plugin's edits until a render shows them. */
+export async function serverRenderSession(app, round) {
+	const design = "grai's plugin";
+	const { locale, root, key, catalogFile } = fixture(app, design, round);
+	const server = await serve(app, root, design, locale, { edits: [] });
+	try {
+		const renderer = server.environments.ssr.runner;
+		const rendered = async (key) =>
+			(await renderer.import("/render.js")).render(key, locale);
+		// The server's program evaluated before the first edit, as a dev server has it.
+		await rendered(key);
+		const original = JSON.parse(readFileSync(catalogFile, "utf8"))[key];
+		const samples = [];
+		for (let edit = 0; edit < WARMUPS + EDITS; edit++) {
+			await delay(SAVE_INTERVAL_MS);
+			const text = `Edit ${round}.${edit}: ${original}`;
+			const written = save(catalogFile, key, text);
+			const until = performance.now() + PATIENCE_MS;
+			while ((await rendered(key)) !== text) {
+				if (performance.now() > until)
+					throw new Error(
+						`no server render showed "${text}" in ${PATIENCE_MS} ms`,
+					);
+				await delay(1);
+			}
+			const shown = now() - written;
+			if (edit >= WARMUPS) samples.push({ server: shown });
+		}
+		return { samples };
+	} finally {
+		await server.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 }
