@@ -13,7 +13,6 @@ import {
 import { createRequire, register } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { compile } from "@inlang/paraglide-js";
 import { cacheDir } from "./apps.mjs";
 
 const installed = (path) =>
@@ -67,6 +66,9 @@ export async function paraglideOutput(app, options = {}) {
 
 	const staging = `${outdir}.partial`;
 	rmSync(staging, { recursive: true, force: true });
+	// Loaded here, not with this module, so that a dev start that times importing Paraglide's plugin
+	// (dev-pages.mjs) does not find its package loaded already.
+	const { compile } = await import("@inlang/paraglide-js");
 	await compile({
 		project: writeProject(app, directory),
 		outdir: staging,
