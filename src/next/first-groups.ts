@@ -1,21 +1,19 @@
 // The groups of a Next app's keys for a `next dev` start that has none saved, as a fresh clone has:
 // read beside the watch's first compile, which Next waits for then, on a thread of their own
-// (`group-worker.ts`), and taken by the start's release (`startup.ts`) only when they come early.
+// (`group-worker.ts`), and taken by that compile (`startup.ts`) when they come in time.
 //
-// The thread reads the code at once. The groups need the output written, which the read resolves
-// the app's imports of, so they come from a second read, once the compile has written it. Taking
-// them costs the start that read, a save and one more compile; it saves the first page the shards
-// it would compile in each layer that reads a key. On the bench's page, at 6,366 keys, Next
-// waits 59–80 ms more and its first page comes 195–373 ms sooner; an app of 2,000 files takes
-// longer to read than its catalogs to compile, and starts on its shards. A start cannot tell what
-// the groups save its pages, so the rule is a heuristic, measured on those: take the groups when
-// the code was read before the compile was done, and they come within the time the compile took
-// again. That time counts any wait for the output's lock, and not the save and compile after it;
-// a page that reads no key gains nothing from the wait. A start with groups saved never reads
-// beside its compile.
+// The thread reads the code at once, through the output not written yet (`unwritten-output.ts`).
+// Once the compile has compiled the catalogs, it sends each key's weight: if the code is read by
+// then, it waits for the groups, as only grouping the keys by their weights is left; if not, it
+// renders the keys by their shards meanwhile, and takes the groups if they came during that render,
+// rendering the keys again by them (`placing.ts`). It writes the output once. Taking the groups
+// costs the start that grouping, or that render; they save the first page the shards it would
+// compile in each layer that reads a key. On the bench's page every fresh start waited for them,
+// as the read was done when the catalogs were. A start cannot tell what the groups save its pages, so the rule is a
+// heuristic, measured on those: a page that reads no key gains nothing from them. A start with
+// groups saved never reads beside its compile.
 
 import { extname } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { isKeyGroups, type KeyGroups } from "../saved-groups.ts";
@@ -26,14 +24,10 @@ export type FirstGroups = {
 	/** Whether the code is read: settles true once it is, or false once the read failed or stopped. */
 	read: Promise<boolean>;
 	/**
-	 * The groups, once the first compile is done in `compiled` ms and has written the output: by
-	 * each key's weight, if the code was read already and they come within `compiled` ms more;
-	 * otherwise none.
+	 * The groups by each key's weight, once the code is read; none if the read failed or stopped
+	 * first.
 	 */
-	after(
-		weights: ReadonlyMap<string, number>,
-		compiled: number,
-	): Promise<KeyGroups | undefined>;
+	after(weights: ReadonlyMap<string, number>): Promise<KeyGroups | undefined>;
 	/** Stops the read, and settles once its thread has stopped. */
 	stop(): Promise<void>;
 };
@@ -50,7 +44,6 @@ export function firstGroups(
 	script: URL = groupWorker,
 ): FirstGroups {
 	const worker = new Worker(script, { workerData: data, execArgv: [] });
-	let isRead = false;
 	let readSettled: (read: boolean) => void = () => {};
 	const read = new Promise<boolean>((resolve) => {
 		readSettled = resolve;
@@ -58,7 +51,6 @@ export function firstGroups(
 	const answered = new Promise<KeyGroups | undefined>((resolve) => {
 		worker.on("message", (message: unknown) => {
 			if (message === "read") {
-				isRead = true;
 				readSettled(true);
 				return;
 			}
@@ -76,16 +68,10 @@ export function firstGroups(
 	});
 	return {
 		read,
-		async after(weights, compiled) {
-			if (!isRead) return undefined;
+		async after(weights) {
+			if (!(await read)) return undefined;
 			worker.postMessage(weights);
-			const waiting = new AbortController();
-			const late = delay(compiled, undefined, { signal: waiting.signal }).catch(
-				() => undefined,
-			);
-			const groups = await Promise.race([answered, late]);
-			waiting.abort();
-			return groups;
+			return answered;
 		},
 		async stop() {
 			await worker.terminate();

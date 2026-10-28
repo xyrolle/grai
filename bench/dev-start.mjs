@@ -1,12 +1,17 @@
 // Dev start: a Vite dev server started cold, until its page of 500 messages shows, per library
 // (dev-pages.mjs): grai's plugin, Paraglide's, i18next's and use-intl's pages, and the page with no
 // messages, which draws the same texts from its own code. Two pages: 500 plain texts, and 500
-// calls in the catalog's own mix of texts, inputs, plurals and markup.
+// calls in the catalog's own mix of texts, inputs, plurals and markup. And the start a developer
+// makes most, a restart: the page of plain texts again, in the directory a cold start just left,
+// with its output, its saved build and Vite's cache, as far as that start wrote them.
 //
-// Each start is a new Node process, in a new directory with no output and no cache, Vite's own
-// among them. It is timed from the server's creation, once Vite, the plugins and Chromium have
-// loaded, by the page's clock: until its texts are in the DOM ("ready"), and until the frame
-// drawn after that ("shown"). Importing the plugins and writing the page are outside the time.
+// Each start is a new Node process. A cold one is in a new directory with no output and no cache,
+// Vite's own among them; a restart follows a cold start of its own library, untimed, which loaded
+// the page and closed its server. Each start is timed from the import of its library's Vite plugin,
+// as an app's config imports it before its server starts, once Vite and Chromium have loaded, by
+// the page's clock: until its texts are in the DOM ("ready"), and until the frame drawn after that
+// ("shown"). A library with no plugin of its own, as i18next and use-intl, imports none. Writing
+// the page is outside the time.
 // Once timed, the page's texts are checked against the texts its calls show, and an error in the
 // page fails the start.
 //
@@ -57,16 +62,23 @@ function fault(drawn, texts, errors) {
 	return `text ${at} is ${JSON.stringify(drawn[at])}, not ${JSON.stringify(texts[at])}`;
 }
 
-/** Runs in the child: one cold start of the design's page, printed as JSON. */
-async function child(design, name, pageFile) {
+/**
+ * Runs in the child: one start of the design's page, printed as JSON. A cold start writes the page
+ * into a new directory; a restart takes the directory as the last start left it. Vite writes its
+ * cache once it has optimized the page's dependencies, so a start that closed sooner, or a page
+ * with none, leaves none.
+ */
+async function child(design, name, pageFile, restart) {
 	const [app] = selectedApps([name]);
 	const locale = otherLocale(app);
 	const page = JSON.parse(readFileSync(pageFile, "utf8"));
 	const root = join(cacheDir, "dev-start", app.id);
-	writeFixture(root, app, locale, design, page);
 	const viteCache = join(root, ".vite");
-	if (existsSync(viteCache))
-		throw new Error(`Vite's cache ${viteCache} is there before the start`);
+	if (!restart) {
+		writeFixture(root, app, locale, design, page);
+		if (existsSync(viteCache))
+			throw new Error(`Vite's cache ${viteCache} is there before the start`);
+	}
 	const browser = await chromium.launch();
 	try {
 		const tab = await browser.newPage();
@@ -76,13 +88,14 @@ async function child(design, name, pageFile) {
 			if (message.type() === "error") errors.push(message.text());
 		});
 		const start = now();
+		const plugins = await pluginsFor(design, app, root, locale, { edits: [] });
 		const server = await createServer({
 			root,
 			cacheDir: viteCache,
 			configFile: false,
 			logLevel: "silent",
 			server: { host: "127.0.0.1", port: 0 },
-			plugins: pluginsFor(design, app, root, locale, { edits: [] }),
+			plugins,
 		});
 		try {
 			await server.listen();
@@ -114,11 +127,11 @@ async function child(design, name, pageFile) {
 	}
 }
 
-/** One cold start in a new process, in a process group of its own, stopped however it ends. */
-async function start(design, app, pageFile) {
+/** One start in a new process, in a process group of its own, stopped however it ends. */
+async function start(design, app, pageFile, restart = false) {
 	const starting = startServer(
 		process.execPath,
-		[self, "--child", design, app.id, pageFile],
+		[self, restart ? "--restart" : "--child", design, app.id, pageFile],
 		{ stdio: ["ignore", "pipe", "inherit"] },
 	);
 	let output = "";
@@ -143,7 +156,10 @@ async function start(design, app, pageFile) {
 	);
 }
 
-/** Every design's starts on one page, round by round, each round with the load it started at. */
+/**
+ * Every design's starts on one page, round by round, each round with the load it started at. A
+ * restart's round starts each design cold first, untimed, then restarts it.
+ */
 async function rounds(app, page) {
 	const directory = join(cacheDir, "dev-start");
 	mkdirSync(directory, { recursive: true });
@@ -155,7 +171,8 @@ async function rounds(app, page) {
 		const starts = {};
 		for (let index = 0; index < designs.length; index++) {
 			const design = designs[(index + round) % designs.length];
-			starts[design] = await start(design, app, pageFile);
+			if (page.restart) await start(design, app, pageFile);
+			starts[design] = await start(design, app, pageFile, page.restart);
 		}
 		kept.push({ load, starts });
 	}
@@ -174,8 +191,11 @@ function report(app, page, kept) {
 		kept.map(({ starts }) => starts[design][field]);
 	const loads = kept.map(({ load }) => load);
 	const [grai, ...others] = designs;
+	const server = page.restart
+		? "a Vite dev server restarted with what its last start left"
+		: "a cold Vite dev server";
 	console.log(
-		`\n### ${app.name}, ${page.title}: a cold Vite dev server until its page shows, each start a new process, ${ROUNDS} rounds at a load of ${loads.map(whole).join(", ")}, ms\n`,
+		`\n### ${app.name}, ${page.title}: ${server} until its page shows, each start a new process, ${ROUNDS} rounds at a load of ${loads.map(whole).join(", ")}, ms\n`,
 	);
 	const confidence = percent(medianInterval(runs(grai, "shown")));
 	console.log(
@@ -224,8 +244,9 @@ function report(app, page, kept) {
 	);
 }
 
-if (process.argv[2] === "--child") {
-	await child(process.argv[3], process.argv[4], process.argv[5]);
+if (process.argv[2] === "--child" || process.argv[2] === "--restart") {
+	const [, , kind, design, app, pageFile] = process.argv;
+	await child(design, app, pageFile, kind === "--restart");
 } else {
 	if (ROUNDS % designs.length !== 0)
 		throw new Error(
@@ -233,12 +254,19 @@ if (process.argv[2] === "--child") {
 		);
 	for (const app of selectedApps()) {
 		const locale = otherLocale(app);
+		const texts = textPage(app, locale);
 		const pages = [
-			{ name: "text", title: "500 plain texts", ...textPage(app, locale) },
+			{ name: "text", title: "500 plain texts", ...texts },
 			{
 				name: "mixed",
 				title: "500 calls in the catalog's own mix",
 				...(await mixedPage(app, locale)),
+			},
+			{
+				name: "restart",
+				title: "500 plain texts",
+				restart: true,
+				...texts,
 			},
 		];
 		for (const page of pages) report(app, page, await rounds(app, page));

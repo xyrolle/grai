@@ -39,36 +39,69 @@ const literalCall =
 const escapable = new Set(["{", "}", "\\"]);
 
 /**
+ * Whether a pattern is its text alone: it has no placeholder or markup, which a `{` opens, and no
+ * escape, which a `\` starts, so its text is the pattern as written.
+ */
+export function isPlainText(source: string): boolean {
+	return !source.includes("{") && !source.includes("\\");
+}
+
+/**
  * Parses the inlang message format's pattern syntax. `\{`, `\}` and `\\` are escapes, a `{` that
  * is never closed is text, and anything in braces that is not a placeholder or markup is an error.
  */
 export function parsePattern(source: string): Part[] {
-	if (!source.includes("{") && !source.includes("\\")) {
+	if (isPlainText(source)) {
 		return source === "" ? [] : [{ type: "text", value: source }];
 	}
 	const parts: Part[] = [];
 	let text = "";
-	for (let index = 0; index < source.length; index++) {
-		const char = source.charAt(index);
-		const next = source.charAt(index + 1);
-		if (char === "\\" && escapable.has(next)) {
-			text += next;
-			index++;
+	// The text between one `{` or `\` and the next is taken whole.
+	let from = 0;
+	while (from < source.length) {
+		const at = nextSpecial(source, from);
+		if (at === -1) {
+			text += source.slice(from);
+			break;
+		}
+		text += source.slice(from, at);
+		if (source.charAt(at) === "\\") {
+			const next = source.charAt(at + 1);
+			const escaped = escapable.has(next);
+			text += escaped ? next : "\\";
+			from = at + (escaped ? 2 : 1);
 			continue;
 		}
-		const close = char === "{" ? placeholderEnd(source, index) : -1;
+		const close = placeholderEnd(source, at);
 		if (close === -1) {
-			text += char;
+			text += "{";
+			from = at + 1;
 			continue;
 		}
 		if (text !== "") parts.push({ type: "text", value: text });
 		text = "";
-		parts.push(placeholder(source.slice(index + 1, close)));
-		index = close;
+		parts.push(placeholder(source.slice(at + 1, close)));
+		from = close + 1;
 	}
 	if (text !== "") parts.push({ type: "text", value: text });
 	return parts;
 }
+
+/**
+ * The index of the next `{` or `\` from an index on, or -1 when there is none: one scan forward,
+ * which the parser starts where the last one ended, so it reads the text between them once, however
+ * many escapes and placeholders the pattern holds.
+ */
+function nextSpecial(source: string, from: number): number {
+	for (let index = from; index < source.length; index++) {
+		const char = source.charCodeAt(index);
+		if (char === braceCode || char === slashCode) return index;
+	}
+	return -1;
+}
+
+const braceCode = "{".charCodeAt(0);
+const slashCode = "\\".charCodeAt(0);
 
 /**
  * The index of the `}` that closes the placeholder or markup a `{` opens, or -1 when none does. A

@@ -4,7 +4,8 @@ import { descriptionsText } from "./descriptions.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { catalogsOf } from "./import/catalogs.ts";
 import { convertSources, type ImportFormat } from "./import/convert.ts";
-import { mappingFile, mappingText } from "./import/mapping.ts";
+import { mappingText } from "./import/mapping.ts";
+import { mappingFile } from "./import/mapping-file.ts";
 import type { ImportReport } from "./import/report.ts";
 import { findSources } from "./import/sources.ts";
 import {
@@ -14,7 +15,7 @@ import {
 } from "./import/write.ts";
 
 export { type ImportFormat, importFormats } from "./import/convert.ts";
-export { mappingFile } from "./import/mapping.ts";
+export { mappingFile } from "./import/mapping-file.ts";
 export {
 	type ImportNotice,
 	type ImportReport,

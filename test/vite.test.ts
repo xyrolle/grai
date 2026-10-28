@@ -19,6 +19,7 @@ import {
 	build,
 	createLogger,
 	createServer,
+	createServerModuleRunner,
 	type HotPayload,
 	isRunnableDevEnvironment,
 	type Plugin,
@@ -154,6 +155,37 @@ const sized = (word: string) =>
 	`${word} `.repeat(Math.ceil((8 * requestBytes) / word.length));
 
 describe("the Vite plugin's build", () => {
+	it("builds a page and a server with no warning of its own", async () => {
+		const { dir } = project({ en: { title: "Title" }, de: { title: "Titel" } });
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { m } from "./out/messages.js";\nconsole.log(m.title());\n`,
+		);
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><script type="module" src="/main.js"></script>`,
+		);
+		const warnings: string[] = [];
+		const customLogger = createLogger("warn");
+		customLogger.warn = (message) => warnings.push(message);
+		customLogger.warnOnce = (message) => warnings.push(message);
+		for (const ssr of [false, true]) {
+			await build({
+				root: dir,
+				configFile: false,
+				customLogger,
+				plugins: [grai({ localeChunks: true })],
+				build: {
+					write: false,
+					ssr,
+					...(ssr ? { rolldownOptions: { input: join(dir, "main.js") } } : {}),
+				},
+			});
+		}
+
+		expect(warnings).toEqual([]);
+	});
+
 	it("gives each entry only the keys its code uses, when each set of them is worth a chunk of its own", async () => {
 		const { dir } = project({
 			en: {
@@ -1770,6 +1802,73 @@ export const render = () => \`\${title()} \${footer()}\`;
 
 		expect(keys?.code).toContain("export");
 		expect(keys?.code).not.toContain("sourceMappingURL=data:");
+	});
+
+	it("serves the output's files with no source map, as it serves the dev module", async () => {
+		const { dir } = project(catalogs);
+		writeTitleRender(dir);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { ...loopback, watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		await server.listen();
+		const served = (path: string) =>
+			fetch(new URL(path, server.resolvedUrls?.local[0])).then((response) =>
+				response.text(),
+			);
+
+		for (const path of ["out/messages.js", "out/internal.js"]) {
+			const code = await served(path);
+			expect(code).toContain("export");
+			expect(code).not.toContain("sourceMappingURL=data:");
+		}
+	});
+
+	it("keeps the file and line of the output's runtime in a server's stack trace", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "check.js"),
+			`import { assertIsLocale } from "./out/runtime.js";\nexport const check = (locale) => assertIsLocale(locale);\n`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			server: { watch: fixtures },
+			plugins: [grai()],
+		});
+		onTestFinished(() => server.close());
+		// Vitest takes Error.prepareStackTrace, which turns Node's own source maps off, so this runner
+		// reads the maps Vite gives each module itself, as Node does for a server outside a test.
+		const runner = createServerModuleRunner(server.environments.ssr, {
+			sourcemapInterceptor: "prepareStackTrace",
+		});
+		onTestFinished(() => runner.close());
+		const { check } = await runner.import("/check.js");
+
+		let stack = "";
+		try {
+			check("bad");
+		} catch (error) {
+			stack = String((error as Error).stack);
+		}
+		const frame = /\/out\/(runtime-\w+\.js):(\d+):(\d+)\)$/m.exec(
+			stack.split("\n").find((line) => line.includes("at assertIsLocale")) ??
+				"",
+		);
+		expect(frame, stack).not.toBeNull();
+		const [, file = "", line = "", column = ""] = frame ?? [];
+		await expect
+			.poll(() => existsSync(join(dir, "out", file)), devWait)
+			.toBe(true);
+		const thrown = readFileSync(join(dir, "out", file), "utf8").split("\n")[
+			Number(line) - 1
+		];
+		expect(thrown?.slice(Number(column) - 1)).toBe("unknownLocale(value);");
 	});
 
 	it("closes once the compile under way has finished, leaving the project to remove", async () => {

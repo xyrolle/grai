@@ -81,7 +81,7 @@ function savedBytes(build: Build): Buffer {
 		compilation: { ...compilation, catalogs: compilation.catalogs.map(save) },
 	};
 	const payload = serialize(saved);
-	return Buffer.concat([Buffer.from(`${key}\n${payload.length}\n`), payload]);
+	return Buffer.concat([Buffer.from(`${key()}\n${payload.length}\n`), payload]);
 }
 
 /**
@@ -101,10 +101,14 @@ export async function savedBuild(
 		if (error instanceof GraiError) return undefined;
 		throw error;
 	}
-	const key = buildKey(config, options);
+	let key: string | undefined;
+	const keyOf = () => {
+		key ??= buildKey(config, options);
+		return key;
+	};
 	const saved = await readSaved(
 		join(config.outdir, stateDirectory, savedName),
-		key,
+		keyOf,
 	);
 	if (saved === undefined) return undefined;
 	const takenUp = new Map<SavedCatalog, Catalog>();
@@ -124,7 +128,7 @@ export async function savedBuild(
 			...saved.compilation,
 			catalogs: saved.compilation.catalogs.map(takeUp),
 		},
-		key,
+		key: keyOf,
 	};
 }
 
@@ -135,11 +139,12 @@ export async function savedBuild(
  */
 async function readSaved(
 	file: string,
-	key: string,
+	key: () => string,
 ): Promise<Saved | undefined> {
-	const header = Buffer.from(`${key}\n`);
 	try {
 		const bytes = await readFile(file);
+		// The key only once there is a saved build, as its compiler's identity reads the compiler.
+		const header = Buffer.from(`${key()}\n`);
 		if (!bytes.subarray(0, header.length).equals(header)) return undefined;
 		const lengthEnd = bytes.indexOf("\n", header.length);
 		const payload = bytes.subarray(lengthEnd + 1);

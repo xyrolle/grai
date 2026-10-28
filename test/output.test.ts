@@ -1,4 +1,4 @@
-import { execFile, spawnSync } from "node:child_process";
+import { execFile, spawn, spawnSync } from "node:child_process";
 import {
 	appendFileSync,
 	cpSync,
@@ -12,6 +12,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
@@ -252,18 +253,75 @@ for (const layout of ["src", "dist"] as const) {
 				),
 			);
 			const taken = [start(), start()];
-			// The generator alone changes: each locale's arrow function opens with a comment.
-			const generator = join(compiler, `locale-function${extension}`);
-			const arrow = ") => $";
-			expect(readFileSync(generator, "utf8").split(arrow)).toHaveLength(2);
-			writeFileSync(
-				generator,
-				readFileSync(generator, "utf8").replace(arrow, ") => /* patched */ $"),
-			);
+			patchGenerator(compiler, extension);
 
 			expect([...taken, start()]).toEqual([false, true, false]);
 			expect(outputHolds(dir, "/* patched */")).toBe(true);
 		},
+	);
+
+	it(
+		`saves a build as the compiler that compiled it, though its modules change before the save, in grai's ${layout}`,
+		processTest,
+		async () => {
+			const { dir, config } = project(catalogs);
+			const { compiler, extension, start } = graiCopy(dir, config, layout);
+			// A dev server's first start: it serves its page from the compile, and writes and saves the
+			// build once it is quiet, here once told to.
+			const script = `const [grai, config, extension] = process.argv.slice(1);
+const { compileProject, writeBuild } = await import(grai + "/compile" + extension);
+const { saveBuild } = await import(grai + "/saved-build" + extension);
+const { createInterface } = await import("node:readline");
+const compiled = await compileProject(config, undefined, { pseudoLocale: true, declare: false });
+console.log("compiled");
+for await (const _ of createInterface({ input: process.stdin })) break;
+await saveBuild((await writeBuild(compiled)).build);
+console.log("saved");`;
+			const serving = spawn(
+				process.execPath,
+				[
+					"--input-type=module",
+					"-e",
+					script,
+					pathToFileURL(compiler).href,
+					config,
+					extension,
+				],
+				{ stdio: ["pipe", "pipe", "pipe"] },
+			);
+			let errors = "";
+			serving.stderr.on("data", (chunk) => {
+				errors += chunk;
+			});
+			const lines = createInterface({ input: serving.stdout });
+			const said = (line: string) =>
+				new Promise<void>((resolve, reject) => {
+					lines.on("line", (got) => {
+						if (got === line) resolve();
+					});
+					serving.on("close", () => reject(new Error(errors)));
+				});
+			const compiled = said("compiled");
+			const saved = said("saved");
+			await compiled;
+			patchGenerator(compiler, extension);
+			serving.stdin.end("save\n");
+			await saved;
+
+			expect(start()).toBe(false);
+			expect(outputHolds(dir, "/* patched */")).toBe(true);
+		},
+	);
+}
+
+/** Changes the compiler's generator alone: each locale's arrow function opens with a comment. */
+function patchGenerator(compiler: string, extension: string): void {
+	const generator = join(compiler, `locale-function${extension}`);
+	const arrow = ") => $";
+	expect(readFileSync(generator, "utf8").split(arrow)).toHaveLength(2);
+	writeFileSync(
+		generator,
+		readFileSync(generator, "utf8").replace(arrow, ") => /* patched */ $"),
 	);
 }
 

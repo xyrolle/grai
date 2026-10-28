@@ -1,40 +1,77 @@
-// When a `next dev` start may go on: once the watch's first compile has ended, with the keys placed
-// by the groups read beside it if they came in time (`first-groups.ts`). This operation alone
-// decides it, and owns the read's thread: it stops that thread and waits for it to stop, and places
-// the keys, before it settles. A compile of an edit that ends meanwhile tells nothing, so no output
-// is written for the groups once Next has started.
-import { saveGroups } from "../saved-groups.ts";
+// A `next dev` start's first compile and its release, when the groups are read beside it
+// (`first-groups.ts`). The compile asks for them once it has compiled the catalogs (`placing`), and
+// places the keys by them if they come in time (`placing.ts`), in the one output it writes, and
+// saves them for the compiles after once that output is written. The start may go on once the
+// watch has started (`Watch.first`: that compile has ended, and so has the compile of every edit
+// that came meanwhile) and the read's thread has stopped (`released`). No compile after the first
+// asks, so no output is written for the groups read once Next has started.
+import type { Compilation } from "../compilation.ts";
+import type { Placing } from "../placing.ts";
+import { type KeyGroups, savedGroups } from "../saved-groups.ts";
 import type { Compiled, Watch } from "../watch.ts";
 import type { FirstGroups } from "./first-groups.ts";
 import { keyWeights } from "./key-groups.ts";
 
-/** How the start's compiles ended, and whether its keys are placed by the groups read beside it. */
+/** How the start's last compile ended, and whether the groups read beside the first are saved. */
 export type Started = { compiled: Compiled; grouped: boolean };
 
+/** What the first compile asks for the groups, and the start's release. */
+export type Startup = {
+	placing: Placing | undefined;
+	/** Settles once Next may start: the watch has started, and the read's thread has stopped. */
+	released: (watching: Watch) => Promise<Started>;
+};
+
 /**
- * Settles once Next may start: after the first compile, and, with the groups read beside it, after
- * the compile that places the keys by them, its read again of a catalog mid-save included.
+ * The start of a watch whose first compile writes `outdir`, with the groups `reading` reads, if any,
+ * which the compile places the keys by only if Next waits for it (`held`): a read for a start Next
+ * does not wait for stops at once. The compile waits for groups once the code is read, as only
+ * grouping the keys by their weights is left then (`placing.ts`).
  */
-export async function started(
-	watching: Watch,
+export function startup(
 	reading: FirstGroups | undefined,
-): Promise<Started> {
-	const first = await watching.first;
-	if (reading === undefined) return { compiled: first, grouped: false };
-	const build = "result" in first ? first.build : undefined;
-	let groups: readonly (readonly string[])[] | undefined;
-	try {
-		if (build !== undefined && "result" in first) {
-			groups = await reading.after(
-				keyWeights(build.compilation),
-				first.milliseconds,
-			);
-		}
-	} finally {
-		await reading.stop();
-	}
-	if (build === undefined || groups === undefined)
-		return { compiled: first, grouped: false };
-	await saveGroups(build.config.outdir, groups);
-	return { compiled: await watching.compileAgain(), grouped: true };
+	outdir: string,
+	held: Promise<boolean>,
+): Startup {
+	/** The groups the compile was given. */
+	let given: KeyGroups | undefined;
+	let read = false;
+	let waits = false;
+	void reading?.read.then((done) => {
+		read = done;
+	});
+	void held.then((waited) => {
+		waits = waited;
+		if (!waited) return reading?.stop();
+	});
+	const groupsFor = async (
+		reading: FirstGroups,
+		compilation: Compilation,
+	): Promise<KeyGroups | undefined> => {
+		if (!(await held)) return undefined;
+		given = await reading.after(keyWeights(compilation));
+		return given;
+	};
+	return {
+		placing:
+			reading &&
+			(async (compilation) => {
+				// A turn of the event loop takes in the read's word that it is done, which came while the
+				// compile ran.
+				await new Promise((resolve) => setImmediate(resolve));
+				return {
+					groups: groupsFor(reading, compilation),
+					waited: read && waits,
+				};
+			}),
+		released: async (watching) => {
+			const compiled = await watching.first;
+			await reading?.stop();
+			// The compile saved the groups it was given if it wrote the output placed by them.
+			const grouped =
+				given !== undefined &&
+				JSON.stringify(savedGroups(outdir)) === JSON.stringify(given);
+			return { compiled, grouped };
+		},
+	};
 }

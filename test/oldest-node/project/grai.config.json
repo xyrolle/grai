@@ -1,0 +1,6 @@
+{
+	"locales": ["en", "de"],
+	"baseLocale": "en",
+	"catalogs": "messages/{locale}.json",
+	"outdir": "out"
+}

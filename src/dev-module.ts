@@ -15,14 +15,23 @@ import { everyLocale } from "./page-keys.ts";
 
 /**
  * The dev module's table: its text keys' rows as one JSON string, and the other keys' rows. A
- * spread, not `Object.assign`, which would set a key named `__proto__` through the setter.
+ * spread, not `Object.assign`, which would set a key named `__proto__` through the setter. The
+ * JSON is in single quotes, which leave its own quotes as they are: about 28 KB less on the
+ * synthetic catalog's page, for the dev server to send and the browser to read.
  */
 const table = (textRows: string, callRows: string) =>
 	`const T = {
-	...JSON.parse(${JSON.stringify(`{${textRows}}`)}),
+	...JSON.parse('${singleQuoted(`{${textRows}}`)}'),
 ${callRows}
 };
 `;
+
+/**
+ * Text as a single-quoted string holds it: its `\` and `'` escaped. JSON has no raw line breaks,
+ * and a string may hold U+2028 and U+2029 as they are.
+ */
+const singleQuoted = (text: string) =>
+	text.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
 
 /**
  * The positions in the config's `locales` whose variants the table's rows hold, in order, and how
@@ -118,30 +127,30 @@ export function devModule(
 		locale === undefined
 			? locales.map((_, index) => index)
 			: [locales.indexOf(locale)];
-	const held = (variants: readonly string[]) =>
-		slots.map((slot) => variants[slot]);
-	const keys = [...build.compilation.keys];
-	const texts = keys.filter(([, compiled]) => compiled.kind === "text");
-	const calls = keys.filter(([, compiled]) => compiled.kind !== "text");
-	const textRows = texts
-		.map(
-			([key, compiled]) =>
-				`${JSON.stringify(key)}:{"v":[${held(compiled.variants).join(",")}]}`,
-		)
-		.join(",");
+	const [slot] = slots;
+	const held = (variants: readonly string[], separator: string) =>
+		slots.length === 1 && slot !== undefined
+			? (variants[slot] ?? "")
+			: slots.map((each) => variants[each]).join(separator);
+	const keys: string[] = [];
+	const textRows: string[] = [];
+	const callRows: string[] = [];
+	for (const [key, compiled] of build.compilation.keys) {
+		keys.push(key);
+		if (compiled.kind === "text")
+			textRows.push(
+				`${JSON.stringify(key)}:{"v":[${held(compiled.variants, ",")}]}`,
+			);
+		else callRows.push(`\t${identifierKey(key)}: ${row(compiled, held)},`);
+	}
 	const names = calledNames(build.compilation.keys.values(), [
 		"markup",
 		"message",
 	]);
-	const callRows = calls
-		.map(
-			([key, compiled]) => `\t${identifierKey(key)}: ${row(compiled, held)},`,
-		)
-		.join("\n");
 	return `${outputImports(names, (file) => join(outdir, file), build.rendered.modules)}
-${slotsCode(slots, locales.length)}${table(textRows, callRows)}${madeCode}${destructuredExports(
+${slotsCode(slots, locales.length)}${table(textRows.join(","), callRows.join("\n"))}${madeCode}${destructuredExports(
 	"made",
-	keys.map(([key]) => key),
+	keys,
 	new Set([...everyName(names), ...devWords]),
 )}${patchCode(version)}`;
 }
@@ -201,7 +210,7 @@ export function patchModule(
 	const keys = changed.flatMap((key) => build.compilation.keys.get(key) ?? []);
 	const rows = changed.map(
 		(key) =>
-			`\t${identifierKey(key)}: ${row(build.compilation.keys.get(key), (variants) => variants)},`,
+			`\t${identifierKey(key)}: ${row(build.compilation.keys.get(key), (variants, separator) => variants.join(separator))},`,
 	);
 	return `${outputImports(calledNames(keys, []), (file) => join(outdir, file), build.rendered.modules)}\nexport const rows = {\n${rows.join("\n")}\n};\n`;
 }
@@ -209,12 +218,10 @@ export function patchModule(
 /** A key's row in the dev table: the variants `held` keeps of its locales', and their parts for markup. */
 function row(
 	compiled: CompiledKey | undefined,
-	held: (variants: readonly string[]) => readonly (string | undefined)[],
+	held: (variants: readonly string[], separator: string) => string,
 ): string {
 	if (compiled === undefined) return "{}";
 	const parts =
-		compiled.kind === "markup"
-			? `, p: [${held(compiled.parts).join(", ")}]`
-			: "";
-	return `{ v: [${held(compiled.variants).join(", ")}]${parts} }`;
+		compiled.kind === "markup" ? `, p: [${held(compiled.parts, ", ")}]` : "";
+	return `{ v: [${held(compiled.variants, ", ")}]${parts} }`;
 }

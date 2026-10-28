@@ -112,8 +112,10 @@ export function messageGroups(
 			test: (id: string) => runtimeKind(id) !== undefined,
 		},
 		{
+			// A group named by a function names itself in the bundler's timing report by `debugName`.
 			name: (id: string, graph: ChunkingGraph) =>
 				pageChunkOf(id, graph) ?? null,
+			debugName: "grai-messages",
 			test: isMessageModule,
 		},
 	];

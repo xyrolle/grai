@@ -6,7 +6,13 @@ import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { caseCollisions, isCompilable, keyProblems } from "./key-checks.ts";
 import { declarationOf, type KeyDeclaration } from "./key-declarations.ts";
 import { parseMessages } from "./key-messages.ts";
-import { type KeyModule, keyModule, type RuntimeFunction } from "./modules.ts";
+import {
+	type KeyModule,
+	keyModule,
+	type RuntimeFunction,
+	textModule,
+} from "./modules.ts";
+import { isPlainText } from "./pattern.ts";
 
 /**
  * A key compiled from its raw messages, one per locale, kept so an unchanged key is not compiled
@@ -67,15 +73,17 @@ export function compileCatalogs(
 	const keys = new Map(edited === undefined ? undefined : previous?.keys);
 	const candidates = edited ?? allKeys(catalogs);
 	const changed = new Set<string>();
-	const adds = [...candidates].some(
-		(key) =>
-			previous?.keys.has(key) !== true &&
-			catalogs.some((catalog) => catalog.messages.has(key)),
-	);
-	const collisions =
-		previous !== undefined && !adds
-			? new Map<string, string>()
-			: caseCollisions(allKeys(catalogs));
+	// A key added since the previous compilation can collide with another by case.
+	const adds =
+		previous === undefined ||
+		[...candidates].some(
+			(key) =>
+				!previous.keys.has(key) &&
+				catalogs.some((catalog) => catalog.messages.has(key)),
+		);
+	const collisions = adds
+		? caseCollisions(edited === undefined ? candidates : allKeys(catalogs))
+		: new Map<string, string>();
 	const base = catalogs.find((catalog) => catalog.locale === config.baseLocale);
 	const fallbackOf = fallbackPositions(config.locales, config.fallbacks);
 	for (const key of candidates) {
@@ -155,6 +163,11 @@ function compileKey(
 		errors.push(...keyProblems(key, catalogs, values, collisions));
 		return undefined;
 	}
+	// A key whose message is plain text in every locale is that text, as its parse would show: a
+	// compile that leaves the declarations to the output's write, which parses every key, need not
+	// parse it, which a dev server's first page waits for.
+	if (!declare && values.every(isPlainMessage))
+		return compiledKey(key, values, textModule(values), false);
 	const messages = parseMessages(key, catalogs, sources, values, errors);
 	if (messages === undefined) return undefined;
 	const declared = declare
@@ -164,14 +177,33 @@ function compileKey(
 		errors.push(declared);
 		return undefined;
 	}
-	const module = keyModule(key, messages);
-	return {
+	return compiledKey(
+		key,
+		values,
+		keyModule(key, messages),
+		messages.some((message) => message.markup),
+		declared,
+	);
+}
+
+/** Whether a catalog's raw message is a pattern that is its text alone (`isPlainText`). */
+function isPlainMessage(value: unknown): value is string {
+	return typeof value === "string" && isPlainText(value);
+}
+
+function compiledKey(
+	key: string,
+	values: readonly unknown[],
+	module: KeyModule,
+	markup: boolean,
+	declared?: KeyDeclaration,
+): CompiledKey {
+	const compiled: CompiledKey = {
 		name: key,
 		values,
 		value: module.value,
 		serverValue: module.serverValue,
 		serverUses: module.serverUses,
-		...(declared === undefined ? {} : { declared }),
 		uses: module.uses,
 		plurals: module.plurals,
 		formats: module.formats,
@@ -179,8 +211,10 @@ function compileKey(
 		kind: module.kind,
 		variants: module.variants,
 		parts: module.parts,
-		markup: messages.some((message) => message.markup),
+		markup,
 	};
+	if (declared !== undefined) compiled.declared = declared;
+	return compiled;
 }
 
 /**

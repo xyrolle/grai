@@ -1,61 +1,73 @@
-import { readdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	watch as watchFile,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { type FirstGroups, firstGroups } from "../src/next/first-groups.ts";
-import { started } from "../src/next/startup.ts";
-import type { KeyGroups } from "../src/saved-groups.ts";
-import { groupsFile } from "../src/saved-groups.ts";
-import { watch } from "../src/watch.ts";
+import { startup } from "../src/next/startup.ts";
+import { savedBuild } from "../src/saved-build.ts";
+import { groupsFile, type KeyGroups } from "../src/saved-groups.ts";
+import { developing, watch } from "../src/watch.ts";
 import { freshApp } from "./next-fresh-app.ts";
 
-// When a fresh `next dev` start may go on (`startup.ts`): once its first compile has ended, with the
-// keys placed by the groups read beside it when they come in time. No other compile releases it.
+// A fresh `next dev` start whose first compile asks for the groups read beside it (`startup.ts`):
+// it places the keys by them in the one output it writes when they come in time, and the start is
+// released once the watch has started, that compile and those of the edits that came meanwhile
+// ended, and the read has stopped.
 
-/** A read of the groups whose answer the test gives, once the start has asked for it. */
-function heldRead() {
+/**
+ * A read of the groups whose answer the test gives, once the compile has asked for it: its code read
+ * by then, or still being read.
+ */
+function heldRead(read = true) {
 	let asked: () => void = () => {};
 	const asking = new Promise<void>((resolve) => {
 		asked = resolve;
 	});
-	let answer: (groups: KeyGroups) => void = () => {};
-	const answered = new Promise<KeyGroups>((resolve) => {
+	let answer: (groups: KeyGroups | undefined) => void = () => {};
+	const answered = new Promise<KeyGroups | undefined>((resolve) => {
 		answer = resolve;
 	});
-	const stops: string[] = [];
+	const events: string[] = [];
 	const reading: FirstGroups = {
-		read: Promise.resolve(true),
+		read: read ? Promise.resolve(true) : new Promise<boolean>(() => {}),
 		after: () => {
+			events.push("asked");
 			asked();
 			return answered;
 		},
 		stop: async () => {
-			stops.push("stopped");
+			events.push("stopped");
 		},
 	};
-	return { reading, asking, answer, stops };
+	return { reading, asking, answer, events };
 }
 
-/** A watch of the app whose reports the test reads, and waits for one by one; closed after it. */
-function watched(config: string) {
+/** The start of a fresh app's watch with this read, its reports, and its release, closed after. */
+function started(
+	config: string,
+	outdir: string,
+	reading: FirstGroups,
+	held = true,
+) {
 	const reports: CompileResult[] = [];
-	let reported: () => void = () => {};
+	const start = startup(reading, outdir, Promise.resolve(held));
 	const watching = watch(
 		config,
-		(result) => {
-			reports.push(result);
-			reported();
-		},
+		(result) => reports.push(result),
 		(error) => {
 			throw error;
 		},
+		{ placeFirst: start.placing },
 	);
 	onTestFinished(() => watching.close());
-	const nextReport = () =>
-		new Promise<void>((resolve) => {
-			reported = resolve;
-		});
-	return { watching, reports, nextReport };
+	return { reports, release: start.released(watching), watching };
 }
 
 const groupModules = (dir: string) =>
@@ -63,121 +75,179 @@ const groupModules = (dir: string) =>
 		/^g\d+-.*\.js$/.test(name),
 	);
 
-it("starts Next only once the keys are placed by the groups, though an edit compiles while they are read", async () => {
+it("places the keys by the groups that have come when the first compile asks, in the one output it writes, and releases the start after it", async () => {
 	const { dir, config } = freshApp();
-	const { watching, reports, nextReport } = watched(config);
 	const held = heldRead();
-	let released = false;
-	const release = started(watching, held.reading).then((start) => {
-		released = true;
-		return start;
-	});
-
-	await held.asking;
-	const edited = nextReport();
-	writeFileSync(
-		join(dir, "messages", "en.json"),
-		JSON.stringify({ about: "About us", home: "Home", unread: "Unread" }),
-	);
-	await edited;
-	expect(released).toBe(false);
-
 	held.answer([["about"], ["home"]]);
+	const { reports, release } = started(config, join(dir, "out"), held.reading);
+
 	const { grouped, compiled } = await release;
+
 	expect(grouped).toBe(true);
-	expect(held.stops).toEqual(["stopped"]);
+	expect(reports).toHaveLength(1);
+	expect(held.events).toEqual(["asked", "stopped"]);
 	expect(groupModules(dir)).toHaveLength(2);
 	expect("build" in compiled && compiled.build?.rendered.groups).toBe(
 		JSON.stringify([["about"], ["home"]]),
 	);
-	// Nothing is written for the groups once Next has started.
-	const count = reports.length;
-	await watching.close();
-	expect(reports).toHaveLength(count);
+	expect(
+		JSON.parse(readFileSync(groupsFile(join(dir, "out")), "utf8")),
+	).toEqual([["about"], ["home"]]);
 });
 
-it("starts Next only once the compile that places the keys has read a catalog met mid-save again", async () => {
+it("releases the start once an edit that came while its first compile waited for the groups is written, and saves that edit's build for the next start", async () => {
 	const { dir, config } = freshApp();
-	const { watching, reports } = watched(config);
+	const out = join(dir, "out");
 	const held = heldRead();
-	const release = started(watching, held.reading);
-
+	const start = startup(held.reading, out, Promise.resolve(true));
+	const lock = join(out, ".grai", "lock");
+	const reports: CompileResult[] = [];
+	const watching = watch(
+		config,
+		(result) => {
+			reports.push(result);
+			// Once the first compile's output is written, the next write waits for this lock.
+			if (reports.length === 1) writeFileSync(lock, String(process.pid));
+		},
+		(error) => {
+			throw error;
+		},
+		{ placeFirst: start.placing },
+	);
+	onTestFinished(() => watching.close());
+	let released = false;
+	const release = start.released(watching).then((started) => {
+		released = true;
+		return started;
+	});
+	// Heard by the time the watch has asked, as the watch's own watcher is.
+	const catalog = join(dir, "messages", "en.json");
+	const seen = new Promise<void>((resolve) => {
+		const watcher = watchFile(catalog, () => {
+			watcher.close();
+			resolve();
+		});
+	});
 	await held.asking;
-	// The catalog stays broken: the compile reads it again once the files are quiet, and that stands.
-	writeFileSync(join(dir, "messages", "en.json"), '{ "about": "Abo');
+	writeFileSync(
+		catalog,
+		JSON.stringify({
+			...JSON.parse(readFileSync(catalog, "utf8")),
+			added: "Added",
+		}),
+	);
+	await seen;
+	// The watch hears the edit in the same turn of the event loop.
+	await new Promise((resolve) => setImmediate(resolve));
 	held.answer([["about"], ["home"]]);
-	const { compiled } = await release;
+
+	await expect.poll(() => reports.length).toBe(1);
+	// The edit's write waits for the lock: the start is not released meanwhile.
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(released).toBe(false);
+	rmSync(lock);
+	const { compiled, grouped } = await release;
+
+	expect(grouped).toBe(true);
+	expect(reports).toHaveLength(2);
+	expect(
+		"result" in compiled && compiled.build?.compilation.keys.has("added"),
+	).toBe(true);
+	await watching.close();
+	const saved = await savedBuild(config, developing);
+	expect(saved?.compilation.keys.has("added")).toBe(true);
+	expect(saved?.rendered.groups).toBe(JSON.stringify([["about"], ["home"]]));
+});
+
+it("writes nothing into an outdir another tool fills, not even the groups it was given, at the start or at an edit after it", async () => {
+	const { dir, config } = freshApp();
+	const out = join(dir, "out");
+	mkdirSync(out);
+	writeFileSync(join(out, "notes.md"), "Not grai's\n");
+	const held = heldRead();
+	held.answer([["about"], ["home"]]);
+	const { reports, release } = started(config, out, held.reading);
+
+	const { grouped } = await release;
+
+	const refused = () =>
+		reports.map(({ errors }) => errors.map(({ code }) => code));
+	expect(grouped).toBe(false);
+	expect(refused()).toEqual([["outdir-not-empty"]]);
+	expect(readdirSync(out)).toEqual(["notes.md"]);
+	const catalog = join(dir, "messages", "en.json");
+	writeFileSync(
+		catalog,
+		JSON.stringify({
+			...JSON.parse(readFileSync(catalog, "utf8")),
+			added: "Added",
+		}),
+	);
+	await expect.poll(() => reports.length).toBe(2);
+	expect(refused()).toEqual([["outdir-not-empty"], ["outdir-not-empty"]]);
+	expect(readdirSync(out)).toEqual(["notes.md"]);
+});
+
+it("places the keys by their shards, and releases the start without waiting, when the code is still being read and the groups do not come while the first compile renders", async () => {
+	const { dir, config } = freshApp();
+	const held = heldRead(false);
+	const { reports, release } = started(config, join(dir, "out"), held.reading);
+
+	const { grouped } = await release;
+
+	expect(grouped).toBe(false);
+	expect(reports).toHaveLength(1);
+	expect(held.events).toEqual(["asked", "stopped"]);
+	expect(groupModules(dir)).toEqual([]);
+});
+
+it("releases the start once a first compile that met a catalog mid-save has read it again, its read stopped and never asked", async () => {
+	const { dir, config } = freshApp();
+	writeFileSync(join(dir, "messages", "en.json"), '{ "about": "Abo');
+	const held = heldRead();
+	const { reports, release } = started(config, join(dir, "out"), held.reading);
+
+	const { compiled, grouped } = await release;
 
 	expect(
 		"result" in compiled && compiled.result.errors.map(({ code }) => code),
 	).toEqual(["catalog-invalid"]);
-	expect(reports.at(-1)?.errors.map(({ code }) => code)).toEqual([
-		"catalog-invalid",
+	expect(reports.map(({ errors }) => errors.map(({ code }) => code))).toEqual([
+		["catalog-invalid"],
 	]);
+	expect({ grouped, events: held.events }).toEqual({
+		grouped: false,
+		events: ["stopped"],
+	});
 });
 
-it("places the keys by the groups before Next starts, when a catalog mid-save is mended while the compile waits to read it again", async () => {
-	const { dir, config } = freshApp();
-	const { watching } = watched(config);
-	const held = heldRead();
-	const catalog = join(dir, "messages", "en.json");
-	const release = started(watching, held.reading);
-
-	await held.asking;
-	writeFileSync(catalog, '{ "about": "Abo');
-	held.answer([["about"], ["home"]]);
-	// Events keep coming while the save goes on, which holds the read again back; then it ends whole.
-	const touched = setInterval(
-		() => utimesSync(catalog, new Date(), new Date()),
-		5,
-	);
-	onTestFinished(() => clearInterval(touched));
-	await expect
-		.poll(() => readFileSync(groupsFile(join(dir, "out")), "utf8"))
-		.toContain("about");
-	writeFileSync(
-		catalog,
-		JSON.stringify({ about: "About", home: "Home", unread: "Unread" }),
-	);
-	clearInterval(touched);
-	const { compiled } = await release;
-
-	expect("result" in compiled && compiled.result.errors).toEqual([]);
-	expect(groupModules(dir)).toHaveLength(2);
-});
-
-it("starts Next on its first compile, and stops the read, when the code was not read by then", async () => {
-	const { dir, config } = freshApp();
-	const { watching } = watched(config);
-	const stops: string[] = [];
-	const reading: FirstGroups = {
-		read: Promise.resolve(false),
-		after: async () => undefined,
-		stop: async () => {
-			stops.push("stopped");
-		},
-	};
-
-	const { grouped } = await started(watching, reading);
-
-	expect(grouped).toBe(false);
-	expect(stops).toEqual(["stopped"]);
-	expect(groupModules(dir)).toEqual([]);
-});
-
-it("places a fresh app's keys by the groups its code's read gives, once that read is done before the first compile is", async () => {
-	// Catalogs large enough that their compile, the time the groups have to come in, far outlasts
-	// the second read of the app's few files.
+it("places a fresh app's keys by the groups its code's read gives, once that read is done before the catalogs are compiled", async () => {
+	// Catalogs large enough that rendering their keys by their shards, the time the groups have to
+	// come in, far outlasts grouping the app's few files once the weights come.
 	const { dir, config, data } = freshApp(20_000);
 	const reading = firstGroups(data);
 	expect(await reading.read).toBe(true);
-	const { watching } = watched(config);
 
-	const { grouped } = await started(watching, reading);
+	const { release, reports } = started(config, join(dir, "out"), reading);
+	const { grouped } = await release;
 
 	expect(grouped).toBe(true);
+	expect(reports).toHaveLength(1);
 	expect(
 		JSON.parse(readFileSync(groupsFile(join(dir, "out")), "utf8")),
 	).toEqual([["about"], ["home"]]);
 	expect(groupModules(dir)).toHaveLength(2);
+});
+
+it("places the keys by their shards, and stops the read at once, when Next does not wait for the first compile", async () => {
+	const { dir, config } = freshApp();
+	const held = heldRead();
+	held.answer([["about"], ["home"]]);
+	const { release } = started(config, join(dir, "out"), held.reading, false);
+
+	const { grouped } = await release;
+
+	expect(grouped).toBe(false);
+	expect(held.events).toEqual(["stopped", "stopped"]);
+	expect(groupModules(dir)).toEqual([]);
 });

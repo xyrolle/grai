@@ -3,13 +3,14 @@ import { whenQuiet } from "./quiet.ts";
 import { saveBuild, saveBuildNow } from "./saved-build.ts";
 
 /**
- * Saves a watcher's first build once the process is quiet (`whenQuiet`), once `flush` is called,
- * or as the process exits, unless it is the build it started from (`from`) as that was saved: it
- * compiled no key, and placed the keys as that did (`rendered.groups`). One that placed them by
- * groups saved since is saved, so the next start does not place them again. The builds after it are
- * not saved, since the next start compiles what they changed as edits, but for a build its watcher
- * compiled again to place the keys by groups saved since (`retook`), as a Next start that read its
- * groups beside its first compile does: it is saved in place of the first, or after it. Saving the
+ * Saves the build a watcher's start ends with once the process is quiet (`whenQuiet`), once `flush`
+ * is called, or as the process exits: the last build its first compile and the compiles of the
+ * changes that came meanwhile wrote, until `started` is called, or, if they wrote none, the first
+ * build written after. None is saved if every build of the start is the build it started from
+ * (`from`), as that was saved: it compiled no key, and placed the keys as that did
+ * (`rendered.groups`). One that placed them by groups saved since is saved, so the next start does
+ * not place them again. The builds after it are not saved, since the next start compiles what they
+ * changed as edits. Saving the
  * build of a project of 6,379 keys in 3 locales takes about 20 ms to serialize 22 MB, which its dev
  * server's start, about 5 s of work, should not take on. The save at exit is for a process that
  * ends before it is quiet: a dev server stopped by SIGTERM, which Vite closes, though in an app
@@ -17,10 +18,13 @@ import { saveBuild, saveBuildNow } from "./saved-build.ts";
  */
 export function firstBuildSaver(): {
 	took: (build: Build, from: Build | undefined) => void;
-	retook: (build: Build) => void;
+	started: () => void;
 	flush: () => Promise<void>;
 } {
+	let starting = true;
+	/** Whether a build was taken, and whether one taken differs from the one before it. */
 	let taken = false;
+	let differs = false;
 	let unsaved: Build | undefined;
 	/** Stops the wait for the process to be quiet, while one runs. */
 	let stopWaiting: (() => void) | undefined;
@@ -48,19 +52,17 @@ export function firstBuildSaver(): {
 	};
 	return {
 		took: (build, from) => {
-			if (taken) return;
+			if (taken && !starting) return;
 			taken = true;
-			// The build it started from, unchanged: its keys and their places are those it saved.
-			if (
-				build.compilation.changed.size === 0 &&
-				build.rendered.groups === from?.rendered.groups
-			)
-				return;
-			keep(build);
+			// A build that compiled no key from the build before it, and placed the keys as that did,
+			// holds what that one does.
+			differs ||=
+				build.compilation.changed.size > 0 ||
+				build.rendered.groups !== from?.rendered.groups;
+			if (differs) keep(build);
 		},
-		retook: (build) => {
-			taken = true;
-			keep(build);
+		started: () => {
+			starting = false;
 		},
 		flush: async () => {
 			save();

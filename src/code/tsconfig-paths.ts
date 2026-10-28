@@ -153,3 +153,73 @@ function isFile(path: string): boolean {
 function isDirectory(path: string): boolean {
 	return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 }
+
+/**
+ * The `paths` the resolver applies to the project's modules, as TypeScript takes them from its
+ * tsconfig: the nearest of it and those it extends that declares `paths` (a tsconfig's own options
+ * override those it extends, a later `extends` an earlier one's), each target from the `baseUrl`
+ * that applies, or else from that tsconfig's directory; the `baseUrl`, below which every other
+ * specifier may name a file; and the directories of the projects it references, whose modules the
+ * resolver may give their own. Undefined when one of them cannot be read.
+ */
+export function appliedPaths(file: string):
+	| {
+			paths: readonly PathsEntry[];
+			baseUrl: string | undefined;
+			references: readonly string[];
+	  }
+	| undefined {
+	type Applied = {
+		paths?: { value: Record<string, unknown>; from: string };
+		baseUrl?: string;
+	};
+	const read = new Set<string>();
+	const optionsOf = (config: string): Applied | undefined => {
+		if (read.has(config)) return {};
+		read.add(config);
+		const value = jsonc(config);
+		if (!isRecord(value)) return undefined;
+		const applied: Applied = {};
+		for (const parent of [value.extends].flat()) {
+			if (parent === undefined) continue;
+			const found =
+				typeof parent === "string" ? extended(config, parent) : undefined;
+			const inherited = found === undefined ? undefined : optionsOf(found);
+			if (inherited === undefined) return undefined;
+			Object.assign(applied, inherited);
+		}
+		const options = isRecord(value.compilerOptions)
+			? value.compilerOptions
+			: {};
+		const directory = dirname(config);
+		if (typeof options.baseUrl === "string")
+			applied.baseUrl = resolve(directory, options.baseUrl);
+		if (isRecord(options.paths))
+			applied.paths = { value: options.paths, from: directory };
+		return applied;
+	};
+	const applied = optionsOf(file);
+	const root = jsonc(file);
+	if (applied === undefined || !isRecord(root)) return undefined;
+	const paths: PathsEntry[] = [];
+	for (const [key, targets] of Object.entries(applied.paths?.value ?? {})) {
+		if (!Array.isArray(targets)) return undefined;
+		const from = applied.baseUrl ?? applied.paths?.from ?? dirname(file);
+		paths.push({
+			key,
+			targets: targets
+				.filter((each) => typeof each === "string")
+				.map((target) => resolve(from, target)),
+		});
+	}
+	const references: string[] = [];
+	for (const reference of Array.isArray(root.references)
+		? root.references
+		: []) {
+		const path = isRecord(reference) ? reference.path : undefined;
+		if (typeof path !== "string") return undefined;
+		const at = resolve(dirname(file), path);
+		references.push(isDirectory(at) ? at : dirname(at));
+	}
+	return { paths, baseUrl: applied.baseUrl, references };
+}

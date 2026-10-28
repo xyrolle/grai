@@ -12,7 +12,7 @@ import { expect, it, onTestFinished } from "vitest";
 import type { CompileResult } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { savedBuild } from "../src/saved-build.ts";
-import { groupsFile, saveGroups } from "../src/saved-groups.ts";
+import { savedGroups } from "../src/saved-groups.ts";
 import { watch } from "../src/watch.ts";
 import { project } from "./project.ts";
 
@@ -180,8 +180,11 @@ it("compiles for development, with the config's pseudo-locale", async () => {
 	expect(await locales).toEqual(["en", "de", "en-XA"]);
 });
 
-it("settles a compile asked for once the read again of a catalog met mid-save has ended, after its report", async () => {
+it("settles the first compile once its read again of a catalog met mid-save has ended, after its report", async () => {
 	const { dir, config } = project(catalogs);
+	// The catalog is broken from the start, so the first compile reads it again once the files are
+	// quiet, and that read's result stands.
+	writeFileSync(join(dir, "messages", "de.json"), '{ "title": "Tit');
 	const events: string[] = [];
 	const watcher = watch(
 		config,
@@ -190,38 +193,51 @@ it("settles a compile asked for once the read again of a catalog met mid-save ha
 		() => events.push("failed"),
 	);
 	onTestFinished(() => watcher.close());
-	await watcher.first;
 
-	// The catalog stays broken, so the compile asked for reads it again once the files are quiet,
-	// and that read's result stands.
-	writeFileSync(join(dir, "messages", "de.json"), '{ "title": "Tit');
-	const compiled = await watcher.compileAgain();
-	events.push("compiled");
+	const compiled = await watcher.first;
+	events.push("first");
 
 	expect(
 		"result" in compiled && compiled.result.errors.map(({ code }) => code),
 	).toEqual(["catalog-invalid"]);
-	expect(events.slice(-2)).toEqual(["report catalog-invalid", "compiled"]);
+	expect(events).toEqual(["report catalog-invalid", "first"]);
 });
 
-it("saves the build of a compile asked for to place the keys by groups saved since, which the next start takes up and saves nothing", async () => {
-	const { dir, config } = project(catalogs);
-	const outdir = join(dir, "out");
+/** A watcher of the project whose first compile is given groups, as Next's start gives them. */
+function placed(config: string) {
+	const asked: number[] = [];
+	const reported: CompileResult[] = [];
 	const watcher = watch(
 		config,
-		() => {},
-		() => {},
+		(result) => reported.push(result),
+		(error) => {
+			throw error;
+		},
+		{
+			placeFirst: async (compilation) => {
+				asked.push(compilation.keys.size);
+				return { groups: Promise.resolve([["title"]]), waited: true };
+			},
+		},
 	);
+	return { watcher, asked, reported };
+}
+
+it("places the keys by the groups the first compile is given, and saves that build for the next start, which takes it up and saves nothing", async () => {
+	const { dir, config } = project(catalogs);
+	const outdir = join(dir, "out");
+	const { watcher } = placed(config);
 	await watcher.first;
-	await saveGroups(outdir, [["title"]]);
-	await watcher.compileAgain();
 	await watcher.close();
 
+	expect(savedGroups(outdir)).toEqual([["title"]]);
+
+	expect(
+		readdirSync(join(outdir, "keys")).some((name) => /^g0-.*\.js$/.test(name)),
+	).toBe(true);
 	const saved = join(outdir, ".grai", "build");
 	const build = await savedBuild(config, { pseudoLocale: true });
-	expect(build?.rendered.groups).toBe(
-		JSON.stringify(JSON.parse(readFileSync(groupsFile(outdir), "utf8"))),
-	);
+	expect(build?.rendered.groups).toBe(JSON.stringify([["title"]]));
 	const { mtimeMs } = statSync(saved);
 	const restarted = watch(
 		config,
@@ -231,6 +247,21 @@ it("saves the build of a compile asked for to place the keys by groups saved sin
 	await restarted.first;
 	await restarted.close();
 	expect(statSync(saved).mtimeMs).toBe(mtimeMs);
+});
+
+it("asks no compile after the first for the groups", async () => {
+	const { dir, config } = project(catalogs);
+	const { watcher, asked, reported } = placed(config);
+	onTestFinished(() => watcher.close());
+	await watcher.first;
+
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ title: "Überschrift" }),
+	);
+	await expect.poll(() => reported.length).toBe(2);
+
+	expect(asked).toEqual([1]);
 });
 
 /** A watcher that serves its first compile before it writes it, and the reports the test reads. */

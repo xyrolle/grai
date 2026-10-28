@@ -13,6 +13,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { cacheDir } from "./apps.mjs";
+import { editedCatalog } from "./catalog-edit.mjs";
 import {
 	createServer,
 	pluginsFor,
@@ -43,7 +44,7 @@ async function serve(app, root, design, locale, timings) {
 			port: 0,
 			watch: { ignored: ["**/render.js", "**/main.js", "**/index.html"] },
 		},
-		plugins: pluginsFor(design, app, root, locale, timings),
+		plugins: await pluginsFor(design, app, root, locale, timings),
 	});
 	await server.listen();
 	return server;
@@ -90,12 +91,11 @@ function fixture(app, design, round) {
 	return { locale, root, page, key, catalogFile };
 }
 
-/** Saves the key's text into the catalog; returns when. */
+/** Saves the key's text into the catalog, as an editor saves it; returns when, as the write began. */
 function save(catalogFile, key, text) {
-	const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
-	catalog[key] = text;
+	const edited = editedCatalog(catalogFile, key, text);
 	const written = now();
-	writeFileSync(catalogFile, JSON.stringify(catalog, null, "\t"));
+	writeFileSync(catalogFile, edited);
 	return written;
 }
 

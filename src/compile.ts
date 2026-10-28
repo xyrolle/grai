@@ -22,9 +22,10 @@ import {
 	type RuntimeSources,
 	renderModules,
 } from "./output-modules.ts";
+import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
-import { type KeyGroups, savedGroups } from "./saved-groups.ts";
+import { type KeyGroups, savedGroups, saveGroups } from "./saved-groups.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
 export type CompileResult = { written: string[]; errors: GraiError[] };
@@ -40,8 +41,12 @@ export type CompiledProject = ParsedCatalogs & {
 	hashes: readonly string[];
 	compilation: Compilation;
 	rendered: RenderedModules;
-	/** What a saved build must match to be taken up again: `buildKey` of the config as read. */
-	key: string;
+	/**
+	 * What a saved build must match to be taken up again: `buildKey` of the config as read, made
+	 * when it is first asked for, as the build is saved, with the compiler's identity taken as the
+	 * project was compiled (`compileProject`).
+	 */
+	key: () => string;
 };
 
 /** Everything a compile read, made and wrote, kept so the next compile redoes only what changed. */
@@ -147,9 +152,14 @@ function hashesOf(sources: readonly CatalogSource[]): string[] {
 /**
  * How a compile is for: development and tests take the config's pseudo-locale, a build never. A
  * build that writes a copy of each message chunk per locale says so in config.js (`localeCopies`),
- * for the server that points pages at them.
+ * for the server that points pages at them. `placing`, when given, is asked once the catalogs are
+ * compiled for groups to place the keys by in place of those saved (`placing.ts`).
  */
-export type CompileOptions = { pseudoLocale?: boolean; localeCopies?: boolean };
+export type CompileOptions = {
+	pseudoLocale?: boolean;
+	localeCopies?: boolean;
+	placing?: Placing | undefined;
+};
 
 /**
  * Compiles again after an edit: reads the config and catalogs, parses only the catalogs that
@@ -179,7 +189,11 @@ export async function compileProject(
 	previous: CompiledProject | undefined,
 	options: CompileOptions & { declare?: boolean } = {},
 ): Promise<CompiledProject | { errors: GraiError[] }> {
-	const read = await readProject(configFile);
+	const reading = readProject(configFile);
+	// The compiler's identity, taken while the catalogs are read and before anything is compiled: a
+	// build saved later is this process's compiler's, whatever changes on disk meanwhile.
+	hashOfCompiler();
+	const read = await reading;
 	if ("errors" in read) return read;
 	const before =
 		previous !== undefined && sameConfig(previous.config, read.config)
@@ -248,6 +262,7 @@ function compiledFrom(
 		declare,
 	});
 	if (compilation.errors.length > 0) return { errors: [...compilation.errors] };
+	let key: string | undefined;
 	return {
 		config,
 		sources,
@@ -262,7 +277,10 @@ function compiledFrom(
 			localeCopies,
 			previous?.rendered.formats,
 		),
-		key: buildKey(configured, { pseudoLocale, localeCopies }),
+		key: () => {
+			key ??= buildKey(configured, { pseudoLocale, localeCopies });
+			return key;
+		},
 	};
 }
 
@@ -276,7 +294,7 @@ function compiledFrom(
 export async function writeBuild(
 	compiled: CompiledProject,
 	previous?: Build,
-	{ localeCopies = false }: CompileOptions = {},
+	{ localeCopies = false, placing }: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
 	const { config, sources, parts, catalogs } = compiled;
 	const compilation = declareKeys(config, compiled.compilation);
@@ -296,25 +314,46 @@ export async function writeBuild(
 		moved || before === undefined
 			? basePositions(sources, parts, config.baseLocale)
 			: before.positions;
-	const { output, rendered } = renderOutput(
-		config,
-		compiled.rendered,
-		compilation,
-		{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
-		groups,
-		before?.rendered,
-	);
+	const render = (by: KeyGroups, last: Rendered | undefined) =>
+		renderOutput(
+			config,
+			compiled.rendered,
+			compilation,
+			{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
+			by,
+			last,
+		);
+	const asked = await placing?.(compilation);
+	const early =
+		asked &&
+		(asked.waited
+			? await asked.groups.catch(() => undefined)
+			: await cameBy(asked.groups));
+	let placement = early ?? groups;
+	let { output, rendered } = render(placement, before?.rendered);
+	const late =
+		asked && !asked.waited && early === undefined
+			? await cameBy(asked.groups)
+			: undefined;
+	if (late !== undefined) {
+		placement = late;
+		({ output, rendered } = render(late, rendered));
+	}
 	let written: string[];
 	try {
 		written = await writeOutput(
 			config.outdir,
 			output,
-			inputsOf(config, compiled.hashes, localeCopies, groups),
+			inputsOf(config, compiled.hashes, localeCopies, placement),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
 		return { result: { written: [], errors: [error] } };
 	}
+	// Groups `placing` gave are the outdir's once the output placed by them is written, and not
+	// before: only a write of grai's own output, which refuses an outdir another tool fills, makes
+	// the state directory (`assertOutdirIsGrais`).
+	if (placement !== groups) await saveGroups(config.outdir, placement);
 	return {
 		result: { written, errors: [] },
 		build: { ...compiled, compilation, positions, rendered },

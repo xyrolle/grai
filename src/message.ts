@@ -58,21 +58,26 @@ const noFormatted: ReadonlyMap<string, FormattedLocal> = new Map();
  */
 function patternMessage(locale: string, source: string): LocaleMessage {
 	const pattern = parsePattern(source);
-	let inputs = noInputs;
+	// Made at the first input, as most patterns are text alone and share `noInputs`.
+	let inputs: Set<string> | undefined;
+	const add = (name: string) => {
+		inputs ??= new Set();
+		inputs.add(name);
+	};
 	let markup = false;
 	for (const part of pattern) {
 		if (part.type === "variable" || part.type === "literal") {
+			if (part.type === "variable") add(part.name);
 			const given = part.format?.input?.name;
-			const shown = part.type === "variable" ? [part.name] : [];
-			inputs = new Set([...inputs, ...shown, ...(given ? [given] : [])]);
+			if (given) add(given);
 		} else if (isMarkup(part)) {
 			markup = true;
-			inputs = new Set([...inputs, ...markupVariables(part)]);
+			for (const name of markupVariables(part)) add(name);
 		}
 	}
 	return {
 		locale,
-		inputs,
+		inputs: inputs ?? noInputs,
 		plurals: noPlurals,
 		formatted: noFormatted,
 		selectors: [],
@@ -237,10 +242,10 @@ function withInputs(
  * input it is the text of, which is the value MessageFormat 2 gives it.
  */
 function shownAsInputs(
-	variants: readonly Variant[],
+	variants: Variant[],
 	strings: ReadonlyMap<string, string>,
 ): Variant[] {
-	if (strings.size === 0) return [...variants];
+	if (strings.size === 0) return variants;
 	const shown = (name: string) => strings.get(name) ?? name;
 	return variants.map(({ keys, pattern }) => ({
 		keys,

@@ -14,6 +14,7 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { editedCatalog } from "./catalog-edit.mjs";
 import { median, medianInterval } from "./medians.mjs";
 import { assertListed, devStart } from "./next-dev.mjs";
 import {
@@ -35,18 +36,15 @@ export const EDIT_APPS = ["grai", "next-intl", "next-intl, client keys picked"];
 const components = ["server", "client"];
 const now = () => performance.timeOrigin + performance.now();
 
-/** A message's text in its catalog, saved as an editor saves it; returns when. */
+/** A message's text in its catalog, saved as an editor saves it; returns when, as the write began. */
 function save(catalog, key, text) {
-	const messages = JSON.parse(readFileSync(catalog, "utf8"));
-	messages[key] = text;
-	writeFileSync(catalog, JSON.stringify(messages, null, "\t"));
-	return now();
+	const edited = editedCatalog(catalog, key, text);
+	const saved = now();
+	writeFileSync(catalog, edited);
+	return saved;
 }
 
-/**
- * When grai wrote the shard that holds `text`: its file's modification time. A shard's name carries
- * its content's hash, so an edit writes a new file rather than changing a watched one.
- */
+/** When grai wrote the module of keys that holds `text`: its file's modification time. */
 function writtenAt(outdir, text) {
 	const keys = join(outdir, "keys");
 	for (const name of readdirSync(keys)) {

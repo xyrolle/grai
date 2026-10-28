@@ -1,3 +1,4 @@
+import { rmSync, symlinkSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { members } from "../src/bits.ts";
@@ -366,5 +367,158 @@ describe("a Next app's groups of keys", () => {
 			],
 			["badge_text", "home_button"],
 		]);
+	});
+});
+
+/** A page that reads `heading_a` from a specifier, and a layout. */
+const pageOf = (specifier: string, more = "") => ({
+	"app/layout.jsx":
+		"export default function Layout({ children }) {\n\treturn <html><body>{children}</body></html>;\n}\n",
+	"app/page.jsx": `import { heading_a } from "${specifier}";
+${more}
+export default function Page() {
+	return <main>{heading_a()}</main>;
+}
+`,
+});
+
+/** An app's files that import the output through a tsconfig `paths` alias, with and without `.js`. */
+const aliased = {
+	"tsconfig.json": JSON.stringify({
+		compilerOptions: { paths: { "@out/*": ["./out/*"] } },
+	}),
+	"app/layout.jsx": barrels["app/layout.jsx"],
+	"app/page.jsx": `import * as m from "@out/keys.js";
+
+export default function Page() {
+	return <main>{m.heading_a()}</main>;
+}
+`,
+	"app/b/page.jsx": `"use client";
+import { heading_b } from "@out/keys";
+
+export default function B() {
+	return <main>{heading_b()}</main>;
+}
+`,
+};
+
+describe("the contexts read before the output is written, as beside a fresh clone's first compile", () => {
+	const unwritten = async (
+		files: Record<string, string>,
+		words: Record<string, string>,
+		prepare: (dir: string) => void = () => {},
+	) => {
+		const { dir, config, compilation } = await compiledApp([], files, words);
+		prepare(dir);
+		const written = await contextsIn(dir, config, compilation);
+		rmSync(config.outdir, { recursive: true, force: true });
+		return { written, unwritten: await contextsIn(dir, config, compilation) };
+	};
+
+	it("are those read once it is, through relative imports, a barrel of keys and a computed read", async () => {
+		const { written, unwritten: before } = await unwritten(app, catalog());
+		expect(before).toEqual(written);
+		expect(Object.keys(before)).toContain("nav_home");
+	});
+
+	it("are those read once it is, through keys' own paths a package.json maps to keys.js", async () => {
+		const { written, unwritten: before } = await unwritten(
+			pathAndStarBarrels,
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(Object.keys(before)).toContain("heading_a");
+	});
+
+	it("are those read once it is, through a tsconfig alias, with the module's extension and without", async () => {
+		const { written, unwritten: before } = await unwritten(
+			aliased,
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({
+			heading_a: ["page.jsx server"],
+			heading_b: ["b/page.jsx client"],
+		});
+	});
+
+	it("are those read once it is, through package imports whose conditions name another module first, under a condition the resolver does not take", async () => {
+		const { written, unwritten: before } = await unwritten(
+			{
+				...pageOf("#catalog"),
+				"package.json": JSON.stringify({
+					type: "module",
+					imports: {
+						"#catalog": {
+							custom: "./out/messages.js",
+							default: "./out/keys.js",
+						},
+					},
+				}),
+			},
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({ heading_a: ["page.jsx server"] });
+	});
+
+	it("are those read once it is, through the imports of each module's own package.json, where a nested package maps the same name elsewhere", async () => {
+		const { written, unwritten: before } = await unwritten(
+			{
+				...pageOf(
+					"#catalog",
+					'import { Widget } from "../widgets/widget.jsx";\n',
+				),
+				"package.json": JSON.stringify({
+					type: "module",
+					imports: { "#catalog": "./out/keys.js" },
+				}),
+				"widgets/package.json": JSON.stringify({
+					type: "module",
+					imports: { "#catalog": "./catalog.js" },
+				}),
+				"widgets/widget.jsx": `import { heading_b } from "#catalog";
+
+export function Widget() {
+	return <p>{heading_b()}</p>;
+}
+`,
+			},
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({ heading_a: ["page.jsx server"] });
+	});
+
+	it("are those read once it is, through a tsconfig alias beside a Vite alias by a pattern that names something else", async () => {
+		const { written, unwritten: before } = await unwritten(
+			{
+				...aliased,
+				"vite.config.js":
+					'export default { resolve: { alias: [{ find: /^~elsewhere\\//, replacement: "/nowhere/" }] } };\n',
+			},
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({
+			heading_a: ["page.jsx server"],
+			heading_b: ["b/page.jsx client"],
+		});
+	});
+
+	it("are those read once it is, through a tsconfig alias whose target goes by a symlink to the project", async () => {
+		const { written, unwritten: before } = await unwritten(
+			{
+				...pageOf("@catalog"),
+				"tsconfig.json": JSON.stringify({
+					compilerOptions: { paths: { "@catalog": ["./linked/out/keys.js"] } },
+				}),
+			},
+			barrelWords,
+			(dir) => symlinkSync(dir, join(dir, "linked"), "dir"),
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({ heading_a: ["page.jsx server"] });
 	});
 });
