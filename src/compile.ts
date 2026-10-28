@@ -1,6 +1,5 @@
 import { hash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { serialize } from "node:v8";
 import { basePositions, basePositionsMoved } from "./base-positions.ts";
 import {
@@ -12,16 +11,14 @@ import {
 } from "./catalog.ts";
 import { localeCatalogs, type ParsedCatalogs } from "./catalog-parts.ts";
 import { type Compilation, compileCatalogs } from "./compilation.ts";
-import { type Compiler, compilerOf } from "./compiler-identity.ts";
+import { compilerIdentity } from "./compiler-identity.ts";
 import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
-import { readManifest } from "./manifest.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
 import type { RuntimeSources } from "./output-modules.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
-import { stateDirectory } from "./state-directory.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
 export type CompileResult = { written: string[]; errors: GraiError[] };
@@ -66,28 +63,24 @@ const runtime: RuntimeSources = {
 };
 
 /**
- * The compiler (`compilerOf`), whose identity decides the output besides the config and the
+ * The compiler's identity (`compilerIdentity`): what decides the output besides the config and the
  * catalogs. A new version of grai changes it, and so does a local build, which keeps its version,
- * so the output is written again after either. Taken on a process's first compile, from the
- * modules the outdir's manifest names when they still hash to its identity.
+ * so the output is written again after either. Taken on the first compile.
  */
-let compiler: Compiler | undefined;
+let compilerHash: string | undefined;
 
-async function compilerFor(outdir: string): Promise<Compiler> {
-	compiler ??= await compilerOf(
-		[
-			runtime.runtime,
-			runtime.server,
-			runtime.testing,
-			runtime.declarations.runtime,
-			runtime.declarations.server,
-			runtime.declarations.testing,
-			runtime.declarations.setLocale.live,
-			runtime.declarations.setLocale.reload,
-		],
-		(await readManifest(join(outdir, stateDirectory)))?.compiler,
-	);
-	return compiler;
+async function hashOfCompiler(): Promise<string> {
+	compilerHash ??= await compilerIdentity([
+		runtime.runtime,
+		runtime.server,
+		runtime.testing,
+		runtime.declarations.runtime,
+		runtime.declarations.server,
+		runtime.declarations.testing,
+		runtime.declarations.setLocale.live,
+		runtime.declarations.setLocale.reload,
+	]);
+	return compilerHash;
 }
 
 /**
@@ -234,7 +227,6 @@ async function build(
 			config.outdir,
 			output,
 			await inputsOf(config, hashes, localeCopies),
-			await compilerFor(config.outdir),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
@@ -307,11 +299,10 @@ async function inputsOf(
 	hashes: readonly string[],
 	localeCopies: boolean,
 ): Promise<string> {
-	const { identity } = await compilerFor(config.outdir);
 	return hash(
 		"sha1",
 		JSON.stringify(
-			[identity, localeCopies, config, hashes],
+			[await hashOfCompiler(), localeCopies, config, hashes],
 			collectionsAsLists,
 		),
 	);
@@ -332,7 +323,7 @@ export async function buildKey(
 	{ pseudoLocale = false, localeCopies = false }: CompileOptions,
 ): Promise<string> {
 	return JSON.stringify({
-		compiler: (await compilerFor(config.outdir)).identity,
+		compiler: await hashOfCompiler(),
 		runtime: [process.versions.v8, process.versions.icu],
 		options: { pseudoLocale, localeCopies },
 		config: hash("sha1", serialize(config)),

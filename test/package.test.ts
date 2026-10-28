@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { compilerModulesFile, digestOf } from "../src/compiler-identity.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 /** The package manager running the tests, as it names itself to scripts; else pnpm on the PATH. */
@@ -114,7 +115,7 @@ function text(dir: string, file: string): string {
 	return readFileSync(join(dir, file), "utf8");
 }
 
-it("packs each module compiled with its declarations, and nothing else", () => {
+it("packs each module compiled with its declarations, the list of the compiler's, and nothing else", () => {
 	expect(packed.files).toEqual(
 		[
 			"CHANGELOG.md",
@@ -123,6 +124,7 @@ it("packs each module compiled with its declarations, and nothing else", () => {
 			"SECURITY.md",
 			"config.schema.json",
 			"package.json",
+			`dist/${compilerModulesFile}`,
 			...compiledModules(),
 			...runtimeFiles().map((file) => `dist/${file}`),
 		].sort(),
@@ -139,6 +141,20 @@ it("packs the runtime's modules and the declarations' templates as they are writ
 	]);
 
 	expect(shipped).toEqual(written);
+});
+
+it("lists the compiler's modules each with the hash of its bytes as packed, this module's among them", () => {
+	const listed: Record<string, string> = JSON.parse(
+		text(packed.dir, `dist/${compilerModulesFile}`),
+	);
+	const packedDigests = Object.keys(listed).map((module) => [
+		module,
+		digestOf(readFileSync(join(packed.dir, "dist", module))),
+	]);
+
+	expect(Object.entries(listed)).toEqual(packedDigests);
+	expect(Object.keys(listed)).toContain("compiler-identity.js");
+	expect(Object.keys(listed)).not.toContain("cli.js");
 });
 
 it("packs every file the package's exports and bin name", () => {
