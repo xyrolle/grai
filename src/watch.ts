@@ -1,12 +1,6 @@
 import { type FSWatcher, watch as watchPath } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
-import {
-	type Build,
-	type CompiledProject,
-	type CompileResult,
-	compileProject,
-	writeBuild,
-} from "./compile.ts";
+import type { Build, CompiledProject, CompileResult } from "./compile.ts";
 import { isMissing, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import { firstBuildSaver } from "./first-build-saver.ts";
@@ -24,6 +18,12 @@ import type { Served } from "./served.ts";
  * both with room, and a broken catalog is still reported 20 ms after its save.
  */
 const settleMilliseconds = 20;
+
+/**
+ * The compiler, loaded once a watcher first compiles or writes: a restart serves its first page
+ * from the saved build's index (`savedIndex`), and loads it only as it takes the build up.
+ */
+const compiler = () => import("./compile.ts");
 
 /** How a watcher compiles: for development, with the config's pseudo-locale. */
 export const developing = { pseudoLocale: true };
@@ -182,6 +182,7 @@ export function watch(
 	 */
 	const writeServed = async (compiled: CompiledProject, started: number) => {
 		const unchanged = { ...compiled.compilation, changed: new Set<string>() };
+		const { writeBuild } = await compiler();
 		const next = await writeBuild(
 			{ ...compiled, compilation: unchanged },
 			undefined,
@@ -218,6 +219,7 @@ export function watch(
 	> => {
 		changes = false;
 		const serving = servesEarly && !closed;
+		const { compileProject, writeBuild } = await compiler();
 		// A compile served before its write leaves the keys' declarations to the write too.
 		const compiled = await compileProject(configFile, build, {
 			...developing,
