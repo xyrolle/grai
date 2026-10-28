@@ -17,6 +17,7 @@ import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
 import type { RuntimeSources } from "./output-modules.ts";
+import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
 import { type KeyGroups, savedGroups } from "./saved-groups.ts";
@@ -130,9 +131,14 @@ function hashesOf(sources: readonly CatalogSource[]): string[] {
 /**
  * How a compile is for: development and tests take the config's pseudo-locale, a build never. A
  * build that writes a copy of each message chunk per locale says so in config.js (`localeCopies`),
- * for the server that points pages at them.
+ * for the server that points pages at them. `placing`, when given, is asked once the catalogs are
+ * compiled for groups to place the keys by in place of those saved (`placing.ts`).
  */
-export type CompileOptions = { pseudoLocale?: boolean; localeCopies?: boolean };
+export type CompileOptions = {
+	pseudoLocale?: boolean;
+	localeCopies?: boolean;
+	placing?: Placing | undefined;
+};
 
 /**
  * Compiles again after an edit: reads the config and catalogs, parses only the catalogs that
@@ -205,7 +211,7 @@ async function build(
 	hashes: readonly string[],
 	groups: KeyGroups,
 	previous?: Build,
-	{ pseudoLocale = false, localeCopies = false }: CompileOptions = {},
+	{ pseudoLocale = false, localeCopies = false, placing }: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
 	const parsed = parseCatalogs(sources, previous);
 	if (parsed.errors.length > 0) {
@@ -228,20 +234,37 @@ async function build(
 		moved || previous === undefined
 			? basePositions(sources, parts, config.baseLocale)
 			: previous.positions;
-	const { output, rendered } = renderOutput(
-		config,
-		runtime,
-		compilation,
-		{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
-		{ localeCopies, groups },
-		previous?.rendered,
-	);
+	const render = (by: KeyGroups, before: Rendered | undefined) =>
+		renderOutput(
+			config,
+			runtime,
+			compilation,
+			{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
+			{ localeCopies, groups: by },
+			before,
+		);
+	const asked = await placing?.(compilation);
+	const early =
+		asked &&
+		(asked.waited
+			? await asked.groups.catch(() => undefined)
+			: await cameBy(asked.groups));
+	let placement = early ?? groups;
+	let { output, rendered } = render(placement, previous?.rendered);
+	const late =
+		asked && !asked.waited && early === undefined
+			? await cameBy(asked.groups)
+			: undefined;
+	if (late !== undefined) {
+		placement = late;
+		({ output, rendered } = render(late, rendered));
+	}
 	let written: string[];
 	try {
 		written = await writeOutput(
 			config.outdir,
 			output,
-			inputsOf(config, hashes, localeCopies, groups),
+			inputsOf(config, hashes, localeCopies, placement),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
