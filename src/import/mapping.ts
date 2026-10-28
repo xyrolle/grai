@@ -4,9 +4,7 @@ import { isMissing, isRecord } from "../config.ts";
 import { GraiError } from "../error.ts";
 import type { ImportedKey } from "./catalogs.ts";
 import { type ImportFormat, importFormats } from "./convert.ts";
-
-/** The mapping's file, beside the config: it stays until the last call site is migrated. */
-export const mappingFile = "grai.import.json";
+import { mappingFile } from "./mapping-file.ts";
 
 /** What a call of a grai key takes: the inputs it reads, and whether it has markup to render. */
 export type MappedKey = { key: string; inputs: string[]; markup?: true };

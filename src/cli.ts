@@ -1,32 +1,7 @@
 #!/usr/bin/env node
-import { addCommand } from "./cli/add.ts";
-import { checkCommand } from "./cli/check.ts";
-import { type Command, UsageError } from "./cli/command.ts";
-import { compileCommand } from "./cli/compile.ts";
-import { exportCommand } from "./cli/export.ts";
-import { findCommand } from "./cli/find.ts";
-import { importCommand } from "./cli/import.ts";
-import { mergeCommand } from "./cli/merge.ts";
-import { migrateCommand } from "./cli/migrate.ts";
-import { renameCommand } from "./cli/rename.ts";
-import { seedCommand } from "./cli/seed.ts";
-import { watchCommand } from "./cli/watch.ts";
+import { UsageError } from "./cli/command.ts";
+import { commands } from "./cli/commands.ts";
 import { ownEntry } from "./own-entry.ts";
-
-/** Each command by its name, in the order the usage lists them. */
-const commands: Record<string, Command> = {
-	compile: compileCommand,
-	watch: watchCommand,
-	check: checkCommand,
-	seed: seedCommand,
-	export: exportCommand,
-	merge: mergeCommand,
-	add: addCommand,
-	import: importCommand,
-	migrate: migrateCommand,
-	find: findCommand,
-	rename: renameCommand,
-};
 
 const usage = `Usage: grai <command> [--config <file>]
 
@@ -47,7 +22,8 @@ if (name === "--help" || name === "help") {
 	process.exitCode = 2;
 } else {
 	try {
-		process.exitCode = await command.run(args);
+		const { run } = await command.load();
+		process.exitCode = await run(args);
 	} catch (error) {
 		if (!(error instanceof UsageError)) throw error;
 		console.error(`grai: ${error.message}\n\n${usage}`);
