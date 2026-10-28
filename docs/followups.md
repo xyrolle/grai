@@ -129,9 +129,9 @@ Done when: the compile, or `grai check`, reports a markup element that a locale 
 
 ## Prove the design on both reference apps
 
-App A runs on grai, and `docs/benchmarks.md` cites its numbers. On the client, a forced `{ locale }` other than the current one throws, and every key must be in every locale; app B is not known to break either rule outside its tests.
+App A runs on grai, and the benches run on its catalogs. On the client, a forced `{ locale }` other than the current one throws, and every key must be in every locale; app B is not known to break either rule outside its tests.
 
-Done when: a local branch of app B on grai passes its own checks and tests, and `docs/benchmarks.md` cites its cold `dev` and one-message edit times.
+Done when: a local branch of app B on grai passes its own checks and tests, and its own `vite dev`'s cold start and one-message edit are measured as `bench/dev-start.mjs` and `bench/hmr.mjs` measure them.
 
 ## Import what `grai import` leaves out
 
