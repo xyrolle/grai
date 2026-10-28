@@ -123,7 +123,7 @@ export async function readProjectCode(
 	// An import of the output not written yet resolves to where its modules go.
 	const unwritten = existsSync(output.keys)
 		? undefined
-		: unwrittenOutput(output, mappings ?? []);
+		: unwrittenOutput(output, resolution);
 	// A key's path the app maps to keys.js is that key's own module, as a build resolves it.
 	const resolve: Resolve = async (source, importer) => {
 		const path =

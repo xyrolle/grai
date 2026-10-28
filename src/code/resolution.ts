@@ -82,6 +82,14 @@ export function resolverFor(
 			.path ?? undefined;
 }
 
+/** The conditions of a package's `exports` and `imports` the resolver takes, as a bundler's client does. */
+export const conditionNames: readonly string[] = [
+	"import",
+	"module",
+	"browser",
+	"default",
+];
+
 function resolverOf({ tsconfig }: Resolution): ResolverFactory {
 	return new ResolverFactory({
 		// The project's tsconfig for every module, as SvelteKit, Astro and Next apply its paths: to a
@@ -89,7 +97,7 @@ function resolverOf({ tsconfig }: Resolution): ResolverFactory {
 		...(tsconfig === undefined
 			? {}
 			: { tsconfig: { configFile: tsconfig, references: "auto" } }),
-		conditionNames: ["import", "module", "browser", "default"],
+		conditionNames: [...conditionNames],
 		mainFields: ["module", "main"],
 		extensions,
 		extensionAlias: {
