@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { cacheDir, selectedApps } from "./apps.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiEntry } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 
@@ -44,7 +44,7 @@ async function graiMessages() {
 			outdir: "out",
 		}),
 	);
-	const { compile } = await import(join(graiSource, "index.ts"));
+	const { compile } = await import(graiEntry("."));
 	const { errors } = await compile(config);
 	if (errors.length > 0) throw new Error(errors[0].message);
 	return (await import(pathToFileURL(join(dir, "out", "messages.js")).href)).m;

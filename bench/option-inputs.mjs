@@ -10,7 +10,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "./apps.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiEntry } from "./grai.mjs";
 import { formatNs, nanosecondsPer } from "./measure.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 
@@ -54,7 +54,7 @@ function writeCatalogs() {
 }
 
 const { directory, catalogs } = writeCatalogs();
-const { compile } = await import(join(graiSource, "index.ts"));
+const { compile } = await import(graiEntry("."));
 const { errors } = await compile(join(directory, "grai.config.json"));
 if (errors.length > 0) throw new Error(errors.map((e) => e.message).join("\n"));
 const { m } = await import(join(directory, "out", "messages.js"));

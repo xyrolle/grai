@@ -8,9 +8,9 @@ import { join } from "node:path";
 import { brotliCompressSync } from "node:zlib";
 import { rolldown } from "rolldown";
 import { cacheDir } from "./apps.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiEntry } from "./grai.mjs";
 
-const { compile } = await import(join(graiSource, "index.ts"));
+const { compile } = await import(graiEntry("."));
 
 const options = {
 	none: {},

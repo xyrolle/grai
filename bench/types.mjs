@@ -1,178 +1,144 @@
 // Typed keys: what type checking a file of 500 message calls costs with each library's typed
 // keys: grai's and Paraglide's generated declarations, i18next's keys merged into its types from
 // the locale's JSON (`CustomTypeOptions`), and use-intl's, inferred from the messages it is
-// given. `tsc --noEmit` with TypeScript 7, median of three, and the editor's completion after
-// `m.` or inside `t("`, from TypeScript 6's language service, which tsserver runs: the first
-// request, which checks the program, and the next, each a median of three new language services.
+// given. `tsc --noEmit` with TypeScript 7, and the editor's completions after `m.` or inside `t("`
+// (completions.mjs), from TypeScript 6's language service, which tsserver runs, and from
+// TypeScript 7's language server: the first request, which checks what it needs of the program;
+// the next one, the file unchanged; the details of the list's first entry, asked apart; and one
+// after each edit an editor's user makes: a typed prefix, a new call site, and a key added to the
+// catalog. Each sample is a new process, its project's catalog written as the app has it; every
+// library takes one each round, in an order that rotates, so the load from other work weighs on
+// each alike. Medians of ROUNDS, with every sample kept.
 //   node types.mjs [app...]
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { selectedApps } from "./apps.mjs";
-import { sampleCalls, takesInputs } from "./calls.mjs";
-import { graiSource, writeGraiProject } from "./grai.mjs";
-import { i18nextValues, libraryCatalogs } from "./libraries.mjs";
-import { paraglideOutput, resolveTypeScript6 } from "./paraglide.mjs";
-import { otherLocale } from "./request.mjs";
+import { writeState } from "./completions.mjs";
 import { recordResults } from "./results.mjs";
+import { CALLS, writeProjects } from "./types-projects.mjs";
 
-const CALLS = 500;
-const RUNS = 3;
-const require = createRequire(import.meta.url);
-const ts6 = require("typescript6");
-const tsc7 = join(
-	new URL(".", import.meta.url).pathname,
-	"node_modules/.bin/tsc",
-);
+const ROUNDS = 3;
+/** Past this, a sample is stuck: i18next's first completion takes about six minutes. */
+const SAMPLE_DEADLINE_MS = 60 * 60 * 1000;
+const here = new URL(".", import.meta.url).pathname;
+const tsc7 = join(here, "node_modules/.bin/tsc");
 
-/** TypeScript 7's version, as its tsc prints it. */
-const ts7Version = () =>
-	execFileSync(tsc7, ["--version"], { encoding: "utf8" })
-		.trim()
-		.split(" ")
-		.at(-1);
-
-const compilerOptions = {
-	target: "es2024",
-	module: "nodenext",
-	strict: true,
-	noEmit: true,
-	skipLibCheck: true,
-	resolveJsonModule: true,
+/** The language servers a completion sample runs on, by the script that drives each. */
+const engines = {
+	ts6: "completion-ts6.mjs",
+	ts7: "completion-ts7.mjs",
 };
 
-/**
- * Each library's project: its files (the declarations it needs and a file of 500 calls) and the
- * text after which the editor is asked to complete a key.
- */
-async function writeProjects(app) {
-	const config = writeGraiProject(app, "types");
-	const directory = join(config, "..");
-	const { compile } = await import(join(graiSource, "index.ts"));
-	await compile(config);
-	resolveTypeScript6();
-	const paraglide = await paraglideOutput(app, { emitTsDeclarations: true });
-	const locale = otherLocale(app);
-	const { i18next, icu } = libraryCatalogs(app, locale);
-	writeFileSync(join(directory, "translation.json"), JSON.stringify(i18next));
-	writeFileSync(join(directory, "messages.json"), JSON.stringify(icu));
-	writeFileSync(
-		join(directory, "i18next.d.ts"),
-		`import "i18next";
-import type translation from "./translation.json" with { type: "json" };
-declare module "i18next" {
-	interface CustomTypeOptions {
-		resources: { translation: typeof translation };
-	}
-}
-`,
-	);
-	const calls = sampleCalls(app, CALLS);
-	const values = (call, given = call.inputs) =>
-		takesInputs(call) ? JSON.stringify(given) : "";
-	const keyCalls = (write) =>
-		calls.map((call) => `\t${write(call)},`).join("\n");
-	const sources = {
-		grai: `import { m } from "./out/messages.js";\nexport const texts = [\n${keyCalls((call) => `m.${call.key}(${values(call)})`)}\n];\n`,
-		paraglide: `import { m } from "./${relative(directory, join(paraglide, "messages.js"))}";\nexport const texts = [\n${keyCalls((call) => `m.${call.key}(${values(call)})`)}\n];\n`,
-		i18next: `import i18next from "i18next";\nconst t = i18next.t;\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${takesInputs(call) ? `, ${values(call, i18nextValues(app, call.key, call.inputs))}` : ""})`)}\n];\n`,
-		"use-intl": `import { createTranslator } from "use-intl/core";\nimport messages from "./messages.json" with { type: "json" };\nconst t = createTranslator({ locale: ${JSON.stringify(locale)}, messages });\nexport const texts = [\n${keyCalls((call) => `t(${JSON.stringify(call.key)}${takesInputs(call) ? `, ${values(call)}` : ""})`)}\n];\n`,
-	};
-	const projects = [
-		["grai's declarations", "grai", [], "\nm."],
-		["Paraglide's declarations", "paraglide", [], "\nm."],
-		["i18next's CustomTypeOptions", "i18next", ["i18next.d.ts"], '\nt("'],
-		["use-intl, keys inferred from the messages", "use-intl", [], '\nt("'],
-	];
-	return projects.map(([title, name, declarations, marker]) => {
-		writeFileSync(join(directory, `${name}.ts`), sources[name]);
-		const files = [...declarations, `${name}.ts`];
-		writeFileSync(
-			join(directory, `tsconfig.${name}.json`),
-			JSON.stringify({ compilerOptions, files }),
-		);
-		return {
-			title,
-			name,
-			files: files.map((file) => join(directory, file)),
-			marker,
-			directory,
-		};
-	});
+/** The requests of a completion sample, as the tables head them. */
+const steps = {
+	first: "first completion",
+	next: "next completion, unchanged",
+	details: "the first entry's details",
+	prefix: "after a typed prefix",
+	callSite: "at a new call site",
+	catalog: "after a catalog change",
+};
+
+/** Milliseconds `tsc --noEmit` takes on the project, its process included. */
+function typeCheck(project) {
+	const start = performance.now();
+	execFileSync(tsc7, ["-p", project.directory], { stdio: "inherit" });
+	return performance.now() - start;
 }
 
-/** Milliseconds to the first completion at the project's marker, appended to its calls, and to the next one. */
-function completion({ name, files, marker, directory }) {
-	const path = join(directory, `${name}.ts`);
-	const text = `${readFileSync(path, "utf8")}${marker}`;
-	const host = {
-		getScriptFileNames: () => files,
-		getScriptVersion: () => "1",
-		getScriptSnapshot: (file) =>
-			ts6.ScriptSnapshot.fromString(
-				file === path ? text : (ts6.sys.readFile(file) ?? ""),
-			),
-		getCurrentDirectory: () => directory,
-		getCompilationSettings: () =>
-			ts6.convertCompilerOptionsFromJson(compilerOptions, directory).options,
-		getDefaultLibFileName: ts6.getDefaultLibFilePath,
-		fileExists: ts6.sys.fileExists,
-		readFile: ts6.sys.readFile,
-		readDirectory: ts6.sys.readDirectory,
-		directoryExists: ts6.sys.directoryExists,
-		getDirectories: ts6.sys.getDirectories,
-	};
-	const service = ts6.createLanguageService(host, ts6.createDocumentRegistry());
-	const at = (start) => {
-		const result = service.getCompletionsAtPosition(path, text.length, {});
-		return {
-			ms: performance.now() - start,
-			entries: result?.entries.length ?? 0,
-		};
-	};
-	const first = at(performance.now());
-	const next = at(performance.now());
-	return { first: first.ms, next: next.ms, entries: first.entries };
+/**
+ * One completion sample in a new process, the project's catalog first written as the app has it:
+ * each request's milliseconds, and TypeScript's version.
+ */
+function completions(project, engine) {
+	writeState(project, "before");
+	const output = execFileSync(
+		process.execPath,
+		[join(here, engines[engine]), project.description],
+		{ encoding: "utf8", timeout: SAMPLE_DEADLINE_MS },
+	);
+	return JSON.parse(output.trim().split("\n").at(-1));
 }
 
 const median = (values) =>
 	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-for (const app of selectedApps()) {
-	const recorded = [];
-	const projects = await writeProjects(app);
-	console.log(`\n### ${app.name}: type checking ${CALLS} message calls, ms\n`);
-	console.log(
-		"| keys typed by | `tsc --noEmit`, TypeScript 7 | first completion, TypeScript 6 | next completion | completions |",
+/** A cell of a table: the median and the range of the samples. */
+const cell = (values) =>
+	`${median(values).toFixed(0)} (${Math.min(...values).toFixed(0)}–${Math.max(...values).toFixed(0)})`;
+
+/** Each step's samples, empty. */
+const noSamples = () =>
+	Object.fromEntries(Object.keys(steps).map((step) => [step, []]));
+
+/** Each step's median. */
+const medians = (taken) =>
+	Object.fromEntries(
+		Object.entries(taken).map(([step, values]) => [step, median(values)]),
 	);
-	console.log("|---|---|---|---|---|");
-	for (const project of projects) {
-		const runs = Array.from({ length: RUNS }, () => {
-			const start = performance.now();
-			execFileSync(
-				tsc7,
-				["-p", join(project.directory, `tsconfig.${project.name}.json`)],
-				{ stdio: "inherit" },
-			);
-			return performance.now() - start;
-		});
-		const completions = Array.from({ length: RUNS }, () => completion(project));
-		const done = {
-			tsc: median(runs),
-			first: median(completions.map((each) => each.first)),
-			next: median(completions.map((each) => each.next)),
-			entries: completions[0].entries,
-		};
-		console.log(
-			`| ${project.title} | ${done.tsc.toFixed(0)} | ${done.first.toFixed(0)} | ${done.next.toFixed(0)} | ${done.entries} |`,
-		);
-		recorded.push({ library: project.title, ...done });
+
+for (const app of selectedApps()) {
+	const projects = await writeProjects(app);
+	const samples = new Map(
+		projects.map((project) => [
+			project,
+			{ tsc: [], ts6: noSamples(), ts7: noSamples() },
+		]),
+	);
+	const versions = { ts6: "", ts7: "" };
+	for (let round = 0; round < ROUNDS; round++) {
+		for (let index = 0; index < projects.length; index++) {
+			const project = projects[(index + round) % projects.length];
+			const taken = samples.get(project);
+			writeState(project, "before");
+			taken.tsc.push(typeCheck(project));
+			for (const engine of Object.keys(engines)) {
+				const sample = completions(project, engine);
+				for (const step of Object.keys(steps))
+					taken[engine][step].push(sample[step]);
+				versions[engine] = sample.typescript;
+			}
+		}
 	}
-	recordResults(`types-${app.id}`, recorded, {
+	console.log(
+		`\n### ${app.name}: ${CALLS} message calls, ms, medians of ${ROUNDS} (range)\n`,
+	);
+	console.log(
+		`| keys typed by | \`tsc --noEmit\`, TypeScript ${versions.ts7} |\n|---|---|`,
+	);
+	for (const project of projects)
+		console.log(`| ${project.title} | ${cell(samples.get(project).tsc)} |`);
+	for (const [engine, server] of [
+		["ts6", `TypeScript ${versions.ts6}'s language service`],
+		["ts7", `TypeScript ${versions.ts7}'s language server`],
+	]) {
+		console.log(`\nCompletions, ${server}:\n`);
+		console.log(`| keys typed by | ${Object.values(steps).join(" | ")} |`);
+		console.log(`|---|${"---|".repeat(Object.keys(steps).length)}`);
+		for (const project of projects) {
+			const taken = samples.get(project)[engine];
+			const cells = Object.keys(steps).map((step) => cell(taken[step]));
+			console.log(`| ${project.title} | ${cells.join(" | ")} |`);
+		}
+	}
+	const rows = projects.map((project) => {
+		const { tsc, ts6, ts7 } = samples.get(project);
+		return {
+			library: project.title,
+			tsc: median(tsc),
+			...medians(ts6),
+			ts7: medians(ts7),
+			samples: { tsc, ts6, ts7 },
+		};
+	});
+	recordResults(`types-${app.id}`, rows, {
 		app: app.name,
 		calls: CALLS,
-		runs: RUNS,
-		typescript: { tsc: ts7Version(), languageService: ts6.version },
+		runs: ROUNDS,
+		typescript: {
+			tsc: versions.ts7,
+			languageService: versions.ts6,
+			languageServer: versions.ts7,
+		},
 	});
 }

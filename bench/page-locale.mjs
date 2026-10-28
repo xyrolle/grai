@@ -22,14 +22,16 @@ import { join } from "node:path";
 import { brotliCompressSync, gzipSync } from "node:zlib";
 import { chromium } from "playwright-core";
 import { build } from "vite";
-import { localeScript } from "../src/locale-script.ts";
-import { grai } from "../src/vite.ts";
+import { graiEntry, graiModule } from "./grai.mjs";
+
+const { localeScript } = await import(graiModule("locale-script.ts"));
+const { grai } = await import(graiEntry("./vite"));
 
 const RUNS = 31;
 const THROTTLING = [1, 4];
 const locales = ["ro", "ru", "en"];
 
-/** The script's bytes for a config, minified as a build writes it. */
+/** The script's bytes for a config, minified as a build with each locale's copies writes it. */
 function scriptBytes(name, strategy) {
 	const config = {
 		locales,
@@ -44,7 +46,7 @@ function scriptBytes(name, strategy) {
 			unlocalizedPaths: [],
 		},
 	};
-	const text = localeScript(config, true);
+	const text = localeScript(config, { minify: true, copies: true });
 	return `| ${name} | ${text.length} | ${gzipSync(text).length} | ${brotliCompressSync(text).length} |`;
 }
 
@@ -129,6 +131,7 @@ const median = (values) =>
 
 console.log("\n### The locale script's bytes, minified, for 3 locales\n");
 console.log("| strategy | bytes | gzip | brotli |\n| --- | --- | --- | --- |");
+console.log(scriptBytes("cookie", ["cookie"]));
 console.log(
 	scriptBytes("cookie, preferredLanguage", ["cookie", "preferredLanguage"]),
 );

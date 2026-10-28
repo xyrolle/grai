@@ -12,12 +12,12 @@ import { join, posix } from "node:path";
 import { rolldown } from "rolldown";
 import { selectedApps } from "./apps.mjs";
 import { NOTHING, readBuild, sizes, sum } from "./build-record.mjs";
-import { graiSource } from "./grai.mjs";
+import { graiModule } from "./grai.mjs";
 import { paraglideOutput, paraglideVersion } from "./paraglide.mjs";
 import { template, writePrototype } from "./prototype.mjs";
 
 const { localeDirectory, messageDirectory } = await import(
-	join(graiSource, "message-directories.ts")
+	graiModule("message-directories.ts")
 );
 
 const [appName, paraglideRecord, graiRecord] = process.argv.slice(2);

@@ -17,9 +17,9 @@ import {
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { rolldown } from "rolldown";
+import { graiCli } from "./grai.mjs";
 
 const bench = fileURLToPath(new URL(".", import.meta.url));
-const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const locales = ["en", "ru", "ar"];
 const counts = [0, 1, 2, 3, 5, 11, 21, 22, 101, 1000];
 
@@ -79,7 +79,7 @@ async function compared(app, dir) {
 		}),
 	);
 	const grai = (...args) =>
-		execFileSync(process.execPath, [cli, ...args], {
+		execFileSync(process.execPath, [graiCli, ...args], {
 			cwd: dir,
 			encoding: "utf8",
 		});

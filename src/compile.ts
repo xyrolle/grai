@@ -19,6 +19,7 @@ import { isUpToDate, writeOutput } from "./output.ts";
 import type { RuntimeSources } from "./output-modules.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
 import { type Rendered, renderOutput } from "./render.ts";
+import { type KeyGroups, savedGroups } from "./saved-groups.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
 export type CompileResult = { written: string[]; errors: GraiError[] };
@@ -91,15 +92,16 @@ export async function compile(configFile: string): Promise<CompileResult> {
 	const read = await readProject(configFile);
 	if ("errors" in read) return { written: [], errors: read.errors };
 	const hashes = hashesOf(read.sources);
+	const groups = savedGroups(read.config.outdir);
 	if (
 		await isUpToDate(
 			read.config.outdir,
-			await inputsOf(read.config, hashes, false),
+			await inputsOf(read.config, hashes, false, groups),
 		)
 	) {
 		return { written: [], errors: [] };
 	}
-	const { result } = await build(read.config, read.sources, hashes);
+	const { result } = await build(read.config, read.sources, hashes, groups);
 	return result;
 }
 
@@ -112,7 +114,12 @@ export async function isCompiled(configFile: string): Promise<boolean> {
 	if ("errors" in read) return false;
 	return isUpToDate(
 		read.config.outdir,
-		await inputsOf(read.config, hashesOf(read.sources), false),
+		await inputsOf(
+			read.config,
+			hashesOf(read.sources),
+			false,
+			savedGroups(read.config.outdir),
+		),
 	);
 }
 
@@ -152,7 +159,14 @@ export async function recompile(
 			? oldHash
 			: hash("sha1", source.bytes);
 	});
-	return build(read.config, read.sources, hashes, before, options);
+	return build(
+		read.config,
+		read.sources,
+		hashes,
+		savedGroups(read.config.outdir),
+		before,
+		options,
+	);
 }
 
 function sameConfig(a: Config, b: Config): boolean {
@@ -189,6 +203,7 @@ async function build(
 	configured: Config,
 	sources: readonly CatalogSource[],
 	hashes: readonly string[],
+	groups: KeyGroups,
 	previous?: Build,
 	{ pseudoLocale = false, localeCopies = false }: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
@@ -218,7 +233,7 @@ async function build(
 		runtime,
 		compilation,
 		{ paths: config.catalogs.get(config.baseLocale) ?? [], positions, moved },
-		{ localeCopies },
+		{ localeCopies, groups },
 		previous?.rendered,
 	);
 	let written: string[];
@@ -226,7 +241,7 @@ async function build(
 		written = await writeOutput(
 			config.outdir,
 			output,
-			await inputsOf(config, hashes, localeCopies),
+			await inputsOf(config, hashes, localeCopies, groups),
 		);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
@@ -290,19 +305,20 @@ function parsed(
 }
 
 /**
- * What decides the output: the compiler, whether its build writes the locale copies, the config
- * and every catalog's bytes. The whole config, as no field is then left out by mistake: the
- * catalogs' paths are in the declaration maps.
+ * What decides the output: the compiler, whether its build writes the locale copies, the config,
+ * every catalog's bytes, and the groups of keys saved for it. The whole config, as no field is then
+ * left out by mistake: the catalogs' paths are in the declaration maps.
  */
 async function inputsOf(
 	config: Config,
 	hashes: readonly string[],
 	localeCopies: boolean,
+	groups: KeyGroups,
 ): Promise<string> {
 	return hash(
 		"sha1",
 		JSON.stringify(
-			[await hashOfCompiler(), localeCopies, config, hashes],
+			[await hashOfCompiler(), localeCopies, config, hashes, groups],
 			collectionsAsLists,
 		),
 	);

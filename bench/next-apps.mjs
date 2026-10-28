@@ -3,8 +3,9 @@
 // rendering SERVER_KEYS messages and a client component rendering CLIENT_KEYS, chosen evenly
 // across the keys both libraries can hold, so it has the catalog's share of plurals, inputs and
 // markup. next-intl reads the ICU catalog libraries.mjs writes, its markup dropped as grai's string
-// call drops it. Each app sits under bench/.cache/next/, inside bench's own install of next, react,
-// next-intl and grai.
+// call drops it. Each catalog's apps sit under bench/.cache/next/<catalog>/, inside bench's own
+// install of next, react, next-intl and grai, so a run of several catalogs never loads one's output
+// for another's.
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -113,7 +114,7 @@ function writeFiles(root, files) {
 }
 
 function writeGrai(app, keys) {
-	const root = join(nextDir, "grai");
+	const root = join(nextDir, app.id, "grai");
 	writeFiles(root, {
 		"grai.config.json": JSON.stringify({
 			locales: app.locales,
@@ -173,7 +174,7 @@ ${items(keys.client, app, (key, inputs) => `m.${key}(${Object.keys(inputs).lengt
 }
 
 function writeNextIntl(app, keys, { picked }) {
-	const root = join(nextDir, picked ? "next-intl-picked" : "next-intl");
+	const root = join(nextDir, app.id, picked ? "next-intl-picked" : "next-intl");
 	const messages = {};
 	for (const locale of app.locales) {
 		messages[`messages/${locale}.json`] = JSON.stringify(
@@ -277,8 +278,8 @@ async function pageWords(app, keys, locale, graiRoot) {
 }
 
 /** The page with one locale's words written in. */
-function writePlain(words, locale) {
-	const root = join(nextDir, "plain");
+function writePlain(app, words, locale) {
+	const root = join(nextDir, app.id, "plain");
 	const items = (list) =>
 		list.map((word) => `\t\t\t<li>{${JSON.stringify(word)}}</li>`).join("\n");
 	writeFiles(root, {
@@ -315,6 +316,21 @@ ${items(words.client)}
 }
 
 /**
+ * A copy of grai's app beside it, for the starts from an empty outdir, which then leave the app's
+ * own output as its watch prepared it. Its .next and outdir are left out, as each start removes them.
+ */
+export function emptyOutputCopy(root) {
+	const copy = join(root, "..", "grai-empty");
+	rmSync(copy, { recursive: true, force: true });
+	cpSync(root, copy, {
+		recursive: true,
+		filter: (path) =>
+			![".next", "src/i18n"].some((each) => path === join(root, each)),
+	});
+	return copy;
+}
+
+/**
  * Writes the four apps for one catalog, after compiling grai's catalogs for the page's words: the
  * words of the page's messages, in its order, which every app's page lists.
  */
@@ -333,7 +349,7 @@ export async function writeNextApps(app, locale) {
 			"next-intl, client keys picked": writeNextIntl(app, keys, {
 				picked: true,
 			}),
-			plain: writePlain(words, locale),
+			plain: writePlain(app, words, locale),
 		},
 	};
 }

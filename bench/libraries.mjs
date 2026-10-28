@@ -116,14 +116,21 @@ const hasMarkup = (value) => /\{[#/]/.test(JSON.stringify(value));
 
 /**
  * The library catalogs for one locale: i18next's, ICU's, ICU's of the messages with markup with
- * their tags kept, and how many messages neither format can hold.
+ * their tags kept, and how many messages neither format can hold. `keys` picks the messages before
+ * they are converted, so that each keeps every form its format writes for it, such as i18next's
+ * plural and context keys; by default, the locale's whole catalog.
  */
-export function libraryCatalogs(app, locale) {
+export function libraryCatalogs(
+	app,
+	locale,
+	keys = Object.keys(app.messages[locale]),
+) {
 	const i18next = {};
 	const icu = {};
 	const icuMarkup = {};
 	let skipped = 0;
-	for (const [key, value] of Object.entries(app.messages[locale])) {
+	for (const key of keys) {
+		const value = app.messages[locale][key];
 		if (!portable(app, key)) {
 			skipped++;
 			continue;
@@ -149,12 +156,22 @@ export function i18nextValues(app, key, inputs) {
  * Writes, for one locale, each library's catalog as JSON and a module whose `t` is that library's
  * translate function for the locale: i18next's `getFixedT`, and use-intl's `createTranslator`,
  * which parses each message with intl-messageformat on its first call and caches it. use-intl's
- * module also has `markup`, its `t.markup` over the messages with markup.
+ * module also has `markup`, its `t.markup` over the messages with markup. With `keys`, the
+ * catalogs hold those messages alone, as both libraries advise loading what a page shows, and go
+ * in a directory of their own, named `set`; by default, the locale's whole catalog.
  */
-export function writeLibraryModules(app, locale) {
-	const directory = join(cacheDir, "libraries", app.id);
+export function writeLibraryModules(
+	app,
+	locale,
+	{ keys, set = "catalog" } = {},
+) {
+	const directory = join(cacheDir, "libraries", app.id, set);
 	mkdirSync(directory, { recursive: true });
-	const { i18next, icu, icuMarkup, skipped } = libraryCatalogs(app, locale);
+	const { i18next, icu, icuMarkup, skipped } = libraryCatalogs(
+		app,
+		locale,
+		keys,
+	);
 	writeFileSync(
 		join(directory, `${locale}.i18next.json`),
 		JSON.stringify(i18next),

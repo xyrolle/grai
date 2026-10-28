@@ -631,6 +631,38 @@ export function pageText(...texts) {
 }
 
 /**
+ * The text of a message without inputs as a server's component reads it, as `requestText` makes
+ * it. Every one has the same shape and the same getter, so the reads of a page's many texts share
+ * one: a getter of its own per text made a server render about a fifth slower.
+ */
+class RequestText {
+	/** @type {readonly string[]} */
+	#texts;
+
+	/** @param {readonly string[]} texts */
+	constructor(texts) {
+		this.#texts = texts;
+	}
+
+	/** The message in the request's locale, read each time. */
+	get text() {
+		return variantFor(this.#texts, undefined);
+	}
+}
+
+/**
+ * A message without inputs as a server build's component reads it where a page reads its string
+ * (`pageText`): an object whose `text` is the message in the request's locale. One string per
+ * locale, in `locales` order.
+ *
+ * @param {...string} texts
+ * @returns {{ readonly text: string }}
+ */
+export function requestText(...texts) {
+	return new RequestText(texts);
+}
+
+/**
  * A message with markup: its text, and its parts for the app to draw the markup.
  *
  * @template Inputs, Part

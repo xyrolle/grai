@@ -107,6 +107,10 @@ type CompiledInputs = { readonly [input: string]: unknown };
 export declare function text(...texts: string[]): Message;
 /** A compiled message without inputs as the page's string, chosen once. */
 export declare function pageText(...texts: string[]): string;
+/** A compiled message without inputs as a server's component reads it: its `text` in the request's locale. */
+export declare function requestText(...texts: string[]): {
+	readonly text: string;
+};
 /** A compiled message with inputs: a function per locale, in `locales` order. */
 export declare function message(
 	...variants: ((inputs: CompiledInputs) => string)[]
