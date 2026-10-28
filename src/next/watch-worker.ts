@@ -51,7 +51,9 @@ const watching = watch(
 	},
 	// A compile that throws, as when the outdir cannot be written: the next save compiles again.
 	(error) => console.error(error),
-	{ placeFirst: start.placing },
+	// Next reads the output's modules from the disk, never its declarations: a first compile writes
+	// the modules before Next may start, and the declarations once the process is quiet.
+	{ declareLater: true, placeFirst: start.placing },
 );
 start.released(watching).then(({ compiled, grouped: saved }) => {
 	released = true;
