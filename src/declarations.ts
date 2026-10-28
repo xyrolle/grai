@@ -1,6 +1,5 @@
 import { inputTypes } from "./input-types.ts";
-import type { LocaleMessage } from "./message.ts";
-import { isMarkup } from "./pattern.ts";
+import { type LocaleMessage, markupNames } from "./message.ts";
 
 /**
  * A key's declaration in keys.d.ts, written as text: its type and the base locale's words. Throws
@@ -21,16 +20,7 @@ export function keyDeclaration(
 
 /** The names of a message's markup in every locale, as a union of string literals. */
 function tagsType(messages: readonly LocaleMessage[]): string {
-	const names = new Set<string>();
-	for (const { variants } of messages) {
-		for (const { pattern } of variants) {
-			for (const part of pattern) {
-				if (isMarkup(part)) names.add(part.name);
-			}
-		}
-	}
-	return [...names]
-		.sort()
+	return markupNames(messages)
 		.map((name) => JSON.stringify(name))
 		.join(" | ");
 }

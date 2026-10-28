@@ -91,6 +91,44 @@ it("keeps the files the output stops naming while a reader may still load them, 
 	);
 });
 
+it("keeps each key's inputs as the keys.js a reader read declares them, though an edit changed them while it loaded", async () => {
+	const greetings = (input: string) => ({
+		en: { hello: `Hello {${input}}`, bye: `Goodbye {${input}}` },
+		de: { hello: `Hallo {${input}}`, bye: `Tschüss {${input}}` },
+	});
+	const { dir, compile } = project(greetings("name"));
+	const out = join(dir, "out");
+	await compile();
+	await saveGroups(out, [["hello"], ["bye"]]);
+	await compile();
+	// What each key says to a caller of either input: its contract, by the name it reads.
+	const said = async (copy: string) => {
+		const { m }: { m: Messages } = await import(
+			pathToFileURL(join(copy, "messages.js")).href
+		);
+		const inputs = { name: "Ada", user: "Bea" };
+		return [m.hello?.(inputs), m.bye?.(inputs)];
+	};
+	// The reader stops before the second group, and the edit renames the input of both keys.
+	let groups = 0;
+	const reader = outputReader(out, async (file) => {
+		if (!/^keys\/g\d+-/.test(file) || ++groups < 2) return;
+		for (const [locale, messages] of Object.entries(greetings("user")))
+			writeFileSync(
+				join(dir, "messages", `${locale}.json`),
+				JSON.stringify(messages),
+			);
+		expect((await compile()).errors).toEqual([]);
+	});
+	await reader.read("messages.js");
+	const fresh = outputReader(out);
+	await fresh.read("messages.js");
+
+	expect(groups).toBe(2);
+	expect(await said(reader.copy)).toEqual(["Hello Ada", "Goodbye Ada"]);
+	expect(await said(fresh.copy)).toEqual(["Hello Bea", "Goodbye Bea"]);
+});
+
 /** A server that renders `m.title()` in each request's locale, as the cookie names it. */
 const cookieServer = { strategy: ["cookie"], cookieName: "locale" };
 
