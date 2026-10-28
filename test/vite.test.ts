@@ -1382,6 +1382,41 @@ export const render = () => modules["./out/messages.js"].m.title();
 		);
 	});
 
+	it("starts no watch after it closed, for a module whose transform was under way", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`const modules = import.meta.glob("./out/messages.js", { eager: true });
+export const render = () => Object.keys(modules).length;
+`,
+		);
+		const held = Promise.withResolvers<void>();
+		const released = Promise.withResolvers<void>();
+		const holding: Plugin = {
+			name: "holding",
+			transform: {
+				order: "pre",
+				async handler(_code, id) {
+					if (id.endsWith("/render.js")) {
+						held.resolve();
+						await released.promise;
+					}
+					return null;
+				},
+			},
+		};
+		const { server, rendered } = await appServerOf(dir, [holding]);
+		const rendering = rendered().then(String, String);
+		await held.promise;
+
+		// The client's container closes, and with it the plugin's watch, under the server's transform.
+		await server.environments.client.pluginContainer.close();
+		released.resolve();
+		await rendering;
+
+		expect(existsSync(join(dir, "out"))).toBe(false);
+	});
+
 	it("leaves the output out of the dependency scan before it is written, which finds the page's dependencies", async () => {
 		const { dir } = project(catalogs);
 		const release = heldOutput(dir);
