@@ -196,13 +196,12 @@ function compiledKey(
 	markup: boolean,
 	declared?: KeyDeclaration,
 ): CompiledKey {
-	return {
+	const compiled: CompiledKey = {
 		name: key,
 		values,
 		value: module.value,
 		serverValue: module.serverValue,
 		serverUses: module.serverUses,
-		...(declared === undefined ? {} : { declared }),
 		uses: module.uses,
 		plurals: module.plurals,
 		formats: module.formats,
@@ -212,6 +211,8 @@ function compiledKey(
 		parts: module.parts,
 		markup,
 	};
+	if (declared !== undefined) compiled.declared = declared;
+	return compiled;
 }
 
 /**
