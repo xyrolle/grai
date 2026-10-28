@@ -10,9 +10,13 @@ import type { Messages } from "./project.ts";
  * A reader of an output, as a module loader is: it reads an entry, then each module before the
  * modules it imports, every module once however many import it, and copies what it read to a
  * directory of its own, removed after the test. Entries read one after the other land in the one
- * copy, as one application's imports do.
+ * copy, as one application's imports do. `before`, when given, is awaited before each module is
+ * read, as a loader that stops between two of them.
  */
-export function outputReader(out: string): {
+export function outputReader(
+	out: string,
+	before?: (file: string) => Promise<void>,
+): {
 	copy: string;
 	read(entry: string): Promise<void>;
 } {
@@ -22,6 +26,7 @@ export function outputReader(out: string): {
 	const visit = async (file: string): Promise<void> => {
 		if (read.has(file)) return;
 		read.add(file);
+		await before?.(file);
 		const text = await readFile(join(out, file), "utf8");
 		mkdirSync(dirname(join(copy, file)), { recursive: true });
 		writeFileSync(join(copy, file), text);

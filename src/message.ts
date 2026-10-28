@@ -30,6 +30,20 @@ export type LocaleMessage = {
 	markup: boolean;
 };
 
+/** The names of a key's markup in every locale's message, sorted. */
+export function markupNames(messages: readonly LocaleMessage[]): string[] {
+	const names = new Set<string>();
+	for (const { markup, variants } of messages) {
+		if (!markup) continue;
+		for (const { pattern } of variants) {
+			for (const part of pattern) {
+				if (isMarkup(part)) names.add(part.name);
+			}
+		}
+	}
+	return [...names].sort();
+}
+
 const messageFields = new Set(["declarations", "selectors", "match"]);
 
 /**
