@@ -4,7 +4,7 @@ import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import type { BuildReading } from "./code/build-reading.ts";
 import { type Build, recompile } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
-import { devModule, pageKeysShell } from "./dev-module.ts";
+import { devModule } from "./dev-module.ts";
 import { GraiError, messagesOf } from "./error.ts";
 import {
 	isMessageModule,
@@ -102,13 +102,12 @@ export function graiPlugin(
 	let bundling: Bundling | undefined;
 	/**
 	 * keys.js, a page's in one locale, or a key's module, as the dev server serves them from memory;
-	 * nothing for any other id. A page's keys.js takes its locale's: a server renders any.
+	 * nothing for any other id. keys.js holds every locale, for a server, a worker and a page no
+	 * import map points at its locale's.
 	 */
-	const devCode = (id: string, compiled: Build, page: boolean) => {
+	const devCode = (id: string, compiled: Build) => {
 		if (id === devKeysId || id === files.keysFile)
-			return page
-				? pageKeysShell(compiled)
-				: devModule(files.outdir, compiled, patchesMade());
+			return devModule(files.outdir, compiled, patchesMade());
 		const locale = pageKeysLocale(id, compiled.config.locales);
 		if (locale !== undefined)
 			return devModule(files.outdir, compiled, patchesMade(), locale);
@@ -285,7 +284,7 @@ export function graiPlugin(
 			// Without side effects, a build leaves out every key a chunk's code does not use, so a key
 			// lands in the chunks of the entries that use it.
 			const code = serving
-				? devCode(id, compiled, this.environment.config.consumer === "client")
+				? devCode(id, compiled)
 				: bundling?.moduleCode(id, compiled, this.environment.config.consumer);
 			if (code === undefined) return null;
 			// No source map in dev: the module is the compiler's, with no source of its own to map back
