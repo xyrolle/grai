@@ -1,14 +1,19 @@
 // A horizontal bar chart as an SVG, in a light or a dark theme: thin bars from one baseline with a
-// 4 px rounded data-end, each named left of it and valued at its end, one axis with its unit, and
-// hairline gridlines. grai's bars take the accent and every other library's the neutral, so a bar
-// is told by its name, never by its colour alone. The text is ink, never a bar's colour.
+// 4 px rounded data-end, each named left of it and valued at its end, the interval that holds its
+// median a whisker across it where it has one, one axis with its unit, and hairline gridlines.
+// grai's bars take the accent and every other library's the neutral, so a bar is told by its name,
+// never by its colour alone. The text is ink, never a bar's colour.
 
-/** A bar: what it names, its value on the axis, its value as written at its end, and whether it is grai's. */
+/**
+ * A bar: what it names, its value on the axis, its value as written at its end, whether it is
+ * grai's, and the interval that holds its median, on the axis, where its rounds give one.
+ */
 export type Bar = {
 	label: string;
 	value: number;
 	shown: string;
 	grai: boolean;
+	interval?: { low: number; high: number };
 };
 
 /** Bars that belong together, under an optional heading. */
@@ -92,6 +97,12 @@ function barPath(x: number, y: number, length: number): string {
 	return `M${at(x)},${at(y)}H${at(end - r)}A${r},${r} 0 0 1 ${at(end)},${at(y + r)}V${at(y + bar - r)}A${r},${r} 0 0 1 ${at(end - r)},${at(y + bar)}H${at(x)}Z`;
 }
 
+/** An interval's whisker from `low` to `high`, capped at both ends, in ink across its bar. */
+function whisker(low: number, high: number, middle: number, theme: Theme) {
+	const cap = 4;
+	return `<path d="M${at(low)},${at(middle)}H${at(high)}M${at(low)},${at(middle - cap)}V${at(middle + cap)}M${at(high)},${at(middle - cap)}V${at(middle + cap)}" stroke="${theme.primary}" stroke-width="1.5" fill="none"/>`;
+}
+
 const xmlText = (text: string) =>
 	text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
@@ -113,7 +124,9 @@ function wrapped(text: string, characters: number): string[] {
 /** The chart in a theme, as an SVG document: each bar's name in a column left of the bars. */
 export function barChart(chart: BarChart, theme: Theme): string {
 	const bars = chart.groups.flatMap((group) => group.bars);
-	const max = Math.max(...bars.map((each) => each.value));
+	const max = Math.max(
+		...bars.map((each) => Math.max(each.value, each.interval?.high ?? 0)),
+	);
 	/** grai's names are bold only beside another library's, where they tell the two apart. */
 	const contrasted = bars.some((each) => !each.grai);
 	const step = tickStep(max);
@@ -146,11 +159,22 @@ export function barChart(chart: BarChart, theme: Theme): string {
 			const length = Math.max(scale(each.value), 1);
 			const fill = each.grai ? theme.accent : theme.neutral;
 			const middle = y + row / 2;
+			const end = Math.max(length, scale(each.interval?.high ?? 0));
 			parts.push(
 				`<text x="${x0 - 10}" y="${middle + 5}" font-size="14" text-anchor="end" ${each.grai && contrasted ? 'font-weight="600" ' : ""}fill="${theme.primary}">${xmlText(each.label)}</text>`,
 				`<path d="${barPath(x0, middle - bar / 2, length)}" fill="${fill}"/>`,
+				...(each.interval === undefined
+					? []
+					: [
+							whisker(
+								x0 + scale(each.interval.low),
+								x0 + scale(each.interval.high),
+								middle,
+								theme,
+							),
+						]),
 				// The surface's halo keeps a gridline the value crosses out of its glyphs.
-				`<text x="${at(x0 + length + 6)}" y="${middle + 5}" font-size="14" fill="${theme.primary}" stroke="${theme.surface}" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">${xmlText(each.shown)}</text>`,
+				`<text x="${at(x0 + end + 6)}" y="${middle + 5}" font-size="14" fill="${theme.primary}" stroke="${theme.surface}" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">${xmlText(each.shown)}</text>`,
 			);
 			y += row;
 		}
