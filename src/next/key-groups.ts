@@ -46,29 +46,44 @@ export function keyWeights(compilation: Compilation): Map<string, number> {
 export async function nextKeyGroups(
 	config: Config,
 	weights: ReadonlyMap<string, number>,
-	{ extensions = defaultPageExtensions, store }: GroupReading = {},
+	reading: GroupReading = {},
 ): Promise<string[][] | GraiError> {
+	const grouping = await groupsOfCode(config, reading);
+	return grouping instanceof GraiError ? grouping : grouping(weights);
+}
+
+/**
+ * The app's code read for its groups (`nextKeyGroups`), which then gives them for the keys'
+ * weights: the read needs no key, so it may run before the catalogs are compiled.
+ */
+export async function groupsOfCode(
+	config: Config,
+	{ extensions = defaultPageExtensions, store }: GroupReading = {},
+): Promise<
+	((weights: ReadonlyMap<string, number>) => Promise<string[][]>) | GraiError
+> {
 	const code = await readProjectCode(config, [config.root], {
 		every: true,
 		store,
 	});
 	if (code instanceof GraiError) return code;
-	const contexts = await keyContexts(
-		code,
-		await readingOf(code),
-		nextRoutes(config.root, extensions),
-		[...weights.keys()],
-	);
-	const sets = keySets(
-		[...contexts.of].map(([key, read]) => ({
-			key,
-			weight: weights.get(key) ?? 0,
-			contexts: read,
-			firstPaint: true,
-		})),
-		moduleCost,
-	);
-	return sets
-		.map(({ keys }) => [...keys].sort())
-		.sort(([a = ""], [b = ""]) => (a < b ? -1 : 1));
+	const reading = await readingOf(code);
+	const routes = nextRoutes(config.root, extensions);
+	return async (weights) => {
+		const contexts = await keyContexts(code, reading, routes, [
+			...weights.keys(),
+		]);
+		const sets = keySets(
+			[...contexts.of].map(([key, read]) => ({
+				key,
+				weight: weights.get(key) ?? 0,
+				contexts: read,
+				firstPaint: true,
+			})),
+			moduleCost,
+		);
+		return sets
+			.map(({ keys }) => [...keys].sort())
+			.sort(([a = ""], [b = ""]) => (a < b ? -1 : 1));
+	};
 }
