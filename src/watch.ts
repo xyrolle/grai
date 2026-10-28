@@ -13,6 +13,7 @@ import type { Placing } from "./placing.ts";
 import { whenQuiet } from "./quiet.ts";
 import { type SavedIndex, savedBuild, savedIndex } from "./saved-build.ts";
 import type { Served } from "./served.ts";
+import type { writeUndeclared } from "./undeclared.ts";
 
 /**
  * How long the followed files must be quiet before a catalog that did not parse is read again. A
@@ -84,9 +85,9 @@ const followDeadline = 2000;
  * change, when `write` asks for it, or as the watcher closes. It ends once its write has, written
  * or failed, as a catalog in the middle of a save holds it until the files have settled, and is
  * reported, closing or not; a change since what was served is compiled after it. With
- * `declareLater`, for a dev server that reads the output from the disk, as `next dev` does, a first
- * compile with no saved build to start from writes every module now, whole, and leaves its keys'
- * declarations and their maps to that task (`writeUndeclared`): it is reported and ended once its
+ * `declareLater`, the write of the modules alone (`undeclared.ts`), which a dev server that reads the
+ * output from the disk, as `next dev` does, gives, a first compile with no saved build to start from
+ * writes every module now, whole, and leaves its keys' declarations and their maps to that task: it is reported and ended once its
  * modules are written, and the write of the rest is reported too, as an error only the declarations
  * find reaches the server so. That write writes nothing if another writer of the outdir, as another
  * watcher is, has replaced those modules since: what is there is that writer's, whole or to be. Every other compile is reported once its output is written. The build the start ends with is saved for the
@@ -104,11 +105,11 @@ export function watch(
 	failed: (error: unknown) => void,
 	{
 		serve,
-		declareLater = false,
+		declareLater,
 		placeFirst,
 	}: {
 		serve?: (served: Served, milliseconds: number) => void;
-		declareLater?: boolean;
+		declareLater?: typeof writeUndeclared | undefined;
 		placeFirst?: Placing | undefined;
 	} = {},
 ): Watch {
@@ -132,7 +133,7 @@ export function watch(
 	 * Whether the first compile writes its modules before its declarations: with `declareLater`, and
 	 * none if a saved build was taken up.
 	 */
-	let declaresLater = declareLater;
+	let declaresLater = declareLater !== undefined;
 	/** The wait for the process to be quiet, to run the task that follows what was served early. */
 	let stopWaiting = () => {};
 	/** Whether a followed file changed, or a compile was asked for, since the last compile read them. */
@@ -253,18 +254,18 @@ export function watch(
 	> => {
 		changes = false;
 		const serving = servesEarly && !closed;
-		const deferring = declaresLater && !closed;
-		const { compileProject, writeBuild, writeUndeclared } = await compiler();
+		const deferring = declaresLater && !closed ? declareLater : undefined;
+		const { compileProject, writeBuild } = await compiler();
 		// A compile served or written before its declarations leaves declaring the keys to the write.
 		const compiled = await compileProject(configFile, build, {
 			...developing,
-			declare: !serving && !deferring,
+			declare: !serving && deferring === undefined,
 		});
 		if ("errors" in compiled)
 			return { result: { written: [], errors: compiled.errors } };
 		if (serving) return { served: compiled };
-		if (deferring) {
-			const { result, undeclared } = await writeUndeclared(compiled, {
+		if (deferring !== undefined) {
+			const { result, undeclared } = await deferring(compiled, {
 				...developing,
 				placing: placing(),
 			});

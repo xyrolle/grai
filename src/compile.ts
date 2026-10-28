@@ -1,4 +1,4 @@
-import { hash, randomUUID } from "node:crypto";
+import { hash } from "node:crypto";
 import { basePositions, basePositionsMoved } from "./base-positions.ts";
 import { buildKey } from "./build-key.ts";
 import {
@@ -25,12 +25,7 @@ import { hashesOf, inputsOf } from "./output-inputs.ts";
 import { type RenderedModules, renderModules } from "./output-modules.ts";
 import { cameBy, type Placing } from "./placing.ts";
 import { withPseudoLocale } from "./pseudo-locale.ts";
-import {
-	type Output,
-	type Rendered,
-	renderOutput,
-	renderUndeclared,
-} from "./render.ts";
+import { type Output, type Rendered, renderOutput } from "./render.ts";
 import { type KeyGroups, savedGroups, saveGroups } from "./saved-groups.ts";
 
 /** What a compile wrote, relative to the outdir, or every error found, sorted by file, key and locale. */
@@ -303,56 +298,10 @@ export async function writeBuild(
 }
 
 /**
- * Writes a compiled project's output without its keys' declarations, left undeclared by its
- * compile (`compileProject` with `declare` false), as a dev server that reads the output from the
- * disk needs only its modules before its first page: every module, whole, and none of the
- * declarations or their maps. The manifest records it as so written, by an id of its own
- * (`Publication`), and no check takes it for the output of its config and catalogs until
- * `writeBuild`, given what this returns, has declared the keys and written the rest, which names
- * the modules alike (`renderUndeclared`), unless another write replaced it first.
- */
-export async function writeUndeclared(
-	compiled: CompiledProject,
-	{ localeCopies = false, placing }: CompileOptions = {},
-): Promise<{ result: CompileResult; undeclared?: Undeclared }> {
-	const { config } = compiled;
-	const saved = savedGroups(config.outdir);
-	const { output, rendered, placement } = await placedRender(
-		compiled.compilation,
-		saved,
-		placing,
-		(by, last) =>
-			renderUndeclared(
-				config,
-				compiled.rendered,
-				compiled.compilation,
-				by,
-				last,
-			),
-		undefined,
-	);
-	const id = randomUUID();
-	const done = await published(
-		config.outdir,
-		output,
-		inputsOf(config, compiled.hashes, localeCopies, placement),
-		placement !== saved ? placement : undefined,
-		{ undeclared: id },
-	);
-	if (done instanceof GraiError)
-		return { result: { written: [], errors: [done] } };
-	if ("superseded" in done) return { result: { written: [], errors: [] } };
-	return {
-		result: { written: done.written, errors: [] },
-		undeclared: { id, groups: placement, rendered },
-	};
-}
-
-/**
  * The output rendered by the groups `placing` gives, if they come in time (`placing.ts`), else by
  * those saved, and the groups it was placed by.
  */
-async function placedRender(
+export async function placedRender(
 	compilation: Compilation,
 	saved: KeyGroups,
 	placing: Placing | undefined,
@@ -384,7 +333,7 @@ async function placedRender(
  * written, and not before: only a write of grai's own output, which refuses an outdir another tool
  * fills, makes the state directory (`assertOutdirIsGrais`).
  */
-async function published(
+export async function published(
 	outdir: string,
 	output: Output,
 	inputs: string,

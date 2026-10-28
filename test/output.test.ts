@@ -17,15 +17,11 @@ import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
-import {
-	compileProject,
-	recompile,
-	writeBuild,
-	writeUndeclared,
-} from "../src/compile.ts";
+import { compileProject, recompile, writeBuild } from "../src/compile.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { readManifest } from "../src/manifest.ts";
 import { isCompiled } from "../src/output-inputs.ts";
+import { writeUndeclared } from "../src/undeclared.ts";
 import {
 	isDeclarations,
 	outputTexts,

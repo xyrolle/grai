@@ -53,7 +53,13 @@ const watching = watch(
 	(error) => console.error(error),
 	// Next reads the output's modules from the disk, never its declarations: a first compile writes
 	// the modules before Next may start, and the declarations once the process is quiet.
-	{ declareLater: true, placeFirst: start.placing },
+	{
+		declareLater: async (compiled, options) => {
+			const { writeUndeclared } = await import("../undeclared.ts");
+			return writeUndeclared(compiled, options);
+		},
+		placeFirst: start.placing,
+	},
 );
 start.released(watching).then(({ compiled, grouped: saved }) => {
 	released = true;

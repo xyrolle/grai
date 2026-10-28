@@ -9,7 +9,12 @@ import {
 } from "./declaration-maps.ts";
 import type { DeclaredKey } from "./key-declarations.ts";
 import { keyExports } from "./key-exports.ts";
-import { placedKeys, placementOf, replaced } from "./key-placement.ts";
+import {
+	type Placement,
+	placedKeys,
+	placementOf,
+	replaced,
+} from "./key-placement.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import type { OutputModules, RenderedModules } from "./output-modules.ts";
 import type { KeyGroups } from "./saved-groups.ts";
@@ -47,7 +52,7 @@ export type Output = {
  * declared, the declarations with the hash of theirs, their map, `<label>.d.ts.map`, and the line
  * of the declarations each key is on.
  */
-type ShardFiles = ModuleFiles & {
+export type ShardFiles = ModuleFiles & {
 	declared?: {
 		declarations: string;
 		declarationsHash: string;
@@ -103,50 +108,24 @@ export function renderOutput(
 		);
 		shardFiles.set(index, { ...module, declared: { ...declared, map } });
 	}
-	return outputOf(rendered, places, shardFiles, true);
+	return outputOf(rendered, places, shardFiles);
 }
 
 /**
- * The output as `renderOutput` renders it, but without any declarations or their maps, for keys
- * compiled but not declared yet: every module the output's modules import, whole, as a dev server
- * starting from it needs, its declarations left to the write after (`writeBuild`). A module is
- * named by its shape, which its declarations do not change, so the write after names it alike and
- * writes no module again.
+ * The output of each place's files, the modules beside the keys' first, each place's declarations
+ * and their map where it has them, and the output rendered, for the next render to start from.
  */
-export function renderUndeclared(
-	config: Config,
+export function outputOf(
 	rendered: RenderedModules,
-	compilation: Compilation,
-	groups: KeyGroups,
-	previous?: Rendered,
-): { output: Output; rendered: Rendered } {
-	const places = placed(config, rendered, compilation, groups, previous);
-	const shardFiles = new Map<number, ShardFiles>();
-	for (const { index, module } of places.modules) {
-		const { name, module: text, moduleHash } = module;
-		shardFiles.set(index, { name, module: text, moduleHash });
-	}
-	return outputOf(rendered, places, shardFiles, false);
-}
-
-/**
- * The output of each place's files, the modules beside the keys' first, and the output rendered,
- * for the next render to start from: with the declarations and their maps, or without any.
- */
-function outputOf(
-	rendered: RenderedModules,
-	places: ReturnType<typeof placed>,
+	places: Places,
 	shardFiles: ReadonlyMap<number, ShardFiles>,
-	declared: boolean,
 ): { output: Output; rendered: Rendered } {
 	const files = [...shardFiles.values()];
 	const keysIndex = files
 		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
 		.join("");
-	const taken = ([path]: OutputFile) =>
-		declared || !(path.endsWith(".d.ts") || path.endsWith(".d.ts.map"));
 	const keyModules: OutputFile[] = [];
-	const mutable = rendered.moduleFiles.mutable.filter(taken);
+	const mutable = [...rendered.moduleFiles.mutable];
 	for (const [index, shard] of shardFiles) {
 		keyModules.push([`keys/${shard.name}.js`, shard.module, shard.moduleHash]);
 		if (shard.declared === undefined) continue;
@@ -158,10 +137,9 @@ function outputOf(
 		]);
 		mutable.push([`keys/${places.placement.label(index)}.d.ts.map`, map]);
 	}
-	mutable.push(["keys.js", keysIndex]);
-	if (declared) mutable.push(["keys.d.ts", keysIndex]);
+	mutable.push(["keys.js", keysIndex], ["keys.d.ts", keysIndex]);
 	const output: Output = {
-		immutable: rendered.moduleFiles.immutable.filter(taken),
+		immutable: rendered.moduleFiles.immutable,
 		keyModules,
 		mutable,
 	};
@@ -190,6 +168,13 @@ function keysOf<Key extends CompiledKey>(
 	return compiled;
 }
 
+/** How the keys are placed, each place's keys, and each place that holds keys (`placed`). */
+type Places = {
+	placement: Placement;
+	shards: readonly (readonly string[])[];
+	modules: readonly Place[];
+};
+
 /**
  * A place that holds keys: its index and label, its keys, its module, its files rendered before,
  * and those again if its module is the one rendered then.
@@ -207,13 +192,13 @@ type Place = {
  * Each place's keys and module: the module rendered again for a place whose keys changed or that
  * imports a module renamed, else the one rendered before.
  */
-function placed(
+export function placed(
 	config: Config,
 	rendered: RenderedModules,
 	compilation: Compilation,
 	groups: KeyGroups,
 	previous: Rendered | undefined,
-) {
+): Places {
 	const { modules } = rendered;
 	const placement = placementOf(groups, compilation.keys.keys());
 	const before =
