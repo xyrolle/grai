@@ -1,3 +1,4 @@
+import { hash } from "node:crypto";
 import type { Compilation, CompiledKey } from "./compilation.ts";
 import type { Config } from "./config.ts";
 import { contentName } from "./content-names.ts";
@@ -13,19 +14,32 @@ import { calledNames, everyName, outputImports } from "./output-imports.ts";
 import type { OutputModules, RenderedModules } from "./output-modules.ts";
 import type { KeyGroups } from "./saved-groups.ts";
 
-/** A file of the output: its path in the outdir, and its text. */
-export type OutputFile = readonly [path: string, text: string];
+/**
+ * A file of the output: its path in the outdir, its text, and, for a mutable file whose render took
+ * it, the SHA-1 of its text, which the write then does not take again.
+ */
+export type OutputFile = readonly [path: string, text: string, hash?: string];
 
 /**
  * The output, as a compile publishes it. The immutable files are named by their content, so a
  * compile writes each once and never replaces it. The mutable ones keep their names and are
  * replaced when their text changes: the entries apps import, which name the immutable files, and
- * each shard's declaration map.
+ * each place's declarations, which keep its module's name, and their map.
  */
 export type Output = {
 	immutable: readonly OutputFile[];
 	mutable: readonly OutputFile[];
 };
+
+/** Each file of an output, its text by its path. */
+export function textsOf(output: Output): Map<string, string> {
+	return new Map(
+		[...output.immutable, ...output.mutable].map(([path, text]) => [
+			path,
+			text,
+		]),
+	);
+}
 
 /**
  * A place's files as rendered (`key-placement.ts`): the name of its module and declarations,
@@ -38,6 +52,8 @@ type ShardFiles = {
 	module: string;
 	declared?: {
 		declarations: string;
+		/** The declarations' hash, taken once as they are rendered. */
+		hash: string;
 		map: string;
 		lines: readonly DeclarationLine[];
 	};
@@ -71,8 +87,15 @@ export function renderOutput(
 ): { output: Output; rendered: Rendered } {
 	const places = placed(config, rendered, compilation, groups, previous);
 	const shardFiles = new Map<number, Required<ShardFiles>>();
-	for (const { index, label, keys, module, before, kept } of places.modules) {
-		const name = places.name(index, module);
+	for (const {
+		index,
+		label,
+		keys,
+		name,
+		module,
+		before,
+		kept,
+	} of places.modules) {
 		const declared =
 			kept?.declared ??
 			shardDeclarations(label, keysOf(keys, compilation), rendered.modules);
@@ -100,7 +123,7 @@ export function renderOutput(
 			...rendered.moduleFiles.mutable,
 			...[...shardFiles].flatMap(
 				([index, { name, declared }]): OutputFile[] => [
-					[`keys/${name}.d.ts`, declared.declarations],
+					[`keys/${name}.d.ts`, declared.declarations, declared.hash],
 					[`keys/${places.placement.label(index)}.d.ts.map`, declared.map],
 				],
 			),
@@ -129,8 +152,8 @@ export function renderUndeclared(
 ): { output: Output; rendered: Rendered } {
 	const places = placed(config, rendered, compilation, groups, previous);
 	const shardFiles = new Map<number, ShardFiles>();
-	for (const { index, module } of places.modules)
-		shardFiles.set(index, { name: places.name(index, module), module });
+	for (const { index, name, module } of places.modules)
+		shardFiles.set(index, { name, module });
 	const files = [...shardFiles.values()];
 	const undeclared = ([path]: OutputFile) => !isDeclarations(path);
 	const output: Output = {
@@ -177,13 +200,15 @@ function keysOf<Key extends CompiledKey>(
 }
 
 /**
- * A place that holds keys: its index and label, its keys, its module, its files rendered before,
+ * A place that holds keys: its index and label, its keys, its name and module, its files rendered before,
  * and those again if its module is the one rendered then.
  */
 type Place = {
 	index: number;
 	label: string;
 	keys: readonly string[];
+	/** `<label>-<hash>`, by the module's content. */
+	name: string;
 	module: string;
 	before: ShardFiles | undefined;
 	kept: ShardFiles | undefined;
@@ -232,6 +257,7 @@ function placed(
 		if (keys.length === 0) return;
 		const previousFiles = before?.shardFiles.get(index);
 		const kept = dirty.has(index) ? undefined : previousFiles;
+		const label = placement.label(index);
 		const module =
 			kept?.module ??
 			shardModule(
@@ -241,21 +267,15 @@ function placed(
 			);
 		places.push({
 			index,
-			label: placement.label(index),
+			label,
 			keys,
+			name: kept?.name ?? contentName(label, module),
 			module,
 			before: previousFiles,
 			kept,
 		});
 	});
-	return {
-		placement,
-		shards,
-		modules: places,
-		/** A place's name, `<label>-<hash>`, by its module's content. */
-		name: (index: number, module: string) =>
-			contentName(placement.label(index), module),
-	};
+	return { placement, shards, modules: places };
 }
 
 /** The rendered output, for the next render to start from. */
@@ -267,7 +287,7 @@ function renderedWith(
 ): Rendered {
 	return {
 		...rendered,
-		files: new Map([...output.immutable, ...output.mutable]),
+		files: textsOf(output),
 		groups: places.placement.groups,
 		shards: places.shards,
 		shardFiles,
@@ -324,7 +344,7 @@ function shardDeclarations(
 	label: string,
 	keys: ReadonlyMap<string, DeclaredKey>,
 	modules: OutputModules,
-): { declarations: string; lines: DeclarationLine[] } {
+): { declarations: string; hash: string; lines: DeclarationLine[] } {
 	const types = [...keys.values()].some((key) => key.markup)
 		? "MarkupMessage, Message"
 		: "Message";
@@ -337,5 +357,6 @@ function shardDeclarations(
 		parts.push(key.declared.text);
 	}
 	parts.push(`//# sourceMappingURL=${label}.d.ts.map\n`);
-	return { declarations: parts.join(""), lines };
+	const declarations = parts.join("");
+	return { declarations, hash: hash("sha1", declarations), lines };
 }

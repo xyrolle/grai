@@ -4,7 +4,7 @@ import { configModule } from "./config-module.ts";
 import { contentName, pinImports } from "./content-names.ts";
 import { type Formatter, formatModule } from "./formatters.ts";
 import { pluralModule } from "./plurals.ts";
-import type { Output, OutputFile } from "./render.ts";
+import { type Output, type OutputFile, textsOf } from "./render.ts";
 import {
 	type DeclarationTemplates,
 	runtimeDeclarations,
@@ -160,7 +160,7 @@ export function renderModules(
 		moduleFiles,
 		modules: { runtime: anchor, plurals, formats: formats?.[0] },
 		formats: rendered,
-		files: new Map([...moduleFiles.immutable, ...moduleFiles.mutable]),
+		files: textsOf(moduleFiles),
 	};
 }
 

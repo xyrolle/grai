@@ -1,4 +1,5 @@
 import { execFile, spawn, spawnSync } from "node:child_process";
+import { hash } from "node:crypto";
 import {
 	appendFileSync,
 	cpSync,
@@ -214,6 +215,24 @@ it("writes the same output in two steps, every module whole and then the declara
 	);
 	expect(outputTexts(out)).toEqual(outputTexts(join(once.dir, "out")));
 	expect(await isCompiled(config)).toBe(true);
+});
+
+it("records each mutable file by the hash of the text it wrote, the declarations' taken as they were rendered", async () => {
+	const { dir, compile } = project(catalogs);
+	expect((await compile()).errors).toEqual([]);
+	const out = join(dir, "out");
+
+	const manifest = await readManifest(join(out, ".grai"));
+
+	const recorded = Object.entries(manifest?.mutable ?? {});
+	expect(recorded.some(([file]) => /^keys\/[^/]+\.d\.ts$/.test(file))).toBe(
+		true,
+	);
+	for (const [file, recordedHash] of recorded)
+		expect([file, recordedHash]).toEqual([
+			file,
+			hash("sha1", readFileSync(join(out, file), "utf8")),
+		]);
 });
 
 it("takes no output written without its declarations for the output of its catalogs, so the next compile writes them, and them alone", async () => {

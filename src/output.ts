@@ -67,7 +67,10 @@ export async function writeOutput(
 		]);
 		const present = contents.files;
 		const hashes = new Map(
-			output.mutable.map(([file, text]) => [file, hash("sha1", text)]),
+			output.mutable.map(([file, text, known]) => [
+				file,
+				known ?? hash("sha1", text),
+			]),
 		);
 		const recorded = new Map(Object.entries(manifest?.mutable ?? {}));
 		const now = Date.now();
