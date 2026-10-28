@@ -8,13 +8,16 @@
 // Rolldown's own timing of the plugins' hooks (`checks.bundlerTimings`, bundler-timings.mjs) is
 // kept beside them, for each hook it names: one of a second or more. Vite times plugins only in its
 // dev server. The builds take turns, RUNS rounds of the three, so the load from other work weighs
-// on each alike; medians.
+// on each alike; medians. After each build, every page of it is opened in Chromium and must draw
+// its texts (built-pages.mjs).
 //   node build-added.mjs [app...]      synthetic and synthetic-13326 by default
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
+import { chromium } from "playwright-core";
 import { selectedApps } from "./apps.mjs";
 import { writeBuildApps } from "./build-apps.mjs";
+import { checkBuiltPages } from "./built-pages.mjs";
 import { bundlerTimings } from "./bundler-timings.mjs";
 import { graiEntry } from "./grai.mjs";
 import { recordResults } from "./results.mjs";
@@ -126,8 +129,9 @@ function reported(build, plugin) {
 }
 
 /** One app's builds and compiles, as results/build-added.json has them. */
-async function measure(app) {
-	const { roots, graiConfig, project, calls } = await writeBuildApps(app);
+async function measure(browser, app) {
+	const { roots, graiConfig, project, calls, pages } =
+		await writeBuildApps(app);
 	const extra = { stub: undefined, grai: graiConfig, paraglide: project };
 	const builds = { stub: [], grai: [], paraglide: [] };
 	const compiles = { grai: [], paraglide: [] };
@@ -135,10 +139,12 @@ async function measure(app) {
 		const order = variants.map(
 			(_, index) => variants[(index + round) % variants.length],
 		);
-		for (const variant of order)
+		for (const variant of order) {
 			builds[variant].push(
 				run("build", variant, roots[variant], extra[variant]),
 			);
+			await checkBuiltPages(browser, join(roots[variant], "dist"), pages);
+		}
 		for (const library of round % 2 === 0
 			? ["grai", "paraglide"]
 			: ["paraglide", "grai"])
@@ -176,11 +182,12 @@ if (process.argv[2] === "--child") {
 	await child(...process.argv.slice(3));
 } else {
 	const names = process.argv.slice(2);
+	const browser = await chromium.launch();
 	const recorded = [];
 	for (const app of selectedApps(
 		names.length > 0 ? names : ["synthetic", "synthetic-13326"],
 	)) {
-		const measured = await measure(app);
+		const measured = await measure(browser, app);
 		recorded.push(measured);
 		console.log(
 			`\n### ${app.name}: ${measured.calls} calls on its pages, ms, medians of ${RUNS}\n`,
@@ -201,5 +208,6 @@ if (process.argv[2] === "--child") {
 			);
 		}
 	}
+	await browser.close();
 	recordResults("build-added", recorded, { runs: RUNS });
 }
