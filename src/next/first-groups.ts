@@ -5,13 +5,14 @@
 // The thread reads the code at once. The groups need the output written, which the read resolves
 // the app's imports of, so they come from a second read, once the compile has written it. Taking
 // them costs the start that read, a save and one more compile; it saves the first page the shards
-// it would compile in each layer that reads a key. On the bench's page, at 6,366 keys, Next waits
-// 80 ms more and its first page comes 221–373 ms sooner; an app of 2,000 files takes longer to read
-// than its catalogs to compile, and starts on its shards. A start cannot tell what the groups save
-// its pages, so the rule is a heuristic, measured on those: take the groups when the code was read
-// before the compile was done, and they come within the time the compile took again. That time
-// counts any wait for the output's lock, and not the save and compile after it; a page that reads
-// no key gains nothing from the wait. A start with groups saved never reads beside its compile.
+// it would compile in each layer that reads a key. On the bench's page, at 6,366 keys, Next
+// waits 59–80 ms more and its first page comes 195–373 ms sooner; an app of 2,000 files takes
+// longer to read than its catalogs to compile, and starts on its shards. A start cannot tell what
+// the groups save its pages, so the rule is a heuristic, measured on those: take the groups when
+// the code was read before the compile was done, and they come within the time the compile took
+// again. That time counts any wait for the output's lock, and not the save and compile after it;
+// a page that reads no key gains nothing from the wait. A start with groups saved never reads
+// beside its compile.
 
 import { extname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
