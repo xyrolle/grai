@@ -1781,6 +1781,8 @@ export const render = () => \`\${title()} \${footer()}\`;
 			server: { watch: fixtures },
 			plugins: [grai()],
 		});
+		// The first compile, which a module's load starts and is served before its output is written.
+		await server.environments.ssr.pluginContainer.load("\0grai:keys");
 		await server.close();
 
 		expect(existsSync(join(dir, "out", "messages.js"))).toBe(true);
