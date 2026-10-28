@@ -79,11 +79,35 @@ const linked = (section: Section) =>
 		? `#${anchor(section.heading)}`
 		: `docs/benchmarks.md#${anchor(section.heading)}`;
 
-/** Every measure's row, the strongest first, each linked to its chart on the page that shows it. */
+/**
+ * Every measure's row, each linked to its chart on the page that shows it: the strongest first,
+ * rows that go together side by side, at the place of the strongest of them.
+ */
 function glanceTable(all: Section[]): string {
-	const rows = all
-		.flatMap((section) => section.glance.map((glance) => ({ glance, section })))
-		.toSorted((a, b) => verdict(b.glance).strength - verdict(a.glance).strength)
+	const entries = all.flatMap((section) =>
+		section.glance.map((glance, order) => ({
+			glance,
+			section,
+			order,
+			group: glance.together ?? `${section.id} ${order}`,
+		})),
+	);
+	const strongest = new Map<string, number>();
+	for (const { glance, group } of entries)
+		strongest.set(
+			group,
+			Math.max(
+				strongest.get(group) ?? Number.NEGATIVE_INFINITY,
+				verdict(glance).strength,
+			),
+		);
+	const rows = entries
+		.toSorted(
+			(a, b) =>
+				(strongest.get(b.group) ?? 0) - (strongest.get(a.group) ?? 0) ||
+				a.group.localeCompare(b.group) ||
+				a.order - b.order,
+		)
 		.map(({ glance, section }) => [
 			`[${glance.measure}](${linked(section)})`,
 			unbroken(glance.shown(glance.grai)),

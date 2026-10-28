@@ -141,7 +141,7 @@ export function compileSection(): Section {
 				duration,
 				{ kind: "ratio", ratio: compileRatio(last, `${plain}, cold`) },
 			),
-		],
+		].map((glance) => ({ ...glance, together: "compile" })),
 	};
 }
 
@@ -155,17 +155,16 @@ export function editSection(): Section {
 	const groups = byKeys(rows, entries, (ms) => ms, duration);
 	const last: CompileRow = largest(rows);
 	const title = "One message edited, compiled again";
-	const against = (variant: string, setup: string, other: string) =>
-		glanceOf(
+	const against = (variant: string, setup: string, other: string) => ({
+		...glanceOf(
 			`Compile after one edit, ${whole(last.keys)} keys, ${setup}`,
 			editOf(compiled(last, "grai")),
-			[
-				`Paraglide's Vite plugin in dev, ${other}`,
-				editOf(compiled(last, variant)),
-			],
+			[other, editOf(compiled(last, variant))],
 			duration,
 			{ kind: "ratio", ratio: compileRatio(last, `${variant}, edit`) },
-		);
+		),
+		together: "edit",
+	});
 	return {
 		id: "edit",
 		heading: "Compiling after one edit",
@@ -201,11 +200,15 @@ export function editSection(): Section {
 		],
 		note: `The same message edited each time, its text replaced as an editor saves it: grai compiles again by \`recompile\` from the build its compile before kept, as its Vite plugin and \`grai watch\` do; Paraglide's Vite plugin, as a dev server drives it, compiles again by its \`watchChange\` from the compilation it kept, in the layout it takes in development, locale modules, without declarations and with them. Medians of ${runs} rounds in rotating order, each in a new process (\`bench/compile-time.mjs\`).`,
 		glance: [
-			against(devTyped, "both emit declarations", "with declarations"),
 			against(
 				devPlain,
-				"Paraglide without declarations",
-				"without declarations",
+				"Paraglide's default",
+				"Paraglide's Vite plugin in dev, without declarations, its default",
+			),
+			against(
+				devTyped,
+				"both emit declarations",
+				"Paraglide's Vite plugin in dev, declarations through TypeScript 6",
 			),
 		],
 	};
