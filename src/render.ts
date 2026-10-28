@@ -87,7 +87,7 @@ export function renderOutput(
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
 	const places = placed(config, rendered, compilation, groups, previous);
-	const shardFiles = new Map<number, Required<ShardFiles>>();
+	const shardFiles = new Map<number, ShardFiles>();
 	for (const { index, label, keys, module, kept, before } of places.modules) {
 		const declared =
 			kept?.declared ??
@@ -103,34 +103,7 @@ export function renderOutput(
 		);
 		shardFiles.set(index, { ...module, declared: { ...declared, map } });
 	}
-	const files = [...shardFiles.values()];
-	const keysIndex = indexOf(files);
-	const output: Output = {
-		immutable: rendered.moduleFiles.immutable,
-		keyModules: files.flatMap((shard): OutputFile[] => [
-			[`keys/${shard.name}.js`, shard.module, shard.moduleHash],
-			[
-				`keys/${shard.name}.d.ts`,
-				shard.declared.declarations,
-				shard.declared.declarationsHash,
-			],
-		]),
-		mutable: [
-			...rendered.moduleFiles.mutable,
-			...[...shardFiles].map(
-				([index, { declared }]): OutputFile => [
-					`keys/${places.placement.label(index)}.d.ts.map`,
-					declared.map,
-				],
-			),
-			["keys.js", keysIndex],
-			["keys.d.ts", keysIndex],
-		],
-	};
-	return {
-		output,
-		rendered: renderedWith(rendered, output, places, shardFiles),
-	};
+	return outputOf(rendered, places, shardFiles, true);
 }
 
 /**
@@ -153,38 +126,55 @@ export function renderUndeclared(
 		const { name, module: text, moduleHash } = module;
 		shardFiles.set(index, { name, module: text, moduleHash });
 	}
+	return outputOf(rendered, places, shardFiles, false);
+}
+
+/**
+ * The output of each place's files, the modules beside the keys' first, and the output rendered,
+ * for the next render to start from: with the declarations and their maps, or without any.
+ */
+function outputOf(
+	rendered: RenderedModules,
+	places: ReturnType<typeof placed>,
+	shardFiles: ReadonlyMap<number, ShardFiles>,
+	declared: boolean,
+): { output: Output; rendered: Rendered } {
 	const files = [...shardFiles.values()];
-	const undeclared = ([path]: OutputFile) => !isDeclarations(path);
+	const keysIndex = files
+		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
+		.join("");
+	const taken = ([path]: OutputFile) =>
+		declared || !(path.endsWith(".d.ts") || path.endsWith(".d.ts.map"));
+	const keyModules: OutputFile[] = [];
+	const mutable = rendered.moduleFiles.mutable.filter(taken);
+	for (const [index, shard] of shardFiles) {
+		keyModules.push([`keys/${shard.name}.js`, shard.module, shard.moduleHash]);
+		if (shard.declared === undefined) continue;
+		const { declarations, declarationsHash, map } = shard.declared;
+		keyModules.push([
+			`keys/${shard.name}.d.ts`,
+			declarations,
+			declarationsHash,
+		]);
+		mutable.push([`keys/${places.placement.label(index)}.d.ts.map`, map]);
+	}
+	mutable.push(["keys.js", keysIndex]);
+	if (declared) mutable.push(["keys.d.ts", keysIndex]);
 	const output: Output = {
-		immutable: rendered.moduleFiles.immutable.filter(undeclared),
-		keyModules: files.map(
-			(shard): OutputFile => [
-				`keys/${shard.name}.js`,
-				shard.module,
-				shard.moduleHash,
-			],
-		),
-		mutable: [
-			...rendered.moduleFiles.mutable.filter(undeclared),
-			["keys.js", indexOf(files)],
-		],
+		immutable: rendered.moduleFiles.immutable.filter(taken),
+		keyModules,
+		mutable,
 	};
 	return {
 		output,
-		rendered: renderedWith(rendered, output, places, shardFiles),
+		rendered: {
+			...rendered,
+			files: textsByPath(output.immutable, output.keyModules, output.mutable),
+			groups: places.placement.groups,
+			shards: places.shards,
+			shardFiles,
+		},
 	};
-}
-
-/** Whether an output's file is declarations or their map, which a dev server never imports. */
-function isDeclarations(path: string): boolean {
-	return path.endsWith(".d.ts") || path.endsWith(".d.ts.map");
-}
-
-/** keys.js, which re-exports every place's module. */
-function indexOf(files: readonly ShardFiles[]): string {
-	return files
-		.map(({ name }) => `export * from "./keys/${name}.js";\n`)
-		.join("");
 }
 
 /** The keys a place holds, compiled. */
@@ -269,22 +259,6 @@ function placed(
 		});
 	});
 	return { placement, shards, modules: places };
-}
-
-/** The rendered output, for the next render to start from. */
-function renderedWith(
-	rendered: RenderedModules,
-	output: Output,
-	places: ReturnType<typeof placed>,
-	shardFiles: ReadonlyMap<number, ShardFiles>,
-): Rendered {
-	return {
-		...rendered,
-		files: textsByPath(output.immutable, output.keyModules, output.mutable),
-		groups: places.placement.groups,
-		shards: places.shards,
-		shardFiles,
-	};
 }
 
 /**
