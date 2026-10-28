@@ -383,7 +383,9 @@ describe("the Nuxt example under nuxt dev, a first start with an error only the 
 	let restore = () => {};
 	beforeAll(async () => {
 		restore = conflictingInput(join(example, "messages"));
-		firstStart(outdir);
+		// After an upgrade: Nuxt's server reads the output's files, which the module's compile, failing
+		// on the error, leaves as an earlier grai wrote them; from a fresh clone it has none to read.
+		firstStart(outdir, { kept: true });
 		app = await nuxtDev();
 		origin = app.origin;
 	}, 120_000);
