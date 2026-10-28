@@ -292,6 +292,9 @@ export function watch(
 		}
 		running = compileChanges().finally(() => {
 			running = undefined;
+			// A compile asked for after the last one checked for more, as the write a page's serve leads
+			// to asks for at once, runs now.
+			if (again && !closed) run();
 		});
 	};
 
