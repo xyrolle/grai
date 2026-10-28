@@ -1,0 +1,8 @@
+{
+	"name": "grai-oldest-node",
+	"private": true,
+	"type": "module",
+	"imports": {
+		"#i18n/messages/*": "./out/keys.js"
+	}
+}
