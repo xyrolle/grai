@@ -203,7 +203,7 @@ describe("handleLocale, by the URL prefix", { timeout: 30_000 }, () => {
 		await page.getByText("Desenat în browser").waitFor();
 		await page.evaluate("window.unreloaded = true");
 
-		await page.getByRole("link", { name: "Despre" }).click();
+		await page.getByRole("link", { name: "Despre", exact: true }).click();
 		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
 
 		expect(await page.evaluate("window.unreloaded")).toBe(true);
@@ -301,7 +301,7 @@ describe("handleLocale, under a base path", { timeout: 30_000 }, () => {
 			await page.getByRole("link", { name: "Despre" }).getAttribute("href"),
 		).toBe("/shop/ro/despre");
 
-		await page.getByRole("link", { name: "Despre" }).click();
+		await page.getByRole("link", { name: "Despre", exact: true }).click();
 		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
 		await page.context().close();
 	});
@@ -382,14 +382,12 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 	}
 
 	/**
-	 * Waits until the page has started, which a server-rendered heading does not show: an edit
-	 * whose loads Kit runs again before its client has started is lost. Then marks the page, so a
-	 * reload, which would lose the mark, shows.
+	 * Marks the page, so a reload, which would lose the mark, shows. Each test marks a page once it
+	 * drew what only its browser draws, or what it drew after a navigation in the browser: by then
+	 * Kit's client has started, which it does in the turn it hydrates the page, and an edit made
+	 * after reaches the client, whose loads Kit can run again.
 	 */
-	const mark = async (page: Page) => {
-		await page.waitForLoadState("networkidle");
-		await page.evaluate("window.unreloaded = true");
-	};
+	const mark = (page: Page) => page.evaluate("window.unreloaded = true");
 	const marked = (page: Page) => page.evaluate("window.unreloaded");
 
 	it("serves the first page before its first compile's output is written", async () => {
@@ -444,7 +442,11 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 	});
 
 	it("draws again the text a server load returns", async () => {
-		const page = await open(origin, "/ro/about");
+		// The page, reached by a link the started client follows, as its server-rendered heading alone
+		// would not show that the client has started.
+		const page = await open(origin, "/ro/");
+		await page.getByText("Desenat în browser").waitFor();
+		await page.getByRole("link", { name: "Despre", exact: true }).click();
 		await page.getByRole("heading", { name: "Despre acest exemplu" }).waitFor();
 		await mark(page);
 
