@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it, onTestFinished } from "vitest";
 import { type Build, type CompileResult, recompile } from "../src/compile.ts";
-import { savedBuild } from "../src/saved-build.ts";
+import { savedBuild, savedIndex } from "../src/saved-build.ts";
 import { saveGroups } from "../src/saved-groups.ts";
 import { savingFile } from "../src/state-saves.ts";
 import { watch } from "../src/watch.ts";
@@ -344,4 +344,26 @@ it("saves one whole build when two watchers of an outdir close at once, so no st
 		written: [],
 		files: start.build?.rendered.files,
 	});
+});
+
+it("reads a saved build's index alone, the build's own code, while the catalogs are as it was compiled from", async () => {
+	const { dir, config: file } = project(catalogs, config);
+	const { build } = await started(file);
+
+	const index = await savedIndex(file, { pseudoLocale: true });
+	const codeOf = (
+		keys: ReadonlyMap<string, { variants: unknown }> | undefined,
+	) => [...(keys ?? [])].map(([key, { variants }]) => [key, variants]);
+	expect(codeOf(index?.compilation.keys)).toEqual(
+		codeOf(build?.compilation.keys),
+	);
+	expect(index?.rendered.modules).toEqual(build?.rendered.modules);
+	expect("sources" in (index ?? {})).toBe(false);
+
+	writeFileSync(
+		join(dir, "messages", "de.json"),
+		JSON.stringify({ ...catalogs.de, title: "Überschrift" }),
+	);
+	expect(await savedIndex(file, { pseudoLocale: true })).toBeUndefined();
+	expect(await savedBuild(file, { pseudoLocale: true })).toBeDefined();
 });
