@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { members } from "../src/bits.ts";
@@ -366,5 +367,65 @@ describe("a Next app's groups of keys", () => {
 			],
 			["badge_text", "home_button"],
 		]);
+	});
+});
+
+/** An app's files that import the output through a tsconfig `paths` alias, with and without `.js`. */
+const aliased = {
+	"tsconfig.json": JSON.stringify({
+		compilerOptions: { paths: { "@out/*": ["./out/*"] } },
+	}),
+	"app/layout.jsx": barrels["app/layout.jsx"],
+	"app/page.jsx": `import * as m from "@out/keys.js";
+
+export default function Page() {
+	return <main>{m.heading_a()}</main>;
+}
+`,
+	"app/b/page.jsx": `"use client";
+import { heading_b } from "@out/keys";
+
+export default function B() {
+	return <main>{heading_b()}</main>;
+}
+`,
+};
+
+describe("the contexts read before the output is written, as beside a fresh clone's first compile", () => {
+	const unwritten = async (
+		files: Record<string, string>,
+		words: Record<string, string>,
+	) => {
+		const { dir, config, compilation } = await compiledApp([], files, words);
+		const written = await contextsIn(dir, config, compilation);
+		rmSync(config.outdir, { recursive: true, force: true });
+		return { written, unwritten: await contextsIn(dir, config, compilation) };
+	};
+
+	it("are those read once it is, through relative imports, a barrel of keys and a computed read", async () => {
+		const { written, unwritten: before } = await unwritten(app, catalog());
+		expect(before).toEqual(written);
+		expect(Object.keys(before)).toContain("nav_home");
+	});
+
+	it("are those read once it is, through keys' own paths a package.json maps to keys.js", async () => {
+		const { written, unwritten: before } = await unwritten(
+			pathAndStarBarrels,
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(Object.keys(before)).toContain("heading_a");
+	});
+
+	it("are those read once it is, through a tsconfig alias, with the module's extension and without", async () => {
+		const { written, unwritten: before } = await unwritten(
+			aliased,
+			barrelWords,
+		);
+		expect(before).toEqual(written);
+		expect(before).toEqual({
+			heading_a: ["page.jsx server"],
+			heading_b: ["b/page.jsx client"],
+		});
 	});
 });
