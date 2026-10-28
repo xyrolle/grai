@@ -119,16 +119,15 @@ function digests(modules: ReadonlyMap<string, Buffer>): Map<string, string> {
  * list is that of the directory this code runs from.
  */
 function builtModules(part: BuiltPart): Map<string, string> | undefined {
-	let listed: unknown;
+	let chunks: unknown;
 	try {
-		listed = JSON.parse(readFileSync(join(root, builtModulesFile), "utf8"));
+		const lists: Partial<Record<BuiltPart, unknown>> | null = JSON.parse(
+			readFileSync(join(root, builtModulesFile), "utf8"),
+		);
+		chunks = lists?.[part];
 	} catch {
 		return undefined;
 	}
-	const chunks =
-		typeof listed === "object" && listed !== null && part in listed
-			? (listed as Record<BuiltPart, unknown>)[part]
-			: undefined;
 	if (typeof chunks !== "object" || chunks === null) return undefined;
 	const modules = new Map<string, string>();
 	for (const [path, built] of Object.entries(chunks)) {
