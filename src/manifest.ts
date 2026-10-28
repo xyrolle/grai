@@ -1,5 +1,6 @@
 import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import type { Compiler } from "./compiler-identity.ts";
 import { isMissing, isRecord } from "./config.ts";
 import { replaceFile } from "./replace-file.ts";
 
@@ -10,6 +11,8 @@ import { replaceFile } from "./replace-file.ts";
 export type Manifest = {
 	/** A hash of the compiler, the config and the catalogs the output was compiled from. */
 	inputs: string;
+	/** The compiler, with the modules its identity is the hash of, for the next process to take. */
+	compiler?: Compiler;
 	/** The files named by their content. */
 	immutable: string[];
 	/** The files with names of their own, each with the hash of what it holds. */
@@ -62,11 +65,22 @@ function isManifest(value: unknown): value is Manifest {
 	return (
 		isRecord(value) &&
 		typeof value.inputs === "string" &&
+		(value.compiler === undefined || isCompiler(value.compiler)) &&
 		Array.isArray(value.immutable) &&
 		value.immutable.every((file) => typeof file === "string") &&
 		isRecord(value.mutable) &&
 		Object.values(value.mutable).every((hash) => typeof hash === "string") &&
 		isRecord(value.retired) &&
 		Object.values(value.retired).every((at) => typeof at === "number")
+	);
+}
+
+function isCompiler(value: unknown): value is Compiler {
+	return (
+		isRecord(value) &&
+		typeof value.identity === "string" &&
+		(value.modules === undefined ||
+			(Array.isArray(value.modules) &&
+				value.modules.every((module) => typeof module === "string")))
 	);
 }

@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { compilerModules } from "../src/compiler-identity.ts";
 import { project } from "./project.ts";
 
 const source = fileURLToPath(new URL("../src/", import.meta.url));
@@ -44,17 +44,28 @@ console.log(JSON.stringify({ loaded: [...loaded], parses }));
 	return JSON.parse(run.stdout);
 }
 
-it("is made of the modules a compile and its saved build load, every one and no other", async () => {
-	const { config } = project({
+it("is made of the modules a compile and its saved build load, every one and no other, which a later start takes from the manifest without parsing them", () => {
+	const { dir, config } = project({
 		en: { title: "Title", greeting: "Hello {name}" },
 		de: { title: "Titel", greeting: "Hallo {name}" },
 	});
-	const modules = new Set(
-		[...((await compilerModules())?.keys() ?? [])].map((module) =>
-			join(source, module),
-		),
-	);
 
-	expect(new Set(start(config).loaded)).toEqual(modules);
+	const first = start(config);
+	const { compiler } = JSON.parse(
+		readFileSync(join(dir, "out", ".grai", "manifest.json"), "utf8"),
+	);
+	const modules = new Set(
+		compiler.modules.map((module: string) => join(source, module)),
+	);
+	const later = start(config);
+
+	// The parser is one of them, as the module that finds them imports it, though a later start,
+	// which parses nothing, does not load it.
+	const parser = join(source, "code", "parse.ts");
+
+	expect(first.parses).toBe(true);
+	expect(later.parses).toBe(false);
+	expect(new Set([...later.loaded, parser])).toEqual(modules);
+	expect(later.loaded).not.toContain(parser);
 	expect(modules.has(join(source, "cli.ts"))).toBe(false);
 });
