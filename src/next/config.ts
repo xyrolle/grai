@@ -7,9 +7,10 @@ import {
 	PHASE_PRODUCTION_BUILD,
 } from "next/constants.js";
 import { baseDisagreement } from "../base-agreement.ts";
-import { type CompileResult, compile, isCompiled } from "../compile.ts";
+import type { CompileResult } from "../compile.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
+import { isCompiled } from "../output-inputs.ts";
 import { packageName } from "../package-name.ts";
 import type { AppData } from "./app-data.ts";
 import { count, reportErrors } from "./errors.ts";
@@ -48,7 +49,12 @@ export function withGrai(
 				configFile,
 				pageExtensions: nextConfig.pageExtensions ?? [...defaultPageExtensions],
 			});
-		} else built(await compile(configFile));
+		} else {
+			// The compiler loads for a build alone: a dev server's start checks the output, and its
+			// watch compiles on a thread of its own.
+			const { compile } = await import("../compile.ts");
+			built(await compile(configFile));
+		}
 		return resolvingOutput(nextConfig, outdir);
 	};
 }
