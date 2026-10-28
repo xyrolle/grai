@@ -4,7 +4,7 @@ import { configModule } from "./config-module.ts";
 import { contentName, pinImports } from "./content-names.ts";
 import { type Formatter, formatModule } from "./formatters.ts";
 import { pluralModule } from "./plurals.ts";
-import type { OutputFile } from "./render.ts";
+import type { Output, OutputFile } from "./render.ts";
 import {
 	type DeclarationTemplates,
 	runtimeDeclarations,
@@ -38,6 +38,32 @@ export type OutputModules = {
 };
 
 /**
+ * The output's files that name no key, which a compile renders before the keys' (`renderModules`):
+ * as the output publishes them, the modules the keys import among them, and formats.js. `files`
+ * has every file rendered by path: these, and once the keys' are rendered, theirs too.
+ */
+export type RenderedModules = {
+	moduleFiles: Output;
+	modules: OutputModules;
+	formats: RenderedFormats;
+	files: ReadonlyMap<string, string>;
+};
+
+/** The output's .gitignore: everything in it is compiled from the catalogs, so none of it is committed. */
+const gitignore = "# grai writes this directory from the catalogs.\n*\n";
+
+/** `m`, the namespace of keys.js, as messages.js and its declarations export it. */
+const messagesModule = `export * as m from "./keys.js";\n`;
+
+/**
+ * The outdir's package.json. Its modules are ES modules whatever the project's package.json says,
+ * and only server.js, which binds the request's store as it loads, has effects of its own: a bundler
+ * that reads `sideEffects` then leaves out each module of keys no code reads, as `next dev` does in
+ * each of its layers, and keeps a module whose keys are read whole, its check among them.
+ */
+const outdirPackage = `${JSON.stringify({ type: "module", sideEffects: ["./server.js"] }, null, "\t")}\n`;
+
+/**
  * The runtime's anchor: the one module of the output whose text changes with the runtime, which
  * every entry and module of the output reaches the runtime and its config through. A process reads
  * it once, so it holds one runtime, whichever compile's it read.
@@ -67,9 +93,11 @@ const runtimeApiTypes = ["Locale", "MarkupMessage", "Message", "MessagePart"];
  * The modules beside the keys, each named by its content: the config, the runtime that reads it,
  * the plural rules, and the formatters when a message calls one. With them come the anchor,
  * `internal.js`, which re-exports the runtime, and with it what the rest of the output reads of the
- * config, and which an adapter takes what it binds from, and the entries apps import: `runtime.js`, the runtime's API alone, and `server.js`
- * and `testing.js`, whose imports name the anchor. They change only with grai, never with the
- * config. formats.js is the previous render's while no changed key calls other formatters.
+ * config, and which an adapter takes what it binds from; the entries apps import: `runtime.js`, the
+ * runtime's API alone, `server.js` and `testing.js`, whose imports name the anchor, and
+ * `messages.js`, the namespace of keys.js; and the outdir's .gitignore and package.json. The entries
+ * change only with grai, never with the config. formats.js is the previous render's while no changed
+ * key calls other formatters.
  */
 export function renderModules(
 	config: Config,
@@ -77,12 +105,7 @@ export function renderModules(
 	compilation: Compilation,
 	localeCopies: boolean,
 	previous?: RenderedFormats,
-): {
-	modules: OutputModules;
-	immutable: OutputFile[];
-	entries: OutputFile[];
-	formats: RenderedFormats;
-} {
+): RenderedModules {
 	const configCode = configModule(config, localeCopies);
 	const configFile = `${contentName("config", configCode)}.js`;
 	const runtimeCode = pinImports(
@@ -107,9 +130,7 @@ export function renderModules(
 		["./config.js", anchor],
 		["./runtime.js", anchor],
 	]);
-	return {
-		formats: rendered,
-		modules: { runtime: anchor, plurals, formats: formats?.[0] },
+	const moduleFiles: Output = {
 		immutable: [
 			[configFile, configCode],
 			[`${runtime}.js`, runtimeCode],
@@ -117,7 +138,9 @@ export function renderModules(
 			[plurals, pluralsCode],
 			...(formats === undefined ? [] : [formats]),
 		],
-		entries: [
+		mutable: [
+			[".gitignore", gitignore],
+			["package.json", outdirPackage],
 			[anchor, reexport(`${runtime}.js`)],
 			["internal.d.ts", reexport(`${runtime}.js`)],
 			["runtime.js", api(runtimeApi)],
@@ -129,7 +152,15 @@ export function renderModules(
 			["server.d.ts", sources.declarations.server],
 			["testing.js", pinImports(sources.testing, anchored)],
 			["testing.d.ts", sources.declarations.testing],
+			["messages.js", messagesModule],
+			["messages.d.ts", messagesModule],
 		],
+	};
+	return {
+		moduleFiles,
+		modules: { runtime: anchor, plurals, formats: formats?.[0] },
+		formats: rendered,
+		files: new Map([...moduleFiles.immutable, ...moduleFiles.mutable]),
 	};
 }
 

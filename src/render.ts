@@ -9,12 +9,7 @@ import {
 import { keyExports } from "./key-exports.ts";
 import { placedKeys, placementOf, replaced } from "./key-placement.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
-import {
-	type OutputModules,
-	type RenderedFormats,
-	type RuntimeSources,
-	renderModules,
-} from "./output-modules.ts";
+import type { OutputModules, RenderedModules } from "./output-modules.ts";
 import type { KeyGroups } from "./saved-groups.ts";
 
 /** A file of the output: its path in the outdir, and its text. */
@@ -44,12 +39,8 @@ type ShardFiles = {
 	lines: readonly DeclarationLine[];
 };
 
-/** The output's files by path, the modules the keys import, and each place's keys and files. */
-export type Rendered = {
-	files: ReadonlyMap<string, string>;
-	modules: OutputModules;
-	/** formats.js, which the next render keeps if the messages call the same formatters. */
-	formats: RenderedFormats;
+/** The whole output rendered: the modules beside the keys, and each place's keys and files. */
+export type Rendered = RenderedModules & {
 	/** The groups the keys were placed by, as JSON. */
 	groups: string;
 	/** Each place's keys, sorted. */
@@ -58,22 +49,8 @@ export type Rendered = {
 	shardFiles: ReadonlyMap<number, ShardFiles>;
 };
 
-/** The output's .gitignore: everything in it is compiled from the catalogs, so none of it is committed. */
-const gitignore = "# grai writes this directory from the catalogs.\n*\n";
-
-/** `m`, the namespace of keys.js, as messages.js and its declarations export it. */
-const messagesModule = `export * as m from "./keys.js";\n`;
-
 /**
- * The outdir's package.json. Its modules are ES modules whatever the project's package.json says,
- * and only server.js, which binds the request's store as it loads, has effects of its own: a bundler
- * that reads `sideEffects` then leaves out each module of keys no code reads, as `next dev` does in
- * each of its layers, and keeps a module whose keys are read whole, its check among them.
- */
-const outdirPackage = `${JSON.stringify({ type: "module", sideEffects: ["./server.js"] }, null, "\t")}\n`;
-
-/**
- * Renders the output. Each key's module is its group's, when the saved groups hold it, else its
+ * Renders the output: the modules beside the keys, as rendered, and the keys. Each key's module is its group's, when the saved groups hold it, else its
  * shard's, by a hash of its name, so a key stays in its place while others come and go
  * (`key-placement.ts`). Only the places whose keys changed are rendered again, and those that
  * import a module renamed: every place for the runtime, and for the plural rules or the formatters,
@@ -81,19 +58,13 @@ const outdirPackage = `${JSON.stringify({ type: "module", sideEffects: ["./serve
  */
 export function renderOutput(
 	config: Config,
-	runtime: RuntimeSources,
+	rendered: RenderedModules,
 	compilation: Compilation,
 	base: BaseCatalog,
-	{ localeCopies, groups }: { localeCopies: boolean; groups: KeyGroups },
+	groups: KeyGroups,
 	previous?: Rendered,
 ): { output: Output; rendered: Rendered } {
-	const { modules, immutable, entries, formats } = renderModules(
-		config,
-		runtime,
-		compilation,
-		localeCopies,
-		previous?.formats,
-	);
+	const { modules, moduleFiles } = rendered;
 	const placement = placementOf(groups, compilation.keys.keys());
 	const before =
 		previous?.shards.length === placement.count &&
@@ -151,34 +122,29 @@ export function renderOutput(
 		.join("");
 	const output: Output = {
 		immutable: [
-			...immutable,
+			...moduleFiles.immutable,
 			...files.flatMap(({ name, module, declarations }): OutputFile[] => [
 				[`keys/${name}.js`, module],
 				[`keys/${name}.d.ts`, declarations],
 			]),
 		],
 		mutable: [
-			[".gitignore", gitignore],
-			["package.json", outdirPackage],
+			...moduleFiles.mutable,
 			...[...shardFiles].map(
 				([index, { map }]): OutputFile => [
 					`keys/${placement.label(index)}.d.ts.map`,
 					map,
 				],
 			),
-			...entries,
 			["keys.js", keysIndex],
 			["keys.d.ts", keysIndex],
-			["messages.js", messagesModule],
-			["messages.d.ts", messagesModule],
 		],
 	};
 	return {
 		output,
 		rendered: {
+			...rendered,
 			files: new Map([...output.immutable, ...output.mutable]),
-			modules,
-			formats,
 			groups: placement.groups,
 			shards,
 			shardFiles,
