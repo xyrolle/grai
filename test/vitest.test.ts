@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import {
 	cpSync,
+	existsSync,
 	mkdtempSync,
 	realpathSync,
 	rmSync,
@@ -63,11 +64,9 @@ test("one key mocked", () => {
 		expect(run.stdout).toContain("1 passed");
 	});
 
-	it("fails a run on a catalog error before any test takes the messages, as a dev server shows it only after its first page", async () => {
-		const { dir } = project({
-			en: { title: "Title", listed: "{x :list}" },
-			de: { title: "Titel", listed: "{x :number}" },
-		});
+	/** A project whose test marks that it ran, and asserts the output was written before it did. */
+	function writtenFirst(messages: Parameters<typeof project>[0]) {
+		const { dir } = project(messages);
 		symlinkSync(nodeModules, join(dir, "node_modules"));
 		writeFileSync(
 			join(dir, "vitest.config.js"),
@@ -75,25 +74,51 @@ test("one key mocked", () => {
 		);
 		writeFileSync(
 			join(dir, "title.test.js"),
-			`import { expect, test } from "vitest";
+			`import { existsSync, writeFileSync } from "node:fs";
+import { expect, test } from "vitest";
 import { m } from "./out/messages.js";
 test("the title", () => {
+	writeFileSync(new URL("./ran", import.meta.url), "");
+	expect(existsSync(new URL("./out/messages.d.ts", import.meta.url))).toBe(true);
 	expect(m.title()).toBe("Title");
 });
 `,
 		);
+		return dir;
+	}
 
-		const run = await promisify(execFile)(
-			process.execPath,
-			[vitest, "run", "--root", dir],
-			{ cwd: dir, env: ownEnvironment },
-		).catch((error: { stdout: string; stderr: string }) => error);
+	// Vitest runs in mode test unless told another, and is a test run in any.
+	for (const mode of [[], ["--mode", "development"]]) {
+		const run = (dir: string) =>
+			promisify(execFile)(
+				process.execPath,
+				[vitest, "run", "--root", dir, ...mode],
+				{ cwd: dir, env: ownEnvironment },
+			).catch((error: { stdout: string; stderr: string }) => error);
 
-		expect(`${run.stdout}${run.stderr}`).toContain(
-			"x is formatted as a list in en and is formatted as a number in de, and no value suits both.",
-		);
-		expect(run.stdout).not.toContain("1 passed");
-	});
+		it(`writes the output before a test takes the messages${mode.length === 0 ? "" : `, in mode ${mode[1]}`}`, async () => {
+			const dir = writtenFirst({
+				en: { title: "Title" },
+				de: { title: "Titel" },
+			});
+
+			expect((await run(dir)).stdout).toContain("1 passed");
+		});
+
+		it(`fails a run on a catalog error before any test takes the messages, as a dev server shows it only after its first page${mode.length === 0 ? "" : `, in mode ${mode[1]}`}`, async () => {
+			const dir = writtenFirst({
+				en: { title: "Title", listed: "{x :list}" },
+				de: { title: "Titel", listed: "{x :number}" },
+			});
+
+			const { stdout, stderr } = await run(dir);
+
+			expect(`${stdout}${stderr}`).toContain(
+				"x is formatted as a list in en and is formatted as a number in de, and no value suits both.",
+			);
+			expect(existsSync(join(dir, "ran"))).toBe(false);
+		});
+	}
 
 	it("mocks one key in a Next app, whose Vitest config lists grai's plugin as it has no Vite config", async () => {
 		// The Next example as an app has it, its packages installed, with a Vitest config and a test of
