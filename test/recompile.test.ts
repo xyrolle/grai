@@ -50,7 +50,7 @@ const parsed = (messages: Record<string, unknown>): Catalog => ({
 });
 
 describe("a recompile after an edit", () => {
-	it("compiles only the keys the edit touched, and writes only their shard and the entry naming it", async () => {
+	it("compiles only the keys the edit touched, and replaces only their module, in place under its name", async () => {
 		const { dir, config } = project(catalogs);
 		const first = await recompile(config, undefined);
 		writeFileSync(
@@ -59,6 +59,30 @@ describe("a recompile after an edit", () => {
 		);
 		const second = await recompile(config, first.build);
 
+		const module = first.result.written.find((file) => /^keys\/0-/.test(file));
+		expect(second.result.written).toEqual([module]);
+		expect(readFileSync(join(dir, "out", module ?? ""), "utf8")).toContain(
+			'"Überschrift"',
+		);
+		expect([...(second.build?.compilation.changed ?? [])]).toEqual(["title"]);
+	});
+
+	it("renames a module of keys, and the entries naming it, when an edit adds a key to it", async () => {
+		const { dir, config } = project(catalogs);
+		const first = await recompile(config, undefined);
+		for (const [locale, messages] of Object.entries(catalogs)) {
+			writeFileSync(
+				join(dir, "messages", `${locale}.json`),
+				laidOut({ ...messages, subtitle: `${messages.title}!` }),
+			);
+		}
+		const second = await recompile(config, first.build);
+
+		const module = (written: readonly string[]) =>
+			written.find((file) => /^keys\/0-.*\.js$/.test(file));
+		expect(module(second.result.written)).not.toBe(
+			module(first.result.written),
+		);
 		expect(second.result.written.map(withoutContentHash)).toEqual([
 			"keys/0.js",
 			"keys/0.d.ts",
@@ -66,7 +90,6 @@ describe("a recompile after an edit", () => {
 			"keys.js",
 			"keys.d.ts",
 		]);
-		expect([...(second.build?.compilation.changed ?? [])]).toEqual(["title"]);
 	});
 
 	it("keeps each key's message one locale at a time, for adapters that write a module per locale", async () => {

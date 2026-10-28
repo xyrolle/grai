@@ -12,7 +12,10 @@ export type Manifest = {
 	inputs: string;
 	/** The files named by their content. */
 	immutable: string[];
-	/** The files with names of their own, each with the hash of what it holds. */
+	/**
+	 * The files a compile replaces in place, each with the hash of what it holds: the modules of keys
+	 * and their declarations, named by their shape, and the files with names of their own.
+	 */
 	mutable: Record<string, string>;
 	/** The files no output names any more, each with when it stopped being named, in ms. */
 	retired: Record<string, number>;
