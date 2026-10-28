@@ -1312,6 +1312,45 @@ export const render = () => modules["./out/messages.js"].m.title();
 		expect(await rendered()).toBe("Title");
 	});
 
+	/**
+	 * A dev server of the project as an app's has it, its page's HTML beside its modules and its
+	 * dependencies already found, with `plugins` ahead of grai's, and a server render of render.js.
+	 * It never listens, so nothing but a module starts the plugin's watch.
+	 */
+	async function appServerOf(dir: string, plugins: Plugin[] = []) {
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><script type="module" src="/render.js"></script>`,
+		);
+		const server = await createServer({
+			root: dir,
+			configFile: false,
+			logLevel: "silent",
+			optimizeDeps: { noDiscovery: true },
+			server: { watch: fixtures },
+			plugins: [...plugins, grai()],
+		});
+		onTestFinished(() => server.close());
+		const ssr = server.environments.ssr;
+		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
+		const rendered = async () =>
+			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		return { server, rendered };
+	}
+
+	it("writes the output before the first module that expands a glob of it, when nothing else started the watch", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "render.js"),
+			`const modules = import.meta.glob("./out/messages.js", { eager: true });
+export const render = () => modules["./out/messages.js"].m.title();
+`,
+		);
+		const { rendered } = await appServerOf(dir);
+
+		expect(await rendered()).toBe("Title");
+	});
+
 	it("leaves the output out of the dependency scan before it is written, which finds the page's dependencies", async () => {
 		const { dir } = project(catalogs);
 		const release = heldOutput(dir);
