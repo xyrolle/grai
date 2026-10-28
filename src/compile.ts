@@ -16,6 +16,7 @@ import { type Compilation, compileCatalogs } from "./compilation.ts";
 import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
+import { type DeclaredKey, declareKeys } from "./key-declarations.ts";
 import { isUpToDate, writeOutput } from "./output.ts";
 import {
 	type RenderedModules,
@@ -45,7 +46,9 @@ export type Compiled = ParsedCatalogs & {
 };
 
 /** Everything a compile read, made and wrote, kept so the next compile redoes only what changed. */
-export type Build = Compiled & {
+export type Build = Omit<Compiled, "compilation" | "rendered"> & {
+	/** Every key compiled and declared. */
+	compilation: Compilation<DeclaredKey>;
 	/** Where each key is in the base locale's catalog, for the declaration maps. */
 	positions: ReadonlyMap<string, Position>;
 	rendered: Rendered;
@@ -175,13 +178,14 @@ export async function recompile(
 /**
  * The first half of `recompile`: compiles from `previous` as it does, and renders the modules
  * beside the keys, but neither renders the keys nor writes anything. `previous` may be a project
- * compiled so and not written yet. Returns every error found, or the project compiled, for
- * `writeBuild` to write.
+ * compiled so and not written yet. With `declare` false, the keys are left undeclared for
+ * `writeBuild` to declare (`compileCatalogs`). Returns every error found, or the project compiled,
+ * for `writeBuild` to write.
  */
 export async function compileProject(
 	configFile: string,
 	previous: Compiled | undefined,
-	options: CompileOptions = {},
+	options: CompileOptions & { declare?: boolean } = {},
 ): Promise<Compiled | { errors: GraiError[] }> {
 	const read = await readProject(configFile);
 	if ("errors" in read) return read;
@@ -237,14 +241,20 @@ function compiledFrom(
 	sources: readonly CatalogSource[],
 	hashes: readonly string[],
 	previous?: Compiled,
-	{ pseudoLocale = false, localeCopies = false }: CompileOptions = {},
+	{
+		pseudoLocale = false,
+		localeCopies = false,
+		declare = true,
+	}: CompileOptions & { declare?: boolean } = {},
 ): Compiled | { errors: GraiError[] } {
 	const parsed = parseCatalogs(sources, previous);
 	if (parsed.errors.length > 0) return { errors: parsed.errors };
 	const { config, catalogs } = pseudoLocale
 		? withPseudoLocale(configured, parsed.catalogs, previous?.catalogs)
 		: { config: configured, catalogs: parsed.catalogs };
-	const compilation = compileCatalogs(config, catalogs, previous?.compilation);
+	const compilation = compileCatalogs(config, catalogs, previous?.compilation, {
+		declare,
+	});
 	if (compilation.errors.length > 0) return { errors: [...compilation.errors] };
 	return {
 		config,
@@ -265,18 +275,21 @@ function compiledFrom(
 }
 
 /**
- * The second half of `recompile`: renders a compiled project's keys, placed by the groups saved
- * for its outdir, and writes its output, every file of it the outdir lacks or holds otherwise.
- * `previous` is the build written last, which the project was compiled from: with the same config,
- * only what changed since is rendered again, and with none, or another config, everything is.
- * `localeCopies` is the compile's.
+ * The second half of `recompile`: declares the keys its compile left undeclared (`declareKeys`),
+ * renders a compiled project's keys, placed by the groups saved for its outdir, and writes its
+ * output, every file of it the outdir lacks or holds otherwise. `previous` is the build written
+ * last, which the project was compiled from: with the same config, only what changed since is
+ * rendered again, and with none, or another config, everything is. `localeCopies` is the compile's.
  */
 export async function writeBuild(
 	compiled: Compiled,
 	previous?: Build,
 	{ localeCopies = false }: CompileOptions = {},
 ): Promise<{ result: CompileResult; build?: Build }> {
-	const { config, sources, parts, catalogs, compilation } = compiled;
+	const { config, sources, parts, catalogs } = compiled;
+	const compilation = declareKeys(config, compiled.compilation);
+	if (compilation.errors.length > 0)
+		return { result: { written: [], errors: [...compilation.errors] } };
 	const before =
 		previous !== undefined && sameConfig(previous.config, config)
 			? previous
@@ -312,7 +325,7 @@ export async function writeBuild(
 	}
 	return {
 		result: { written, errors: [] },
-		build: { ...compiled, positions, rendered },
+		build: { ...compiled, compilation, positions, rendered },
 	};
 }
 

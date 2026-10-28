@@ -6,6 +6,7 @@ import {
 	type DeclarationLine,
 	shardMap,
 } from "./declaration-maps.ts";
+import type { DeclaredKey } from "./key-declarations.ts";
 import { keyExports } from "./key-exports.ts";
 import { placedKeys, placementOf, replaced } from "./key-placement.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
@@ -59,7 +60,7 @@ export type Rendered = RenderedModules & {
 export function renderOutput(
 	config: Config,
 	rendered: RenderedModules,
-	compilation: Compilation,
+	compilation: Compilation<DeclaredKey>,
 	base: BaseCatalog,
 	groups: KeyGroups,
 	previous?: Rendered,
@@ -184,11 +185,11 @@ function importsRenamed(
 function renderShard(
 	label: string,
 	keys: readonly string[],
-	compilation: Compilation,
+	compilation: Compilation<DeclaredKey>,
 	modules: OutputModules,
 	locales: readonly string[],
 ): Omit<ShardFiles, "map"> {
-	const compiled = new Map<string, CompiledKey>();
+	const compiled = new Map<string, DeclaredKey>();
 	for (const key of keys) {
 		const compiledKey = compilation.keys.get(key);
 		if (compiledKey !== undefined) compiled.set(key, compiledKey);
@@ -219,7 +220,7 @@ function shardModule(
 
 /** A shard's declarations, but the line naming their map, and the line each key's is on. */
 function shardDeclarations(
-	keys: ReadonlyMap<string, CompiledKey>,
+	keys: ReadonlyMap<string, DeclaredKey>,
 	modules: OutputModules,
 ): { body: string; lines: DeclarationLine[] } {
 	const types = [...keys.values()].some((key) => key.markup)
@@ -229,9 +230,9 @@ function shardDeclarations(
 	const lines: DeclarationLine[] = [];
 	let line = 2;
 	for (const [name, key] of keys) {
-		line += key.declarationLines;
+		line += key.declared.lines;
 		lines.push([name, line - 1]);
-		parts.push(key.declaration);
+		parts.push(key.declared.text);
 	}
 	return { body: parts.join(""), lines };
 }

@@ -1,15 +1,12 @@
-import { type Catalog, fileOfKey } from "./catalog.ts";
+import type { Catalog } from "./catalog.ts";
 import type { Config } from "./config.ts";
-import { lineCount } from "./declaration-maps.ts";
-import { keyDeclaration } from "./declarations.ts";
 import { sameJson } from "./edit.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { fallbackPositions, messageSource } from "./fallbacks.ts";
-import { InputConflict } from "./input-types.ts";
 import { caseCollisions, isCompilable, keyProblems } from "./key-checks.ts";
-import { type LocaleMessage, parseMessage } from "./message.ts";
+import { declarationOf, type KeyDeclaration } from "./key-declarations.ts";
+import { parseMessages } from "./key-messages.ts";
 import { type KeyModule, keyModule, type RuntimeFunction } from "./modules.ts";
-import { MessageProblem } from "./problem.ts";
 
 /**
  * A key compiled from its raw messages, one per locale, kept so an unchanged key is not compiled
@@ -22,9 +19,8 @@ export type CompiledKey = Pick<
 	/** The key's name, which its module exports it under. */
 	name: string;
 	values: readonly unknown[];
-	declaration: string;
-	/** The lines the declaration takes, for the declaration maps. */
-	declarationLines: number;
+	/** Its declaration, unless its compile left it to the output's write (`declareKeys`). */
+	declared?: KeyDeclaration;
 	uses: ReadonlySet<RuntimeFunction>;
 	/** The functions of plurals.js the key's code calls, by name. */
 	plurals: ReadonlySet<string>;
@@ -36,10 +32,10 @@ export type CompiledKey = Pick<
 };
 
 /** Every key compiled, or the errors that stop the output from being written. */
-export type Compilation = {
+export type Compilation<Key extends CompiledKey = CompiledKey> = {
 	/** The catalogs compiled, one per locale. */
 	catalogs: readonly Catalog[];
-	keys: ReadonlyMap<string, CompiledKey>;
+	keys: ReadonlyMap<string, Key>;
 	/** The keys compiled again, added or removed since the previous compilation. */
 	changed: ReadonlySet<string>;
 	/** The keys whose code calls a formatter, so formats.js is written from them alone. */
@@ -55,12 +51,15 @@ export type Compilation = {
 /**
  * Compiles every key. A key whose raw messages equal the previous compilation's is taken from it
  * as it is. After an edit, only the keys the edit touched are looked at, so an edit costs only
- * the keys it changes.
+ * the keys it changes. Each key compiled is declared too, unless `declare` is false: a dev server
+ * that serves its first page before it writes the output leaves that to the write (`declareKeys`),
+ * and with it the errors of inputs no value suits in every locale.
  */
 export function compileCatalogs(
 	config: Config,
 	catalogs: readonly Catalog[],
 	previous?: Compilation,
+	{ declare = true }: { declare?: boolean } = {},
 ): Compilation {
 	const errors: GraiError[] = [];
 	const edited =
@@ -94,14 +93,10 @@ export function compileCatalogs(
 		}
 		changed.add(key);
 		keys.delete(key);
-		const compiled = compileKey(
-			key,
-			catalogs,
-			sources,
+		const compiled = compileKey(key, catalogs, sources, collisions, errors, {
+			declare,
 			base,
-			collisions,
-			errors,
-		);
+		});
 		if (compiled !== undefined) keys.set(key, compiled);
 	}
 	if (edited === undefined) {
@@ -142,17 +137,17 @@ function sameFormatters(
 }
 
 /**
- * Compiles one key, or adds why it cannot be to the errors. A key no catalog has any more is
- * undefined. `sources` holds, for each locale, the catalog its message comes from: its own, or the
- * one it falls back to.
+ * Compiles one key, and declares it with `declare`, or adds why it cannot be to the errors. A key
+ * no catalog has any more is undefined. `sources` holds, for each locale, the catalog its message
+ * comes from: its own, or the one it falls back to.
  */
 function compileKey(
 	key: string,
 	catalogs: readonly Catalog[],
 	sources: readonly (Catalog | undefined)[],
-	base: Catalog | undefined,
 	collisions: ReadonlyMap<string, string>,
 	errors: GraiError[],
+	{ declare, base }: { declare: boolean; base: Catalog | undefined },
 ): CompiledKey | undefined {
 	const values = sources.map((source) => source?.messages.get(key));
 	if (values.every((value) => value === undefined)) return undefined;
@@ -162,9 +157,11 @@ function compileKey(
 	}
 	const messages = parseMessages(key, catalogs, sources, values, errors);
 	if (messages === undefined) return undefined;
-	const declaration = declarationOf(key, messages, base, catalogs, sources);
-	if (declaration instanceof GraiError) {
-		errors.push(declaration);
+	const declared = declare
+		? declarationOf(key, messages, base, catalogs, sources)
+		: undefined;
+	if (declared instanceof GraiError) {
+		errors.push(declared);
 		return undefined;
 	}
 	const module = keyModule(key, messages);
@@ -174,8 +171,7 @@ function compileKey(
 		value: module.value,
 		serverValue: module.serverValue,
 		serverUses: module.serverUses,
-		declaration,
-		declarationLines: lineCount(declaration),
+		...(declared === undefined ? {} : { declared }),
 		uses: module.uses,
 		plurals: module.plurals,
 		formats: module.formats,
@@ -185,27 +181,6 @@ function compileKey(
 		parts: module.parts,
 		markup: messages.some((message) => message.markup),
 	};
-}
-
-/** A key's declaration, or the error naming the locale of an input no value suits every use of. */
-function declarationOf(
-	key: string,
-	messages: readonly LocaleMessage[],
-	base: Catalog | undefined,
-	catalogs: readonly Catalog[],
-	sources: readonly (Catalog | undefined)[],
-): string | GraiError {
-	try {
-		return keyDeclaration(key, messages, base?.messages.get(key));
-	} catch (error) {
-		if (!(error instanceof InputConflict)) throw error;
-		for (const [index, { file, locale }] of catalogs.entries()) {
-			if (locale !== error.locale) continue;
-			const where = { file: sources[index]?.file ?? file, key, locale };
-			return new GraiError(error.code, where, error.message);
-		}
-		throw error;
-	}
 }
 
 /**
@@ -247,27 +222,4 @@ function unchanged(
 		const before = compiled.values[index];
 		return value === before || sameJson(value, before);
 	});
-}
-
-/** Each locale's message parsed, its errors named by the file the message is in. */
-function parseMessages(
-	key: string,
-	catalogs: readonly Catalog[],
-	sources: readonly (Catalog | undefined)[],
-	values: readonly unknown[],
-	errors: GraiError[],
-): LocaleMessage[] | undefined {
-	const messages: LocaleMessage[] = [];
-	catalogs.forEach((catalog, index) => {
-		const { locale } = catalog;
-		try {
-			messages.push(parseMessage(locale, values[index]));
-		} catch (error) {
-			if (!(error instanceof MessageProblem)) throw error;
-			const file = fileOfKey(sources[index] ?? catalog, key);
-			const where = { file, key, locale };
-			errors.push(new GraiError(error.code, where, error.message));
-		}
-	});
-	return messages.length === catalogs.length ? messages : undefined;
 }
