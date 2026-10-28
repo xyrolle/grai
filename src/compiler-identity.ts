@@ -62,13 +62,17 @@ function identityOf(
 	return digest.digest("hex");
 }
 
-/** The bytes of grai's modules at these paths, or undefined if one is not a file of grai's. */
+/**
+ * The bytes of grai's modules at these paths, or undefined if one is not the path of a file in
+ * grai's directory as `compilerModules` writes it.
+ */
 function bytesOf(paths: readonly string[]): Map<string, Buffer> | undefined {
 	const modules = new Map<string, Buffer>();
 	for (const path of paths) {
-		if (isAbsolute(path) || path.split(sep).includes("..")) return undefined;
+		const file = join(root, path);
+		if (!within(root, file) || relative(root, file) !== path) return undefined;
 		try {
-			modules.set(path, readFileSync(join(root, path)));
+			modules.set(path, readFileSync(file));
 		} catch {
 			return undefined;
 		}
