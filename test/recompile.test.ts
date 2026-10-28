@@ -278,7 +278,8 @@ describe("a recompile after an edit", () => {
 		);
 		const kept = [...(after?.rendered.shardFiles ?? [])].map(
 			([index, files]) =>
-				files.lines === before?.rendered.shardFiles.get(index)?.lines,
+				files.declared?.lines ===
+				before?.rendered.shardFiles.get(index)?.declared?.lines,
 		);
 		// Every shard but the price's keeps what it was rendered as.
 		expect(kept.length).toBeGreaterThan(2);
