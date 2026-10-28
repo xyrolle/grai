@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { CompiledKey } from "./compilation.ts";
-import type { Build } from "./compile.ts";
+import type { CompiledProject } from "./compile.ts";
 import {
 	changeEvent,
 	patchedEvent,
@@ -111,7 +111,7 @@ function madeExports(keys: readonly string[], taken: ReadonlySet<string>) {
  */
 export function devModule(
 	outdir: string,
-	build: Build,
+	build: CompiledProject,
 	version: number,
 ): string {
 	const keys = [...build.compilation.keys];
@@ -156,7 +156,7 @@ export { missing as ${key} };
 /** An edit's patch: the changed keys' rows, which the page writes into its table. */
 export function patchModule(
 	outdir: string,
-	build: Build,
+	build: CompiledProject,
 	changed: readonly string[],
 ): string {
 	const keys = changed.flatMap((key) => build.compilation.keys.get(key) ?? []);

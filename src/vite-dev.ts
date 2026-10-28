@@ -5,7 +5,7 @@ import {
 	isRunnableDevEnvironment,
 	type ViteDevServer,
 } from "vite";
-import type { Build } from "./compile.ts";
+import type { CompiledProject } from "./compile.ts";
 import { patchedEvent, sinceEvent, updateEvent } from "./dev-events.ts";
 import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
@@ -52,12 +52,16 @@ const missingKeyPrefix = "\0grai:missing-key/";
 export function serveMessages(
 	server: ViteDevServer,
 	files: ProjectFiles,
-	{ reloadOnEdit }: { reloadOnEdit: boolean },
-	compiled: (result: Build | readonly Error[]) => void,
+	{
+		reloadOnEdit,
+		servesFirst,
+	}: { reloadOnEdit: boolean; servesFirst: boolean },
+	compiled: (result: CompiledProject | readonly Error[]) => void,
 ): {
 	module: (id: string) => string | undefined;
 	missingKeyImport: (key: string, importer: string) => string | undefined;
 	version: () => number;
+	write: () => Promise<boolean>;
 	close: () => Promise<void>;
 } {
 	const client = server.environments.client;
@@ -73,7 +77,7 @@ export function serveMessages(
 	});
 	/** Each key imported by its path, with the modules that import it so. */
 	const importers = new Map<string, Set<string>>();
-	let previous: Build | undefined;
+	let previous: CompiledProject | undefined;
 	/** The page's word that a server has an edit, from its runner or once it takes the messages again. */
 	const patched: HotPayload = { type: "custom", event: patchedEvent };
 	for (const environment of Object.values(server.environments)) {
@@ -92,7 +96,7 @@ export function serveMessages(
 		});
 	}
 
-	const update = async (before: Build, next: Build) => {
+	const update = async (before: CompiledProject, next: CompiledProject) => {
 		const changed = [...next.compilation.changed];
 		// A change of config or of grai rewrites the runtime's anchor: a page that took the new
 		// runtime beside the old would hold two, each with its own locale.
@@ -183,10 +187,11 @@ export function serveMessages(
 	};
 	/**
 	 * Tells every environment's plugins that the output's modules were created, as Vite's watcher
-	 * does once it reports them. A page that imported the output while a compile failed left Vite's
-	 * resolver a lookup that found nothing, and the page reloads before the watcher catches up.
+	 * does once it reports them. A page that imported the output while a compile failed, or before
+	 * the first compile's output was written, left Vite's resolver a lookup that found nothing, and
+	 * the next import comes before the watcher catches up.
 	 */
-	const created = (build: Build) =>
+	const created = (build: CompiledProject) =>
 		Promise.all(
 			Object.values(server.environments).flatMap((environment) =>
 				[...build.rendered.files.keys()]
@@ -205,27 +210,44 @@ export function serveMessages(
 		shown(error.message, error.stack);
 	};
 
+	/** Whether the build served last was served before its output was written. */
+	let servedUnwritten = false;
+	/** Vite told of the output's files, once the first compile's output is written after it was served. */
+	let announced: Promise<unknown> = Promise.resolve();
+	/**
+	 * Serves a compile's build, its output written or not yet: the open pages and servers take it as
+	 * an update of the last one.
+	 */
+	const serve = (next: CompiledProject, written: boolean) => {
+		const before = previous;
+		previous = next;
+		compiled(next);
+		if (written && servedUnwritten) announced = created(next).catch(failed);
+		servedUnwritten = !written;
+		if (before === undefined && showing) {
+			// The first output comes after a failed compile: Vite learns of it before the page reloads.
+			created(next).then(cleared, failed);
+			return;
+		}
+		cleared();
+		if (before !== undefined) update(before, next).catch(failed);
+	};
 	const watcher = watch(
 		files.configFile,
 		(result, _milliseconds, next) => {
-			if (next === undefined) {
-				compiled(result.errors);
-				shown(messagesOf(result.errors));
-				return;
-			}
-			const before = previous;
-			previous = next;
-			compiled(next);
-			if (before === undefined && showing) {
-				// The first output comes after a failed compile: Vite learns of it before the page reloads.
-				created(next).then(cleared, failed);
-				return;
-			}
-			cleared();
-			if (before !== undefined) update(before, next).catch(failed);
+			if (next !== undefined) return serve(next, true);
+			compiled(result.errors);
+			shown(messagesOf(result.errors));
 		},
 		failed,
+		servesFirst ? { serve: (next) => serve(next, false) } : {},
 	);
+	/** Writes the first compile's output now, if it is not written yet, and tells Vite of its files. */
+	const write = async () => {
+		const wrote = await watcher.write();
+		await announced;
+		return wrote;
+	};
 	/**
 	 * The id a per-key import resolves to when the build lacks its key: a module whose export throws
 	 * when called, with the import shown in the overlay. Undefined while the build has the key, which
@@ -250,6 +272,7 @@ export function serveMessages(
 		module,
 		missingKeyImport,
 		version: () => patches.size,
+		write,
 		close: watcher.close,
 	};
 }
@@ -257,7 +280,7 @@ export function serveMessages(
 /** Whether a file is the plugin's to follow, so Vite's own update leaves it alone. */
 export function followedFile(
 	files: ProjectFiles,
-	build: Build | undefined,
+	build: CompiledProject | undefined,
 	file: string,
 ): boolean {
 	const catalogs = [...(build?.config.catalogs.values() ?? [])].flat();
@@ -269,7 +292,10 @@ export function followedFile(
 }
 
 /** The key a per-key path names by its last segment, `…/<key>.js`, if the build has that key. */
-export function pathKey(build: Build, id: string): string | undefined {
+export function pathKey(
+	build: CompiledProject,
+	id: string,
+): string | undefined {
 	const key = /([^/]+)\.js$/.exec(id)?.[1];
 	return key !== undefined && build.compilation.keys.has(key) ? key : undefined;
 }
