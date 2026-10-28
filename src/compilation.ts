@@ -6,7 +6,13 @@ import { fallbackPositions, messageSource } from "./fallbacks.ts";
 import { caseCollisions, isCompilable, keyProblems } from "./key-checks.ts";
 import { declarationOf, type KeyDeclaration } from "./key-declarations.ts";
 import { parseMessages } from "./key-messages.ts";
-import { type KeyModule, keyModule, type RuntimeFunction } from "./modules.ts";
+import {
+	type KeyModule,
+	keyModule,
+	type RuntimeFunction,
+	textModule,
+} from "./modules.ts";
+import { isPlainText } from "./pattern.ts";
 
 /**
  * A key compiled from its raw messages, one per locale, kept so an unchanged key is not compiled
@@ -155,6 +161,11 @@ function compileKey(
 		errors.push(...keyProblems(key, catalogs, values, collisions));
 		return undefined;
 	}
+	// A key whose message is plain text in every locale is that text, as its parse would show: a
+	// compile that leaves the declarations to the output's write, which parses every key, need not
+	// parse it, which a dev server's first page waits for.
+	if (!declare && values.every(isPlainMessage))
+		return compiledKey(key, values, textModule(values), false);
 	const messages = parseMessages(key, catalogs, sources, values, errors);
 	if (messages === undefined) return undefined;
 	const declared = declare
@@ -164,7 +175,27 @@ function compileKey(
 		errors.push(declared);
 		return undefined;
 	}
-	const module = keyModule(key, messages);
+	return compiledKey(
+		key,
+		values,
+		keyModule(key, messages),
+		messages.some((message) => message.markup),
+		declared,
+	);
+}
+
+/** Whether a catalog's raw message is a pattern that is its text alone (`isPlainText`). */
+function isPlainMessage(value: unknown): value is string {
+	return typeof value === "string" && isPlainText(value);
+}
+
+function compiledKey(
+	key: string,
+	values: readonly unknown[],
+	module: KeyModule,
+	markup: boolean,
+	declared?: KeyDeclaration,
+): CompiledKey {
 	return {
 		name: key,
 		values,
@@ -179,7 +210,7 @@ function compileKey(
 		kind: module.kind,
 		variants: module.variants,
 		parts: module.parts,
-		markup: messages.some((message) => message.markup),
+		markup,
 	};
 }
 
