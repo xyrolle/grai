@@ -9,8 +9,9 @@
 //   from one already up to date: how long it holds Next back, and its CPU until the watch's first
 //   compile is done.
 // - Edit to page: one message edited in its catalog until the page in `next dev` shows it, for a
-//   message in the server component and one in the client component; the median of EDITS saves.
-//   For grai, also until it wrote the edited shard: the rest is Next's.
+//   message in the server component and one in the client component, on grai and on next-intl
+//   with and without the client component's keys picked; the median of EDITS saves. For grai,
+//   also until it wrote the edited shard: the rest is Next's.
 // - Cold first page: `next dev` from an empty .next, from its launch until the page's first response
 //   is complete, with the CPU of Next's processes until then, and until the page is hydrated, of
 //   which the time after the document's first byte is the page's in Chromium, COLD_ROUNDS times for
@@ -251,7 +252,7 @@ for (const app of selectedApps()) {
 		"| app | ready, empty .next | page | ready, .next kept | page | edit, server component | edit, client component |",
 	);
 	console.log("|---|---|---|---|---|---|---|");
-	for (const name of ["grai", "next-intl"]) {
+	for (const name of ["grai", "next-intl", "next-intl, client keys picked"]) {
 		const root = apps[name];
 		const empty = await devStart(root, path, words, [".next"]);
 		const catalogFile = join(root, "messages", `${locale}.json`);
