@@ -111,6 +111,8 @@ export function watch(
 				});
 				if (!quiet && unparsed(next.result)) {
 					again = false;
+					// One wait for quiet at a time: a compile asked for while one went on reads again with it.
+					clearTimeout(settling);
 					settling = setTimeout(settle, settleMilliseconds);
 					return;
 				}
