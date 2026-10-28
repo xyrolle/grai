@@ -3,7 +3,12 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Browser, chromium, type Page } from "playwright-core";
+import {
+	type Browser,
+	chromium,
+	type Page,
+	type Response,
+} from "playwright-core";
 import {
 	afterAll,
 	beforeAll,
@@ -126,13 +131,21 @@ const text = (selector: string) => page.locator(selector).textContent();
 const html = (attribute: "lang" | "dir") =>
 	page.locator("html").getAttribute(attribute);
 
-/** Every script the page downloads, by its path, with its text. */
+/**
+ * Every script the page downloads while the test runs, by its path, with its text. A body the
+ * page let go of before it was read, as a navigation does, rejects only where the test awaits it.
+ */
 function scripts(): Map<string, Promise<string>> {
 	const loaded = new Map<string, Promise<string>>();
-	page.on("response", (response) => {
-		if (response.request().resourceType() === "script") {
-			loaded.set(new URL(response.url()).pathname, response.text());
-		}
+	const record = (response: Response) => {
+		if (response.request().resourceType() !== "script") return;
+		const text = response.text();
+		text.catch(() => {});
+		loaded.set(new URL(response.url()).pathname, text);
+	};
+	page.on("response", record);
+	onTestFinished(() => {
+		page.off("response", record);
 	});
 	return loaded;
 }
