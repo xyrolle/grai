@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
@@ -11,6 +11,11 @@ import {
 	it,
 	onTestFinished,
 } from "vitest";
+import {
+	conflictingInput,
+	conflictingInputError,
+	firstStart,
+} from "./first-start.ts";
 import { stopped } from "./stopped.ts";
 
 // The SvelteKit example (examples/sveltekit), built as an app builds it, with
@@ -19,6 +24,7 @@ const example = fileURLToPath(
 	new URL("../examples/sveltekit/", import.meta.url),
 );
 const bin = (name: string) => join(example, "node_modules/.bin", name);
+const outdir = join(example, "src/lib/i18n");
 
 /** Runs one of the example's build steps, failing with what it printed. */
 function run(command: string, args: string[]): void {
@@ -316,22 +322,26 @@ describe("handleLocale, by the cookie and Accept-Language", {
 	});
 });
 
+/** Starts the example's dev server, on 127.0.0.1 and a port the system picks. */
+const dev = () =>
+	listening(bin("vite"), ["dev", "--host", "127.0.0.1", "--port", "0"]);
+
 describe("@xyrolle/grai/sveltekit/client under vite dev", {
 	timeout: 30_000,
 }, () => {
 	let origin = "";
 	let app: Served | undefined;
+	let first = { release: () => {} };
 	beforeAll(async () => {
-		app = await listening(bin("vite"), [
-			"dev",
-			"--host",
-			"127.0.0.1",
-			"--port",
-			"0",
-		]);
+		// A first start, whose output another writer keeps from being written until the second test.
+		first = firstStart(outdir, { held: true });
+		app = await dev();
 		origin = app.origin;
 	}, 60_000);
-	afterAll(() => app && stopped(app.server));
+	afterAll(async () => {
+		first.release();
+		if (app) await stopped(app.server);
+	});
 
 	/** Gives a Romanian message new text, as an editor saves it, and puts the catalog back after. */
 	function edit(key: string, text: string): void {
@@ -355,6 +365,28 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 	};
 	const marked = (page: Page) => page.evaluate("window.unreloaded");
 
+	it("serves the first page before its first compile's output is written", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByRole("heading", { name: "Bună ziua" }).waitFor();
+		await page.getByText("Desenat în browser").waitFor();
+
+		expect(existsSync(join(outdir, ".grai", "lock"))).toBe(true);
+		await page.context().close();
+	});
+
+	it("draws an edit made while the first compile's output waits to be written", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByText("Desenat în browser").waitFor();
+		await mark(page);
+
+		edit("greeting", "Salutare");
+		first.release();
+		await page.getByRole("heading", { name: "Salutare" }).waitFor();
+
+		expect(await marked(page)).toBe(true);
+		await page.context().close();
+	});
+
 	it("draws an edited message again in place, without a reload", async () => {
 		const page = await open(origin, "/ro/");
 		await page.getByText("Desenat în browser").waitFor();
@@ -376,6 +408,35 @@ describe("@xyrolle/grai/sveltekit/client under vite dev", {
 		await page.getByRole("heading", { name: "Despre exemplu" }).waitFor();
 
 		expect(await marked(page)).toBe(true);
+		await page.context().close();
+	});
+});
+
+describe("@xyrolle/grai/sveltekit under vite dev, a first start with an error only the output's write finds", {
+	timeout: 30_000,
+}, () => {
+	let origin = "";
+	let app: Served | undefined;
+	let restore = () => {};
+	beforeAll(async () => {
+		restore = conflictingInput(join(example, "messages"));
+		firstStart(outdir);
+		app = await dev();
+		origin = app.origin;
+	}, 60_000);
+	afterAll(async () => {
+		if (app) await stopped(app.server);
+		restore();
+	});
+
+	it("serves the first page in its locale, then shows the error in Vite's overlay", async () => {
+		const page = await open(origin, "/ro/");
+		await page.getByRole("heading", { name: "Bună ziua" }).waitFor();
+		await page.getByText("Desenat în browser").waitFor();
+		await page
+			.locator("vite-error-overlay")
+			.getByText(conflictingInputError)
+			.waitFor();
 		await page.context().close();
 	});
 });
