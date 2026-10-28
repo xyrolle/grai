@@ -4,6 +4,7 @@ import { BuildReading } from "./code/build-reading.ts";
 import { FactsCache } from "./code/facts-cache.ts";
 import { parse } from "./code/parse.ts";
 import type { Reading } from "./code/reads.ts";
+import { stateFiles } from "./code/state-store.ts";
 import { withGroups } from "./code-splitting.ts";
 import type { Build } from "./compile.ts";
 import { messagesOf } from "./error.ts";
@@ -101,7 +102,7 @@ export function bundling({
 	/** Each build environment's reading of its modules, from its start. */
 	const readings = new Map<string, BuildReading>();
 	// The facts of the modules the build reads, kept with the CLI's by their code's hash.
-	const facts = new FactsCache(join(files.outdir, stateDirectory));
+	const facts = new FactsCache(stateFiles(join(files.outdir, stateDirectory)));
 	const copies = messageChunkCopies();
 	/**
 	 * What the client build read of its modules, for the keys' reach: the keys each reads or may
