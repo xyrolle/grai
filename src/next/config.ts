@@ -1,4 +1,3 @@
-import { once } from "node:events";
 import { basename, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
@@ -14,6 +13,7 @@ import { GraiError } from "../error.ts";
 import { packageName } from "../package-name.ts";
 import type { AppData } from "./app-data.ts";
 import { count, reportErrors } from "./errors.ts";
+import { firstMessage } from "./first-message.ts";
 import { defaultPageExtensions } from "./routes.ts";
 import type { WatchData } from "./watch-worker.ts";
 
@@ -87,7 +87,9 @@ async function startWatching(data: AppData): Promise<void> {
 	// Next's server holds its process. Other processes read the config for `next dev` too, as
 	// Next's telemetry flush does when the server stops, and must be free to exit.
 	worker.unref();
-	if (!compiled) await once(worker, "message");
+	// A watch that fails or stops before it has written the output fails Next's start, which would
+	// otherwise wait for it for ever.
+	if (!compiled) await firstMessage(worker, "grai's watch");
 	// A watch that stops on an error it did not expect says so, and Next serves on.
 	worker.on("error", (error) => console.error(error));
 }
