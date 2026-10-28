@@ -1,8 +1,8 @@
-import { basename, join, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 import { baseDisagreement, type FrameworkBase } from "./base-agreement.ts";
 import type { BuildReading } from "./code/build-reading.ts";
-import { type Build, recompile } from "./compile.ts";
+import { type Build, type Compiled, recompile } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { devModule } from "./dev-module.ts";
 import { GraiError, messagesOf } from "./error.ts";
@@ -27,6 +27,7 @@ import {
 } from "./vite-dev.ts";
 import { pagePreloads } from "./vite-preloads.ts";
 import { buildReads } from "./vite-reads.ts";
+import { unwrittenOutput } from "./vite-unwritten.ts";
 
 /**
  * The plugin's options:
@@ -46,8 +47,9 @@ export type GraiOptions = {
 };
 
 /**
- * grai's Vite plugins, the one that reads each module before any other and the one that does the
- * rest, and the build its last compile made, for the adapters built on them.
+ * grai's Vite plugins: the one that reads each module before any other, the one that does the rest,
+ * and in dev the one that resolves the output's files before they are written. With them, for the
+ * adapters built on them, the build a build's compile made: a dev server serves its builds itself.
  */
 export type GraiPlugin = {
 	plugins: Plugin[];
@@ -86,9 +88,13 @@ export function graiPlugin(
 	let serving = false;
 	/** Whether Vite runs tests, as Vitest has it, where a module is what a test can mock. */
 	let testing = false;
-	let build: Build | undefined;
-	/** The first compile: its build, or the errors that kept it from one. */
+	/** A build's compile: its build, or the errors that kept it from one, which every environment's build awaits. */
 	let first: Promise<Build | readonly Error[]> | undefined;
+	let build: Build | undefined;
+	/** The dev server's first compile: its build, or the errors that kept it from one. */
+	let firstServed: Promise<Compiled | readonly Error[]> | undefined;
+	/** The build the dev server serves, its last compile's. */
+	let served: Compiled | undefined;
 	let devModuleOf: (id: string) => string | undefined = () => undefined;
 	let missingKeyImport = (
 		_key: string,
@@ -97,16 +103,25 @@ export function graiPlugin(
 	/** How many patches the dev server has made: the version of the dev module it serves now. */
 	let patchesMade = () => 0;
 	let closeMessages = async () => {};
+	/** Has the dev server write its first compile's output now, if it has not yet (`serveMessages`). */
+	let writeServed = async () => false;
 	/** The plugin's part in a build, which a dev server never runs: loaded as a build's config is. */
 	let bundling: Bundling | undefined;
 	/** keys.js, or a key's module, as the dev server serves them from memory; nothing for any other id. */
-	const devCode = (id: string, compiled: Build) => {
+	const devCode = (id: string, compiled: Compiled) => {
 		if (id === devKeysId || id === files.keysFile)
 			return devModule(files.outdir, compiled, patchesMade());
 		return id.startsWith(keyModulePrefix)
 			? keyFromKeys(files, id.slice(keyModulePrefix.length))
 			: undefined;
 	};
+	/**
+	 * A file of the output as the dev server serves it, from the build in memory, which the server
+	 * may serve before the output is written: a page then never takes a file of another compile
+	 * that the outdir still holds.
+	 */
+	const outputCode = (id: string, compiled: Compiled) =>
+		compiled.rendered.files.get(relative(files.outdir, id));
 
 	const plugin: Plugin = {
 		name: "grai",
@@ -184,21 +199,23 @@ export function graiPlugin(
 			},
 		},
 		configureServer(server) {
-			let ready: (compiled: Build | readonly Error[]) => void = () => {};
-			first = new Promise((resolve) => {
+			let ready: (compiled: Compiled | readonly Error[]) => void = () => {};
+			firstServed = new Promise((resolve) => {
 				ready = resolve;
 			});
 			({
 				module: devModuleOf,
 				missingKeyImport,
 				version: patchesMade,
+				write: writeServed,
 				close: closeMessages,
 			} = serveMessages(
 				server,
 				files,
-				{ reloadOnEdit: options.reloadOnEdit === true },
+				// A test run reads the output only once it is written, as it does whatever else it imports.
+				{ reloadOnEdit: options.reloadOnEdit === true, servesFirst: !testing },
 				(compiled) => {
-					if ("compilation" in compiled) build = compiled;
+					if ("compilation" in compiled) served = compiled;
 					ready(compiled);
 				},
 			));
@@ -223,7 +240,7 @@ export function graiPlugin(
 					id.startsWith(patchPrefix)
 				)
 					return `\0${id}`;
-				const compiled = serving ? (build ?? (await first)) : build;
+				const compiled = serving ? (served ?? (await firstServed)) : build;
 				const module = moduleOf(id);
 				// In dev, keys.js is the plugin's module, by an id of its own (`devKeysId`).
 				if (module.type === "keys" && serving) {
@@ -261,34 +278,48 @@ export function graiPlugin(
 			},
 		},
 		async load(id) {
-			if (!serving && id === join(files.outdir, "testing.js")) {
+			if (serving) {
+				const patch = devModuleOf(id);
+				if (patch !== undefined) return patch;
+				const devModuleId =
+					id === devKeysId || id === files.keysFile || isMessageModule(id);
+				const output = !devModuleId && id.startsWith(`${files.outdir}/`);
+				if (!devModuleId && !output) return null;
+				const compiled = served ?? (await firstServed);
+				if (compiled === undefined) return null;
+				// Until a compile succeeds, the output's files are the outdir's, as no build was served.
+				if (!("compilation" in compiled))
+					return output ? null : this.error(messagesOf(compiled));
+				if (output) return outputCode(id, compiled) ?? null;
+				const code = devCode(id, compiled);
+				// No source map: the module is the compiler's, with no source of its own to map back to,
+				// and Vite would inline a map of every line it rewrites, several times the module's size.
+				return code === undefined
+					? null
+					: { code, moduleSideEffects: false, map: { mappings: "" } };
+			}
+			if (id === join(files.outdir, "testing.js")) {
 				return this.error(
 					"The output's testing.js binds a test's locale, so a build refuses it: import it from test files alone.",
 				);
 			}
-			const served = devModuleOf(id);
-			if (served !== undefined) return served;
-			if (id !== devKeysId && id !== files.keysFile && !isMessageModule(id))
-				return null;
+			if (id !== files.keysFile && !isMessageModule(id)) return null;
 			const compiled = build ?? (await first);
 			if (compiled === undefined) return null;
 			if (!("compilation" in compiled)) return this.error(messagesOf(compiled));
+			const code = bundling?.moduleCode(
+				id,
+				compiled,
+				this.environment.config.consumer,
+			);
 			// Without side effects, a build leaves out every key a chunk's code does not use, so a key
-			// lands in the chunks of the entries that use it.
-			const code = serving
-				? devCode(id, compiled)
-				: bundling?.moduleCode(id, compiled, this.environment.config.consumer);
-			if (code === undefined) return null;
-			// No source map in dev: the module is the compiler's, with no source of its own to map back
-			// to, and Vite would inline a map of every line it rewrites, several times the module's size.
-			// A build keeps its maps, which tools read to tell what each chunk holds.
-			return serving
-				? { code, moduleSideEffects: false, map: { mappings: "" } }
-				: { code, moduleSideEffects: false };
+			// lands in the chunks of the entries that use it. A build keeps its maps, which tools read
+			// to tell what each chunk holds.
+			return code === undefined ? null : { code, moduleSideEffects: false };
 		},
 		hotUpdate({ file }) {
 			// The plugin follows the catalogs and the config itself, and its output is its own.
-			return followedFile(files, build, file) ? [] : undefined;
+			return followedFile(files, served ?? build, file) ? [] : undefined;
 		},
 	};
 	const reads = buildReads({
@@ -298,10 +329,15 @@ export function graiPlugin(
 		read: (environment, id, reading) =>
 			bundling?.took(environment, id, reading),
 	});
+	const unwritten = unwrittenOutput({
+		files: () => files,
+		served: () => served,
+		write: () => writeServed(),
+	});
 	return {
-		plugins: [reads, plugin],
+		plugins: [reads, plugin, unwritten],
 		build: () => build,
-		config: () => build?.config ?? readConfig(files.configFile),
+		config: () => (served ?? build)?.config ?? readConfig(files.configFile),
 		reading: (environment) => bundling?.reading(environment),
 	};
 }

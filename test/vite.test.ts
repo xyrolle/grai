@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
@@ -950,29 +951,78 @@ const devTest = { timeout: 60_000 };
 const devWait = { timeout: 30_000 };
 
 describe("the Vite plugin's dev server", devTest, () => {
-	/** A dev server of the project, and a server render of its render.js through Vite's SSR runner. */
-	async function serverRenderOf(dir: string, plugins: Plugin[] = []) {
+	/** A dev server of the project in a mode, its SSR environment, and a render of its render.js there. */
+	async function devServerOf(
+		dir: string,
+		{ plugins = [], mode }: { plugins?: Plugin[]; mode?: string } = {},
+	) {
 		const server = await createServer({
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
+			...(mode === undefined ? {} : { mode }),
 			server: { watch: fixtures },
 			plugins: [grai(), ...plugins],
 		});
 		onTestFinished(() => server.close());
 		const ssr = server.environments.ssr;
 		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
-		return async () =>
+		const rendered = async () =>
 			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
+		return { ssr, rendered };
+	}
+
+	/** A dev server of the project, and a server render of its render.js through Vite's SSR runner. */
+	async function serverRenderOf(dir: string, plugins: Plugin[] = []) {
+		return (await devServerOf(dir, { plugins })).rendered;
 	}
 
 	/** A server render of the project's title. */
 	function serverRender(dir: string, plugins: Plugin[] = []) {
+		writeTitleRender(dir);
+		return serverRenderOf(dir, plugins);
+	}
+
+	/** The project's render.js, which renders its title. */
+	function writeTitleRender(dir: string) {
 		writeFileSync(
 			join(dir, "render.js"),
 			`import { m } from "./out/messages.js";\nexport const render = () => m.title();\n`,
 		);
-		return serverRenderOf(dir, plugins);
+	}
+
+	/**
+	 * Holds the outdir's lock as another writer would, so the dev server's first compile, which serves
+	 * before it writes, cannot write the output until the returned function lets it.
+	 */
+	function heldOutput(dir: string): () => void {
+		const lock = join(dir, "out", ".grai", "lock");
+		mkdirSync(dirname(lock), { recursive: true });
+		writeFileSync(lock, String(process.pid));
+		return () => rmSync(lock);
+	}
+
+	/**
+	 * The path of a file of the output, once the dev server has written it: its first compile writes
+	 * the output after it serves the first page.
+	 */
+	async function writtenOutputFile(dir: string, name: string) {
+		const written = () => outputFile(dir, name).then(Boolean, () => false);
+		await expect.poll(written, devWait).toBe(true);
+		return outputFile(dir, name);
+	}
+
+	/** Whether a module of the output's keys on disk holds a text. */
+	function writtenWith(dir: string, text: string): boolean {
+		const keys = join(dir, "out", "keys");
+		return (
+			existsSync(keys) &&
+			readdirSync(keys).some(
+				(file) =>
+					file.endsWith(".js") &&
+					readFileSync(join(keys, file), "utf8").includes(text),
+			)
+		);
 	}
 
 	/**
@@ -1088,12 +1138,79 @@ export const render = () => {
 		await expect.poll(rendered, devWait).toBe("key-missing");
 	});
 
-	it("fails an import of the output, rather than hold it, when the first compile throws", async () => {
+	it("serves the first page before the first compile's output is written, with the dev module it serves once it is", async () => {
+		const { dir } = project(catalogs);
+		const release = heldOutput(dir);
+		writeTitleRender(dir);
+		const { ssr, rendered } = await devServerOf(dir);
+
+		expect(await rendered()).toBe("Title");
+		expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
+		const served = await ssr.pluginContainer.load("\0grai:keys");
+		release();
+		await expect
+			.poll(() => existsSync(join(dir, "out", "keys.js")), devWait)
+			.toBe(true);
+		expect(await ssr.pluginContainer.load("\0grai:keys")).toEqual(served);
+	});
+
+	it("shows an error only the output's write finds once the first page is served, and keeps the page's messages", async () => {
+		const { dir } = project({
+			en: { ...catalogs.en, listed: "{x :list}" },
+			de: { ...catalogs.de, listed: "{x :number}" },
+		});
+		const errors: string[] = [];
+		const rendered = await serverRender(dir, [sentErrors(errors)]);
+
+		expect(await rendered()).toBe("Title");
+		await expect
+			.poll(() => errors, devWait)
+			.toEqual([
+				'messages/de.json: "listed" (de): x is formatted as a list in en and is formatted as a number in de, and no value suits both. Give each use its own input.',
+			]);
+		expect(await rendered()).toBe("Title");
+	});
+
+	it("shows the first compile's write failing once the first page is served, as when the outdir is a file", async () => {
 		const { dir } = project(catalogs);
 		writeFileSync(join(dir, "out"), "");
-		const rendered = await serverRender(dir);
+		const errors: string[] = [];
+		const rendered = await serverRender(dir, [sentErrors(errors)]);
 
-		await expect(rendered()).rejects.toThrow();
+		expect(await rendered()).toBe("Title");
+		await expect.poll(() => errors.length, devWait).toBe(1);
+	});
+
+	it("takes an edit made while the first compile's output waits to be written, and writes the output with it", async () => {
+		const { dir } = project(catalogs);
+		const release = heldOutput(dir);
+		const rendered = await serverRender(dir);
+		expect(await rendered()).toBe("Title");
+
+		const catalog = join(dir, "messages", "en.json");
+		writeFileSync(
+			catalog,
+			readFileSync(catalog, "utf8").replace('"Title"', '"Heading"'),
+		);
+		release();
+
+		await expect.poll(rendered, devWait).toBe("Heading");
+		await expect.poll(() => writtenWith(dir, '"Heading"'), devWait).toBe(true);
+		expect(writtenWith(dir, '"Title"')).toBe(false);
+	});
+
+	it("writes the output before a test run takes it, and fails the import when the write fails", async () => {
+		const { dir } = project(catalogs);
+		writeTitleRender(dir);
+		const { rendered } = await devServerOf(dir, { mode: "test" });
+		expect(await rendered()).toBe("Title");
+		expect(existsSync(join(dir, "out", "keys.js"))).toBe(true);
+
+		const failing = project(catalogs).dir;
+		writeFileSync(join(failing, "out"), "");
+		writeTitleRender(failing);
+		const failed = await devServerOf(failing, { mode: "test" });
+		await expect(failed.rendered()).rejects.toThrow();
 	});
 
 	it("serves a page that imports the output by a package import before the first compile has written it", async () => {
@@ -1277,7 +1394,9 @@ export const render = () => \`\${m.price({ amount: 5 })} \${globalThis.priceEval
 			currency: "USD",
 		}).format(5);
 		expect(await rendered()).toBe(`${euros} 1`);
-		const formats = (await outputFile(dir, "formats.js")).split("/").at(-1);
+		const formats = (await writtenOutputFile(dir, "formats.js"))
+			.split("/")
+			.at(-1);
 
 		for (const [locale, catalog] of Object.entries(priced("USD")))
 			writeFileSync(
@@ -1568,6 +1687,27 @@ window.loaded = performance.timeOrigin;
 		await title("Überschrift");
 
 		expect(await page.evaluate("window.loaded")).toBe(loaded);
+	});
+
+	it("draws a page and its module worker's messages before the first compile's output is written", async () => {
+		const { dir } = project(catalogs);
+		const release = heldOutput(dir);
+		writeFileSync(
+			join(dir, "worker.js"),
+			`import { m } from "./out/messages.js";\npostMessage(m.footer());\n`,
+		);
+		const { title } = await devPage(
+			dir,
+			`import { m } from "./out/messages.js";
+const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+worker.onmessage = ({ data }) => { document.getElementById("title").textContent = \`\${m.title()} \${data}\`; };
+`,
+		);
+
+		// A worker has no <html lang>, so it renders in the base locale.
+		await title("Titel Footer");
+		expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
+		release();
 	});
 
 	it("shows an edit whose patch came while the page was taking the messages, before it could hear it", async () => {
