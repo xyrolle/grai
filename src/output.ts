@@ -1,7 +1,6 @@
 import { hash } from "node:crypto";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { join, posix } from "node:path";
-import type { Compiler } from "./compiler-identity.ts";
 import { isMissing } from "./config.ts";
 import {
 	type Manifest,
@@ -50,14 +49,13 @@ export async function isUpToDate(
  * immutable files are renamed into place, then the mutable ones, as no file names an immutable one
  * until an entry does. The outdir is grai's: a file the output no longer names that the manifest
  * records is retired, and removed once it has been for `retention`, and any other is removed at
- * once, as is a temporary file a compile that stopped halfway left. The manifest goes last, with
- * the compiler that made the output. Returns the files written.
+ * once, as is a temporary file a compile that stopped halfway left. The manifest goes last.
+ * Returns the files written.
  */
 export async function writeOutput(
 	outdir: string,
 	output: Output,
 	inputs: string,
-	compiler: Compiler,
 ): Promise<string[]> {
 	const state = join(outdir, stateDirectory);
 	await assertOutdirIsGrais(outdir);
@@ -105,7 +103,6 @@ export async function writeOutput(
 		for (const file of expired) retired.delete(file);
 		await writeManifest(state, {
 			inputs,
-			compiler,
 			immutable: output.immutable.map(([file]) => file),
 			mutable: Object.fromEntries(hashes),
 			retired: Object.fromEntries(retired),
