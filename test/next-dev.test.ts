@@ -331,6 +331,8 @@ it("places the keys by the groups saved in the running server at its next catalo
 	const dir = nextProject(1200, homePage(["key7"], ["key900"]), {
 		withGrai: true,
 	});
+	// Compiled before the start, so Next waits for no compile and the start reads no groups beside it.
+	expect((await compile(join(dir, "grai.config.json"))).errors).toEqual([]);
 	const { origin } = await started(dir);
 	expect(await requested(origin, "/")).toContain("de key7");
 	await savedGroups(dir, (groups) => groups.length > 0);

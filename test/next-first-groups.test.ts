@@ -1,11 +1,5 @@
 import { once } from "node:events";
-import {
-	existsSync,
-	mkdtempSync,
-	readdirSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -32,8 +26,8 @@ function script(code: string): URL {
 	return pathToFileURL(file);
 }
 
-it("reads the code before the output is written, then the groups through the output once it is, from each key's weight, and writes nothing", async () => {
-	const { dir, data, compiled } = freshApp();
+it("reads the code before the output is written, and the groups from each key's weight, writing nothing", async () => {
+	const { dir, data, weights } = freshApp();
 	const worker = new Worker(
 		new URL("../src/next/group-worker.ts", import.meta.url),
 		{ workerData: data, execArgv: [] },
@@ -43,22 +37,20 @@ it("reads the code before the output is written, then the groups through the out
 	});
 
 	expect(await once(worker, "message")).toEqual(["read"]);
-	worker.postMessage(await compiled());
+	worker.postMessage(await weights());
 
 	expect(await once(worker, "message")).toEqual([[["about"], ["home"]]]);
-	// The output's own files only: the read kept the facts and the listing in memory.
-	expect(readdirSync(join(dir, "out", ".grai")).sort()).not.toContain("facts");
-	expect(readdirSync(join(dir, "out", ".grai")).sort()).not.toContain("files");
+	// The read kept the facts and the listing in memory: no file of the outdir is there.
+	expect(existsSync(join(dir, "out"))).toBe(false);
 });
 
-it("gives a start no groups when the code is not read by the time its compile is done, and stops", async () => {
-	const { data, compiled } = freshApp();
-	const weights = await compiled();
+it("gives no groups once stopped before the code is read", async () => {
+	const { data, weights } = freshApp();
 	const reading = firstGroups(data);
-
-	expect(await reading.after(weights, 60_000)).toBeUndefined();
 	await reading.stop();
+
 	expect(await reading.read).toBe(false);
+	expect(await reading.after(await weights())).toBeUndefined();
 });
 
 it("leaves nothing on disk once stopped, and the read once the server is quiet still groups the keys", async () => {
@@ -74,20 +66,6 @@ it("leaves nothing on disk once stopped, and the read once the server is quiet s
 	]);
 });
 
-it("gives a start no groups when they do not come within the compile's time", async () => {
-	const { data } = freshApp();
-	const reading = firstGroups(
-		data,
-		script(
-			`parentPort.postMessage("read");\nparentPort.on("message", () => {});`,
-		),
-	);
-	onTestFinished(() => reading.stop());
-
-	expect(await reading.read).toBe(true);
-	expect(await reading.after(new Map(), 50)).toBeUndefined();
-});
-
 it("gives a start no groups, at once, when the read fails after reading the code", async () => {
 	const { data } = freshApp();
 	const reading = firstGroups(
@@ -99,7 +77,7 @@ it("gives a start no groups, at once, when the read fails after reading the code
 	onTestFinished(() => reading.stop());
 
 	expect(await reading.read).toBe(true);
-	expect(await reading.after(new Map(), 600_000)).toBeUndefined();
+	expect(await reading.after(new Map())).toBeUndefined();
 });
 
 it("settles a stop once the read's thread has stopped, though it never yields", async () => {
@@ -111,5 +89,5 @@ it("settles a stop once the read's thread has stopped, though it never yields", 
 
 	expect(await reading.read).toBe(true);
 	await reading.stop();
-	expect(await reading.after(new Map(), 600_000)).toBeUndefined();
+	expect(await reading.after(new Map())).toBeUndefined();
 });
