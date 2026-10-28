@@ -339,10 +339,14 @@ export function writeFixture(
 	return page.calls[0].key;
 }
 
+/** The designs grai's plugin was chosen from (hmr.mjs), each served by `devPlugin`. */
+const prototypes = ["whole", "patch", "patch, fs.watch"];
+
 /**
- * The design's plugins: grai's dev plugin, or Paraglide's Vite plugin, or none but the timing. A
- * library's plugin is imported here, as an app's config imports it before its server starts, so a
- * start timed from this call counts it.
+ * The design's plugins: grai's dev plugin, or Paraglide's Vite plugin, or none but the timing, or a
+ * prototype's. A library's plugin is imported here, as an app's config imports it before its server
+ * starts, so a start timed from this call counts it. A name that is none of the designs is refused,
+ * rather than served as a prototype.
  */
 export async function pluginsFor(design, app, root, locale, timings) {
 	const catalogFile = join(root, "messages", `${locale}.json`);
@@ -365,5 +369,9 @@ export async function pluginsFor(design, app, root, locale, timings) {
 		const { grai } = await import(graiEntry("./vite"));
 		return [grai({ config: join(root, "grai.config.json") })];
 	}
-	return [devPlugin(root, app.locales, design, timings)];
+	if (prototypes.includes(design))
+		return [devPlugin(root, app.locales, design, timings)];
+	throw new Error(
+		`${JSON.stringify(design)} is none of the dev pages' designs.`,
+	);
 }
