@@ -3,46 +3,42 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { compilerModulesFile } from "../src/compiler-identity.ts";
-import { compilerModules } from "../src/compiler-modules.ts";
+import { type BuiltPart, builtModulesFile } from "../src/compiler-identity.ts";
 import { project } from "./project.ts";
 
-const source = fileURLToPath(new URL("../src/", import.meta.url));
 /** grai as built, which the gate builds before the tests. */
 const built = fileURLToPath(new URL("../dist/", import.meta.url));
 
+/** The chunks grai's build lists for a part of grai, by their paths in dist. */
+function listed(part: BuiltPart): string[] {
+	const lists: Record<BuiltPart, Record<string, string>> = JSON.parse(
+		readFileSync(join(built, builtModulesFile), "utf8"),
+	);
+	return Object.keys(lists[part]);
+}
+
 /**
- * A start as a dev server's, in a process of its own, of grai in `directory`, its modules with
- * `extension`: it takes up the saved build, compiles, saves the build and takes it up again. Every
- * module of grai's it loads, as Node resolves them, and whether it loads oxc's parser.
+ * A compile of the project through the package's own entry, `compile` from dist/index.js, in a
+ * process of its own: every file of grai's build it loads, by its path in dist, and whether it
+ * loads oxc's parser.
  */
-function start(
-	directory: string,
-	extension: string,
-	config: string,
-): { loaded: string[]; parses: boolean } {
-	const module = (name: string) =>
-		JSON.stringify(pathToFileURL(join(directory, `${name}${extension}`)).href);
+function compiled(config: string): { loaded: string[]; parses: boolean } {
 	const script = `
 import { registerHooks } from "node:module";
+import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 const loaded = new Set();
 let parses = false;
 registerHooks({
 	resolve(specifier, context, nextResolve) {
 		const resolved = nextResolve(specifier, context);
-		if (resolved.url.startsWith(${JSON.stringify(pathToFileURL(directory).href)})) loaded.add(fileURLToPath(resolved.url));
+		if (resolved.url.startsWith(${JSON.stringify(pathToFileURL(built).href)})) loaded.add(relative(${JSON.stringify(built)}, fileURLToPath(resolved.url)));
 		if (specifier === "oxc-parser") parses = true;
 		return resolved;
 	},
 });
-const { recompile } = await import(${module("compile")});
-const { saveBuild, savedBuild } = await import(${module("saved-build")});
-const config = process.argv[1];
-const options = { pseudoLocale: true };
-const { build } = await recompile(config, await savedBuild(config, options), options);
-await saveBuild(build);
-await recompile(config, await savedBuild(config, options), options);
+const { compile } = await import(${JSON.stringify(pathToFileURL(join(built, "index.js")).href)});
+await compile(process.argv[1]);
 console.log(JSON.stringify({ loaded: [...loaded], parses }));
 `;
 	const run = spawnSync(
@@ -59,30 +55,19 @@ const catalogs = {
 	de: { title: "Titel", greeting: "Hallo {name}" },
 };
 
-it("is made of the modules a compile and its saved build load, every one and no other", async () => {
+it("lists, as built, every chunk a compile loads but the entry it came through, and loads no parser", () => {
 	const { config } = project(catalogs);
-	const modules = new Set(
-		[...((await compilerModules())?.keys() ?? [])].map((module) =>
-			join(source, module),
-		),
-	);
-
-	const { loaded, parses } = start(source, ".ts", config);
+	const { loaded, parses } = compiled(config);
+	const compiler = new Set(listed("compiler"));
 
 	expect(parses).toBe(false);
-	expect(new Set(loaded)).toEqual(modules);
-	expect(modules.has(join(source, "cli.ts"))).toBe(false);
+	expect(loaded).toContain("index.js");
+	expect(loaded.filter((file) => !compiler.has(file))).toEqual(["index.js"]);
 });
 
-it("is made, as built, of the modules its build lists, which a start hashes, parsing none", () => {
-	const { config } = project(catalogs);
-	const listed: Record<string, string> = JSON.parse(
-		readFileSync(join(built, compilerModulesFile), "utf8"),
-	);
-	const { loaded, parses } = start(built, ".js", config);
+it("lists no entry among the compiler's chunks, as an entry's own code is no compile's", () => {
+	const compiler = listed("compiler");
 
-	expect(parses).toBe(false);
-	expect(new Set(loaded)).toEqual(
-		new Set(Object.keys(listed).map((module) => join(built, module))),
-	);
+	for (const entry of ["cli.js", "index.js", "vite.js", "next/config.js"])
+		expect(compiler).not.toContain(entry);
 });

@@ -4,6 +4,7 @@ import { minifySync } from "vite";
 import type { Config } from "./config.ts";
 import { directionOf } from "./config-module.ts";
 import { globPattern } from "./globs.ts";
+import { packageFile } from "./package-files.ts";
 
 /** A page's message chunks and their copies, `{locale}` standing for the page's locale. */
 export type PageChunks = {
@@ -89,9 +90,7 @@ type PageFunction =
  */
 let pageLocale: Promise<Record<PageFunction, () => unknown>> | undefined;
 function pageFunctions(): Promise<Record<PageFunction, () => unknown>> {
-	pageLocale ??= import(
-		new URL("./runtime/page-locale.js", import.meta.url).href
-	);
+	pageLocale ??= import(packageFile("runtime/page-locale.js").href);
 	return pageLocale;
 }
 
@@ -173,10 +172,7 @@ const places = new Map<string, Place>([
 /** The source of a function declared at the top of a runtime module, exported or not. */
 async function functionSource(file: string, name: string): Promise<string> {
 	const { parse } = await import("./code/parse.ts");
-	const text = readFileSync(
-		new URL(`./runtime/${file}`, import.meta.url),
-		"utf8",
-	);
+	const text = readFileSync(packageFile(`runtime/${file}`), "utf8");
 	for (const statement of parse(file, text).program.body) {
 		const declaration =
 			statement.type === "ExportNamedDeclaration"

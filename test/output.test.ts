@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
 import { compileProject, recompile, writeBuild } from "../src/compile.ts";
+import { builtModulesFile } from "../src/compiler-identity.ts";
 import { withoutContentHash } from "../src/content-names.ts";
 import { readManifest } from "../src/manifest.ts";
 import { isCompiled } from "../src/output-inputs.ts";
@@ -65,9 +66,10 @@ function modified(dir: string): Record<string, number> {
  * tests), for a test to change as a new version, a local build or a patch would, with its modules'
  * extension; the packages it imports resolve from the project. Each run of it is a process of its
  * own, of a script given `grai`'s URL, the `config` and the `extension`, which prints its result as
- * JSON: a compile of the project, and what it wrote, each file by its name without the hash of its
- * content; and a dev server's start, which takes up the saved build, compiles from it and saves its
- * build, and whether it took one up.
+ * JSON: a compile of the project through the package's entry, and what it wrote, each file by its
+ * name without the hash of its content; and, in grai's source, whose modules a script imports by
+ * their names as the build's chunks do not keep them, a dev server's start, which takes up the
+ * saved build, compiles from it and saves its build, and whether it took one up.
  */
 function graiCopy(dir: string, config: string, layout: "src" | "dist" = "src") {
 	const compiler = join(dir, "grai");
@@ -333,10 +335,14 @@ it(
 			compile();
 			return (await readManifest(join(dir, "out", ".grai")))?.inputs;
 		};
+		const [chunk] = Object.keys(
+			JSON.parse(readFileSync(join(compiler, builtModulesFile), "utf8"))
+				.compiler,
+		);
 		const first = await compiledFor();
 		appendFileSync(join(compiler, "cli.js"), "\n");
 		const afterCli = await compiledFor();
-		appendFileSync(join(compiler, "pattern.js"), "\n");
+		appendFileSync(join(compiler, chunk ?? ""), "\n");
 
 		expect(afterCli).toBe(first);
 		expect(await compiledFor()).not.toBe(first);
@@ -344,60 +350,42 @@ it(
 );
 
 it(
-	"finds the compiler's modules no more once one imports a path no literal gives, which fails grai's build",
+	"writes the output again with a changed generator, as built",
 	processTest,
-	() => {
+	async () => {
 		const { dir, config } = project(catalogs);
-		const { compiler, run } = graiCopy(dir, config);
-		const unfound = () =>
-			run(
-				'const { compilerModules } = await import(grai + "/compiler-modules" + extension); console.log(JSON.stringify((await compilerModules()) === undefined));',
-			);
-		const before = unfound();
-		appendFileSync(
-			join(compiler, "modules.ts"),
-			'\nexport const later = (name: string) => import("./" + name + ".ts");\n',
-		);
+		const { compiler, compile } = graiCopy(dir, config, "dist");
+		compile();
+		patchGenerator(compiler);
+		compile();
 
-		expect([before, unfound()]).toEqual([false, true]);
+		expect(outputHolds(dir, "/* patched */")).toBe(true);
 	},
 );
 
-for (const layout of ["src", "dist"] as const) {
-	it(
-		`takes up no saved build once a module a compile imports changes, however its import is written, in grai's ${layout}`,
-		processTest,
-		() => {
-			const { dir, config } = project(catalogs);
-			const { compiler, extension, start } = graiCopy(dir, config, layout);
-			// The import of the compiler's generator in single quotes, as a patch may write it.
-			const modules = join(compiler, `modules${extension}`);
-			const imported = `from "./locale-function${extension}"`;
-			expect(readFileSync(modules, "utf8")).toContain(imported);
-			writeFileSync(
-				modules,
-				readFileSync(modules, "utf8").replace(
-					imported,
-					`from './locale-function${extension}'`,
-				),
-			);
-			const taken = [start(), start()];
-			patchGenerator(compiler, extension);
+it(
+	"takes up no saved build once a module a compile runs changes",
+	processTest,
+	() => {
+		const { dir, config } = project(catalogs);
+		const { compiler, start } = graiCopy(dir, config);
+		const taken = [start(), start()];
+		patchGenerator(compiler);
 
-			expect([...taken, start()]).toEqual([false, true, false]);
-			expect(outputHolds(dir, "/* patched */")).toBe(true);
-		},
-	);
+		expect([...taken, start()]).toEqual([false, true, false]);
+		expect(outputHolds(dir, "/* patched */")).toBe(true);
+	},
+);
 
-	it(
-		`saves a build as the compiler that compiled it, though its modules change before the save, in grai's ${layout}`,
-		processTest,
-		async () => {
-			const { dir, config } = project(catalogs);
-			const { compiler, extension, start } = graiCopy(dir, config, layout);
-			// A dev server's first start: it serves its page from the compile, and writes and saves the
-			// build once it is quiet, here once told to.
-			const script = `const [grai, config, extension] = process.argv.slice(1);
+it(
+	"saves a build as the compiler that compiled it, though its modules change before the save",
+	processTest,
+	async () => {
+		const { dir, config } = project(catalogs);
+		const { compiler, extension, start } = graiCopy(dir, config);
+		// A dev server's first start: it serves its page from the compile, and writes and saves the
+		// build once it is quiet, here once told to.
+		const script = `const [grai, config, extension] = process.argv.slice(1);
 const { compileProject, writeBuild } = await import(grai + "/compile" + extension);
 const { saveBuild } = await import(grai + "/saved-build" + extension);
 const { createInterface } = await import("node:readline");
@@ -406,47 +394,55 @@ console.log("compiled");
 for await (const _ of createInterface({ input: process.stdin })) break;
 await saveBuild((await writeBuild(compiled)).build);
 console.log("saved");`;
-			const serving = spawn(
-				process.execPath,
-				[
-					"--input-type=module",
-					"-e",
-					script,
-					pathToFileURL(compiler).href,
-					config,
-					extension,
-				],
-				{ stdio: ["pipe", "pipe", "pipe"] },
-			);
-			let errors = "";
-			serving.stderr.on("data", (chunk) => {
-				errors += chunk;
-			});
-			const lines = createInterface({ input: serving.stdout });
-			const said = (line: string) =>
-				new Promise<void>((resolve, reject) => {
-					lines.on("line", (got) => {
-						if (got === line) resolve();
-					});
-					serving.on("close", () => reject(new Error(errors)));
+		const serving = spawn(
+			process.execPath,
+			[
+				"--input-type=module",
+				"-e",
+				script,
+				pathToFileURL(compiler).href,
+				config,
+				extension,
+			],
+			{ stdio: ["pipe", "pipe", "pipe"] },
+		);
+		let errors = "";
+		serving.stderr.on("data", (chunk) => {
+			errors += chunk;
+		});
+		const lines = createInterface({ input: serving.stdout });
+		const said = (line: string) =>
+			new Promise<void>((resolve, reject) => {
+				lines.on("line", (got) => {
+					if (got === line) resolve();
 				});
-			const compiled = said("compiled");
-			const saved = said("saved");
-			await compiled;
-			patchGenerator(compiler, extension);
-			serving.stdin.end("save\n");
-			await saved;
+				serving.on("close", () => reject(new Error(errors)));
+			});
+		const compiled = said("compiled");
+		const saved = said("saved");
+		await compiled;
+		patchGenerator(compiler);
+		serving.stdin.end("save\n");
+		await saved;
 
-			expect(start()).toBe(false);
-			expect(outputHolds(dir, "/* patched */")).toBe(true);
-		},
-	);
-}
+		expect(start()).toBe(false);
+		expect(outputHolds(dir, "/* patched */")).toBe(true);
+	},
+);
 
-/** Changes the compiler's generator alone: each locale's arrow function opens with a comment. */
-function patchGenerator(compiler: string, extension: string): void {
-	const generator = join(compiler, `locale-function${extension}`);
+/**
+ * Changes the compiler's generator alone: each locale's arrow function opens with a comment. Its
+ * module in grai's source, or the one chunk of grai's build that holds it.
+ */
+function patchGenerator(compiler: string): void {
 	const arrow = ") => $";
+	const holding = readdirSync(compiler, { recursive: true, encoding: "utf8" })
+		.filter((file) => /\.(js|ts)$/.test(file) && !file.endsWith(".d.ts"))
+		.filter((file) =>
+			readFileSync(join(compiler, file), "utf8").includes(arrow),
+		);
+	expect(holding).toHaveLength(1);
+	const generator = join(compiler, holding[0] ?? "");
 	expect(readFileSync(generator, "utf8").split(arrow)).toHaveLength(2);
 	writeFileSync(
 		generator,

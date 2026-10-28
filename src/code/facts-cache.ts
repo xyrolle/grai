@@ -14,10 +14,9 @@
  */
 
 import { createHash, hash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { partModules } from "../compiler-identity.ts";
+import { packageDirectory } from "../package-files.ts";
 import { type FileFacts, type ModuleFacts, table } from "./facts.ts";
 import type { StateStore } from "./state-store.ts";
 
@@ -40,14 +39,19 @@ const record = "\u0002";
 /** The packages whose versions decide what a file's facts are: grai's parser and the frameworks'. */
 const readers = ["oxc-parser", "svelte", "vue", "astro", "@mdx-js/mdx"];
 
-const require = createRequire(import.meta.url);
+const require = createRequire(packageDirectory);
+
+/** The version of the reader this process runs (`readerVersion`), taken the first time it is asked. */
+let runningReader: string | undefined;
+function runningReaderVersion(): string {
+	runningReader ??= readerVersion(partModules("reader"));
+	return runningReader;
+}
 
 export class FactsCache {
 	private readonly store: StateStore;
 	/** What the facts are read with (`readerVersion`), which every kept fact of a file's is keyed on. */
-	readonly version: string = readerVersion(
-		dirname(fileURLToPath(import.meta.url)),
-	);
+	readonly version: string = runningReaderVersion();
 	private readonly read: ReadonlyMap<string, Entry>;
 	private readonly kept = new Map<string, Entry>();
 	private added = false;
@@ -155,18 +159,14 @@ export function textHash(text: string): string {
 }
 
 /**
- * What facts are read with: the hash of the reader's modules, every file in its directory, so an
- * unreleased change to it counts as much as a release; and the version of each parser it loads.
+ * What facts are read with: the hash of the reader's modules (`partModules`), each by its path with
+ * the hash of its bytes, so an unreleased change to it counts as much as a release; and the version
+ * of each parser it loads.
  */
-export function readerVersion(directory: string): string {
+export function readerVersion(modules: ReadonlyMap<string, string>): string {
 	const code = createHash("sha1");
-	const files = readdirSync(directory, { withFileTypes: true })
-		.filter((entry) => entry.isFile())
-		.map(({ name }) => name)
-		.sort();
-	for (const name of files) {
-		code.update(name).update(readFileSync(join(directory, name)));
-	}
+	for (const [file, digest] of modules)
+		code.update(file).update("\0").update(digest).update("\0");
 	const parsers = readers.map((name) => {
 		try {
 			return `${name}@${require(`${name}/package.json`).version}`;
