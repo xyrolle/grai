@@ -34,7 +34,7 @@ Not adopted:
 
 ## Compared with other libraries
 
-[docs/benchmarks.md](benchmarks.md) compares grai with Paraglide, i18next, use-intl and next-intl: each bench there takes the libraries in rounds whose order rotates, pairs them round by round, and gives each figure the interval that holds its median. One measure it does not take yet: a new server process (`startup`), which loads every locale's messages more slowly on grai than on i18next or use-intl, as V8 parses grai's binding for each key as code where they read their catalogs as data, and renders its first page sooner; with Node's compile cache warm, grai loads first. The sections below are the measurements behind grai's own decisions.
+[docs/benchmarks.md](benchmarks.md) compares grai with Paraglide, i18next, use-intl and next-intl: each bench there takes the libraries in rounds whose order rotates, pairs them round by round, and gives each figure the interval that holds its median. The sections below are the measurements behind grai's own decisions.
 
 ## Server
 

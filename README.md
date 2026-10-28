@@ -299,7 +299,6 @@ Where the table at a glance has grai behind, clear of its interval:
 
 Besides those:
 
-- **A new server process loads the messages more slowly** than i18next or use-intl, though it renders its first page sooner, and with Node's compile cache loads first ([docs/limitations.md](docs/limitations.md)).
 - **A cold check costs seconds on a large project,** the price of reading code exactly; CI's cache keeps it to the files that changed ([the commands' chart](docs/benchmarks.md#the-refactoring-commands)).
 - **Not supported yet:** `:unit`'s `usage`, and an option's value taken from an input other than a currency, a unit and a time zone. Each is a compile error that names the construct, never an approximation.
 
