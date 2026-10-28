@@ -15,14 +15,23 @@ import { everyLocale } from "./page-keys.ts";
 
 /**
  * The dev module's table: its text keys' rows as one JSON string, and the other keys' rows. A
- * spread, not `Object.assign`, which would set a key named `__proto__` through the setter.
+ * spread, not `Object.assign`, which would set a key named `__proto__` through the setter. The
+ * JSON is in single quotes, which leave its own quotes as they are: about 28 KB less on the
+ * synthetic catalog's page, for the dev server to send and the browser to read.
  */
 const table = (textRows: string, callRows: string) =>
 	`const T = {
-	...JSON.parse(${JSON.stringify(`{${textRows}}`)}),
+	...JSON.parse('${singleQuoted(`{${textRows}}`)}'),
 ${callRows}
 };
 `;
+
+/**
+ * Text as a single-quoted string holds it: its `\` and `'` escaped. JSON has no raw line breaks,
+ * and a string may hold U+2028 and U+2029 as they are.
+ */
+const singleQuoted = (text: string) =>
+	text.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
 
 /**
  * The positions in the config's `locales` whose variants the table's rows hold, in order, and how
