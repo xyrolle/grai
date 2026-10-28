@@ -1,6 +1,6 @@
 // grai as the benches reach it, from this one place: the package as published, this repository's
 // build (`dist`, which `pnpm build` writes), its entries where package.json's `exports` and `bin`
-// map them, and its other modules beside them. A bench that times grai's own code running would
+// map them, and the parts its benches time, from an entry of the build for them. A bench that times grai's own code running would
 // otherwise charge it Node's stripping of TypeScript as each module of the source loads, which no
 // app pays. A bench refuses to run on a build older than the source.
 //
@@ -54,12 +54,10 @@ export function graiEntry(path) {
 }
 
 /**
- * A module of the build the package does not export, by its source's name, such as "compile.ts":
- * for a bench of the compiler's own parts.
+ * The parts of grai the benches time, from the build's entry for them (`src/bench.ts`), which the
+ * package neither exports nor ships: the chunks an app runs, as the build bundles them.
  */
-export function graiModule(source) {
-	return join(repository, "dist", source.replace(/\.ts$/, ".js"));
-}
+export const graiParts = join(repository, "dist", "bench.js");
 
 /** grai's CLI, as the package's `bin` names it. */
 export const graiCli = join(repository, manifest.bin.grai);

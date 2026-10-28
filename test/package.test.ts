@@ -131,6 +131,9 @@ function bundled(extension = ".js"): string[] {
 		.map((file) => file.slice("dist/".length));
 }
 
+/** The benches' entry (`src/bench.ts`), which the build makes and the package does not ship. */
+const benchEntry = "bench";
+
 it("packs the bundle with its maps, each module's declarations, the lists of the chunks grai's parts run, and nothing else", () => {
 	expect(packed.files).toEqual(
 		[
@@ -141,12 +144,15 @@ it("packs the bundle with its maps, each module's declarations, the lists of the
 			"config.schema.json",
 			"package.json",
 			`dist/${builtModulesFile}`,
-			...sourceModules().map((module) => `dist/${module}.d.ts`),
+			...sourceModules()
+				.filter((module) => module !== benchEntry)
+				.map((module) => `dist/${module}.d.ts`),
 			...bundled().map((file) => `dist/${file}`),
 			...bundled(".js.map").map((file) => `dist/${file}`),
 			...runtimeFiles().map((file) => `dist/${file}`),
 		].sort(),
 	);
+	expect(bundled()).not.toContain(`${benchEntry}.js`);
 });
 
 it("maps each module of the bundle that holds code to its sources, which its map holds", () => {

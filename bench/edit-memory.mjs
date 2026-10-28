@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { selectedApps } from "./apps.mjs";
-import { graiModule, writeGraiProject } from "./grai.mjs";
+import { graiParts, writeGraiProject } from "./grai.mjs";
 
 const EDITS = 400;
 const self = new URL(import.meta.url).pathname;
@@ -14,7 +14,7 @@ const mebibytes = (bytes) => bytes / 2 ** 20;
 
 /** Runs in the child: the first build, then the edits, with the live heap after each. */
 async function child(config, catalog, key) {
-	const { recompile } = await import(graiModule("compile.ts"));
+	const { recompile } = await import(graiParts);
 	const heap = () => {
 		globalThis.gc();
 		return mebibytes(process.memoryUsage().heapUsed);

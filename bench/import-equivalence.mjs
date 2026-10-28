@@ -13,9 +13,9 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import i18next from "i18next";
 import { IntlMessageFormat } from "intl-messageformat";
-import { graiCli, graiModule } from "./grai.mjs";
+import { graiCli, graiParts } from "./grai.mjs";
 
-const { importCatalogs } = await import(graiModule("import.ts"));
+const { importCatalogs } = await import(graiParts);
 
 const locales = ["en", "ru", "ar"];
 const counts = [0, 1, 2, 3, 5, 11, 12, 21, 22, 25, 100, 101, 1000, 1.5];

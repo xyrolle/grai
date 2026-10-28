@@ -120,6 +120,7 @@
 	},
 	"files": [
 		"dist",
+		"!dist/bench.*",
 		"config.schema.json",
 		"CHANGELOG.md",
 		"SECURITY.md"
