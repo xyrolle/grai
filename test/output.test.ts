@@ -211,6 +211,50 @@ it("writes the same output in two steps, every module whole and then the declara
 	expect(await isCompiled(config)).toBe(true);
 });
 
+/** Each module of the output, with its text and when it was last written. */
+function modulesIn(out: string): Map<string, [string, number]> {
+	return new Map(
+		[...outputTexts(out)]
+			.filter(([file]) => file.endsWith(".js"))
+			.map(([file, text]) => [file, [text, statSync(join(out, file)).mtimeMs]]),
+	);
+}
+
+it("completes no output written without its declarations once another write has replaced it, whichever completion comes first", async () => {
+	for (const replacedFirst of [false, true]) {
+		const { dir, config } = project(catalogs);
+		const out = join(dir, "out");
+		// Two writers of the outdir, as two watchers are, each placing the keys its own way.
+		const shards = await compiledUndeclared(config);
+		const byShards = await writeUndeclared(shards);
+		const grouped = await compiledUndeclared(config);
+		const byGroups = await writeUndeclared(grouped, {
+			placing: async () => ({
+				groups: Promise.resolve([["title"]]),
+				waited: true,
+			}),
+		});
+		const completeShards = () =>
+			writeBuild(shards, undefined, { undeclared: byShards.undeclared });
+		const completeGroups = () =>
+			writeBuild(grouped, undefined, { undeclared: byGroups.undeclared });
+
+		if (!replacedFirst)
+			expect((await completeGroups()).result.errors).toEqual([]);
+		const before = modulesIn(out);
+		const superseded = await completeShards();
+		expect(superseded).toEqual({ result: { written: [], errors: [] } });
+		expect(modulesIn(out)).toEqual(before);
+		if (replacedFirst)
+			expect((await completeGroups()).result.errors).toEqual([]);
+
+		expect(
+			[...modulesIn(out).keys()].some((file) => /^keys\/g0-.+\.js$/.test(file)),
+		).toBe(true);
+		expect(await isCompiled(config)).toBe(true);
+	}
+});
+
 it("records each file it replaces by the hash of the text it wrote, a module of keys' and its declarations' taken as they were rendered", async () => {
 	const { dir, compile } = project(catalogs);
 	expect((await compile()).errors).toEqual([]);

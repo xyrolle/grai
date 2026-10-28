@@ -88,7 +88,8 @@ const followDeadline = 2000;
  * compile with no saved build to start from writes every module now, whole, and leaves its keys'
  * declarations and their maps to that task (`writeUndeclared`): it is reported and ended once its
  * modules are written, and the write of the rest is reported too, as an error only the declarations
- * find reaches the server so. Every other compile is reported once its output is written. The build the start ends with is saved for the
+ * find reaches the server so. That write writes nothing if another writer of the outdir, as another
+ * watcher is, has replaced those modules since: what is there is that writer's, whole or to be. Every other compile is reported once its output is written. The build the start ends with is saved for the
  * next start (`firstBuildSaver`). It watches until the process ends or `close` is called, whose
  * promise settles once the compile under way, if any, has finished, the output is written and the
  * build is saved, so the project can then be removed.

@@ -15,7 +15,12 @@ import { type Config, readConfig } from "./config.ts";
 import type { Position } from "./declaration-maps.ts";
 import { GraiError, sortErrors } from "./error.ts";
 import { type DeclaredKey, declareKeys } from "./key-declarations.ts";
-import { isUpToDate, type Publication, writeOutput } from "./output.ts";
+import {
+	isUpToDate,
+	type Publication,
+	type Published,
+	writeOutput,
+} from "./output.ts";
 import { hashesOf, inputsOf } from "./output-inputs.ts";
 import { type RenderedModules, renderModules } from "./output-modules.ts";
 import { cameBy, type Placing } from "./placing.ts";
@@ -230,7 +235,9 @@ export type Undeclared = { id: string; groups: KeyGroups; rendered: Rendered };
  * last, which the project was compiled from: with the same config, only what changed since is
  * rendered again, and with none, or another config, everything is. `localeCopies` is the compile's.
  * With `undeclared`, the project's output written already without its declarations, the keys are
- * placed as they were then, and only the declarations and their maps are rendered and written.
+ * placed as they were then, and only the declarations and their maps are rendered and written; or
+ * nothing, and no build is given, if another write has replaced that output since, as another
+ * watcher of the outdir may.
  */
 export async function writeBuild(
 	compiled: CompiledProject,
@@ -278,17 +285,19 @@ export async function writeBuild(
 			),
 		undeclared?.rendered ?? before?.rendered,
 	);
-	const written = await published(
+	const done = await published(
 		config.outdir,
 		output,
 		inputsOf(config, compiled.hashes, localeCopies, placement),
 		placement !== saved ? placement : undefined,
-		{},
+		{ completes: undeclared?.id },
 	);
-	if (written instanceof GraiError)
-		return { result: { written: [], errors: [written] } };
+	if (done instanceof GraiError)
+		return { result: { written: [], errors: [done] } };
+	// Another write replaced the output this was to complete: it has no build to give.
+	if ("superseded" in done) return { result: { written: [], errors: [] } };
 	return {
-		result: { written, errors: [] },
+		result: { written: done.written, errors: [] },
 		build: { ...compiled, compilation, positions, rendered },
 	};
 }
@@ -300,7 +309,7 @@ export async function writeBuild(
  * declarations or their maps. The manifest records it as so written, by an id of its own
  * (`Publication`), and no check takes it for the output of its config and catalogs until
  * `writeBuild`, given what this returns, has declared the keys and written the rest, which names
- * the modules alike (`renderUndeclared`).
+ * the modules alike (`renderUndeclared`), unless another write replaced it first.
  */
 export async function writeUndeclared(
 	compiled: CompiledProject,
@@ -332,8 +341,9 @@ export async function writeUndeclared(
 	);
 	if (done instanceof GraiError)
 		return { result: { written: [], errors: [done] } };
+	if ("superseded" in done) return { result: { written: [], errors: [] } };
 	return {
-		result: { written: done, errors: [] },
+		result: { written: done.written, errors: [] },
 		undeclared: { id, groups: placement, rendered },
 	};
 }
@@ -380,16 +390,16 @@ async function published(
 	inputs: string,
 	given: KeyGroups | undefined,
 	publication: Publication,
-): Promise<string[] | GraiError> {
-	let written: string[];
+): Promise<Published | GraiError> {
+	let done: Published;
 	try {
-		written = await writeOutput(outdir, output, inputs, publication);
+		done = await writeOutput(outdir, output, inputs, publication);
 	} catch (error) {
 		if (!(error instanceof GraiError)) throw error;
 		return error;
 	}
-	if (given !== undefined) await saveGroups(outdir, given);
-	return written;
+	if (given !== undefined && "written" in done) await saveGroups(outdir, given);
+	return done;
 }
 
 /**
