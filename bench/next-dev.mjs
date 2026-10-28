@@ -126,7 +126,9 @@ export async function devStart(root, path, words, cleared = []) {
 /**
  * `next dev` from its launch until Chromium, in a context of its own, has hydrated the page and it
  * lists `words`, after removing the app's directories `cleared` names: the page's Observer stamps
- * `hydratedAt` in its effect, which runs once React has hydrated the page. A hydration error fails
+ * `hydratedAt` in its effect, which runs once React has hydrated the page. Also from its launch, when
+ * the document's first byte came: what came after it is the page's time in Chromium, its scripts'
+ * loading and hydration, apart from Next's compile and render before it. A hydration error fails
  * the run. The server is left running.
  */
 export async function hydratedStart(browser, root, path, words, cleared = []) {
@@ -146,6 +148,11 @@ export async function hydratedStart(browser, root, path, words, cleared = []) {
 	const hydratedAt = await page
 		.waitForFunction(() => window.hydratedAt, null, { timeout: 120_000 })
 		.then((handle) => handle.jsonValue());
+	const documentAt = await page.evaluate(
+		() =>
+			performance.timeOrigin +
+			performance.getEntriesByType("navigation")[0].responseStart,
+	);
 	const texts = await page.$$eval("li", (items) =>
 		items.map((item) => item.textContent),
 	);
@@ -153,5 +160,9 @@ export async function hydratedStart(browser, root, path, words, cleared = []) {
 	if (errors.length > 0)
 		throw new Error(`${url} failed to hydrate:\n${errors.join("\n")}`);
 	check(texts, words, `${url} once hydrated`);
-	return { server, hydrated: hydratedAt - server.launched };
+	return {
+		server,
+		hydrated: hydratedAt - server.launched,
+		document: documentAt - server.launched,
+	};
 }
