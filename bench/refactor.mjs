@@ -7,8 +7,12 @@
 // nothing grai keeps between commands: the facts and the file listing in the outdir's .grai are
 // removed. The compiled output stays, and so do the file system's caches of the project's files.
 // Warm has the state the run before it left. Every run starts from the same project: a file the
-// run before changed is written back as it was, and the output compiled again. A run that fails
-// fails the bench: check and check --fix may exit 1, which is their verdict.
+// run before changed is written back as it was, and the output compiled again. Once a run's clock
+// has stopped, its result is checked exactly (refactor-expected.mjs): check's problems; every line
+// find prints; every file rename leaves, the key renamed at exactly the places find prints and
+// every other byte as it was; and that check --fix removed exactly the keys added, each catalog
+// then as it was before them, and its check's verdict. A synthetic project's results are known in
+// advance; an app's are those of a first run outside the rounds, which every run must repeat.
 //   node refactor.mjs [app...]      synthetic by default; a or b with GRAI_BENCH_A or _B
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -16,6 +20,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { graiCli } from "./grai.mjs";
 import { median, medianInterval } from "./medians.mjs";
+import {
+	assertChecked,
+	assertFiles,
+	assertFixed,
+	assertFound,
+	checkedOf,
+	foundLines,
+	renamedFiles,
+} from "./refactor-expected.mjs";
 import {
 	busiestKey,
 	snapshot,
@@ -56,13 +69,7 @@ function addUnusedKeys(dir, catalogs) {
 	}
 }
 
-/** Throws unless the run exited with one of `statuses`. */
-function assertExited(run, statuses) {
-	if (!statuses.includes(run.status))
-		throw new Error(`grai exited ${run.status}:\n${run.stderr}`);
-}
-
-/** The project and how each command runs on it. */
+/** The project and what each command must do on it. */
 function prepareProject(app, dir) {
 	const project = writeRefactorProject(app, dir);
 	const files = snapshot(dir, project);
@@ -72,20 +79,33 @@ function prepareProject(app, dir) {
 	const compiled = cli(dir, ["compile"]);
 	if (compiled.status !== 0) throw new Error(compiled.stderr);
 	const key = busiestKey(files, catalogs);
+	const renamed = `${key}_x`;
+	const checked = project.checked ?? checkedOf(cli(dir, ["check", "--json"]));
+	const found =
+		project.checked === undefined
+			? cli(dir, ["find", key]).stdout.trimEnd().split("\n")
+			: foundLines(files, catalogs, key);
+	const catalogTexts = new Map(catalogs.map((file) => [file, files.get(file)]));
 	const commands = {
 		check: {
 			args: ["check", "--json"],
-			assert: (run) => assertExited(run, [0, 1]),
+			assert: (run) => assertChecked(run, checked),
 		},
-		find: { args: ["find", key], assert: (run) => assertExited(run, [0]) },
+		find: { args: ["find", key], assert: (run) => assertFound(run, found) },
 		rename: {
-			args: ["rename", key, `${key}_x`],
-			assert: (run) => assertExited(run, [0]),
+			args: ["rename", key, renamed],
+			assert: (run) => {
+				if (run.status !== 0) throw new Error(run.stderr);
+				assertFiles(dir, renamedFiles(files, found, key, renamed), "rename");
+			},
 		},
 		"check --fix": {
 			args: ["check", "--fix"],
 			before: () => addUnusedKeys(dir, catalogs),
-			assert: (run) => assertExited(run, [0, 1]),
+			assert: (run) => {
+				assertFixed(run, unused, checked);
+				assertFiles(dir, catalogTexts, "check --fix");
+			},
 		},
 	};
 	return { project, files, key, commands };
