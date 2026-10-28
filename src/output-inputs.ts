@@ -23,19 +23,23 @@ export function hashesOf(sources: readonly CatalogSource[]): string[] {
 
 /**
  * What decides the output: the compiler, whether its build writes the locale copies, the config,
- * every catalog's bytes, and the groups of keys saved for it. The whole config, as no field is then
- * left out by mistake: the catalogs' paths are in the declaration maps.
+ * every catalog's bytes, the groups of keys saved for it, and whether it holds the keys'
+ * declarations, as every output does once written whole. The whole config, as no field is then left
+ * out by mistake: the catalogs' paths are in the declaration maps. An output written without its
+ * declarations (`writeUndeclared`) is so never taken for the whole one, and a start after one that
+ * stopped before writing them writes them.
  */
 export function inputsOf(
 	config: Config,
 	hashes: readonly string[],
 	localeCopies: boolean,
 	groups: KeyGroups,
+	declared = true,
 ): string {
 	return hash(
 		"sha1",
 		JSON.stringify(
-			[hashOfCompiler(), localeCopies, config, hashes, groups],
+			[hashOfCompiler(), localeCopies, config, hashes, groups, declared],
 			collectionsAsLists,
 		),
 	);
