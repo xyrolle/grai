@@ -341,6 +341,8 @@ export function watch(
 	return {
 		first: start.promise,
 		write: async () => {
+			// A first compile under way may serve early, and the write follows what it serves.
+			if (early === undefined) await running;
 			if (early === undefined) return false;
 			const { followed } = early;
 			if (!following) {
@@ -381,10 +383,10 @@ export type Watch = {
 	/** How the first compile ends. */
 	first: Promise<Compiled>;
 	/**
-	 * Runs the task that follows a first page served early (`serve`) now, if it has not run: the
-	 * write of the first compile, or the take-up of the saved build after its index, which writes
-	 * any file of the output gone since. Settles once it has ended, written or failed, with whether
-	 * there was one.
+	 * Runs the task that follows a first page served early (`serve`) now, if it has not run, once a
+	 * first compile under way has served or written: the write of the first compile, or the take-up
+	 * of the saved build after its index, which writes any file of the output gone since. Settles
+	 * once it has ended, written or failed, with whether there was one.
 	 */
 	write: () => Promise<boolean>;
 	close: () => Promise<void>;
