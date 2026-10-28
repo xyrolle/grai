@@ -8,9 +8,10 @@ import {
 	sinceEvent,
 	updateEvent,
 } from "./dev-events.ts";
-import { freshName } from "./key-exports.ts";
+import { destructuredExports } from "./key-exports.ts";
 import { identifierKey } from "./literal-key.ts";
 import { calledNames, everyName, outputImports } from "./output-imports.ts";
+import { everyLocale } from "./page-keys.ts";
 
 /**
  * The dev module's table: its text keys' rows as one JSON string, and the other keys' rows. A
@@ -91,30 +92,6 @@ const devWords = new Set(
 );
 
 /**
- * The keys' exports, each destructured from `made` under its own name, unless the module's code
- * takes that name: such a key is destructured under a name of its own, `$` and the key, and
- * exported under the key.
- */
-function madeExports(keys: readonly string[], taken: ReadonlySet<string>) {
-	const own = keys.filter((key) => !taken.has(key));
-	const exports = [`export const { ${own.join(", ")} } = made;\n`];
-	const bound = new Set([...taken, ...keys]);
-	const renamed = keys
-		.filter((key) => taken.has(key))
-		.map((key) => {
-			const name = freshName(`$${key}`, bound);
-			bound.add(name);
-			return { key, name };
-		});
-	if (renamed.length > 0)
-		exports.push(
-			`const { ${renamed.map(({ key, name }) => `${key}: ${name}`).join(", ")} } = made;\n`,
-			`export { ${renamed.map(({ key, name }) => `${name} as ${key}`).join(", ")} };\n`,
-		);
-	return exports.join("");
-}
-
-/**
  * keys.js in dev: every key, with its locales in a table, and the handler that writes an edit's
  * patch into the table, in the page and in a server's module runner alike. After a patch the page
  * dispatches a cancelable `grai:change` on `window`, its `detail.keys` the edited keys: a
@@ -162,10 +139,41 @@ export function devModule(
 		)
 		.join("\n");
 	return `${outputImports(names, (file) => join(outdir, file), build.rendered.modules)}
-${slotsCode(slots, locales.length)}${table(textRows, callRows)}${madeCode}${madeExports(
+${slotsCode(slots, locales.length)}${table(textRows, callRows)}${madeCode}${destructuredExports(
+	"made",
 	keys.map(([key]) => key),
 	new Set([...everyName(names), ...devWords]),
 )}${patchCode(version)}`;
+}
+
+/**
+ * The code of keys.js for the client. A page's import map points it at the page's locale's module,
+ * and Vite still makes keys.js ahead of the page, as it makes every module a page's modules import:
+ * it holds no words, so it costs little. Imported, it takes, from beside its own URL, the module
+ * of the page's locale, by the page's `<html lang>`, as the runtime reads the locale; in a worker,
+ * which no import map reaches and which has no `<html lang>`, the module of every locale's words,
+ * as the runtime there renders in any. It exports their keys.
+ */
+const shellCode = (locales: readonly string[], baseLocale: string) =>
+	`const locales = ${JSON.stringify(locales)};
+const lang = globalThis.document?.documentElement.lang;
+const url = new URL(import.meta.url);
+url.pathname += \`/\${lang === undefined ? ${JSON.stringify(everyLocale)} : locales.includes(lang) ? lang : ${JSON.stringify(baseLocale)}}\`;
+url.search = "";
+const keys = await import(/* @vite-ignore */ url.href);
+`;
+
+/** Every word of the shell's own code, which a key's export takes no name of. */
+const shellWords = new Set(shellCode([], "").match(/[A-Za-z_$][\w$]*/g));
+
+/** keys.js for the client in dev (`shellCode`). */
+export function pageKeysShell(build: Build): string {
+	const { locales, baseLocale } = build.config;
+	return `${shellCode(locales, baseLocale)}${destructuredExports(
+		"keys",
+		[...build.compilation.keys.keys()],
+		shellWords,
+	)}`;
 }
 
 /**

@@ -9,7 +9,7 @@ import type { Build } from "./compile.ts";
 import { patchedEvent, sinceEvent, updateEvent } from "./dev-events.ts";
 import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
-import { devKeysId, pageKeysId } from "./page-keys.ts";
+import { devKeysId, everyLocale, pageKeysId } from "./page-keys.ts";
 import { watch } from "./watch.ts";
 
 /** Where a project's grai files are, for the plugin. */
@@ -103,11 +103,14 @@ export function serveMessages(
 			before.rendered.files.get(anchor) === next.rendered.files.get(anchor);
 		if (changed.length === 0 && sameRuntime) return;
 		const environments = Object.values(server.environments);
-		// keys.js, and each page's, one locale's alone, by the locales of either build.
+		// keys.js, a worker's, every locale's, and each page's, one locale's alone, by the locales of
+		// either build.
 		const keysIds = [
 			devKeysId,
 			...new Set(
-				[...before.config.locales, ...next.config.locales].map(pageKeysId),
+				[everyLocale, ...before.config.locales, ...next.config.locales].map(
+					pageKeysId,
+				),
 			),
 		];
 		// A patch writes a key's new variants into the table, under the export made when the module
