@@ -619,3 +619,43 @@ it.skipIf(process.platform === "win32")(
 		expect(told).not.toEqual([]);
 	},
 );
+
+it("serves a restart's index in a process that loaded no compiler, and loads it once as it takes up the build", async () => {
+	const { config: file } = project(catalogs, config);
+	await started(file);
+	const watching = pathToFileURL(
+		fileURLToPath(new URL("../src/watch.ts", import.meta.url)),
+	).href;
+
+	// A process of its own, which counts its loads of the compiler's module.
+	const { status, stdout, stderr } = spawnSync(
+		process.execPath,
+		[
+			"--input-type=module",
+			"--eval",
+			`import { registerHooks } from "node:module";
+let loads = 0;
+registerHooks({
+	load(url, context, next) {
+		if (url.endsWith("/compile.ts")) loads += 1;
+		return next(url, context);
+	},
+});
+const { watch } = await import(${JSON.stringify(watching)});
+const served = Promise.withResolvers();
+const watcher = watch(${JSON.stringify(file)}, () => {}, (error) => {
+	console.error(error);
+	process.exit(1);
+}, { serve: () => served.resolve() });
+await served.promise;
+const atIndex = loads;
+await watcher.write();
+await watcher.close();
+console.log(JSON.stringify([atIndex, loads]));`,
+		],
+		{ encoding: "utf8" },
+	);
+
+	expect({ status, stderr }).toEqual({ status: 0, stderr: "" });
+	expect(JSON.parse(stdout)).toEqual([0, 1]);
+});
