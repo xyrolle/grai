@@ -397,7 +397,7 @@ describe("a page the dev server serves", () => {
 		]).toEqual([true, false, false]);
 	});
 
-	it("takes its locale's words alone through keys.js itself, with no import map, by its <html lang>", async () => {
+	it("takes every locale's words through keys.js itself when no import map points it at its locale's", async () => {
 		const dir = site(
 			{ strategy: ["preferredLanguage"] },
 			page.replace("<html>", '<html lang="ar">'),
@@ -411,7 +411,37 @@ describe("a page the dev server serves", () => {
 		await tab.waitForFunction(`document.body.textContent !== ""`);
 
 		expect(await tab.evaluate("window.holds()")).toBe("ar ar سلتك");
-		expect(keys).toEqual(["/@id/__x00__grai:keys", "/@id/__x00__grai:keys/ar"]);
+		expect(keys).toEqual(["/@id/__x00__grai:keys"]);
+	});
+
+	it("gives a module worker every locale's words, as a worker has no import map and no <html lang>", async () => {
+		const dir = site({ strategy: ["preferredLanguage"] });
+		writeFileSync(
+			join(dir, "worker.js"),
+			`import { m } from "./out/messages.js";
+import { setLocale } from "./out/runtime.js";
+const base = m.title();
+setLocale("ar");
+postMessage([base, m.title()]);
+`,
+		);
+		writeFileSync(
+			join(dir, "main.js"),
+			`${main}
+window.fromWorker = new Promise((resolve) => {
+	const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+	worker.onmessage = (event) => resolve({ posted: event.data });
+	worker.onerror = (event) => resolve({ error: event.message });
+});
+`,
+		);
+		const { origin, tab } = await devPage(dir, "ro-MD");
+		await tab.goto(origin);
+
+		expect(await tab.evaluate("window.fromWorker")).toEqual({
+			posted: ["Your cart", "سلتك"],
+		});
+		expect(await tab.evaluate("window.holds()")).toBe("ro ro Coșul tău");
 	});
 
 	it("throws for a call in another locale, naming its key, as a page in its locale's words alone", async () => {
