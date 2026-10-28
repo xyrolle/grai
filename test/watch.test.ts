@@ -337,3 +337,16 @@ it("writes what it served when asked as soon as it has served it, while its comp
 	expect(await watcher.write()).toBe(true);
 	expect(keysWith(dir, '"Titel"')).toBe(true);
 });
+
+it("compiles an edit saved just as the write of what it served begins, its watch kept", async () => {
+	const { dir, config } = project(catalogs);
+	const { watcher, served } = servingWatcher(config);
+	await served;
+	const catalog = join(dir, "messages", "de.json");
+
+	// The save's event comes on a later turn; in this one, the write of what was served begins.
+	writeFileSync(catalog, JSON.stringify({ title: "Überschrift" }));
+	await watcher.write();
+
+	await expect.poll(() => keysWith(dir, '"Überschrift"')).toBe(true);
+});
