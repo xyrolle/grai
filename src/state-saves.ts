@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isMissing } from "./config.ts";
 import { isAlive } from "./output-lock.ts";
@@ -34,6 +34,9 @@ export async function saveState(
 ): Promise<void> {
 	const temporary = savingFile(state, name);
 	await removeStaleSaves(state, name);
+	// A save before the first compile has written the output, as of a fresh clone's groups, makes
+	// the state directory.
+	await mkdir(state, { recursive: true });
 	try {
 		await writeFile(temporary, bytes, { flag: "wx" });
 		await rename(temporary, join(state, name));
