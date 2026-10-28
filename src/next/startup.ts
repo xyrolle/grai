@@ -2,9 +2,10 @@
 // (`first-groups.ts`). The compile asks for them once it has compiled the catalogs (`placing`), and
 // places the keys by them if they come in time (`placing.ts`), in the one output it writes, and
 // saves them for the compiles after once that output is written. The start may go on once the
-// watch has started (`Watch.first`: that compile has ended, and so has the compile of every edit
-// that came meanwhile) and the read's thread has stopped (`released`). No compile after the first
-// asks, so no output is written for the groups read once Next has started.
+// watch has started (`released`, `Watch.first`: that compile has ended, and so has the compile of
+// every edit that came meanwhile), and once withGrai has stopped the read's thread and it has
+// stopped (`group-read.ts`). No compile after the first asks, so no output is written for the
+// groups read once Next has started.
 import type { Compilation } from "../compilation.ts";
 import type { Placing } from "../placing.ts";
 import { type KeyGroups, savedGroups } from "../saved-groups.ts";
@@ -18,15 +19,15 @@ export type Started = { compiled: Compiled; grouped: boolean };
 /** What the first compile asks for the groups, and the start's release. */
 export type Startup = {
 	placing: Placing | undefined;
-	/** Settles once Next may start: the watch has started, and the read's thread has stopped. */
+	/** Settles once the watch has started, with whether the groups the first compile took are saved. */
 	released: (watching: Watch) => Promise<Started>;
 };
 
 /**
  * The start of a watch whose first compile writes `outdir`, with the groups `reading` reads, if any,
- * which the compile places the keys by only if Next waits for it (`held`): a read for a start Next
- * does not wait for stops at once. The compile waits for groups once the code is read, as only
- * grouping the keys by their weights is left then (`placing.ts`).
+ * which the compile places the keys by only if Next waits for it (`held`). The compile waits for
+ * groups once the code is read, as only grouping the keys by their weights is left then
+ * (`placing.ts`).
  */
 export function startup(
 	reading: FirstGroups | undefined,
@@ -42,7 +43,6 @@ export function startup(
 	});
 	void held.then((waited) => {
 		waits = waited;
-		if (!waited) return reading?.stop();
 	});
 	const groupsFor = async (
 		reading: FirstGroups,
@@ -66,7 +66,6 @@ export function startup(
 			}),
 		released: async (watching) => {
 			const compiled = await watching.first;
-			await reading?.stop();
 			// The compile saved the groups it was given if it wrote the output placed by them.
 			const grouped =
 				given !== undefined &&
