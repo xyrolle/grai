@@ -13,6 +13,7 @@ import { readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { packageName } from "../package-name.ts";
 import { graiPlugin } from "../vite-plugin.ts";
+import { developing } from "../watch.ts";
 import { localizedPages, sharedPath } from "./pages.ts";
 
 /** The module's options. `config` is the path of the project's grai.config.json, from its root. */
@@ -57,10 +58,14 @@ const module: NuxtModule<GraiNuxtOptions> = defineNuxtModule<GraiNuxtOptions>({
 				base,
 			);
 		}
-		// As @xyrolle/grai/vite's compile, so that the output it finds is already the one it would write.
-		const { result } = await recompile(configFile, undefined, {
-			localeCopies: true,
-		});
+		// As @xyrolle/grai/vite compiles, its dev server's watcher or a build, so that the output it
+		// finds is already the one it would write: a dev server that writes other files after its
+		// first page has Nuxt reload the page.
+		const { result } = await recompile(
+			configFile,
+			undefined,
+			nuxt.options.dev ? developing : { localeCopies: true },
+		);
 		reported(result, nuxt.options.dev);
 
 		const runtime = createResolver(import.meta.url).resolve;
