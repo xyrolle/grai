@@ -8,8 +8,10 @@
 // after each edit an editor's user makes: a typed prefix, a new call site, and a key added to the
 // catalog. Each sample is a new process, its project's catalog written as the app has it; every
 // library takes one each round, in an order that rotates, so the load from other work weighs on
-// each alike. Medians of ROUNDS, with every sample kept.
-//   node types.mjs [app...]
+// each alike. Medians of ROUNDS, with every sample kept: 9 by default, the fewest whose interval
+// leaves out the lowest and the highest sample and still holds the median with 95% confidence
+// (medians.mjs).
+//   node types.mjs [app...]      ROUNDS=<n> to change the rounds
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { selectedApps } from "./apps.mjs";
@@ -17,7 +19,9 @@ import { writeState } from "./completions.mjs";
 import { recordResults } from "./results.mjs";
 import { CALLS, writeProjects } from "./types-projects.mjs";
 
-const ROUNDS = 3;
+const ROUNDS = Number(process.env.ROUNDS ?? 9);
+if (!Number.isInteger(ROUNDS) || ROUNDS < 1)
+	throw new Error(`ROUNDS is ${process.env.ROUNDS}: a whole number of rounds.`);
 /** Past this, a sample is stuck: i18next's first completion takes about six minutes. */
 const SAMPLE_DEADLINE_MS = 60 * 60 * 1000;
 const here = new URL(".", import.meta.url).pathname;
