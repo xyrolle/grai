@@ -3,9 +3,9 @@
 // a page load before it, as a developer's dev server has its dependencies optimized already.
 // - A page session opens the page in Chromium and checks every text it draws; then WARMUPS edits,
 //   not counted, and EDITS timed: one message saved into its catalog with a text of its own, until
-//   the page's MutationObserver saw the target's text change. After each edit every text is
-//   checked again, the edit in place, and an error in the page fails the session. The page's
-//   heap, once collected, is taken at load and after the edits.
+//   the page's MutationObserver saw the target's text change, the DOM updated (not a frame
+//   painted). After each edit every text is checked again, the edit in place, and an error in the
+//   page fails the session. The page's heap, once collected, is taken at load and after the edits.
 // - The server render session runs grai's plugin with no page open: each edit timed until a server
 //   render through Vite's module runner, polled each millisecond, shows it, and every text of the
 //   page rendered and checked after it.

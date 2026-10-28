@@ -1,5 +1,5 @@
 // Dev: one message edited until the page shows it, end to end in Vite: the catalog written, the
-// watcher, the plugin, the socket, the browser, the DOM (hmr-sessions.mjs).
+// watcher, the plugin, the socket, the browser, until the DOM is updated (hmr-sessions.mjs).
 // "grai's plugin" is grai's own Vite plugin, as an app runs it. The designs it was chosen from
 // follow, as experiments: each serves the same module, every locale of every key in one table,
 // from a compiler of this bench's own (prototype.mjs). "whole" lets Vite re-send and re-evaluate it
@@ -55,6 +55,8 @@ const designs = [
 ];
 const SERVER_RENDER = "grai's plugin, a server render";
 const variants = [...designs, SERVER_RENDER];
+const CLOCK =
+	"from the catalog's save until the page's MutationObserver saw the edited text: the DOM updated";
 
 const spread = (samples) => ({
 	median: median(samples),
@@ -99,10 +101,10 @@ function print(app, rows, pairs, rounds, chromiumVersion) {
 			: `${figure.median.toFixed(1)} (${figure.low.toFixed(1)}–${figure.high.toFixed(1)})`;
 	const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 	console.log(
-		`\n### ${app.name}: one message edited until the page shows it, Vite dev, Chromium ${chromiumVersion}, ${rounds} rounds of every design's session in rotating order, ${EDITS} edits a session after ${WARMUPS} not counted, medians (intervals), ms; the page's heap once collected\n`,
+		`\n### ${app.name}: one message edited, ${CLOCK}; Vite dev, Chromium ${chromiumVersion}, ${rounds} rounds of every design's session in rotating order, ${EDITS} edits a session after ${WARMUPS} not counted, medians (intervals), ms; the page's heap once collected\n`,
 	);
 	console.log(
-		"| design | dev module, generated in | page load | edit to page | edit to server render | watcher | plugin | browser | heap at load | heap after the edits |\n|---|---|---|---|---|---|---|---|---|---|",
+		"| design | dev module, generated in | page load | edit until the DOM is updated | edit to server render | watcher | plugin | browser | heap at load | heap after the edits |\n|---|---|---|---|---|---|---|---|---|---|",
 	);
 	for (const row of rows) {
 		const served = row.generated
@@ -180,6 +182,7 @@ try {
 		recordResults(`hmr-${app.id}`, rows, {
 			app: app.name,
 			edits: rounds * EDITS,
+			clock: CLOCK,
 			chromium: browser.version(),
 			pairs,
 			rounds: roundsRecord(kept),
