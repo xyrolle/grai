@@ -1,18 +1,18 @@
 // A `next dev` start's first compile and its release, when the groups are read beside it
 // (`first-groups.ts`). The compile asks for them once it has compiled the catalogs (`placing`), and
-// places the keys by them if they come in time (`placing.ts`), in the one output it writes; they
-// are saved for the starts after. The start may go on once that compile has ended and the read's
-// thread has stopped (`released`): a compile of an edit that ends meanwhile releases nothing, and
-// no compile after the first asks, so no output is written for the groups read once Next has
-// started.
+// places the keys by them if they come in time (`placing.ts`), in the one output it writes, and
+// saves them for the compiles after once that output is written. The start may go on once that
+// compile has ended and the read's thread has stopped (`released`): a compile of an edit that ends
+// meanwhile releases nothing, and no compile after the first asks, so no output is written for the
+// groups read once Next has started.
 import type { Compilation } from "../compilation.ts";
 import type { Placing } from "../placing.ts";
-import { type KeyGroups, saveGroups } from "../saved-groups.ts";
+import { type KeyGroups, savedGroups } from "../saved-groups.ts";
 import type { Compiled, Watch } from "../watch.ts";
 import type { FirstGroups } from "./first-groups.ts";
 import { keyWeights } from "./key-groups.ts";
 
-/** How the start's first compile ended, and whether the groups read beside it were saved. */
+/** How the start's first compile ended, and whether the groups read beside it are saved. */
 export type Started = { compiled: Compiled; grouped: boolean };
 
 /** What the first compile asks for the groups, and the start's release. */
@@ -33,8 +33,8 @@ export function startup(
 	outdir: string,
 	held: Promise<boolean>,
 ): Startup {
-	/** The save of the groups the compile was given, which the start waits for. */
-	let saving: Promise<boolean> = Promise.resolve(false);
+	/** The groups the compile was given. */
+	let given: KeyGroups | undefined;
 	let read = false;
 	let waits = false;
 	void reading?.read.then((done) => {
@@ -49,10 +49,8 @@ export function startup(
 		compilation: Compilation,
 	): Promise<KeyGroups | undefined> => {
 		if (!(await held)) return undefined;
-		const groups = await reading.after(keyWeights(compilation));
-		// Given to the compile at once; the save goes on beside it.
-		if (groups !== undefined) saving = saved(outdir, groups);
-		return groups;
+		given = await reading.after(keyWeights(compilation));
+		return given;
 	};
 	return {
 		placing:
@@ -69,19 +67,11 @@ export function startup(
 		released: async (watching) => {
 			const compiled = await watching.first;
 			await reading?.stop();
-			return { compiled, grouped: await saving };
+			// The compile saved the groups it was given if it wrote the output placed by them.
+			const grouped =
+				given !== undefined &&
+				JSON.stringify(savedGroups(outdir)) === JSON.stringify(given);
+			return { compiled, grouped };
 		},
 	};
-}
-
-/** Saves the groups for the starts after; whether they were. */
-async function saved(outdir: string, groups: KeyGroups): Promise<boolean> {
-	try {
-		await saveGroups(outdir, groups);
-		return true;
-	} catch (error) {
-		// Groups the next start cannot read: its watch reads them again once the server is quiet.
-		console.error(error);
-		return false;
-	}
 }
