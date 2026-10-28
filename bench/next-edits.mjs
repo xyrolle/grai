@@ -35,12 +35,13 @@ export const EDIT_APPS = ["grai", "next-intl", "next-intl, client keys picked"];
 const components = ["server", "client"];
 const now = () => performance.timeOrigin + performance.now();
 
-/** A message's text in its catalog, saved as an editor saves it; returns when. */
+/** A message's text in its catalog, saved; returns when, as the write began. */
 function save(catalog, key, text) {
 	const messages = JSON.parse(readFileSync(catalog, "utf8"));
 	messages[key] = text;
+	const saved = now();
 	writeFileSync(catalog, JSON.stringify(messages, null, "\t"));
-	return now();
+	return saved;
 }
 
 /**
