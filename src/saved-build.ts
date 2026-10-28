@@ -1,13 +1,15 @@
+import { hash } from "node:crypto";
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { type FileHandle, open } from "node:fs/promises";
 import { join } from "node:path";
 import { deserialize, serialize } from "node:v8";
-import type { Catalog } from "./catalog.ts";
+import { type Catalog, readCatalogSources } from "./catalog.ts";
 import type { Compilation } from "./compilation.ts";
 import { type Build, buildKey, type CompileOptions } from "./compile.ts";
 import { type Config, readConfig } from "./config.ts";
 import { GraiError } from "./error.ts";
 import type { DeclaredKey } from "./key-declarations.ts";
+import { type ServedIndex, servedIndex } from "./served.ts";
 import { stateDirectory } from "./state-directory.ts";
 import { ignoreMissing, saveState, savingFile } from "./state-saves.ts";
 
@@ -28,10 +30,15 @@ type Saved = Omit<Build, "key" | "parts" | "catalogs" | "compilation"> & {
 type SavedCatalog = Omit<Catalog, "revision" | "edit">;
 
 /**
- * The file of the saved build in the outdir's state: its key on the first line, the length of the
- * build on the second, then the build, so a file cut short is never taken for one.
+ * The file of the saved build in the outdir's state: its key on the first line; on the second, the
+ * lengths of the build's index (`servedIndex`) and of the build, and the SHA-256 digest of each;
+ * then each as V8 serializes it. A file cut short, or a section whose bytes are not those saved, is
+ * never taken for one, and a restart reads the index alone.
  */
 const savedName = "build";
+
+/** How many bytes the key and the second line take at most, which a read of the file starts with. */
+const headerBytes = 4096;
 
 /**
  * Saves a build for the next process's first compile, as V8 serializes it, in a file beside the
@@ -65,7 +72,7 @@ export function saveBuildNow(build: Build): void {
 	}
 }
 
-/** A build's bytes as saved: its key, the length of the rest, and the rest as V8 serializes it. */
+/** A build's bytes as saved: its key, the length and digest of its index and of the build, and the two. */
 function savedBytes(build: Build): Buffer {
 	const { key, parts, catalogs, compilation, ...rest } = build;
 	const savedOf = new Map<Catalog, SavedCatalog>();
@@ -80,8 +87,15 @@ function savedBytes(build: Build): Buffer {
 		catalogs: catalogs.map(save),
 		compilation: { ...compilation, catalogs: compilation.catalogs.map(save) },
 	};
+	const index = serialize(servedIndex(build));
 	const payload = serialize(saved);
-	return Buffer.concat([Buffer.from(`${key()}\n${payload.length}\n`), payload]);
+	return Buffer.concat([
+		Buffer.from(
+			`${key()}\n${index.length} ${payload.length} ${digestOf(index)} ${digestOf(payload)}\n`,
+		),
+		index,
+		payload,
+	]);
 }
 
 /**
@@ -101,15 +115,34 @@ export async function savedBuild(
 		if (error instanceof GraiError) return undefined;
 		throw error;
 	}
+	const keyOf = keyFor(config, options);
+	const file = await openSaved(config, keyOf);
+	if (file === undefined) return undefined;
+	try {
+		return await buildOf(file, keyOf);
+	} finally {
+		await file.handle.close();
+	}
+}
+
+/**
+ * The build key of a config and options (`buildKey`), made when first asked for: only once there is
+ * a saved build, as its compiler's identity reads the compiler.
+ */
+function keyFor(config: Config, options: CompileOptions): () => string {
 	let key: string | undefined;
-	const keyOf = () => {
+	return () => {
 		key ??= buildKey(config, options);
 		return key;
 	};
-	const saved = await readSaved(
-		join(config.outdir, stateDirectory, savedName),
-		keyOf,
-	);
+}
+
+/** The build a saved file holds, taken up: undefined if its bytes are not those saved. */
+async function buildOf(
+	file: SavedFile,
+	key: () => string,
+): Promise<Build | undefined> {
+	const saved = await section<Saved>(file, "build");
 	if (saved === undefined) return undefined;
 	const takenUp = new Map<SavedCatalog, Catalog>();
 	const takeUp = (catalog: SavedCatalog) => {
@@ -128,33 +161,155 @@ export async function savedBuild(
 			...saved.compilation,
 			catalogs: saved.compilation.catalogs.map(takeUp),
 		},
-		key: keyOf,
+		key,
 	};
 }
 
 /**
- * The build a file saved under this key, or undefined if it holds another key's or none. A saved
- * build only spares a compile, so a file that cannot be read, or that a crash cut short, which its
- * length on the second line tells, is none.
+ * A saved build's index, what a dev server serves before the build is taken up, and that build: of
+ * the same save, as the file read stays open until the build is read or `close` is called, whatever
+ * another process saves meanwhile.
  */
-async function readSaved(
-	file: string,
-	key: () => string,
-): Promise<Saved | undefined> {
+export type SavedIndex = {
+	index: ServedIndex;
+	/** The build of the same save, taken up, which closes the file; undefined if its bytes are not those saved. */
+	build: () => Promise<Build | undefined>;
+	/** Closes the file, where the build is not to be read. */
+	close: () => Promise<void>;
+};
+
+/**
+ * The index of the build the last process saved for this config and options (`servedIndex`), if
+ * the catalogs are as they were when it was compiled, with the build of that save. Undefined if
+ * there is none, or a catalog changed or cannot be read since.
+ */
+export async function savedIndex(
+	configFile: string,
+	options: CompileOptions,
+): Promise<SavedIndex | undefined> {
+	let config: Config;
 	try {
-		const bytes = await readFile(file);
-		// The key only once there is a saved build, as its compiler's identity reads the compiler.
-		const header = Buffer.from(`${key()}\n`);
-		if (!bytes.subarray(0, header.length).equals(header)) return undefined;
-		const lengthEnd = bytes.indexOf("\n", header.length);
-		const payload = bytes.subarray(lengthEnd + 1);
-		const length = Number(bytes.subarray(header.length, lengthEnd).toString());
-		if (lengthEnd === -1 || payload.length !== length) return undefined;
-		// The key names the grai that saved the build, so it is this module's `Saved`.
-		return deserialize(payload);
+		config = readConfig(configFile);
+	} catch (error) {
+		if (error instanceof GraiError) return undefined;
+		throw error;
+	}
+	const keyOf = keyFor(config, options);
+	const file = await openSaved(config, keyOf);
+	if (file === undefined) return undefined;
+	let closing: Promise<void> | undefined;
+	const close = () => {
+		closing ??= file.handle.close();
+		return closing;
+	};
+	const index = await section<ServedIndex>(file, "index");
+	const { sources, errors } = await readCatalogSources(config);
+	const same =
+		index !== undefined &&
+		errors.length === 0 &&
+		sources.length === index.hashes.length &&
+		sources.every(
+			(source, at) => hash("sha1", source.bytes) === index.hashes[at],
+		);
+	if (!same) {
+		await close();
+		return undefined;
+	}
+	let build: Promise<Build | undefined> | undefined;
+	return {
+		index,
+		build: () => {
+			build ??= buildOf(file, keyOf).finally(close);
+			return build;
+		},
+		close,
+	};
+}
+
+/** A saved file, open, and where each of its sections is, with the digest its bytes must have. */
+type SavedFile = {
+	handle: FileHandle;
+	index: SectionPlace;
+	build: SectionPlace;
+};
+type SectionPlace = { offset: number; length: number; digest: string };
+
+/** The second line of a saved file: the length and digest of its index and of its build. */
+const savedPlaces = /^(\d+) (\d+) ([0-9a-f]{64}) ([0-9a-f]{64})$/;
+
+/**
+ * The file of the build the last process saved under this key, open, or undefined if it holds
+ * another key's or none. A saved build only spares a compile, so a file that cannot be read, or
+ * that a crash cut short, which the lengths on its second line tell, is none. The key is made only
+ * once the file is open.
+ */
+async function openSaved(
+	config: Config,
+	key: () => string,
+): Promise<SavedFile | undefined> {
+	let handle: FileHandle;
+	try {
+		handle = await open(join(config.outdir, stateDirectory, savedName));
 	} catch {
 		return undefined;
 	}
+	try {
+		const header = Buffer.from(`${key()}\n`);
+		const head = Buffer.alloc(headerBytes);
+		const { bytesRead } = await handle.read(head, 0, headerBytes, 0);
+		const placesEnd = head.indexOf("\n", header.length);
+		const places =
+			head.subarray(0, header.length).equals(header) &&
+			placesEnd !== -1 &&
+			placesEnd < bytesRead
+				? savedPlaces.exec(head.subarray(header.length, placesEnd).toString())
+				: null;
+		const start = placesEnd + 1;
+		const indexLength = Number(places?.[1]);
+		const buildLength = Number(places?.[2]);
+		const { size } = await handle.stat();
+		if (places === null || size !== start + indexLength + buildLength) {
+			await handle.close();
+			return undefined;
+		}
+		return {
+			handle,
+			index: { offset: start, length: indexLength, digest: places[3] ?? "" },
+			build: {
+				offset: start + indexLength,
+				length: buildLength,
+				digest: places[4] ?? "",
+			},
+		};
+	} catch {
+		await handle.close();
+		return undefined;
+	}
+}
+
+/**
+ * A section of a saved file, its index or the build, as V8 serialized it: undefined if it cannot be
+ * read or its bytes are not those saved, which their digest tells. The key names the grai that
+ * saved the file, so a section is this module's to type.
+ */
+async function section<Section>(
+	file: SavedFile,
+	name: "index" | "build",
+): Promise<Section | undefined> {
+	const { offset, length, digest } = file[name];
+	try {
+		const bytes = Buffer.alloc(length);
+		const { bytesRead } = await file.handle.read(bytes, 0, length, offset);
+		if (bytesRead !== length || digestOf(bytes) !== digest) return undefined;
+		return deserialize(bytes);
+	} catch {
+		return undefined;
+	}
+}
+
+/** The digest of a section's bytes, as the saved file's second line has it. */
+function digestOf(bytes: Buffer): string {
+	return hash("sha256", bytes);
 }
 
 /** A catalog as saved: all of it but its revision and its edit, which are this process's. */
