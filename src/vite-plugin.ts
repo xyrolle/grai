@@ -290,7 +290,10 @@ export function graiPlugin(
 					...options,
 					skipSelf: true,
 				});
-				if (resolved?.id !== files.keysFile) return resolved;
+				// keys.js, or the dev module for it, as the output's resolver has it before the output is
+				// written (`unwrittenOutput`).
+				if (resolved?.id !== files.keysFile && resolved?.id !== devKeysId)
+					return resolved;
 				// In dev, Vite's resolver takes a per-key path to keys.js and to its exports alone, so a key
 				// no catalog has would fail the page; it gets a module of its own instead.
 				const missing = serving

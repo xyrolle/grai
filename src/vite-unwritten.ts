@@ -1,7 +1,7 @@
+import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { Plugin } from "vite";
 import type { CompiledProject } from "./compile.ts";
-import { moduleOf } from "./output-paths.ts";
 import { devKeysId, type ProjectFiles } from "./vite-dev.ts";
 
 /**
@@ -19,13 +19,13 @@ export type UnwrittenOutput = {
  * The dev server's resolver of the output's files while its first compile's output is not written:
  * Vite resolves an import by the file system, which does not have them yet, and the plugin serves
  * them from memory. It runs after Vite's resolver, on an import nothing resolved. One that names a
- * file of the output by its path resolves to that file, or to the dev module for keys.js: relative
- * to the module that imports it, absolute, as an alias makes it, or from the server's root, as a
- * module runner asks for a module by its URL. Another import from a module that may name the
- * output, as a package import does (`mayNameOutput`), has the output written now and is resolved
- * again once it is: only a written output resolves it. Any other is left to fail as it would, so
- * that a lookup Vite expects to fail, as of an entry a project lacks, never has the output written
- * while the first page waits. Once the output is written, it resolves nothing.
+ * file the plugin serves by its path, with or without its `.js`, resolves to that file, or to the
+ * dev module for keys.js: the path relative to the module that imports it, absolute, as an alias
+ * makes it, from the server's root, as a module runner asks for a module by its URL, or as the
+ * package's `imports` map a package import to a path (`packageImportPath`). Any other import from
+ * a module, as one with a query (`?raw`) or by a mapping only the file system resolves, as a
+ * tsconfig's paths, has the output written now, and is resolved again once it is. Once it is
+ * written, an import nothing resolved fails as it would.
  */
 export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 	let root = "";
@@ -38,13 +38,29 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 		resolveId: {
 			order: "post",
 			async handler(id, importer, options) {
+				const served = dev.served();
+				if (served === undefined || id.startsWith("\0")) return null;
 				const { outdir, keysFile } = dev.files();
-				const files = dev.served()?.rendered.files ?? new Map();
-				for (const path of pathsOf(id, importer, root)) {
-					if (path === keysFile) return devKeysId;
-					if (files.has(relative(outdir, path))) return path;
+				const query = id.indexOf("?");
+				const named = pathsOf(
+					query === -1 ? id : id.slice(0, query),
+					importer,
+					root,
+				);
+				const output = named.filter((path) => isInside(outdir, path));
+				// A path outside the output is not the plugin's to resolve.
+				if (named.length > 0 && output.length === 0) return null;
+				for (const path of query === -1 ? output : []) {
+					const file = [path, `${path}.js`].find(
+						(candidate) =>
+							candidate === keysFile ||
+							served.rendered.files.has(relative(outdir, candidate)),
+					);
+					if (file === undefined) continue;
+					const resolved = file === keysFile ? devKeysId : file;
+					return resolved;
 				}
-				if (importer === undefined || !mayNameOutput(id, files)) return null;
+				if (importer === undefined) return null;
 				if (!(await dev.write())) return null;
 				return this.resolve(id, importer, { ...options, skipSelf: true });
 			},
@@ -52,9 +68,15 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 	};
 }
 
+/** Whether a path is inside a directory. */
+function isInside(directory: string, path: string): boolean {
+	const name = relative(directory, path);
+	return name !== "" && !name.startsWith("..") && !isAbsolute(name);
+}
+
 /**
- * The files an import may name by its path: relative to the module that imports it, or an absolute
- * path, which a URL from the server's root may be too.
+ * The files an import may name by its path: relative to the module that imports it, an absolute
+ * path, which a URL from the server's root may be too, or a package import's path.
  */
 function pathsOf(
 	id: string,
@@ -62,22 +84,75 @@ function pathsOf(
 	root: string,
 ): string[] {
 	if (isAbsolute(id)) return [id, join(root, id)];
-	const relativeToImporter =
-		(id.startsWith("./") || id.startsWith("../")) &&
-		importer !== undefined &&
-		isAbsolute(importer);
-	return relativeToImporter ? [resolve(dirname(importer), id)] : [];
+	if (importer === undefined || !isAbsolute(importer)) return [];
+	if (id.startsWith("./") || id.startsWith("../"))
+		return [resolve(dirname(importer), id)];
+	if (!id.startsWith("#")) return [];
+	const path = packageImportPath(id, importer);
+	return path === undefined ? [] : [path];
 }
 
 /**
- * Whether a specifier may name a file of the output by a mapping only a file there resolves: a
- * package import (`#…`), which names a module of the app, or one whose last segment is a file of
- * the output, as `messages.js` or `runtime.js`, or a key's own path, which an app maps to keys.js.
+ * The file a package import (`#…`) names by the `imports` of the package of the module that imports
+ * it: its exact entry, else the pattern with the longest part before its `*`, as Node and Vite
+ * match them. Only a target that is a path names a file without the file system: for one by
+ * conditions, it is undefined, and the import resolves once the output is written.
  */
-function mayNameOutput(
+function packageImportPath(id: string, importer: string): string | undefined {
+	for (let directory = dirname(importer); ; directory = dirname(directory)) {
+		const imports = importsOf(join(directory, "package.json"));
+		if (imports !== undefined) {
+			const [target, subpath] = matched(imports, id) ?? [];
+			return typeof target === "string" &&
+				target.startsWith("./") &&
+				subpath !== undefined
+				? resolve(directory, target.replaceAll("*", subpath))
+				: undefined;
+		}
+		if (dirname(directory) === directory) return undefined;
+	}
+}
+
+/** A package.json's `imports`, empty if it has none; undefined if there is no package.json. */
+function importsOf(manifest: string): object | undefined {
+	let text: string;
+	try {
+		text = readFileSync(manifest, "utf8");
+	} catch {
+		return undefined;
+	}
+	const parsed: unknown = JSON.parse(text);
+	const imports =
+		typeof parsed === "object" && parsed !== null && "imports" in parsed
+			? parsed.imports
+			: undefined;
+	return typeof imports === "object" && imports !== null ? imports : {};
+}
+
+/** The target an `imports` map gives an id, and what its pattern's `*` stands for in the id. */
+function matched(
+	imports: object,
 	id: string,
-	files: ReadonlyMap<string, string>,
-): boolean {
-	const last = id.slice(id.lastIndexOf("/") + 1);
-	return id.startsWith("#") || files.has(last) || moduleOf(id).type === "key";
+): [target: unknown, subpath: string] | undefined {
+	const entries = Object.entries(imports);
+	const exact = entries.find(([key]) => key === id && !key.includes("*"));
+	if (exact !== undefined) return [exact[1], ""];
+	let best: { target: unknown; subpath: string; prefix: number } | undefined;
+	for (const [key, target] of entries) {
+		const star = key.indexOf("*");
+		if (star === -1 || star !== key.lastIndexOf("*")) continue;
+		const suffix = key.slice(star + 1);
+		if (
+			id.length >= key.length &&
+			id.startsWith(key.slice(0, star)) &&
+			id.endsWith(suffix) &&
+			(best === undefined || star > best.prefix)
+		)
+			best = {
+				target,
+				subpath: id.slice(star, id.length - suffix.length),
+				prefix: star,
+			};
+	}
+	return best === undefined ? undefined : [best.target, best.subpath];
 }
