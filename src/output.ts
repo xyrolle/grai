@@ -42,15 +42,15 @@ export async function isUpToDate(
 
 /**
  * Publishes an output, under the outdir's lock. It writes the immutable files that are not there
- * yet, and the mutable files whose content the manifest does not record: the declaration maps, and
- * the entries, which name the rest. What is there is known from a listing of the outdir and from
- * the manifest, never from the memory of an earlier compile, which another writer or a file
- * deleted by hand makes wrong. Every text goes to a temporary file first, all at once; then the
- * immutable files are renamed into place, then the mutable ones, as no file names an immutable one
- * until an entry does. The outdir is grai's: a file the output no longer names that the manifest
- * records is retired, and removed once it has been for `retention`, and any other is removed at
- * once, as is a temporary file a compile that stopped halfway left. The manifest goes last.
- * Returns the files written.
+ * yet, and the others whose content the manifest does not record: the modules of keys with their
+ * declarations, the declaration maps, and the entries, which name the rest. What is there is known
+ * from a listing of the outdir and from the manifest, never from the memory of an earlier compile,
+ * which another writer or a file deleted by hand makes wrong. Every text goes to a temporary file
+ * first, all at once; then the immutable files are renamed into place, then the modules of keys,
+ * then the mutable files, as no file names one of the first two until an entry does. The outdir is
+ * grai's: a file the output no longer names that the manifest records is retired, and removed once
+ * it has been for `retention`, and any other is removed at once, as is a temporary file a compile
+ * that stopped halfway left. The manifest goes last. Returns the files written.
  */
 export async function writeOutput(
 	outdir: string,
@@ -67,33 +67,42 @@ export async function writeOutput(
 		]);
 		const present = contents.files;
 		const hashes = new Map(
-			output.mutable.map(([file, text]) => [file, hash("sha1", text)]),
+			[...output.keyModules, ...output.mutable].map(([file, text, sha1]) => [
+				file,
+				sha1 ?? hash("sha1", text),
+			]),
 		);
 		const recorded = new Map(Object.entries(manifest?.mutable ?? {}));
 		const now = Date.now();
 		const { retired, unknown } = unnamedFiles(manifest, output, present, now);
 		const missing = output.immutable.filter(([file]) => !present.has(file));
-		const changed = output.mutable.filter(
-			([file]) => !present.has(file) || recorded.get(file) !== hashes.get(file),
-		);
+		const changedOf = (files: readonly OutputFile[]) =>
+			files.filter(
+				([file]) =>
+					!present.has(file) || recorded.get(file) !== hashes.get(file),
+			);
+		const changedModules = changedOf(output.keyModules);
+		const changed = changedOf(output.mutable);
 		const expired = [...retired]
 			.filter(([, at]) => now - at >= retention)
 			.map(([file]) => file);
 		const removed = [...unknown, ...expired].map((file) => join(outdir, file));
 		removed.push(...contents.temporaries);
+		const replaced = [...changedModules, ...changed];
 		if (
-			missing.length + changed.length + removed.length === 0 &&
+			missing.length + replaced.length + removed.length === 0 &&
 			manifest?.inputs === inputs
 		)
 			return [];
-		const written = [...missing, ...changed];
+		const written = [...missing, ...replaced];
 		const [temporaries] = await Promise.all([
 			writeTemporaries(written, state),
-			changed.length > 0 ? removeManifest(state) : undefined,
+			replaced.length > 0 ? removeManifest(state) : undefined,
 			makeDirectories(outdir, written, contents.directories),
 		]);
 		try {
 			await renameInto(outdir, missing, temporaries);
+			await renameInto(outdir, changedModules, temporaries);
 			await renameInto(outdir, changed, temporaries);
 		} catch (error) {
 			await Promise.all([...temporaries.values()].map(removeTemporary));
@@ -143,7 +152,9 @@ function unnamedFiles(
 }
 
 function namesOf(output: Output): string[] {
-	return [...output.immutable, ...output.mutable].map(([file]) => file);
+	return [...output.immutable, ...output.keyModules, ...output.mutable].map(
+		([file]) => file,
+	);
 }
 
 /**

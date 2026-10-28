@@ -610,7 +610,9 @@ it("grai watch writes the output, then the files a catalog's edit changes", asyn
 		join(dir, "messages", "de.json"),
 		JSON.stringify({ ...catalogs.de, cart_title: "Warenkorb" }, null, "\t"),
 	);
-	expect(await next()).toMatch(/^grai: wrote 5 files in out \(.+ ms\)$/);
+	expect(await next()).toMatch(
+		/^grai: wrote keys\/0-[0-9a-f]{12}\.js in out \(.+ ms\)$/,
+	);
 });
 
 it("grai watch says the output is up to date once a broken catalog is put back as it was", async () => {
