@@ -952,15 +952,22 @@ const devTest = { timeout: 60_000 };
 const devWait = { timeout: 30_000 };
 
 describe("the Vite plugin's dev server", devTest, () => {
-	/** A dev server of the project in a mode, its SSR environment, and a render of its render.js there. */
+	/**
+	 * A dev server of the project in a mode, its SSR environment, and a render of its render.js there.
+	 */
 	async function devServerOf(
 		dir: string,
-		{ plugins = [], mode }: { plugins?: Plugin[]; mode?: string } = {},
+		{
+			plugins = [],
+			mode,
+			tsconfigPaths = false,
+		}: { plugins?: Plugin[]; mode?: string; tsconfigPaths?: boolean } = {},
 	) {
 		const server = await createServer({
 			root: dir,
 			configFile: false,
 			logLevel: "silent",
+			resolve: { tsconfigPaths },
 			...(mode === undefined ? {} : { mode }),
 			server: { watch: fixtures },
 			plugins: [grai(), ...plugins],
@@ -970,7 +977,7 @@ describe("the Vite plugin's dev server", devTest, () => {
 		if (!isRunnableDevEnvironment(ssr)) throw new Error("ssr is not runnable");
 		const rendered = async () =>
 			(await ssr.runner.import<{ render(): string }>("/render.js")).render();
-		return { ssr, rendered };
+		return { server, ssr, rendered };
 	}
 
 	/** A dev server of the project, and a server render of its render.js through Vite's SSR runner. */
@@ -1204,6 +1211,58 @@ export const render = () => {
 			readFileSync(catalog, "utf8").replace('"Heading"', '"Title"'),
 		);
 		await expect.poll(rendered, devWait).toBe("Title");
+	});
+
+	it("serves the output by a path without its .js, and by a package import, before the first compile's output is written", async () => {
+		const { dir } = project(catalogs);
+		const release = heldOutput(dir);
+		writeFileSync(
+			join(dir, "package.json"),
+			JSON.stringify({ imports: { "#i18n/*": "./out/*" } }),
+		);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import { m } from "./out/messages";
+import { m as imported } from "#i18n/messages.js";
+export const render = () => \`\${m === imported} \${m.title()}\`;
+`,
+		);
+		const { server, rendered } = await devServerOf(dir);
+
+		expect(await rendered()).toBe("true Title");
+		const page =
+			await server.environments.client.transformRequest("/render.js");
+		expect(page?.code.match(/"\/out\/messages\.js"/g)).toHaveLength(2);
+		expect(existsSync(join(dir, "out", "keys.js"))).toBe(false);
+		release();
+	});
+
+	it("writes the output for an import only its files resolve, with a query or by a tsconfig's paths, before the first evaluation", async () => {
+		const { dir } = project(catalogs);
+		writeFileSync(
+			join(dir, "tsconfig.json"),
+			JSON.stringify({
+				compilerOptions: {
+					allowJs: true,
+					paths: { i18n: ["./out/messages.js"] },
+				},
+			}),
+		);
+		writeFileSync(
+			join(dir, "render.js"),
+			`import source from "./out/messages.js?raw";
+import { m } from "i18n";
+export const render = () => \`\${source.includes("export")} \${m.title()}\`;
+`,
+		);
+		const { server, rendered } = await devServerOf(dir, {
+			tsconfigPaths: true,
+		});
+
+		expect(await rendered()).toBe("true Title");
+		const page =
+			await server.environments.client.transformRequest("/render.js");
+		expect(page?.code).toContain('"/out/messages.js?raw"');
 	});
 
 	it("writes the output before a test run takes it, and fails the import when the write fails", async () => {
