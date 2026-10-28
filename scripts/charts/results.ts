@@ -30,7 +30,9 @@ export type Comparison =
 
 /**
  * One row of the table at a glance: a measure, lower is better, grai's figure and the best of the
- * others' in its recommended setup, how each is written, and how they compare.
+ * others' in its recommended setup, how each is written, and how they compare. Rows of one
+ * measure against another library's setups name the same `together`, and the table keeps them
+ * side by side, in the order their section gives them.
  */
 export type Glance = {
 	measure: string;
@@ -38,6 +40,7 @@ export type Glance = {
 	other: { name: string; value: number };
 	shown: (value: number) => string;
 	comparison: Comparison;
+	together?: string;
 };
 
 /**

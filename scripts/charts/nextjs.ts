@@ -124,22 +124,28 @@ export function nextColdSection(): Section {
 			}),
 		],
 		note: `${described()}. \`next dev\` from an empty .next, from its launch until the page's first response is complete, the apps taking turns in rounds whose order rotates, ${rows.cold.grai.runs.length} rounds, each pair's difference taken in the same round (\`bench/nextjs.mjs\`). grai's app starts with the groups of keys its watch saved; the fresh clone's starts with no output at all. ${setupsSaid}. The download is each app's page after \`next build\`, every response compressed with brotli.`,
-		glance: setups.flatMap(({ name, app }) => [
-			glanceOf(
-				"Next.js dev: a cold start's first page",
-				cold("grai"),
-				[name, cold(app)],
-				duration,
-				{ kind: "difference", difference: difference("grai", app) },
-			),
-			glanceOf(
-				"Next.js: a built page's download, brotli",
-				download(rows.bytes.grai),
-				[name, download(rows.bytes[app])],
-				kilobytes,
-				{ kind: "exact" },
-			),
-		]),
+		glance: [
+			...setups.map(({ name, app }) => ({
+				...glanceOf(
+					"Next.js dev: a cold start's first page",
+					cold("grai"),
+					[name, cold(app)],
+					duration,
+					{ kind: "difference", difference: difference("grai", app) },
+				),
+				together: "next cold",
+			})),
+			...setups.map(({ name, app }) => ({
+				...glanceOf(
+					"Next.js: a built page's download, brotli",
+					download(rows.bytes.grai),
+					[name, download(rows.bytes[app])],
+					kilobytes,
+					{ kind: "exact" },
+				),
+				together: "next download",
+			})),
+		],
 	};
 }
 
@@ -208,15 +214,16 @@ export function nextEditSection(): Section {
 		],
 		note: `${described()}. A catalog saved as an editor saves it until Chromium ${chromium} shows the edit in the open page, ${edits} edits an app, in sessions the apps take in rotating rounds, the components' order rotating too, each page checked whole after every edit (\`bench/nextjs.mjs\`). For grai, "written" is when the file holding the edit was written; the rest is Next's. ${setupsSaid}.`,
 		glance: components.flatMap(([heading, component]) =>
-			setups.map(({ name, app }) =>
-				glanceOf(
+			setups.map(({ name, app }) => ({
+				...glanceOf(
 					`Next.js dev: an edit in ${heading.toLowerCase()}, until shown`,
 					edit("grai", component).spread,
 					[name, edit(app, component).spread],
 					duration,
 					{ kind: "ratio", ratio: ratio(app, component) },
 				),
-			),
+				together: `next edit ${component}`,
+			})),
 		),
 	};
 }
