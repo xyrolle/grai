@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { CompiledKey } from "./compilation.ts";
-import type { Build } from "./compile.ts";
+import type { CompiledProject } from "./compile.ts";
 import {
 	changeEvent,
 	patchedEvent,
@@ -109,7 +109,7 @@ const devWords = new Set(
  */
 export function devModule(
 	outdir: string,
-	build: Build,
+	build: CompiledProject,
 	version: number,
 	locale?: string,
 ): string {
@@ -167,7 +167,7 @@ const keys = await import(/* @vite-ignore */ url.href);
 const shellWords = new Set(shellCode([], "").match(/[A-Za-z_$][\w$]*/g));
 
 /** keys.js for the client in dev (`shellCode`). */
-export function pageKeysShell(build: Build): string {
+export function pageKeysShell(build: CompiledProject): string {
 	const { locales, baseLocale } = build.config;
 	return `${shellCode(locales, baseLocale)}${destructuredExports(
 		"keys",
@@ -195,7 +195,7 @@ export { missing as ${key} };
 /** An edit's patch: the changed keys' rows, which the page writes into its table. */
 export function patchModule(
 	outdir: string,
-	build: Build,
+	build: CompiledProject,
 	changed: readonly string[],
 ): string {
 	const keys = changed.flatMap((key) => build.compilation.keys.get(key) ?? []);
