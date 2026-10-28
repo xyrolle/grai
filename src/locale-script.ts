@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { minifySync } from "vite";
-import { parse } from "./code/parse.ts";
 import type { Config } from "./config.ts";
 import { directionOf } from "./config-module.ts";
 import { globPattern } from "./globs.ts";
@@ -23,10 +22,10 @@ export type PageChunks = {
  * every build of a project, so its hash in a Content Security Policy stays valid until the config
  * or grai changes; each page's chunks go in its `data-grai-chunks`, which a hash does not cover.
  */
-export function localeScript(
+export async function localeScript(
 	config: Config,
 	{ minify, copies }: { minify: boolean; copies: boolean },
-): string {
+): Promise<string> {
 	const read = config.strategy.flatMap((source) => places.get(source) ?? []);
 	const settings = Object.assign(
 		{
@@ -37,17 +36,20 @@ export function localeScript(
 		...read.map((place) => place.settings(config)),
 	);
 	const matches = read.some((place) => place.matches);
+	const page = await pageFunctions();
+	// V8 gives a function's source as it stands in its module, so no parser reads page-locale.js.
+	const sourceOf = (name: PageFunction) => page[name].toString();
 	const readers = read.map(
 		(place) =>
-			`(${place.reader})(settings${place.matches ? ", localeReach" : ""})`,
+			`(${sourceOf(place.reader)})(settings${place.matches ? ", localeReach" : ""})`,
 	);
 	const steps = [
-		`(${pickPageLocale})(settings, [${readers.join(", ")}]);`,
-		...(copies ? [`(${pointAtCopies})();`] : []),
+		`(${sourceOf("pickPageLocale")})(settings, [${readers.join(", ")}]);`,
+		...(copies ? [`(${sourceOf("pointAtCopies")})();`] : []),
 	];
 	const parameters = matches ? "settings, localeReach" : "settings";
 	const values = matches
-		? `${inlineJson(settings)}, ${localeReach}`
+		? `${inlineJson(settings)}, ${await localeReach()}`
 		: inlineJson(settings);
 	const call = `((${parameters}) => {\n${steps.join("\n")}\n})(${values});`;
 	return minify ? minifySync("grai-page-locale.js", call).code : call;
@@ -70,16 +72,47 @@ function inlineJson(value: unknown): string {
 	return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
-const pickPageLocale = functionSource("page-locale.js", "pickPageLocale");
-const pointAtCopies = functionSource("page-locale.js", "pointAtCopies");
-const localeReach = functionSource("server.js", "localeReach");
+/** A function of `runtime/page-locale.js` that a page's script holds. */
+type PageFunction =
+	| "pickPageLocale"
+	| "pointAtCopies"
+	| "cookieReader"
+	| "storageReader"
+	| "queryReader"
+	| "languagesReader"
+	| "pathReader";
+
+/**
+ * `runtime/page-locale.js`, imported the first time a script is written. It is the runtime's plain
+ * JavaScript, which type-checking the runtime checks, so it is imported by its URL, with no
+ * declarations of its own beside it.
+ */
+let pageLocale: Promise<Record<PageFunction, () => unknown>> | undefined;
+function pageFunctions(): Promise<Record<PageFunction, () => unknown>> {
+	pageLocale ??= import(
+		new URL("./runtime/page-locale.js", import.meta.url).href
+	);
+	return pageLocale;
+}
+
+/**
+ * The server's language matching, `localeReach` in `runtime/server.js`, read from that module the
+ * first time a page's strategy matches a language. It is the one function of the script that is
+ * not page-locale.js's, and server.js imports the output's config, so it is found by parsing the
+ * module, and the parser loads only for a script that holds it.
+ */
+let localeReachSource: Promise<string> | undefined;
+function localeReach(): Promise<string> {
+	localeReachSource ??= functionSource("server.js", "localeReach");
+	return localeReachSource;
+}
 
 /**
  * A place a page reads for a strategy: the function that makes its reader, what it reads of the
  * config, and whether it matches a language as the server does.
  */
 type Place = {
-	reader: string;
+	reader: PageFunction;
 	settings: (config: Config) => Record<string, unknown>;
 	matches: boolean;
 };
@@ -89,7 +122,7 @@ const places = new Map<string, Place>([
 	[
 		"cookie",
 		{
-			reader: functionSource("page-locale.js", "cookieReader"),
+			reader: "cookieReader",
 			settings: (config) => ({ cookieName: config.cookie?.name }),
 			matches: false,
 		},
@@ -97,7 +130,7 @@ const places = new Map<string, Place>([
 	[
 		"localStorage",
 		{
-			reader: functionSource("page-locale.js", "storageReader"),
+			reader: "storageReader",
 			settings: (config) => ({ localStorageKey: config.localStorageKey }),
 			matches: false,
 		},
@@ -105,7 +138,7 @@ const places = new Map<string, Place>([
 	[
 		"query",
 		{
-			reader: functionSource("page-locale.js", "queryReader"),
+			reader: "queryReader",
 			settings: (config) => ({ queryParameter: config.queryParameter }),
 			matches: true,
 		},
@@ -113,7 +146,7 @@ const places = new Map<string, Place>([
 	[
 		"preferredLanguage",
 		{
-			reader: functionSource("page-locale.js", "languagesReader"),
+			reader: "languagesReader",
 			settings: () => ({}),
 			matches: true,
 		},
@@ -121,7 +154,7 @@ const places = new Map<string, Place>([
 	[
 		"url",
 		{
-			reader: functionSource("page-locale.js", "pathReader"),
+			reader: "pathReader",
 			settings: ({ urlRouting }) => ({
 				prefixes: urlRouting.prefixes,
 				prefixesEveryLocale: urlRouting.localePrefix === "always",
@@ -138,7 +171,8 @@ const places = new Map<string, Place>([
 ]);
 
 /** The source of a function declared at the top of a runtime module, exported or not. */
-function functionSource(file: string, name: string): string {
+async function functionSource(file: string, name: string): Promise<string> {
+	const { parse } = await import("./code/parse.ts");
 	const text = readFileSync(
 		new URL(`./runtime/${file}`, import.meta.url),
 		"utf8",
