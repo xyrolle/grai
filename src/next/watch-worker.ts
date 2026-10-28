@@ -13,13 +13,13 @@ import { parentPort, workerData } from "node:worker_threads";
 import type { Build } from "../compile.ts";
 import { readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
+import { whenQuiet } from "../quiet.ts";
 import { groupsFile, savedGroups, saveGroups } from "../saved-groups.ts";
 import { watch } from "../watch.ts";
 import { type AppData, isAppData } from "./app-data.ts";
 import { reportErrors } from "./errors.ts";
 import { firstGroups } from "./first-groups.ts";
 import { keyWeights, nextKeyGroups } from "./key-groups.ts";
-import { whenQuiet } from "./quiet.ts";
 import { started } from "./startup.ts";
 
 /** What withGrai hands the watch: the app's, and whether Next waits for the first compile. */
