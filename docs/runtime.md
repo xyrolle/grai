@@ -34,31 +34,7 @@ Not adopted:
 
 ## Compared with other libraries
 
-grai against Paraglide 2.29.1, i18next 26.4 and use-intl 4.14 (intl-messageformat 11, as next-intl runs it), on app A's catalogs. Every library renders the same calls, from i18next JSON and ICU MessageFormat converted from the same catalogs (`bench/libraries.mjs`), and its text is checked against grai's before it is timed. One key of app B that neither format can hold is left out of every sample.
-
-| | grai | Paraglide | i18next | use-intl |
-|---|---|---|---|---|
-| A text message on the server (`server`) | 19–25 ns | 46–50 ns | 1,434–1,815 ns | 2,746–3,211 ns |
-| A message with inputs on the server (`server`) | 110–130 ns | 67–122 ns | 3,627–4,262 ns | 3,029–3,519 ns |
-| A plural message on the server (`server`) | 79–90 ns | 667–787 ns | 3,869–4,094 ns | 4,207–4,448 ns |
-| A message with markup, its parts drawn, on the server (`server`) | 121–150 ns | 139–154 ns | no API outside react-i18next's `Trans` | 3,307–3,952 ns, `t.markup` |
-| A text message in a page (`client`) | 4.4–4.8 ns | 361–394 ns; 4.5–5.9 ns given `{ locale }` | 1,031–1,100 ns | 1,337–1,494 ns |
-| A message with inputs in a page (`client`) | 18–19 ns | 366–392 ns; 11.7–12.3 ns given `{ locale }` | 2,063–2,163 ns | 1,363–1,531 ns |
-| Server render of a page of 2,000 messages (`ssr`) | 0.13 ms | 0.20–0.23 ms | 3.89–3.93 ms | 4.84–5.04 ms |
-| Hydrating that page, at full CPU speed and at 4× slower (`hydrate`) | 5.4–6.9 / 22.3–27.8 ms | 7.9–10.4 / 33.5–43.0 ms | 12.2–15.6 / 52.9–66.9 ms | 16.7–21.6 / 71.2–89.2 ms |
-| That page's JS, brotli (`hydrate`) | 22.9–24.9 KB | 38.0–40.5 KB | 125.1–133.3 KB | 124.6–132.5 KB |
-| A new server process: loading every locale's messages, then the first render (`startup`) | 16.6 + 3.1 ms | 46.6 + 2.3 ms | 14.5 + 11.2 ms | 13.0 + 21.9 ms |
-| The same, with Node's compile cache warm (`startup`) | 8.0 + 3.2 ms | 19.5 + 2.4 ms | 11.5 + 11.2 ms | 10.5 + 22.5 ms |
-| Heap the messages hold (`startup`) | 4.1 MB | 7.1 MB | 3.2 MB | 9.9 MB |
-| The runtime in the browser, its whole API, brotli (`library-bytes`) | 1.0 KB | 3.6 KB | 12.1 KB | 10.2 KB |
-| The messages a page downloads (`bytes`) | its keys and some its chunks share, in its locale: 34.5 KB on the largest page with `localeChunks`, 71.3 KB in every locale without | its own keys, in every locale: 51.6 KB | the whole catalog: 104.4 KB | the whole catalog: 103.4 KB |
-| A full compile (`compile-time`) | 67 ms | 3.8 s; 32.1 s with the declarations app A's `sync` writes | none, the catalog is read at run time | none; precompiling is optional, 79 ms a locale |
-| One message edited, until the page shows it in Vite (`hmr`) | 12 ms | 3.8 s, its Vite plugin compiles again | 88 ms, the locale's JSON sent and parsed again | 94 ms, the same |
-| A dev page's heap once collected, with the whole catalog, and what each edit adds (`hmr`) | 8.0 MB; 5.4 KB | 57.6 MB; 40.7 MB | 7.0 MB; 4.8 MB | 6.8 MB; 4.5 MB |
-| Type checking 500 calls with `tsc` 7 (`types`) | 82 ms | 278 ms | 609 ms | 521 ms |
-| The editor's first completion of a key, TypeScript 6 (`types`) | 0.2 s | 1.0 s | 49 s | 21 s |
-
-The server rows run grai's output as its Vite plugin builds it for a server, inside a request that grai's middleware binds to the locale; the page rows run its client build in Chromium, with the page's locale copies swapped in as an import map swaps them. Paraglide's call in a page runs its strategy each time, which a call given `{ locale }` skips. These rows were measured on app A, at 6,379 and then 6,418 keys as its catalogs grew between the runs, at a load of 9–18 on 18 cores: the page rows in two runs and the server rows in one, each range covering its runs and both locales. The startup rows bundle each library into one file with a page of the sample's static calls, as a server build holds them; grai's is its Vite plugin's server build, measured at a load of about 5 on 18 cores. i18next and use-intl load faster than grai and render slower. V8 parses grai's binding for each key and its text keys' strings as code, and their catalogs as data; they then work out each message on its first call. Through the first render grai is ahead: 19.7 ms against 25.7 ms for i18next and 34.9 ms for use-intl. With Node's compile cache warm, grai also loads first (`startup`). On app B, twice app A's size, the gaps widen: i18next's first completion takes 258 s against grai's 0.3 s and Paraglide's 3.4 s (`types`), and the page's JS is 208 KB against 21 KB (`hydrate`). Each bench prints app B and the synthetic catalog too.
+[docs/benchmarks.md](benchmarks.md) compares grai with Paraglide, i18next, use-intl and next-intl: each bench there takes the libraries in rounds whose order rotates, pairs them round by round, and gives each figure the interval that holds its median. One measure it does not take yet: a new server process (`startup`), which loads every locale's messages more slowly on grai than on i18next or use-intl, as V8 parses grai's binding for each key as code where they read their catalogs as data, and renders its first page sooner; with Node's compile cache warm, grai loads first. The sections below are the measurements behind grai's own decisions.
 
 ## Server
 
