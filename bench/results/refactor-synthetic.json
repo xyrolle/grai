@@ -1,6 +1,6 @@
 {
 	"bench": "refactor-synthetic",
-	"date": "2026-10-27T14:03:59.522Z",
+	"date": "2026-10-28T09:17:06.614Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,11 +8,11 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 10.4,
-		"end": 10.8
+		"start": 13.7,
+		"end": 24
 	},
 	"node": "24.16.0",
-	"grai": "cee60fe2",
+	"grai": "1253e02",
 	"versions": {
 		"@inlang/paraglide-js": "2.29.1",
 		"i18next": "26.4.7",
@@ -23,23 +23,318 @@
 		"rolldown": "1.2.15",
 		"playwright-core": "1.64.1"
 	},
-	"runs": 3,
+	"runs": 6,
+	"key": "area70_label_5793",
+	"clock": "grai's CLI in a new Node process, from its launch until it exits",
+	"cold": "the facts and the file listing grai keeps in the outdir's .grai removed; the compiled output and the file system's caches kept",
 	"rows": {
 		"check": {
-			"cold": 2427.5,
-			"warm": 503.5
+			"ran": "grai check --json",
+			"cold": 3366.5,
+			"coldSamples": {
+				"median": 3366.5,
+				"low": 2808.1,
+				"high": 4077.5,
+				"confidence": 0.969,
+				"samples": [
+					2830.2,
+					2808.1,
+					3214.1,
+					4077.5,
+					4055.4,
+					3519
+				]
+			},
+			"warm": 775.1,
+			"warmSamples": {
+				"median": 775.1,
+				"low": 601.7,
+				"high": 1057.8,
+				"confidence": 0.969,
+				"samples": [
+					799,
+					601.7,
+					731.8,
+					879.3,
+					751.2,
+					1057.8
+				]
+			},
+			"rounds": [
+				{
+					"load": 13.7,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 13.7,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 13.6,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 14.1,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 14.3,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 15.2,
+					"order": [
+						"warm",
+						"cold"
+					]
+				}
+			]
 		},
 		"find": {
-			"cold": 2781.6,
-			"warm": 467
+			"ran": "grai find area70_label_5793",
+			"cold": 3568.6,
+			"coldSamples": {
+				"median": 3568.6,
+				"low": 3144.9,
+				"high": 3902.8,
+				"confidence": 0.969,
+				"samples": [
+					3446.9,
+					3846.6,
+					3902.8,
+					3144.9,
+					3247.1,
+					3690.4
+				]
+			},
+			"warm": 700.8,
+			"warmSamples": {
+				"median": 700.8,
+				"low": 619.1,
+				"high": 750.7,
+				"confidence": 0.969,
+				"samples": [
+					750.7,
+					619.1,
+					748.5,
+					701,
+					700.6,
+					656.1
+				]
+			},
+			"rounds": [
+				{
+					"load": 15.4,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 16.1,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 18.4,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 19.4,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 19.4,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 19.7,
+					"order": [
+						"warm",
+						"cold"
+					]
+				}
+			]
 		},
 		"rename": {
-			"cold": 2846.3,
-			"warm": 574.4
+			"ran": "grai rename area70_label_5793 area70_label_5793_x",
+			"cold": 3316.5,
+			"coldSamples": {
+				"median": 3316.5,
+				"low": 3093.4,
+				"high": 4598.8,
+				"confidence": 0.969,
+				"samples": [
+					3093.4,
+					3289.1,
+					3116.3,
+					3558.3,
+					3344,
+					4598.8
+				]
+			},
+			"warm": 726.9,
+			"warmSamples": {
+				"median": 726.9,
+				"low": 622.9,
+				"high": 772.3,
+				"confidence": 0.969,
+				"samples": [
+					622.9,
+					730.1,
+					723.7,
+					745.8,
+					711.8,
+					772.3
+				]
+			},
+			"rounds": [
+				{
+					"load": 20,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 19.8,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 19.9,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 19.6,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 19,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 19.1,
+					"order": [
+						"warm",
+						"cold"
+					]
+				}
+			]
 		},
 		"check --fix": {
-			"cold": 2310.2,
-			"warm": 535
+			"ran": "grai check --fix",
+			"cold": 3249.9,
+			"coldSamples": {
+				"median": 3249.9,
+				"low": 3048,
+				"high": 3443.8,
+				"confidence": 0.969,
+				"samples": [
+					3443.8,
+					3304,
+					3239.8,
+					3048,
+					3259.9,
+					3083.1
+				]
+			},
+			"warm": 891.9,
+			"warmSamples": {
+				"median": 891.9,
+				"low": 747,
+				"high": 918,
+				"confidence": 0.969,
+				"samples": [
+					907.4,
+					918,
+					903.5,
+					880.2,
+					801,
+					747
+				]
+			},
+			"rounds": [
+				{
+					"load": 20.5,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 20.3,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 21.9,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 22.2,
+					"order": [
+						"warm",
+						"cold"
+					]
+				},
+				{
+					"load": 23.3,
+					"order": [
+						"cold",
+						"warm"
+					]
+				},
+				{
+					"load": 23.1,
+					"order": [
+						"warm",
+						"cold"
+					]
+				}
+			]
 		}
 	}
 }
