@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
@@ -16,26 +16,27 @@ const catalogOf = (locale: string, count: number) =>
 		]),
 	);
 
-/** The modules keys.js re-exports, each by its name without its content's hash. */
-const reexported = (out: string) =>
+/** The modules keys.js re-exports, by their paths in the output. */
+const modulesOf = (out: string) =>
 	readFileSync(join(out, "keys.js"), "utf8")
 		.split("\n")
 		.filter(Boolean)
-		.map((line) =>
-			withoutContentHash(/"\.\/(keys\/[^"]+)"/.exec(line)?.[1] ?? ""),
-		);
+		.map((line) => /"\.\/(keys\/[^"]+)"/.exec(line)?.[1] ?? "");
 
-/** The keys a module of keys exports, from its file's text. */
+/** The modules keys.js re-exports, each by its name without its content's hash. */
+const reexported = (out: string) => modulesOf(out).map(withoutContentHash);
+
+/**
+ * The keys a module of keys exports, from the text of the file keys.js names: not one a compile
+ * replaced, which stays a while for readers still loading it.
+ */
 const exportedBy = (out: string, label: string) => {
-	const file = readdirSync(join(out, "keys")).find(
-		(name) =>
-			name.endsWith(".js") && withoutContentHash(name) === `${label}.js`,
+	const file = modulesOf(out).find(
+		(path) => withoutContentHash(path) === `keys/${label}.js`,
 	);
 	if (file === undefined) throw new Error(`no module ${label}`);
 	return [
-		...readFileSync(join(out, "keys", file), "utf8").matchAll(
-			/^export const (\w+)/gm,
-		),
+		...readFileSync(join(out, file), "utf8").matchAll(/^export const (\w+)/gm),
 	]
 		.map(([, key]) => key)
 		.sort();
