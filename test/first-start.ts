@@ -5,24 +5,25 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { stateDirectory } from "../src/state-directory.ts";
 
 /**
- * Makes a project's next dev start a first one, as after a clone or an upgrade of grai: no build
+ * Makes a project's next dev start a first one, as after a fresh clone: no output, and no build
  * saved for its watcher to start from, so the dev server serves its first page before it writes
- * the output. With `held`, another writer holds the outdir's lock, so the output stays unwritten
- * until `release` is called.
+ * the output. With `kept`, the output an earlier grai wrote stays, as after an upgrade of grai,
+ * and only the saved build goes. With `held`, another writer holds the outdir's lock, so the
+ * output stays unwritten until `release` is called.
  */
 export function firstStart(
 	outdir: string,
-	{ held = false }: { held?: boolean } = {},
+	{ held = false, kept = false }: { held?: boolean; kept?: boolean } = {},
 ): { release: () => void } {
-	const state = join(outdir, stateDirectory);
-	rmSync(join(state, "build"), { force: true });
-	const lock = join(state, "lock");
+	if (kept) rmSync(join(outdir, stateDirectory, "build"), { force: true });
+	else rmSync(outdir, { recursive: true, force: true });
+	const lock = join(outdir, stateDirectory, "lock");
 	if (held) {
-		mkdirSync(state, { recursive: true });
+		mkdirSync(dirname(lock), { recursive: true });
 		writeFileSync(lock, String(process.pid));
 	}
 	return { release: () => rmSync(lock, { force: true }) };
