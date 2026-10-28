@@ -14,17 +14,15 @@
  */
 
 import { createHash, hash } from "node:crypto";
-import {
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	writeFileSync,
-} from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type FileFacts, type ModuleFacts, table } from "./facts.ts";
+import type { StateStore } from "./state-store.ts";
+
+/** The name the cache is kept under in its store. */
+const factsName = "facts";
 
 /** What the cache holds for a file: its text's hash, and its facts' text (`keptText`). */
 type Entry = { hash: string; kept: string };
@@ -45,7 +43,7 @@ const readers = ["oxc-parser", "svelte", "vue", "astro", "@mdx-js/mdx"];
 const require = createRequire(import.meta.url);
 
 export class FactsCache {
-	private readonly file: string;
+	private readonly store: StateStore;
 	/** What the facts are read with (`readerVersion`), which every kept fact of a file's is keyed on. */
 	readonly version: string = readerVersion(
 		dirname(fileURLToPath(import.meta.url)),
@@ -54,10 +52,10 @@ export class FactsCache {
 	private readonly kept = new Map<string, Entry>();
 	private added = false;
 
-	/** The cache of a project's facts, in its outdir's state, or an empty one. */
-	constructor(stateDirectory: string) {
-		this.file = join(stateDirectory, "facts");
-		this.read = load(this.file, this.version);
+	/** The cache of a project's facts, as its store keeps it (`stateFiles`), or an empty one. */
+	constructor(store: StateStore) {
+		this.store = store;
+		this.read = load(store.read(factsName), this.version);
 	}
 
 	/** A file's facts, if the cache has them for the text of this hash (`textHash`). */
@@ -102,14 +100,11 @@ export class FactsCache {
 	 */
 	save(): void {
 		if (!this.added && this.kept.size === this.read.size) return;
-		mkdirSync(dirname(this.file), { recursive: true });
-		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
 		const lines = [JSON.stringify(this.version)];
 		for (const [path, { hash, kept }] of this.kept) {
 			lines.push(`${JSON.stringify(path)}\t${hash}\t${kept}`);
 		}
-		writeFileSync(temporary, `${lines.join("\n")}\n`);
-		renameSync(temporary, this.file);
+		this.store.write(factsName, `${lines.join("\n")}\n`);
 		// A watching build saves again only what it reads anew.
 		this.added = false;
 	}
@@ -187,14 +182,13 @@ export function readerVersion(directory: string): string {
  * its path as JSON, its text's hash and its facts' text, apart by tabs, which JSON writes escaped.
  * A cache of another version, or one no reading can use, holds nothing.
  */
-function load(file: string, version: string): ReadonlyMap<string, Entry> {
-	let lines: string[];
-	try {
-		lines = readFileSync(file, "utf8").split("\n");
-	} catch {
-		// No cache yet: every file is read.
-		return new Map();
-	}
+function load(
+	text: string | undefined,
+	version: string,
+): ReadonlyMap<string, Entry> {
+	// No cache yet: every file is read.
+	if (text === undefined) return new Map();
+	const lines = text.split("\n");
 	const entries = new Map<string, Entry>();
 	try {
 		if (JSON.parse(lines[0] ?? "") !== version) return entries;

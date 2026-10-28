@@ -11,24 +11,22 @@
  * its content. A file changed earlier than that changes its times with any later change.
  */
 
-import {
-	type BigIntStats,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-	writeFileSync,
-} from "node:fs";
+import { type BigIntStats, readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { relative, sep } from "node:path";
 import { type Seen, sourcePaths } from "../sources.ts";
 import { specifiersIn, spellsOtherwise } from "./candidates.ts";
 import { textHash } from "./facts-cache.ts";
+import type { StateStore } from "./state-store.ts";
 
 /**
  * The time within which a file's times may not tell two of its texts apart: two seconds, the
  * resolution of a FAT volume's modification time, the coarsest a system keeps.
  */
 const tick = 2_000;
+
+/** The name the listing is kept under in its store. */
+const listingName = "files";
 
 /** A source file, with what the listing knows of it. */
 export type Listed = {
@@ -53,17 +51,17 @@ export type Listed = {
 type Kept = [string, string, string, string, number, string, boolean, string[]];
 
 export class FileListing {
-	private readonly file: string;
+	private readonly store: StateStore;
 	private readonly version: string;
 	private readonly read: ReadonlyMap<string, Kept>;
 	private readonly kept = new Map<string, Kept>();
 	private changed = false;
 
-	/** The listing kept in a project's state, for facts read with `version`, or an empty one. */
-	constructor(stateDirectory: string, version: string) {
-		this.file = join(stateDirectory, "files");
+	/** The listing its store keeps (`stateFiles`), for facts read with `version`, or an empty one. */
+	constructor(store: StateStore, version: string) {
+		this.store = store;
 		this.version = version;
-		this.read = load(this.file, version);
+		this.read = load(store.read(listingName), version);
 	}
 
 	/**
@@ -106,11 +104,11 @@ export class FileListing {
 	/** Writes the listing, when a file was read again or is gone. */
 	save(): void {
 		if (!this.changed) return;
-		mkdirSync(dirname(this.file), { recursive: true });
-		const temporary = `${this.file}.${process.pid}.${Date.now()}.saving`;
 		const files = Object.fromEntries(this.kept);
-		writeFileSync(temporary, JSON.stringify({ version: this.version, files }));
-		renameSync(temporary, this.file);
+		this.store.write(
+			listingName,
+			JSON.stringify({ version: this.version, files }),
+		);
 	}
 
 	private listed(
@@ -175,10 +173,15 @@ function unchanged(kept: Kept, stat: BigIntStats): boolean {
 	return latest / 1e6 < checked - tick;
 }
 
-/** The listing kept in a file, or none for another version or a file no save wrote. */
-function load(file: string, version: string): ReadonlyMap<string, Kept> {
+/** The listing kept, or none for another version or a text no save wrote. */
+function load(
+	text: string | undefined,
+	version: string,
+): ReadonlyMap<string, Kept> {
+	// No listing yet: every file is read.
+	if (text === undefined) return new Map();
 	try {
-		const value: unknown = JSON.parse(readFileSync(file, "utf8"));
+		const value: unknown = JSON.parse(text);
 		if (
 			typeof value !== "object" ||
 			value === null ||
@@ -197,7 +200,7 @@ function load(file: string, version: string): ReadonlyMap<string, Kept> {
 		}
 		return kept;
 	} catch {
-		// No listing yet, or one no save wrote: every file is read.
+		// A listing no save wrote: every file is read.
 		return new Map();
 	}
 }

@@ -25,6 +25,7 @@ import { ModuleGraph, type Output, type Resolve } from "./modules.ts";
 import { Pool } from "./pool.ts";
 import { projectResolution, resolverFor } from "./resolution.ts";
 import { Resolutions, unnamed } from "./resolved.ts";
+import { type StateStore, stateFiles } from "./state-store.ts";
 import { TextTest } from "./text-test.ts";
 import { workspacePackages } from "./workspace.ts";
 
@@ -49,11 +50,15 @@ export type ProjectCode = {
  */
 export type ReadingScope = { key?: string | undefined; every?: boolean };
 
-/** A project's code under the roots, or the error that keeps its imports from resolving. */
+/**
+ * A project's code under the roots, or the error that keeps its imports from resolving. It keeps
+ * the facts and the listing it read for the next reading in `store`: the outdir's state, unless
+ * given another.
+ */
 export async function readProjectCode(
 	given: Config,
 	roots: readonly string[],
-	{ key, every = false }: ReadingScope = {},
+	{ key, every = false, store }: ReadingScope & { store?: StateStore } = {},
 ): Promise<ProjectCode | GraiError> {
 	// Each module named by its real path, as the bundler names it and the resolver resolves it, so a
 	// project reached through a symlink, as macOS reaches its temporary directory, finds its sources
@@ -72,10 +77,11 @@ export async function readProjectCode(
 	if (resolution instanceof GraiError) return resolution;
 	const resolveFile = resolverFor(resolution);
 	const state = join(config.outdir, stateDirectory);
-	const cache = new FactsCache(state);
+	const kept = store ?? stateFiles(state);
+	const cache = new FactsCache(kept);
 	const seen: Seen = { links: [], manifests: [], skipped: [] };
 	const listedRoots = roots.map(realPath);
-	const listing = new FileListing(state, cache.version);
+	const listing = new FileListing(kept, cache.version);
 	const files = await listing.list(
 		listedRoots,
 		config.root,

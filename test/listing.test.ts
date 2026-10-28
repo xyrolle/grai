@@ -9,11 +9,15 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { textHash } from "../src/code/facts-cache.ts";
 import { FileListing } from "../src/code/listing.ts";
+import { stateFiles } from "../src/code/state-store.ts";
 import { projectWith } from "./reading.ts";
 
 /** A listing of a project's `src`, kept in its outdir's state, as a reading lists it. */
 async function listingOf(dir: string) {
-	const listing = new FileListing(join(dir, "out/.grai"), "version");
+	const listing = new FileListing(
+		stateFiles(join(dir, "out/.grai")),
+		"version",
+	);
 	const files = await listing.list([join(dir, "src")], dir, join(dir, "out"), {
 		links: [],
 		manifests: [],
