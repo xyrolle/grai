@@ -122,6 +122,13 @@ export function graiPlugin(
 	let closeMessages = async () => {};
 	/** Has the dev server write its first compile's output now, if it has not yet (`serveMessages`). */
 	let writeServed = async () => false;
+	/** Starts the dev server's compiles, if they have not started (`serveMessages`). */
+	let startServing = () => {};
+	/** The build the dev server serves, once it has one, starting its watch if it has not started. */
+	const servedBuild = async () => {
+		startServing();
+		return served ?? (await firstServed);
+	};
 	/** The plugin's part in a build, which a dev server never runs: loaded as a build's config is. */
 	let bundling: Bundling | undefined;
 	/**
@@ -243,6 +250,7 @@ export function graiPlugin(
 				missingKeyImport,
 				version: patchesMade,
 				write: writeServed,
+				start: startServing,
 				close: closeMessages,
 			} = serveMessages(
 				server,
@@ -254,6 +262,12 @@ export function graiPlugin(
 					ready(compiled);
 				},
 			));
+			// The watch starts once the server listens, after the server's own callbacks, as the browser
+			// asks for the page, or as soon as a module needs the build served (`servedBuild`); with no
+			// server of its own, as in middleware mode, at once.
+			if (server.httpServer === null) startServing();
+			else
+				server.httpServer.once("listening", () => setImmediate(startServing));
 		},
 		// The dev server calls it as it closes: the compile under way finishes first, so nothing is
 		// written into the project once the server has closed.
@@ -262,9 +276,9 @@ export function graiPlugin(
 			await bundling?.end(this);
 		},
 		resolveId: {
-			// Ahead of Vite's resolver, which keeps a lookup that found nothing until its watcher reports
-			// the file: in dev every import waits for the first compile, so none, whatever names the
-			// output, looks for it before it exists. A page whose import failed would stay broken.
+			// Ahead of Vite's resolver, to take keys.js and a key's path to the plugin's modules. Only a
+			// key's path waits for the dev server's first build: an import of a file of the output that
+			// is not written yet resolves behind Vite's resolver (`unwrittenOutput`).
 			order: "pre",
 			async handler(id, importer, options) {
 				if (id.startsWith(outputPrefix))
@@ -275,7 +289,6 @@ export function graiPlugin(
 					id.startsWith(patchPrefix)
 				)
 					return `\0${id}`;
-				const compiled = serving ? (served ?? (await firstServed)) : build;
 				const module = moduleOf(id);
 				// In dev, keys.js is the plugin's module, by an id of its own (`devKeysId`).
 				if (module.type === "keys" && serving) {
@@ -286,6 +299,7 @@ export function graiPlugin(
 					return resolved?.id === files.keysFile ? devKeysId : resolved;
 				}
 				if (module.type !== "key" || importer === undefined) return null;
+				const compiled = serving ? await servedBuild() : build;
 				const resolved = await this.resolve(id, importer, {
 					...options,
 					skipSelf: true,
@@ -323,7 +337,7 @@ export function graiPlugin(
 					isDevKeys(id) || id === files.keysFile || isMessageModule(id);
 				const output = !devModuleId && id.startsWith(`${files.outdir}/`);
 				if (!devModuleId && !output) return null;
-				const compiled = served ?? (await firstServed);
+				const compiled = await servedBuild();
 				if (compiled === undefined) return null;
 				// Until a compile succeeds, the output's files are the outdir's, as no build was served.
 				if (!("compilation" in compiled))
@@ -378,7 +392,12 @@ export function graiPlugin(
 	});
 	const unwritten = unwrittenOutput({
 		files: () => files,
-		served: () => served,
+		served: async () => {
+			const compiled = await servedBuild();
+			return compiled !== undefined && "compilation" in compiled
+				? compiled
+				: undefined;
+		},
 		write: () => writeServed(),
 	});
 	return {
