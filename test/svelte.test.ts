@@ -338,7 +338,7 @@ const greeting = m.greeting({ name });</script>
 		]);
 	});
 
-	it("reads the server's calls as a property, and leaves dev as it is", async () => {
+	it("reads the server's calls as a property every text shares the getter of, and leaves dev as it is", async () => {
 		const dir = svelteApp({
 			"App.svelte": `<script>import { m } from "./out/messages.js";</script>\n<h1>{m.title()}</h1>`,
 		});
@@ -358,7 +358,8 @@ const greeting = m.greeting({ name });</script>
 
 		const server = code((await built(dir, withTexts(), "server")).files);
 
-		expect(server).toContain("get text() {");
+		expect(server).toContain('requestText("Title", "Titel")');
+		expect(server).toContain(".text");
 		expect(server).not.toContain("m.title()");
 		expect(await served(withTexts())).toBe(await served(withCalls()));
 	});
