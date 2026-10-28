@@ -15,7 +15,7 @@ import { watch } from "../watch.ts";
 import type { AppData } from "./app-data.ts";
 import { reportErrors } from "./errors.ts";
 import type { FirstGroups } from "./first-groups.ts";
-import { keyWeights, nextKeyGroups } from "./key-groups.ts";
+import { keyWeights } from "./key-weights.ts";
 import { startup } from "./startup.ts";
 
 /**
@@ -65,8 +65,12 @@ export function session(
 	});
 }
 
-/** Saves the groups of the keys the app's routes read, when they are not those already saved. */
+/**
+ * Saves the groups of the keys the app's routes read, when they are not those already saved. The
+ * code reader loads then, once the server is quiet, and not before the first compile.
+ */
 async function regroup(build: Build, extensions: string[]): Promise<void> {
+	const { nextKeyGroups } = await import("./key-groups.ts");
 	const groups = await nextKeyGroups(
 		build.config,
 		keyWeights(build.compilation),

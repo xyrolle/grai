@@ -10,7 +10,7 @@ import type { Placing } from "../placing.ts";
 import { type KeyGroups, savedGroups } from "../saved-groups.ts";
 import type { Compiled, Watch } from "../watch.ts";
 import type { FirstGroups } from "./first-groups.ts";
-import { keyWeights } from "./key-groups.ts";
+import { keyWeights } from "./key-weights.ts";
 
 /** How the start's last compile ended, and whether the groups read beside the first are saved. */
 export type Started = { compiled: Compiled; grouped: boolean };
