@@ -40,7 +40,7 @@ export function catalogKeys(
 	const open = (within: KeyPath, value: Readonly<Record<string, unknown>>) => {
 		for (const name in value) {
 			if (within.length === 0 && name === schemaKey) continue;
-			const path = [...within, name];
+			const path = within.length === 0 ? [name] : [...within, name];
 			const entry = value[name];
 			if (isRecord(entry)) {
 				if (isVariants(entry)) throw unwrapped(path, where);
