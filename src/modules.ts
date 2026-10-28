@@ -67,22 +67,9 @@ export function keyModule(
 		variants.some(({ pattern }) => formatsLiteral(pattern)),
 	);
 	if (!hasInputs && !hasMarkup && !formats) {
-		const texts = messages.map((message) =>
-			JSON.stringify(plainText(message.variants[0]?.pattern ?? [])),
+		return textModule(
+			messages.map((message) => plainText(message.variants[0]?.pattern ?? [])),
 		);
-		const value = messageValue("text", texts, []);
-		return {
-			value,
-			serverValue: value,
-			uses: textUses,
-			serverUses: textUses,
-			plurals: noNames,
-			formats: noFormats,
-			globals: noNames,
-			kind: "text",
-			variants: texts,
-			parts: [],
-		};
 	}
 	const used: Used = {
 		uses: new Set(),
@@ -107,6 +94,27 @@ export function keyModule(
 		kind,
 		variants,
 		parts: partArrows,
+	};
+}
+
+/**
+ * A key whose message is a text in every locale, one per locale in the config's order: a string per
+ * locale, which every build and dev module holds as it is.
+ */
+export function textModule(texts: readonly string[]): KeyModule {
+	const variants = texts.map((text) => JSON.stringify(text));
+	const value = messageValue("text", variants, []);
+	return {
+		value,
+		serverValue: value,
+		uses: textUses,
+		serverUses: textUses,
+		plurals: noNames,
+		formats: noFormats,
+		globals: noNames,
+		kind: "text",
+		variants,
+		parts: [],
 	};
 }
 
