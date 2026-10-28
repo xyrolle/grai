@@ -12,6 +12,7 @@ import { type CompileResult, compile, isCompiled } from "../compile.ts";
 import { type Config, readConfig } from "../config.ts";
 import { GraiError } from "../error.ts";
 import { packageName } from "../package-name.ts";
+import type { AppData } from "./app-data.ts";
 import { count, reportErrors } from "./errors.ts";
 import { defaultPageExtensions } from "./routes.ts";
 import type { WatchData } from "./watch-worker.ts";
@@ -56,7 +57,7 @@ export function withGrai(
 /** The watch of this process: Next asks for its config more than once, and it starts once. */
 let watched: Promise<void> | undefined;
 
-function watching(data: WatchData): Promise<void> {
+function watching(data: AppData): Promise<void> {
 	watched ??= startWatching(data);
 	return watched;
 }
@@ -70,14 +71,19 @@ const watchWorker = new URL(
 /**
  * Watches on a thread of its own (`watch-worker.ts`), and settles once the output can be read: at
  * once when it is current, so that Next starts while the watch's first compile builds what each
- * edit after it starts from, and else once that compile has written it. Either way the catalogs
- * compile once. The check comes first: started beside it, the watch's compile would hold it back.
+ * edit after it starts from, and else once that compile has written it, with the keys placed by
+ * their groups when the watch read them beside it in time (`first-groups.ts`). Either way the
+ * catalogs compile once. The check comes first: started beside it, the watch's compile would hold
+ * it back.
  */
-async function startWatching(data: WatchData): Promise<void> {
+async function startWatching(data: AppData): Promise<void> {
 	const compiled = await isCompiled(data.configFile);
 	// The watch runs grai's own modules, which take none of the process's flags, and a worker refuses
 	// some of them, such as `--input-type`.
-	const worker = new Worker(watchWorker, { workerData: data, execArgv: [] });
+	const worker = new Worker(watchWorker, {
+		workerData: { ...data, held: !compiled } satisfies WatchData,
+		execArgv: [],
+	});
 	// Next's server holds its process. Other processes read the config for `next dev` too, as
 	// Next's telemetry flush does when the server stops, and must be free to exit.
 	worker.unref();

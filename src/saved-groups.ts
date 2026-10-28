@@ -11,6 +11,11 @@ import { saveState } from "./state-saves.ts";
  */
 const groupsName = "groups.json";
 
+/** The file an outdir's groups are saved in. */
+export function groupsFile(outdir: string): string {
+	return join(outdir, stateDirectory, groupsName);
+}
+
 /** Groups of keys, each a list of the keys it holds. */
 export type KeyGroups = readonly (readonly string[])[];
 
@@ -22,7 +27,7 @@ export type KeyGroups = readonly (readonly string[])[];
 export function savedGroups(outdir: string): KeyGroups {
 	let text: string;
 	try {
-		text = readFileSync(join(outdir, stateDirectory, groupsName), "utf8");
+		text = readFileSync(groupsFile(outdir), "utf8");
 	} catch (error) {
 		if (isMissing(error)) return [];
 		throw error;
@@ -35,7 +40,8 @@ export function savedGroups(outdir: string): KeyGroups {
 	}
 }
 
-function isKeyGroups(value: unknown): value is KeyGroups {
+/** Whether a value is groups of keys: a list of lists of keys. */
+export function isKeyGroups(value: unknown): value is KeyGroups {
 	return (
 		Array.isArray(value) &&
 		value.every(
