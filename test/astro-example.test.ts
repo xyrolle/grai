@@ -1,16 +1,22 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	conflictingInput,
+	conflictingInputError,
+	firstStart,
+} from "./first-start.ts";
 import { stopped } from "./stopped.ts";
 
 // The Astro example (examples/astro), built by `astro build` as an app builds it: as a static site
 // served by `astro preview`, and rendered on demand by the Node adapter. Its pages in Chromium.
 const example = fileURLToPath(new URL("../examples/astro/", import.meta.url));
 const astro = join(example, "node_modules/.bin/astro");
+const outdir = join(example, "src/lib/i18n");
 
 /** Runs `astro build`, failing with what it printed, else giving it. */
 function built(args: string[]): string {
@@ -375,24 +381,38 @@ describe("the Astro example, rendered on demand by the Node adapter", {
 	});
 });
 
+/**
+ * Starts `astro dev`. --ignore-lock: in the foreground, as `astro preview` above. Astro's dev
+ * server leaves requests to Vite's alone inside Vitest, by the VITEST that the suite's runner sets.
+ * No update check: in a project without a recent one, as a fresh clone is, the server asks the
+ * registry and writes .astro/settings.json once it listens. Astro skips one change of that file,
+ * but macOS can report the write as two, and the second restarts the server under the test's
+ * request.
+ */
+const dev = () =>
+	listening(
+		astro,
+		["dev", "--port", "0", "--host", "127.0.0.1", "--ignore-lock"],
+		{ VITEST: "", ASTRO_DISABLE_UPDATE_CHECK: "true" },
+	);
+
 describe("the Astro example in dev", { timeout: 30_000 }, () => {
 	let origin = "";
 	let served: Served | undefined;
+	let first = { release: () => {} };
+	const catalog = join(example, "messages/ro.json");
+	const words = readFileSync(catalog, "utf8");
 	beforeAll(async () => {
-		// --ignore-lock: in the foreground, as `astro preview` above. Astro's dev server leaves
-		// requests to Vite's alone inside Vitest, by the VITEST that the suite's runner sets.
-		// No update check: in a project without a recent one, as a fresh clone is, the server asks
-		// the registry and writes .astro/settings.json once it listens. Astro skips one change of that
-		// file, but macOS can report the write as two, and the second restarts the server under the
-		// test's request.
-		served = await listening(
-			astro,
-			["dev", "--port", "0", "--host", "127.0.0.1", "--ignore-lock"],
-			{ VITEST: "", ASTRO_DISABLE_UPDATE_CHECK: "true" },
-		);
+		// A first start, whose output another writer keeps from being written until the second test.
+		first = firstStart(outdir, { held: true });
+		served = await dev();
 		origin = served.origin;
 	}, 60_000);
-	afterAll(() => served && stopped(served.server));
+	afterAll(async () => {
+		first.release();
+		if (served) await stopped(served.server);
+		writeFileSync(catalog, words);
+	});
 
 	it("matches a path in its locale's words to grai's route, and renders the page's route there", async () => {
 		expect(await pageAt(origin, "/ro/despre/")).toEqual([
@@ -411,5 +431,50 @@ describe("the Astro example in dev", { timeout: 30_000 }, () => {
 			"<h1>Despre acest exemplu</h1>",
 		]);
 		expect((await pageAt(origin, "/en/despre/"))[0]).toBe("404");
+		// Rendered before the first compile's output could be written.
+		expect(existsSync(join(outdir, ".grai", "lock"))).toBe(true);
+	});
+
+	it("renders an edit made while the first compile's output waits to be written", async () => {
+		writeFileSync(
+			catalog,
+			words.replace('"Despre acest exemplu"', '"Despre exemplu"'),
+		);
+		first.release();
+
+		await expect
+			.poll(() => pageAt(origin, "/ro/despre/"), { timeout: 20_000 })
+			.toEqual([
+				"200",
+				'<html lang="ro" dir="ltr">',
+				"<h1>Despre exemplu</h1>",
+			]);
+	});
+});
+
+describe("the Astro example in dev, a first start with an error only the output's write finds", {
+	timeout: 30_000,
+}, () => {
+	let origin = "";
+	let served: Served | undefined;
+	let restore = () => {};
+	beforeAll(async () => {
+		restore = conflictingInput(join(example, "messages"));
+		firstStart(outdir);
+		served = await dev();
+		origin = served.origin;
+	}, 60_000);
+	afterAll(async () => {
+		if (served) await stopped(served.server);
+		restore();
+	});
+
+	it("renders the first page in its locale, then shows the error in Vite's overlay", async () => {
+		await page.goto(`${origin}/ro/despre/`);
+		expect(await text("h1")).toBe("Despre acest exemplu");
+		await page
+			.locator("vite-error-overlay")
+			.getByText(conflictingInputError)
+			.waitFor();
 	});
 });

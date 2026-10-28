@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright-core";
@@ -13,6 +13,11 @@ import {
 	onTestFinished,
 } from "vitest";
 import { outsideTests } from "./app-environment.ts";
+import {
+	conflictingInput,
+	conflictingInputError,
+	firstStart,
+} from "./first-start.ts";
 import { stopped } from "./stopped.ts";
 
 // The Vue example (examples/vue): built by Vite, checked by vue-tsc against the package's built
@@ -21,6 +26,7 @@ import { stopped } from "./stopped.ts";
 const example = fileURLToPath(new URL("../examples/vue/", import.meta.url));
 const vite = join(example, "node_modules/.bin/vite");
 const vueTsc = join(example, "node_modules/.bin/vue-tsc");
+const outdir = join(example, "src/i18n");
 
 /** A server the suite started, and the origin it printed. */
 type Served = { server: ChildProcess; origin: string };
@@ -196,11 +202,17 @@ describe("the Vue example, built", { timeout: 30_000 }, () => {
 describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
 	let origin = "";
 	let app: Served | undefined;
+	let first = { release: () => {} };
 	beforeAll(async () => {
+		// A first start, whose output another writer keeps from being written until the second test.
+		first = firstStart(outdir, { held: true });
 		app = await served(["--dev"]);
 		origin = app.origin;
 	}, 60_000);
-	afterAll(() => app && stopped(app.server));
+	afterAll(async () => {
+		first.release();
+		if (app) await stopped(app.server);
+	});
 
 	/** Writes `text` as the Romanian title, and puts the catalog back after the test. */
 	function editTitle(text: string): void {
@@ -212,6 +224,32 @@ describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
 			JSON.stringify({ ...JSON.parse(catalog), title: text }, null, "\t"),
 		);
 	}
+
+	it("serves the first page before its first compile's output is written, and hydrates without a mismatch", async () => {
+		await openIn(origin, "ro");
+		await page
+			.getByRole("heading", { name: "Un magazin care îți vorbește limba" })
+			.waitFor();
+		await page.getByRole("button", { name: "Adaugă un produs" }).click();
+		expect(await text("#cart")).toBe("2 produse în coș");
+
+		expect(existsSync(join(outdir, ".grai", "lock"))).toBe(true);
+		expect(logged).toEqual([]);
+	});
+
+	it("renders an edit made while the first compile's output waits to be written", async () => {
+		await openIn(origin, "ro");
+		await page.getByRole("button", { name: "Adaugă un produs" }).click();
+
+		editTitle("Un magazin pe limba ta");
+		first.release();
+		await page
+			.getByRole("heading", { name: "Un magazin pe limba ta" })
+			.waitFor();
+
+		expect(await text("#cart")).toBe("2 produse în coș");
+		expect(logged).toEqual([]);
+	});
 
 	it("renders an edited message again in place, keeping the page's state, and hydrates without a mismatch", async () => {
 		await openIn(origin, "ro");
@@ -226,5 +264,34 @@ describe("the Vue example under Vite's dev server", { timeout: 30_000 }, () => {
 		expect(await page.evaluate(() => "unreloaded" in globalThis)).toBe(true);
 		expect(await text("#cart")).toBe("2 produse în coș");
 		expect(logged).toEqual([]);
+	});
+});
+
+describe("the Vue example under Vite's dev server, a first start with an error only the output's write finds", {
+	timeout: 30_000,
+}, () => {
+	let origin = "";
+	let app: Served | undefined;
+	let restore = () => {};
+	beforeAll(async () => {
+		restore = conflictingInput(join(example, "messages"));
+		firstStart(outdir);
+		app = await served(["--dev"]);
+		origin = app.origin;
+	}, 60_000);
+	afterAll(async () => {
+		if (app) await stopped(app.server);
+		restore();
+	});
+
+	it("serves the first page in its locale, then shows the error in Vite's overlay", async () => {
+		await openIn(origin, "ro");
+		await page
+			.getByRole("heading", { name: "Un magazin care îți vorbește limba" })
+			.waitFor();
+		await page
+			.locator("vite-error-overlay")
+			.getByText(conflictingInputError)
+			.waitFor();
 	});
 });
