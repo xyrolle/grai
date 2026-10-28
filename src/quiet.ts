@@ -11,10 +11,13 @@ const quietMilliseconds = 500;
 const quietShare = 0.1;
 
 /**
- * Calls `then` once the process is quiet, unless the function it returns is called first. The wait
- * keeps no process alive.
+ * Calls `then` once the process is quiet, or once `deadline` milliseconds have passed if one is
+ * given, unless the function it returns is called first. The wait keeps no process alive.
  */
-export function whenQuiet(then: () => void): () => void {
+export function whenQuiet(
+	then: () => void,
+	{ deadline }: { deadline?: number } = {},
+): () => void {
 	let used = process.cpuUsage();
 	let at = performance.now();
 	const timer = setInterval(() => {
@@ -23,10 +26,19 @@ export function whenQuiet(then: () => void): () => void {
 		const share = (user + system) / 1000 / (now - at);
 		used = process.cpuUsage();
 		at = now;
-		if (share >= quietShare) return;
-		clearInterval(timer);
-		then();
+		if (share < quietShare) call();
 	}, quietMilliseconds);
 	timer.unref();
-	return () => clearInterval(timer);
+	const late =
+		deadline === undefined ? undefined : setTimeout(() => call(), deadline);
+	late?.unref();
+	function stop() {
+		clearInterval(timer);
+		clearTimeout(late);
+	}
+	function call() {
+		stop();
+		then();
+	}
+	return stop;
 }
