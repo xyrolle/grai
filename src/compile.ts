@@ -40,8 +40,12 @@ export type CompiledProject = ParsedCatalogs & {
 	hashes: readonly string[];
 	compilation: Compilation;
 	rendered: RenderedModules;
-	/** What a saved build must match to be taken up again: `buildKey` of the config as read. */
-	key: string;
+	/**
+	 * What a saved build must match to be taken up again: `buildKey` of the config as read, made
+	 * when it is first asked for, as the build is saved. The compiler's identity it holds reads the
+	 * compiler's modules, which a dev server's first page need not wait for.
+	 */
+	key: () => string;
 };
 
 /** Everything a compile read, made and wrote, kept so the next compile redoes only what changed. */
@@ -248,6 +252,7 @@ function compiledFrom(
 		declare,
 	});
 	if (compilation.errors.length > 0) return { errors: [...compilation.errors] };
+	let key: string | undefined;
 	return {
 		config,
 		sources,
@@ -262,7 +267,10 @@ function compiledFrom(
 			localeCopies,
 			previous?.rendered.formats,
 		),
-		key: buildKey(configured, { pseudoLocale, localeCopies }),
+		key: () => {
+			key ??= buildKey(configured, { pseudoLocale, localeCopies });
+			return key;
+		},
 	};
 }
 
