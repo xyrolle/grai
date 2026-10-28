@@ -433,3 +433,18 @@ it("gives the locale script's index.html hook to the plugins of apps whose pages
 	// Astro's and Nuxt's, which draw their pages too.
 	expect(hooked(graiPlugin({}).plugins)).toEqual([]);
 });
+
+it("holds in the page the code of the places its strategy reads alone", async () => {
+	const { dist } = await built(
+		site({ strategy: ["cookie"], cookieName: "lang" }),
+	);
+	const html = readFileSync(join(dist, "index.html"), "utf8");
+	// The page's one inline script: its others load modules from files.
+	const script = html.match(
+		/<script(?![^>]*\bsrc=)[^>]*>(.*?)<\/script>/s,
+	)?.[1];
+
+	expect(script).toContain("document.cookie");
+	for (const unread of ["localStorage", "URLSearchParams", "navigator", "Intl"])
+		expect(script).not.toContain(unread);
+});

@@ -131,6 +131,7 @@ const median = (values) =>
 
 console.log("\n### The locale script's bytes, minified, for 3 locales\n");
 console.log("| strategy | bytes | gzip | brotli |\n| --- | --- | --- | --- |");
+console.log(scriptBytes("cookie", ["cookie"]));
 console.log(
 	scriptBytes("cookie, preferredLanguage", ["cookie", "preferredLanguage"]),
 );
