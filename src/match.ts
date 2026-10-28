@@ -26,13 +26,14 @@ export function parseMatch(
 			);
 		}
 		const keys = parseVariantKey(key, selectors);
-		if (written.has(keys.join(","))) {
+		const joined = keys.join(",");
+		if (written.has(joined)) {
 			throw new MessageProblem(
 				"message-invalid",
-				`two variants have the keys ${keys.join(",")}, so one of them can never be chosen. Remove one.`,
+				`two variants have the keys ${joined}, so one of them can never be chosen. Remove one.`,
 			);
 		}
-		written.add(keys.join(","));
+		written.add(joined);
 		variants.push({ keys, pattern: parsePattern(pattern) });
 	}
 	return variants;
@@ -45,10 +46,10 @@ export function parseVariantKey(
 ): string[] {
 	const keys = new Map<string, string>();
 	for (const part of key === "" ? [] : key.split(",")) {
-		const [name = "", value = "", extra] = part
-			.split("=")
-			.map((side) => side.trim());
-		if (name === "" || value === "" || extra !== undefined) {
+		const equals = part.indexOf("=");
+		const name = equals === -1 ? part.trim() : part.slice(0, equals).trim();
+		const value = equals === -1 ? "" : part.slice(equals + 1).trim();
+		if (name === "" || value === "" || part.includes("=", equals + 1)) {
 			throw new MessageProblem(
 				"message-invalid",
 				`the variant key "${key}" must be selector=value pairs joined by commas, such as "countPlural=one".`,
