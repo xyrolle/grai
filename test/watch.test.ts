@@ -328,3 +328,12 @@ function keysWith(dir: string, text: string): boolean {
 		)
 	);
 }
+
+it("writes what it served when asked as soon as it has served it, while its compile is still ending", async () => {
+	const { dir, config } = project(catalogs);
+	const { watcher, served } = servingWatcher(config);
+	await served;
+
+	expect(await watcher.write()).toBe(true);
+	expect(keysWith(dir, '"Titel"')).toBe(true);
+});
