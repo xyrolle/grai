@@ -5,13 +5,13 @@ import type { Served } from "./served.ts";
 import { devKeysId, type ProjectFiles } from "./vite-dev.ts";
 
 /**
- * What the resolver takes from grai's plugin: the project's files, the build the dev server serves,
- * and its `write`, which writes the first compile's output now if it is not written yet, with
- * whether it was not (`serveMessages`).
+ * What the resolver takes from grai's plugin: the project's files, the build the dev server serves
+ * once it has one, and its `write`, which writes the first compile's output now if it is not
+ * written yet, with whether it was not (`serveMessages`).
  */
 export type UnwrittenOutput = {
 	files: () => ProjectFiles;
-	served: () => Served | undefined;
+	served: () => Promise<Served | undefined>;
 	write: () => Promise<boolean>;
 };
 
@@ -45,8 +45,9 @@ export function unwrittenOutput(dev: UnwrittenOutput): Plugin {
 		resolveId: {
 			order: "post",
 			async handler(id, importer, options) {
-				const served = dev.served();
-				if (served === undefined || id.startsWith("\0")) return null;
+				if (id.startsWith("\0")) return null;
+				const served = await dev.served();
+				if (served === undefined) return null;
 				const { outdir, keysFile } = dev.files();
 				const query = id.indexOf("?");
 				const specifier = query === -1 ? id : id.slice(0, query);

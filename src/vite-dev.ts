@@ -10,7 +10,7 @@ import { missingKeyModule, patchModule } from "./dev-module.ts";
 import { messagesOf } from "./error.ts";
 import { devKeysId, everyLocale, pageKeysId } from "./page-keys.ts";
 import type { Served } from "./served.ts";
-import { watch } from "./watch.ts";
+import { type Watch, watch } from "./watch.ts";
 
 /** Where a project's grai files are, for the plugin. */
 export type ProjectFiles = {
@@ -35,12 +35,12 @@ export const patchPrefix = "grai:patch/";
 const missingKeyPrefix = "\0grai:missing-key/";
 
 /**
- * The dev server's side: compiles when the server starts and whenever the config or a catalog
- * changes, and nothing else. Each build goes to `compiled`, or the errors of a compile that
- * failed or threw, which the page shows in Vite's overlay until a build succeeds. After an edit,
- * the page gets a patch of the changed keys, or with `reloadOnEdit` reloads; a key added or
- * removed, one turned from text into markup or back, or a new runtime (another config for it to
- * read, or another grai), reloads it. A patch imports the plural rules and formatters by their
+ * The dev server's side: its watch starts once `start` is called, or as `write` asks for it, and
+ * compiles then and whenever the config or a catalog changes, and nothing else. Each build goes to
+ * `compiled`, or the errors of a compile that failed or threw, which the page shows in Vite's
+ * overlay until a build succeeds. After an edit, the page gets a patch of the changed keys, or with
+ * `reloadOnEdit` reloads; a key added or removed, one turned from text into markup or back, or a
+ * new runtime (another config for it to read, or another grai), reloads it. A patch imports the plural rules and formatters by their
  * names in the edit's build, so it reaches them when an edit renames them. A
  * server environment that runs its modules in Vite's runner patches its table the same way, so
  * the next server render has the new words without the runner evaluating the program again; any
@@ -64,6 +64,7 @@ export function serveMessages(
 	missingKeyImport: (key: string, importer: string) => string | undefined;
 	version: () => number;
 	write: () => Promise<boolean>;
+	start: () => void;
 	close: () => Promise<void>;
 } {
 	const client = server.environments.client;
@@ -246,21 +247,28 @@ export function serveMessages(
 		cleared();
 		if (before !== undefined) update(before, next).catch(failed);
 	};
-	const watcher = watch(
-		files.configFile,
-		(result, _milliseconds, next) => {
-			if (next !== undefined) return serve(next, true);
-			compiled(result.errors);
-			shown(messagesOf(result.errors));
-		},
-		failed,
-		// What a page is served early is no output known to be written: the index's output may have
-		// lost a file since, which its take-up writes and Vite is told of then.
-		servesFirst ? { serve: (next) => serve(next, false) } : {},
-	);
+	let watcher: Watch | undefined;
+	/** Whether `close` was called, after which nothing starts. */
+	let closed = false;
+	/** The watch, started on its first call (`start`). */
+	const watching = () => {
+		watcher ??= watch(
+			files.configFile,
+			(result, _milliseconds, next) => {
+				if (next !== undefined) return serve(next, true);
+				compiled(result.errors);
+				shown(messagesOf(result.errors));
+			},
+			failed,
+			// What a page is served early is no output known to be written: the index's output may have
+			// lost a file since, which its take-up writes and Vite is told of then.
+			servesFirst ? { serve: (next) => serve(next, false) } : {},
+		);
+		return watcher;
+	};
 	/** Writes the first compile's output now, if it is not written yet, and tells Vite of its files. */
 	const write = async () => {
-		const wrote = await watcher.write();
+		const wrote = await watching().write();
 		await announced;
 		return wrote;
 	};
@@ -289,7 +297,13 @@ export function serveMessages(
 		missingKeyImport,
 		version: () => patches.size,
 		write,
-		close: watcher.close,
+		start: () => {
+			if (!closed) watching();
+		},
+		close: async () => {
+			closed = true;
+			await watcher?.close();
+		},
 	};
 }
 
