@@ -154,6 +154,37 @@ const sized = (word: string) =>
 	`${word} `.repeat(Math.ceil((8 * requestBytes) / word.length));
 
 describe("the Vite plugin's build", () => {
+	it("builds a page and a server with no warning of its own", async () => {
+		const { dir } = project({ en: { title: "Title" }, de: { title: "Titel" } });
+		writeFileSync(
+			join(dir, "main.js"),
+			`import { m } from "./out/messages.js";\nconsole.log(m.title());\n`,
+		);
+		writeFileSync(
+			join(dir, "index.html"),
+			`<!doctype html><script type="module" src="/main.js"></script>`,
+		);
+		const warnings: string[] = [];
+		const customLogger = createLogger("warn");
+		customLogger.warn = (message) => warnings.push(message);
+		customLogger.warnOnce = (message) => warnings.push(message);
+		for (const ssr of [false, true]) {
+			await build({
+				root: dir,
+				configFile: false,
+				customLogger,
+				plugins: [grai({ localeChunks: true })],
+				build: {
+					write: false,
+					ssr,
+					...(ssr ? { rolldownOptions: { input: join(dir, "main.js") } } : {}),
+				},
+			});
+		}
+
+		expect(warnings).toEqual([]);
+	});
+
 	it("gives each entry only the keys its code uses, when each set of them is worth a chunk of its own", async () => {
 		const { dir } = project({
 			en: {
