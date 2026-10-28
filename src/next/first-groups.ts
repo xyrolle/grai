@@ -7,9 +7,9 @@
 // before the compile was done, and the groups then come within the time the compile took. The start
 // then waits for them at most that long, and compiles once more to place the keys by them, where
 // shards by a hash cost Next's first page every shard in each layer that reads a key: on the bench's
-// page, 6,366 keys, about 30 ms of code read, 10 of grouping and 40 of placing, against 680 ms that
-// shards cost the page. Otherwise the thread stops at once, so that it never takes the CPU from
-// Next's first page, and the watch reads the groups once the server is quiet, for the next start.
+// page, at 6,366 keys, Next waits 80 ms more and its first page comes 221–373 ms sooner. Otherwise
+// the thread stops at once, so that it never takes the CPU from Next's first page, and the watch
+// reads the groups once the server is quiet, for the next start.
 
 import { extname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
