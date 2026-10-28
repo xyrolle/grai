@@ -268,6 +268,8 @@ export function serveMessages(
 	};
 	/** Writes the first compile's output now, if it is not written yet, and tells Vite of its files. */
 	const write = async () => {
+		// Closed, nothing starts a watch, which would write into the project after it.
+		if (closed) return false;
 		const wrote = await watching().write();
 		await announced;
 		return wrote;
