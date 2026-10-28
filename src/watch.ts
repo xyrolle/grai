@@ -31,11 +31,16 @@ const settleMilliseconds = 20;
  * how long the compile took, and with its build when it succeeded; a compile that throws, as when
  * the outdir cannot be written, goes to `failed`, and the next change compiles again.
  *
+ * `first` settles once the first compile has ended, and `compileAgain` once a compile it starts,
+ * or the one after the compile under way, has: with how it ended, after its report, and after the
+ * read again a catalog in the middle of a save takes, so a caller that waits for it never sees
+ * output that compile is still to write.
+ *
  * The first compile starts from the build the project's last watcher saved, if this grai saved it
  * on this runtime from the same config (`savedBuild`), so a start compiles only what changed since,
- * as an edit does. Its first build is saved for the next start (`firstBuildSaver`). It watches until the process ends or `close` is called, whose promise settles once the
- * compile under way, if any, has finished and the build is saved, so the project can then be
- * removed.
+ * as an edit does. Its first build is saved for the next start (`firstBuildSaver`). It watches until
+ * the process ends or `close` is called, whose promise settles once the compile under way, if any,
+ * has finished and the build is saved, so the project can then be removed.
  */
 export function watch(
 	configFile: string,
@@ -45,7 +50,7 @@ export function watch(
 		build: Build | undefined,
 	) => void,
 	failed: (error: unknown) => void,
-): { close: () => Promise<void>; compileAgain: () => Promise<void> } {
+): Watch {
 	let closed = false;
 	let watchers: FSWatcher[] = [];
 	let build: Build | undefined;
@@ -63,6 +68,21 @@ export function watch(
 	/** Whether the next compile is the first, which starts from the saved build. */
 	let first = true;
 	const saver = firstBuildSaver();
+	/** How many compiles have begun, and those waiting for a compile begun after a count to end. */
+	let begun = 0;
+	let waiting: { after: number; ended: (compiled: Compiled) => void }[] = [];
+	/** Ends the wait of every caller a compile begun since its call was waiting for. */
+	const ended = (compiled: Compiled) => {
+		const done = waiting.filter(({ after }) => after < begun);
+		waiting = waiting.filter(({ after }) => after >= begun);
+		for (const waiter of done) waiter.ended(compiled);
+	};
+	/** How the next compile begun from now ends. */
+	const nextCompile = () =>
+		new Promise<Compiled>((resolve) => {
+			if (closed) resolve({ closed: true });
+			else waiting.push({ after: begun, ended: resolve });
+		});
 
 	/**
 	 * Watches the config and the catalogs it names, afresh before each compile: a file an editor
@@ -99,6 +119,7 @@ export function watch(
 			again = false;
 			const quiet = settled;
 			settled = false;
+			begun += 1;
 			const started = performance.now();
 			try {
 				follow();
@@ -119,12 +140,16 @@ export function watch(
 				const from = build;
 				build = next.build ?? build;
 				if (next.build !== undefined) saver.took(next.build, from);
-				if (closed || (reportedBuild && unchanged(next))) continue;
-				report(next.result, performance.now() - started, next.build);
-				reportedBuild = next.build !== undefined;
+				const milliseconds = performance.now() - started;
+				if (!closed && !(reportedBuild && unchanged(next))) {
+					report(next.result, milliseconds, next.build);
+					reportedBuild = next.build !== undefined;
+				}
+				ended({ result: next.result, milliseconds, build: next.build });
 			} catch (error) {
 				reportedBuild = false;
 				failed(error);
+				ended({ error });
 			}
 		} while (again && !closed);
 	};
@@ -139,23 +164,47 @@ export function watch(
 		});
 	};
 
+	const firstCompile = nextCompile();
 	run();
 	return {
-		// For an input no followed file changes, such as the groups an adapter saved; it settles once
-		// that compile is done.
-		compileAgain: () => {
+		first: firstCompile,
+		compileAgain: async () => {
+			const compiled = nextCompile();
 			if (!closed) run();
-			return running ?? Promise.resolve();
+			return compiled;
 		},
 		close: async () => {
 			closed = true;
 			clearTimeout(settling);
 			for (const watcher of watchers) watcher.close();
 			await running;
+			for (const waiter of waiting) waiter.ended({ closed: true });
+			waiting = [];
 			await saver.flush();
 		},
 	};
 }
+
+/**
+ * How a compile ended: its result, how long it took, and its build when it succeeded; or what it
+ * threw; or that the watch closed first.
+ */
+export type Compiled =
+	| { result: CompileResult; milliseconds: number; build: Build | undefined }
+	| { error: unknown }
+	| { closed: true };
+
+/** A watch under way. */
+export type Watch = {
+	/** How the first compile ends. */
+	first: Promise<Compiled>;
+	/**
+	 * Compiles again, for an input no followed file changes, such as the groups an adapter saved,
+	 * and settles with how that compile ends.
+	 */
+	compileAgain: () => Promise<Compiled>;
+	close: () => Promise<void>;
+};
 
 /** Whether a compile succeeded without changing a key or writing a file. */
 function unchanged(next: { result: CompileResult; build?: Build }): boolean {
