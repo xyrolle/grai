@@ -271,6 +271,32 @@ it("saves the groups each route's side reads once next dev is quiet, and the nex
 	});
 });
 
+it("groups a fresh app's keys for its first page, when its code is read before its catalogs compile", {
+	timeout: 180_000,
+}, async () => {
+	// Catalogs large enough that their first compile outlasts the read of the app's few files.
+	const dir = nextProject(20_000, homePage(["key7"], ["key900"]), {
+		withGrai: true,
+	});
+
+	const html = await requested((await started(dir)).origin, "/");
+
+	expect(html).toContain("de key7");
+	expect(html).toContain("de key900");
+	const server = moduleOf(dir, "de key7");
+	const client = moduleOf(dir, "de key900");
+	expect([server, client]).toEqual([
+		expect.stringMatching(/^keys\/g0-/),
+		expect.stringMatching(/^keys\/g1-/),
+	]);
+	expect(compiledKeys(dir)).toEqual({
+		"app-rsc": [server],
+		"app-ssr": [client],
+		"app-client": [client],
+	});
+	expect(await savedGroups(dir, () => true)).toEqual([["key7"], ["key900"]]);
+});
+
 it("renders a key a component reads after the groups were saved, groups it at the next start, and groups again as routes come and go", {
 	timeout: 300_000,
 }, async () => {
