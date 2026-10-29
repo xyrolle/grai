@@ -2,6 +2,36 @@
 
 What changes for those who use grai, release by release, newest first. Until 1.0, a minor release may change the API that `docs/api.md` lists.
 
+## 0.1.1 (unreleased)
+
+Dev servers that serve their first page sooner and load only its locale's words, Next.js pages that compile only the keys their routes read, and a lighter package.
+
+### The compiler
+- A module of keys is named by its shape: its keys, each one's kind, inputs and markup, and what the module imports. An edit to a message's words rewrites the module in place, under the name it had, and leaves `keys.js` as it is, so a bundler that watches the outdir compiles that one module again. An edit that adds or removes a key, or changes a key's inputs or markup, gives the module a new name, as every edit did before, so a process that loads one module before such an edit and another after never calls a key by its old inputs beside another by its new ones.
+- The outdir has a `package.json` of its own. Its modules are ES modules whatever the project's `package.json` says, so a CommonJS project's Node loads them without a warning at each, and only `server.js` has side effects, so a bundler leaves out the modules of keys no code reads.
+- A compile does less work for each message: it reads a pattern's text a run at a time rather than a character at a time, and a select's variants as they were parsed.
+
+### The commands
+- The CLI loads only the command it runs, so `grai help` and `grai compile` start sooner.
+- `grai check`, `find` and `rename` read a Svelte component in async mode, where any expression of its template may `await`.
+
+### The adapters
+- **A dev server's first start serves its first page sooner.** With no saved build, as after a clone or an upgrade of grai, it serves the first page from its first compile, in memory: a message that is plain text in every locale is taken as it is, unparsed. It declares the keys and writes the output once the process is quiet, two seconds after at the latest. Until then the output's files come from memory, by their paths with or without `.js` and by package imports too, and grai writes them first where only a file on disk will do: a glob, an import with a query, Vite's dependency scan, and Vitest's servers.
+- **A restart serves its first page from the saved build's index,** about a tenth of the build, while the catalogs are as they were, and takes up the build once the server is quiet. It loads the compiler only then, and the watch starts once the server listens, so neither holds up Vite's start.
+- **A dev page loads its own locale's words alone,** as a built page loads its locale's copies. Its import map points `keys.js` at its locale's module, and a preload fetches it first: `@xyrolle/grai/vite`'s locale script writes them, and so do SvelteKit's `handleLocale`, Astro's middleware and Nuxt's plugin. A Vitest run keeps every locale's words, as `useLocale` switches between them.
+- A dev server of a plain Vite app no longer loads grai's code readers or its chunking, which a build alone needs.
+- **Next.js: each route's keys in a few modules.** Once `next dev` is quiet, the watch reads the app's code and saves the keys each route reads, on the server and in the client apart, as groups (`.grai/groups.json` in the outdir). Every compile, `next build`'s too, puts each group's keys in a module of its own, so Turbopack compiles a page's keys and few others. The reading follows keys through barrels and `export *`, and takes the routes by the app's page extensions, `page.tsx` too. Groups out of date cost speed, never a key.
+- **Next.js: a fresh clone's first start.** `next dev` reads the groups beside its first compile and places the keys by them before Next starts. It writes the output's modules first, and their declarations once the server is quiet, and `withGrai` checks the output without loading the compiler. `withGrai` fails when the watch fails or stops before it is ready, rather than leave Next waiting, and prints each error the watch reports.
+- **Next.js: an edit to a message's words** rewrites its module of keys in place, so Turbopack compiles that module again and nothing else.
+
+### Locales on the server and in the page
+- The page's locale script holds only the readers of the places the config's `strategy` reads, and the import map's code only in a build with `localeChunks`. `@xyrolle/grai/vite` writes it from the runtime's own functions, and parses `server.js` only for a strategy that matches a language.
+- A Svelte server build reads every text through one getter that all texts share, rather than a getter of each key's own.
+
+### The package
+- `dist` is bundled: a module per entry, and chunks of what they share, so importing grai loads a few modules rather than one per source file. Each module ships with its source map, which holds grai's sources, so a stack trace under `node --enable-source-maps` names grai's source file and line.
+- A start identifies the compiler by the list of its modules that grai's build ships, on Windows too, rather than by hashing every module of the package, and loads no parser to do so.
+
 ## 0.1.0 (2026-10-27)
 
 The first release, published as `@xyrolle/grai`.
