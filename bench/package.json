@@ -40,7 +40,7 @@
 		"refactor": "node refactor.mjs",
 		"dev-start": "node dev-start.mjs",
 		"build-added": "node build-added.mjs",
-		"readme": "pnpm --dir .. build && node refactor.mjs synthetic && node compile-time.mjs synthetic synthetic-13326 && node server.mjs synthetic && node ssr.mjs synthetic && node plurals.mjs && node ordinals.mjs && node types.mjs synthetic synthetic-13326 && node hydrate.mjs synthetic && node hmr.mjs synthetic && node dev-start.mjs synthetic && node library-bytes.mjs synthetic && node build-added.mjs && node nextjs.mjs synthetic",
+		"readme": "pnpm --dir .. build && pnpm install --frozen-lockfile && node refactor.mjs synthetic && node compile-time.mjs synthetic synthetic-13326 && node server.mjs synthetic && node ssr.mjs synthetic && node plurals.mjs && node ordinals.mjs && node types.mjs synthetic synthetic-13326 && node hydrate.mjs synthetic && node hmr.mjs synthetic && node dev-start.mjs synthetic && node library-bytes.mjs synthetic && node build-added.mjs && node nextjs.mjs synthetic",
 		"nextjs": "node nextjs.mjs",
 		"astro": "node astro.mjs",
 		"vue": "node vue.mjs",
