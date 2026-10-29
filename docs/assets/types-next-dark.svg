@@ -14,37 +14,37 @@
 <text x="388" y="415" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">150</text>
 <text x="16" y="100" font-size="13" font-weight="600" fill="#c3c2b7">6,366 keys</text>
 <text x="89" y="131" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
-<path d="M99,119H99.8A4,4 0 0 1 103.8,123V129A4,4 0 0 1 99.8,133H99Z" fill="#898781"/>
-<path d="M103.2,126H104.4M103.2,122V130M104.4,122V130" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="110.4" y="131" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3 ms</text>
+<path d="M99,119H100.2A4,4 0 0 1 104.2,123V129A4,4 0 0 1 100.2,133H99Z" fill="#898781"/>
+<path d="M103.6,126H104.7M103.6,122V130M104.7,122V130" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="110.7" y="131" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">3 ms</text>
 <text x="89" y="163" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
-<path d="M99,151H105.2A4,4 0 0 1 109.2,155V161A4,4 0 0 1 105.2,165H99Z" fill="#898781"/>
-<path d="M108.6,158H110M108.6,154V162M110,154V162" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="116" y="163" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">5 ms</text>
+<path d="M99,151H110.5A4,4 0 0 1 114.5,155V161A4,4 0 0 1 110.5,165H99Z" fill="#898781"/>
+<path d="M111.1,158H117.4M111.1,154V162M117.4,154V162" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="123.4" y="163" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">8 ms</text>
 <text x="89" y="195" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,183H146.4A4,4 0 0 1 150.4,187V193A4,4 0 0 1 146.4,197H99Z" fill="#3987e5"/>
-<path d="M148.7,190H150.8M148.7,186V194M150.8,186V194" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="156.8" y="195" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">27 ms</text>
+<path d="M99,183H168A4,4 0 0 1 172,187V193A4,4 0 0 1 168,197H99Z" fill="#3987e5"/>
+<path d="M158.1,190H199.4M158.1,186V194M199.4,186V194" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="205.4" y="195" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">38 ms</text>
 <text x="89" y="227" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,215H154.3A4,4 0 0 1 158.3,219V225A4,4 0 0 1 154.3,229H99Z" fill="#898781"/>
-<path d="M155.8,222H160.5M155.8,218V226M160.5,218V226" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="166.5" y="227" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">31 ms</text>
+<path d="M99,215H182.7A4,4 0 0 1 186.7,219V225A4,4 0 0 1 182.7,229H99Z" fill="#898781"/>
+<path d="M163.9,222H244.8M163.9,218V226M244.8,218V226" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="250.8" y="227" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">46 ms</text>
 <text x="16" y="256" font-size="13" font-weight="600" fill="#c3c2b7">13,326 keys</text>
 <text x="89" y="287" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
-<path d="M99,275H104.6A4,4 0 0 1 108.6,279V285A4,4 0 0 1 104.6,289H99Z" fill="#898781"/>
-<path d="M107.5,282H110.9M107.5,278V286M110.9,278V286" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="116.9" y="287" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">5 ms</text>
+<path d="M99,275H104.7A4,4 0 0 1 108.7,279V285A4,4 0 0 1 104.7,289H99Z" fill="#898781"/>
+<path d="M107.3,282H110.4M107.3,278V286M110.4,278V286" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="116.4" y="287" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">5 ms</text>
 <text x="89" y="319" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
-<path d="M99,307H114.3A4,4 0 0 1 118.3,311V317A4,4 0 0 1 114.3,321H99Z" fill="#898781"/>
-<path d="M117.9,314H126.4M117.9,310V318M126.4,310V318" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="132.4" y="319" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">10 ms</text>
+<path d="M99,307H122.6A4,4 0 0 1 126.6,311V317A4,4 0 0 1 122.6,321H99Z" fill="#898781"/>
+<path d="M117.8,314H130.2M117.8,310V318M130.2,310V318" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="136.2" y="319" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">14 ms</text>
 <text x="89" y="351" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,339H213.1A4,4 0 0 1 217.1,343V349A4,4 0 0 1 213.1,353H99Z" fill="#3987e5"/>
-<path d="M198.4,346H258M198.4,342V350M258,342V350" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="264" y="351" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">61 ms</text>
+<path d="M99,339H227.2A4,4 0 0 1 231.2,343V349A4,4 0 0 1 227.2,353H99Z" fill="#3987e5"/>
+<path d="M191.3,346H304.2M191.3,342V350M304.2,342V350" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="310.2" y="351" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">69 ms</text>
 <text x="89" y="383" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,371H241A4,4 0 0 1 245,375V381A4,4 0 0 1 241,385H99Z" fill="#898781"/>
-<path d="M227.1,378H349.9M227.1,374V382M349.9,374V382" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="355.9" y="383" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">76 ms</text>
+<path d="M99,371H257.4A4,4 0 0 1 261.4,375V381A4,4 0 0 1 257.4,385H99Z" fill="#898781"/>
+<path d="M212.3,378H348.9M212.3,374V382M348.9,374V382" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="354.9" y="383" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">84 ms</text>
 <text x="388" y="435" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
 </svg>

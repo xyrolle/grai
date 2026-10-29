@@ -5,27 +5,23 @@
 <text x="16" y="44" font-size="13" fill="#52514e">Nanoseconds a choice, for each count from 0 to 999; lower is better</text>
 <line x1="216" y1="65" x2="216" y2="165" stroke="#c3c2b7" stroke-width="1"/>
 <text x="216" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="250.4" y1="65" x2="250.4" y2="165" stroke="#e1e0d9" stroke-width="1"/>
-<text x="250.4" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">200</text>
-<line x1="284.8" y1="65" x2="284.8" y2="165" stroke="#e1e0d9" stroke-width="1"/>
-<text x="284.8" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">400</text>
-<line x1="319.2" y1="65" x2="319.2" y2="165" stroke="#e1e0d9" stroke-width="1"/>
-<text x="319.2" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">600</text>
-<line x1="353.6" y1="65" x2="353.6" y2="165" stroke="#e1e0d9" stroke-width="1"/>
-<text x="353.6" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">800</text>
+<line x1="273.3" y1="65" x2="273.3" y2="165" stroke="#e1e0d9" stroke-width="1"/>
+<text x="273.3" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">200</text>
+<line x1="330.7" y1="65" x2="330.7" y2="165" stroke="#e1e0d9" stroke-width="1"/>
+<text x="330.7" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">400</text>
 <line x1="388" y1="65" x2="388" y2="165" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
+<text x="388" y="182" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">600</text>
 <text x="206" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M216,74H216A2.7,2.7 0 0 1 218.7,76.7V85.3A2.7,2.7 0 0 1 216,88H216Z" fill="#2a78d6"/>
-<path d="M217.9,81H220.4M217.9,77V85M220.4,77V85" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="226.4" y="86" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">16 ns</text>
+<path d="M216,74H216.2A4,4 0 0 1 220.2,78V84A4,4 0 0 1 216.2,88H216Z" fill="#2a78d6"/>
+<path d="M219.6,81H236.5M219.6,77V85M236.5,77V85" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="242.5" y="86" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">15 ns</text>
 <text x="206" y="118" font-size="14" text-anchor="end" fill="#0b0b0b">Intl.PluralRules, cached</text>
-<path d="M216,106H246.5A4,4 0 0 1 250.5,110V116A4,4 0 0 1 246.5,120H216Z" fill="#898781"/>
-<path d="M243.3,113H266.2M243.3,109V117M266.2,109V117" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="272.2" y="118" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">200 ns</text>
+<path d="M216,106H265.4A4,4 0 0 1 269.4,110V116A4,4 0 0 1 265.4,120H216Z" fill="#898781"/>
+<path d="M265.6,113H272.8M265.6,109V117M272.8,109V117" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="278.8" y="118" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">186 ns</text>
 <text x="206" y="150" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M216,138H306.2A4,4 0 0 1 310.2,142V148A4,4 0 0 1 306.2,152H216Z" fill="#898781"/>
-<path d="M296,145H384.6M296,141V149M384.6,141V149" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="390.6" y="150" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">548 ns</text>
+<path d="M216,138H370.1A4,4 0 0 1 374.1,142V148A4,4 0 0 1 370.1,152H216Z" fill="#898781"/>
+<path d="M359.4,145H383.3M359.4,141V149M383.3,141V149" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="389.3" y="150" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">551 ns</text>
 <text x="388" y="202" font-size="12" text-anchor="end" fill="#52514e">nanoseconds a choice</text>
 </svg>
