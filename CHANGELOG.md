@@ -2,7 +2,7 @@
 
 What changes for those who use grai, release by release, newest first. Until 1.0, a minor release may change the API that `docs/api.md` lists.
 
-## 0.1.1 (unreleased)
+## 0.1.1 (2026-10-29)
 
 Dev servers that serve their first page sooner and load only its locale's words, Next.js pages that compile only the keys their routes read, and a lighter package.
 
