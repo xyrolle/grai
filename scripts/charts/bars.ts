@@ -69,6 +69,8 @@ const width = 480;
 const side = 16;
 /** Room right of the longest bar for its value. */
 const valueRoom = 76;
+/** The room an axis's tick needs for its number, so that neighbours never touch. */
+const tickRoom = 52;
 /** The narrowest the bars may be drawn: a label that leaves less is too long for a chart. */
 const minimumPlot = 160;
 const bar = 14;
@@ -78,9 +80,9 @@ const font = `font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"`;
 /** About the width of a character of the labels' 14 px type, to size their column by the longest. */
 const characterWidth = 7.8;
 
-/** A round step for the axis's ticks, about a fifth of the largest value. */
-function tickStep(max: number): number {
-	const rough = max / 5;
+/** A round step for the axis's ticks, about `ticks` of them up to the largest value. */
+function tickStep(max: number, ticks: number): number {
+	const rough = max / ticks;
 	const power = 10 ** Math.floor(Math.log10(rough));
 	const step = [1, 2, 2.5, 5, 10].find((each) => each * power >= rough) ?? 10;
 	return step * power;
@@ -133,8 +135,6 @@ export function barChart(chart: BarChart, theme: Theme): string {
 	);
 	/** grai's names are bold only beside another library's, where they tell the two apart. */
 	const contrasted = bars.some((each) => !each.grai);
-	const step = tickStep(max);
-	const top = Math.ceil(max / step) * step;
 	const longest = Math.max(...bars.map((each) => each.label.length));
 	const labels = Math.ceil(longest * characterWidth) + 12;
 	const x0 = side + labels;
@@ -143,6 +143,8 @@ export function barChart(chart: BarChart, theme: Theme): string {
 		throw new Error(
 			`"${chart.title}": its longest label leaves ${plot} px for the bars; shorten it`,
 		);
+	const step = tickStep(max, Math.min(5, Math.floor(plot / tickRoom)));
+	const top = Math.ceil(max / step) * step;
 	const scale = (value: number) => (value / top) * plot;
 	const characters = Math.floor((width - 2 * side) / subtitleCharacterWidth);
 	const subtitle =
