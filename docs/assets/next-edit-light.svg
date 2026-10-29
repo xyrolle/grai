@@ -6,12 +6,8 @@
 <text x="16" y="64" font-size="13" fill="#52514e">Milliseconds in next dev, from the catalog's save; lower is better</text>
 <line x1="216" y1="85" x2="216" y2="337" stroke="#c3c2b7" stroke-width="1"/>
 <text x="216" y="354" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="259" y1="85" x2="259" y2="337" stroke="#e1e0d9" stroke-width="1"/>
-<text x="259" y="354" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">50</text>
 <line x1="302" y1="85" x2="302" y2="337" stroke="#e1e0d9" stroke-width="1"/>
 <text x="302" y="354" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">100</text>
-<line x1="345" y1="85" x2="345" y2="337" stroke="#e1e0d9" stroke-width="1"/>
-<text x="345" y="354" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">150</text>
 <line x1="388" y1="85" x2="388" y2="337" stroke="#e1e0d9" stroke-width="1"/>
 <text x="388" y="354" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">200</text>
 <text x="16" y="103" font-size="13" font-weight="600" fill="#52514e">A server component</text>
