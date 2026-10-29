@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 447" width="480" height="447" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>The runtime a page needs to show a text, an input and a plural</title>
 <rect x="0.5" y="0.5" width="479" height="446" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">The runtime a page needs to show a text, an input</text>
-<text x="16" y="44" font-size="16" font-weight="600" fill="#0b0b0b">and a plural</text>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">The runtime a page needs to show a text, an input and</text>
+<text x="16" y="44" font-size="16" font-weight="600" fill="#0b0b0b">a plural</text>
 <text x="16" y="64" font-size="13" fill="#52514e">KB brotli; lower is better</text>
 <line x1="99" y1="85" x2="99" y2="401" stroke="#c3c2b7" stroke-width="1"/>
 <text x="99" y="418" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
@@ -15,7 +15,7 @@
 <line x1="330.2" y1="85" x2="330.2" y2="401" stroke="#e1e0d9" stroke-width="1"/>
 <text x="330.2" y="418" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">10</text>
 <line x1="388" y1="85" x2="388" y2="401" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="418" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">13</text>
+<text x="388" y="418" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">12.5</text>
 <text x="16" y="103" font-size="13" font-weight="600" fill="#52514e">In a page that shows a text, an input and a plural</text>
 <text x="89" y="134" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
 <path d="M99,122H128.1A4,4 0 0 1 132.1,126V132A4,4 0 0 1 128.1,136H99Z" fill="#2a78d6"/>

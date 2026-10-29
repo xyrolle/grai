@@ -1,34 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 263" width="480" height="263" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 243" width="480" height="243" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>A warm server render of a page of 2,000 message calls</title>
-<rect x="0.5" y="0.5" width="479" height="262" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">A warm server render of a page of 2,000 message</text>
-<text x="16" y="44" font-size="16" font-weight="600" fill="#f0efec">calls</text>
-<text x="16" y="64" font-size="13" fill="#c3c2b7">Milliseconds a render, in Svelte on Node, in ru; lower is better</text>
-<line x1="99" y1="85" x2="99" y2="217" stroke="#383835" stroke-width="1"/>
-<text x="99" y="234" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="171.3" y1="85" x2="171.3" y2="217" stroke="#2c2c2a" stroke-width="1"/>
-<text x="171.3" y="234" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2</text>
-<line x1="243.5" y1="85" x2="243.5" y2="217" stroke="#2c2c2a" stroke-width="1"/>
-<text x="243.5" y="234" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">4</text>
-<line x1="315.8" y1="85" x2="315.8" y2="217" stroke="#2c2c2a" stroke-width="1"/>
-<text x="315.8" y="234" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">6</text>
-<line x1="388" y1="85" x2="388" y2="217" stroke="#2c2c2a" stroke-width="1"/>
-<text x="388" y="234" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">8</text>
-<text x="89" y="106" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M99,94H100.1A4,4 0 0 1 104.1,98V104A4,4 0 0 1 100.1,108H99Z" fill="#3987e5"/>
-<path d="M103.6,101H105.1M103.6,97V105M105.1,97V105" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="111.1" y="106" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.14 ms</text>
-<text x="89" y="138" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
-<path d="M99,126H101.3A4,4 0 0 1 105.3,130V136A4,4 0 0 1 101.3,140H99Z" fill="#898781"/>
-<path d="M104.7,133H107.1M104.7,129V137M107.1,129V137" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="113.1" y="138" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.17 ms</text>
-<text x="89" y="170" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
-<path d="M99,158H246.3A4,4 0 0 1 250.3,162V168A4,4 0 0 1 246.3,172H99Z" fill="#898781"/>
-<path d="M234.9,165H294.5M234.9,161V169M294.5,161V169" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="300.5" y="170" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.2 ms</text>
-<text x="89" y="202" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
-<path d="M99,190H316.4A4,4 0 0 1 320.4,194V200A4,4 0 0 1 316.4,204H99Z" fill="#898781"/>
-<path d="M308.8,197H365M308.8,193V201M365,193V201" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="371" y="202" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">6.1 ms</text>
-<text x="388" y="254" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds a render</text>
+<rect x="0.5" y="0.5" width="479" height="242" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">A warm server render of a page of 2,000 message calls</text>
+<text x="16" y="44" font-size="13" fill="#c3c2b7">Milliseconds a render, in Svelte on Node, in ru; lower is better</text>
+<line x1="99" y1="65" x2="99" y2="197" stroke="#383835" stroke-width="1"/>
+<text x="99" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="171.3" y1="65" x2="171.3" y2="197" stroke="#2c2c2a" stroke-width="1"/>
+<text x="171.3" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">2</text>
+<line x1="243.5" y1="65" x2="243.5" y2="197" stroke="#2c2c2a" stroke-width="1"/>
+<text x="243.5" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">4</text>
+<line x1="315.8" y1="65" x2="315.8" y2="197" stroke="#2c2c2a" stroke-width="1"/>
+<text x="315.8" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">6</text>
+<line x1="388" y1="65" x2="388" y2="197" stroke="#2c2c2a" stroke-width="1"/>
+<text x="388" y="214" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">8</text>
+<text x="89" y="86" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M99,74H100.1A4,4 0 0 1 104.1,78V84A4,4 0 0 1 100.1,88H99Z" fill="#3987e5"/>
+<path d="M103.6,81H105.1M103.6,77V85M105.1,77V85" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="111.1" y="86" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.14 ms</text>
+<text x="89" y="118" font-size="14" text-anchor="end" fill="#f0efec">Paraglide</text>
+<path d="M99,106H101.3A4,4 0 0 1 105.3,110V116A4,4 0 0 1 101.3,120H99Z" fill="#898781"/>
+<path d="M104.7,113H107.1M104.7,109V117M107.1,109V117" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="113.1" y="118" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">0.17 ms</text>
+<text x="89" y="150" font-size="14" text-anchor="end" fill="#f0efec">i18next</text>
+<path d="M99,138H246.3A4,4 0 0 1 250.3,142V148A4,4 0 0 1 246.3,152H99Z" fill="#898781"/>
+<path d="M234.9,145H294.5M234.9,141V149M294.5,141V149" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="300.5" y="150" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">4.2 ms</text>
+<text x="89" y="182" font-size="14" text-anchor="end" fill="#f0efec">use-intl</text>
+<path d="M99,170H316.4A4,4 0 0 1 320.4,174V180A4,4 0 0 1 316.4,184H99Z" fill="#898781"/>
+<path d="M308.8,177H365M308.8,173V181M365,173V181" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="371" y="182" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">6.1 ms</text>
+<text x="388" y="234" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds a render</text>
 </svg>

@@ -1,40 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 383" width="480" height="383" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 363" width="480" height="363" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Next.js: one message edited, until the page shows it</title>
-<rect x="0.5" y="0.5" width="479" height="382" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">Next.js: one message edited, until the page shows</text>
-<text x="16" y="44" font-size="16" font-weight="600" fill="#f0efec">it</text>
-<text x="16" y="64" font-size="13" fill="#c3c2b7">Milliseconds in next dev, from the catalog's save; lower is better</text>
-<line x1="216" y1="85" x2="216" y2="337" stroke="#383835" stroke-width="1"/>
-<text x="216" y="354" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="302" y1="85" x2="302" y2="337" stroke="#2c2c2a" stroke-width="1"/>
-<text x="302" y="354" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">100</text>
-<line x1="388" y1="85" x2="388" y2="337" stroke="#2c2c2a" stroke-width="1"/>
-<text x="388" y="354" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">200</text>
-<text x="16" y="103" font-size="13" font-weight="600" fill="#c3c2b7">A server component</text>
-<text x="206" y="134" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M216,122H316.8A4,4 0 0 1 320.8,126V132A4,4 0 0 1 316.8,136H216Z" fill="#3987e5"/>
-<path d="M316.6,129H331.4M316.6,125V133M331.4,125V133" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="337.4" y="134" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">122 ms</text>
-<text x="206" y="166" font-size="14" text-anchor="end" fill="#f0efec">next-intl, keys picked</text>
-<path d="M216,154H339.5A4,4 0 0 1 343.5,158V164A4,4 0 0 1 339.5,168H216Z" fill="#898781"/>
-<path d="M332.6,161H355.5M332.6,157V165M355.5,157V165" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="361.5" y="166" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">148 ms</text>
-<text x="206" y="198" font-size="14" text-anchor="end" fill="#f0efec">next-intl, whole catalog</text>
-<path d="M216,186H364.4A4,4 0 0 1 368.4,190V196A4,4 0 0 1 364.4,200H216Z" fill="#898781"/>
-<path d="M359.1,193H372.1M359.1,189V197M372.1,189V197" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="378.1" y="198" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">177 ms</text>
-<text x="16" y="227" font-size="13" font-weight="600" fill="#c3c2b7">A client component</text>
-<text x="206" y="258" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
-<path d="M216,246H248.8A4,4 0 0 1 252.8,250V256A4,4 0 0 1 248.8,260H216Z" fill="#3987e5"/>
-<path d="M251.4,253H254.1M251.4,249V257M254.1,249V257" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="260.1" y="258" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">43 ms</text>
-<text x="206" y="290" font-size="14" text-anchor="end" fill="#f0efec">next-intl, keys picked</text>
-<path d="M216,278H338.9A4,4 0 0 1 342.9,282V288A4,4 0 0 1 338.9,292H216Z" fill="#898781"/>
-<path d="M339.5,285H350.7M339.5,281V289M350.7,281V289" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="356.7" y="290" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">148 ms</text>
-<text x="206" y="322" font-size="14" text-anchor="end" fill="#f0efec">next-intl, whole catalog</text>
-<path d="M216,310H363.3A4,4 0 0 1 367.3,314V320A4,4 0 0 1 363.3,324H216Z" fill="#898781"/>
-<path d="M354.4,317H383M354.4,313V321M383,313V321" stroke="#f0efec" stroke-width="1.5" fill="none"/>
-<text x="389" y="322" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">176 ms</text>
-<text x="388" y="374" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
+<rect x="0.5" y="0.5" width="479" height="362" rx="6" fill="#0d1117" stroke="#2c2c2a"/>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#f0efec">Next.js: one message edited, until the page shows it</text>
+<text x="16" y="44" font-size="13" fill="#c3c2b7">Milliseconds in next dev, from the catalog's save; lower is better</text>
+<line x1="216" y1="65" x2="216" y2="317" stroke="#383835" stroke-width="1"/>
+<text x="216" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="302" y1="65" x2="302" y2="317" stroke="#2c2c2a" stroke-width="1"/>
+<text x="302" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">100</text>
+<line x1="388" y1="65" x2="388" y2="317" stroke="#2c2c2a" stroke-width="1"/>
+<text x="388" y="334" font-size="12" text-anchor="middle" fill="#c3c2b7" style="font-variant-numeric: tabular-nums">200</text>
+<text x="16" y="83" font-size="13" font-weight="600" fill="#c3c2b7">A server component</text>
+<text x="206" y="114" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M216,102H316.8A4,4 0 0 1 320.8,106V112A4,4 0 0 1 316.8,116H216Z" fill="#3987e5"/>
+<path d="M316.6,109H331.4M316.6,105V113M331.4,105V113" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="337.4" y="114" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">122 ms</text>
+<text x="206" y="146" font-size="14" text-anchor="end" fill="#f0efec">next-intl, keys picked</text>
+<path d="M216,134H339.5A4,4 0 0 1 343.5,138V144A4,4 0 0 1 339.5,148H216Z" fill="#898781"/>
+<path d="M332.6,141H355.5M332.6,137V145M355.5,137V145" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="361.5" y="146" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">148 ms</text>
+<text x="206" y="178" font-size="14" text-anchor="end" fill="#f0efec">next-intl, whole catalog</text>
+<path d="M216,166H364.4A4,4 0 0 1 368.4,170V176A4,4 0 0 1 364.4,180H216Z" fill="#898781"/>
+<path d="M359.1,173H372.1M359.1,169V177M372.1,169V177" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="378.1" y="178" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">177 ms</text>
+<text x="16" y="207" font-size="13" font-weight="600" fill="#c3c2b7">A client component</text>
+<text x="206" y="238" font-size="14" text-anchor="end" font-weight="600" fill="#f0efec">grai</text>
+<path d="M216,226H248.8A4,4 0 0 1 252.8,230V236A4,4 0 0 1 248.8,240H216Z" fill="#3987e5"/>
+<path d="M251.4,233H254.1M251.4,229V237M254.1,229V237" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="260.1" y="238" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">43 ms</text>
+<text x="206" y="270" font-size="14" text-anchor="end" fill="#f0efec">next-intl, keys picked</text>
+<path d="M216,258H338.9A4,4 0 0 1 342.9,262V268A4,4 0 0 1 338.9,272H216Z" fill="#898781"/>
+<path d="M339.5,265H350.7M339.5,261V269M350.7,261V269" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="356.7" y="270" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">148 ms</text>
+<text x="206" y="302" font-size="14" text-anchor="end" fill="#f0efec">next-intl, whole catalog</text>
+<path d="M216,290H363.3A4,4 0 0 1 367.3,294V300A4,4 0 0 1 363.3,304H216Z" fill="#898781"/>
+<path d="M354.4,297H383M354.4,293V301M383,293V301" stroke="#f0efec" stroke-width="1.5" fill="none"/>
+<text x="389" y="302" font-size="14" fill="#f0efec" stroke="#0d1117" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">176 ms</text>
+<text x="388" y="354" font-size="12" text-anchor="end" fill="#c3c2b7">milliseconds</text>
 </svg>

@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 361" width="480" height="361" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>A page of 2,000 message calls, 416 distinct keys: its JS</title>
 <rect x="0.5" y="0.5" width="479" height="360" rx="6" fill="#ffffff" stroke="#e1e0d9"/>
-<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">A page of 2,000 message calls, 416 distinct keys:</text>
-<text x="16" y="44" font-size="16" font-weight="600" fill="#0b0b0b">its JS</text>
+<text x="16" y="24" font-size="16" font-weight="600" fill="#0b0b0b">A page of 2,000 message calls, 416 distinct keys: its</text>
+<text x="16" y="44" font-size="16" font-weight="600" fill="#0b0b0b">JS</text>
 <text x="16" y="64" font-size="13" fill="#52514e">KB brotli: every script the built page loads or holds inline, each</text>
 <text x="16" y="81" font-size="13" fill="#52514e">compressed on its own;</text>
 <text x="16" y="98" font-size="13" fill="#52514e">lower is better</text>
