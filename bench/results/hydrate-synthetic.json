@@ -1,6 +1,6 @@
 {
 	"bench": "hydrate-synthetic",
-	"date": "2026-10-27T14:46:03.082Z",
+	"date": "2026-10-29T04:15:09.043Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,11 +8,11 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 11.3,
-		"end": 8.7
+		"start": 21.8,
+		"end": 15.5
 	},
 	"node": "24.16.0",
-	"grai": "cee60fe2",
+	"grai": "e1293d8d",
 	"versions": {
 		"@inlang/paraglide-js": "2.29.1",
 		"i18next": "26.4.7",
@@ -25,392 +25,5235 @@
 	},
 	"app": "synthetic, 6,366 keys",
 	"calls": 2000,
-	"runs": 15,
+	"keys": 416,
+	"runs": 16,
 	"chromium": "156.0.8078.4",
+	"rounds": [
+		{
+			"load": 22.4,
+			"order": [
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog"
+			]
+		},
+		{
+			"load": 22.5,
+			"order": [
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide"
+			]
+		},
+		{
+			"load": 21,
+			"order": [
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies"
+			]
+		},
+		{
+			"load": 20.5,
+			"order": [
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks"
+			]
+		},
+		{
+			"load": 19.3,
+			"order": [
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template"
+			]
+		},
+		{
+			"load": 18.6,
+			"order": [
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next"
+			]
+		},
+		{
+			"load": 18.7,
+			"order": [
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl"
+			]
+		},
+		{
+			"load": 18.2,
+			"order": [
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog"
+			]
+		},
+		{
+			"load": 16.7,
+			"order": [
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog"
+			]
+		},
+		{
+			"load": 16.4,
+			"order": [
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide"
+			]
+		},
+		{
+			"load": 16.9,
+			"order": [
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies"
+			]
+		},
+		{
+			"load": 16.4,
+			"order": [
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks"
+			]
+		},
+		{
+			"load": 17,
+			"order": [
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template"
+			]
+		},
+		{
+			"load": 16.5,
+			"order": [
+				"use-intl",
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next"
+			]
+		},
+		{
+			"load": 15.3,
+			"order": [
+				"i18next, the locale's whole catalog",
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl"
+			]
+		},
+		{
+			"load": 15,
+			"order": [
+				"use-intl, the locale's whole catalog",
+				"Paraglide",
+				"grai, the locale's copies",
+				"grai, every locale's chunks",
+				"prototype, inlined into the template",
+				"i18next",
+				"use-intl",
+				"i18next, the locale's whole catalog"
+			]
+		}
+	],
 	"rows": [
 		{
 			"variant": "Paraglide",
 			"locale": "ro",
 			"slowdown": 1,
 			"bytes": {
-				"raw": 176423,
-				"brotli": 37554
+				"raw": 174539,
+				"brotli": 37653
 			},
+			"resources": [
+				{
+					"path": "/assets/index-DMeYKnn1.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-B4M7EPe1.js",
+					"raw": 173842,
+					"brotli": 37307
+				}
+			],
 			"ms": {
-				"starts": 11.3,
-				"evaluates": 2.1,
-				"hydrates": 7.9,
-				"hydratedAt": 21.6,
-				"mounts": 3
-			}
+				"starts": 10.2,
+				"evaluates": 27.2,
+				"hydrates": 9.95,
+				"hydratedAt": 48.8,
+				"mounts": 3.85
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.67,
+					"low": 1.6,
+					"high": 1.89,
+					"confidence": 0.979,
+					"rounds": [
+						1.93,
+						1.89,
+						1.67,
+						1.84,
+						1.35,
+						2.07,
+						2.11,
+						1.62,
+						1.67,
+						1.64,
+						1.6,
+						1.74,
+						1.67,
+						1.59,
+						1.68,
+						1.57
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 199.5,
+					"evaluated": 208.2,
+					"hydrated": 221.5,
+					"mounted": 4.5
+				},
+				{
+					"loaded": 10.1,
+					"evaluated": 38.7,
+					"hydrated": 48.9,
+					"mounted": 3.9
+				},
+				{
+					"loaded": 10.6,
+					"evaluated": 39,
+					"hydrated": 49.5,
+					"mounted": 4.1
+				},
+				{
+					"loaded": 10.9,
+					"evaluated": 40.5,
+					"hydrated": 51.7,
+					"mounted": 3.9
+				},
+				{
+					"loaded": 8.4,
+					"evaluated": 35.1,
+					"hydrated": 44,
+					"mounted": 3.7
+				},
+				{
+					"loaded": 15.6,
+					"evaluated": 48.1,
+					"hydrated": 59.5,
+					"mounted": 4.3
+				},
+				{
+					"loaded": 14.1,
+					"evaluated": 41.8,
+					"hydrated": 53,
+					"mounted": 4.4
+				},
+				{
+					"loaded": 7.9,
+					"evaluated": 34.4,
+					"hydrated": 43,
+					"mounted": 3.3
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 34.6,
+					"hydrated": 44.1,
+					"mounted": 3.4
+				},
+				{
+					"loaded": 10.1,
+					"evaluated": 35.1,
+					"hydrated": 44.1,
+					"mounted": 3.5
+				},
+				{
+					"loaded": 9.4,
+					"evaluated": 34.5,
+					"hydrated": 43.6,
+					"mounted": 3.7
+				},
+				{
+					"loaded": 9.8,
+					"evaluated": 38.1,
+					"hydrated": 48.9,
+					"mounted": 4
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 33.3,
+					"hydrated": 42.3,
+					"mounted": 3.2
+				},
+				{
+					"loaded": 10.7,
+					"evaluated": 34.9,
+					"hydrated": 44.6,
+					"mounted": 3.4
+				},
+				{
+					"loaded": 10.3,
+					"evaluated": 38.3,
+					"hydrated": 48.9,
+					"mounted": 4
+				},
+				{
+					"loaded": 10.4,
+					"evaluated": 39,
+					"hydrated": 48.6,
+					"mounted": 3.8
+				}
+			]
 		},
 		{
 			"variant": "grai, the locale's copies",
 			"locale": "ro",
 			"slowdown": 1,
 			"bytes": {
-				"raw": 85675,
-				"brotli": 22392
+				"raw": 91825,
+				"brotli": 24549
 			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "/assets/grai-ro/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 29641,
+					"brotli": 7332
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 1044,
+					"brotli": 451
+				}
+			],
 			"ms": {
-				"starts": 8.9,
-				"evaluates": 1.4,
-				"hydrates": 5.2,
-				"hydratedAt": 15.5,
-				"mounts": 2.2
-			}
-		},
-		{
-			"variant": "grai, every locale's chunks",
-			"locale": "ro",
-			"slowdown": 1,
-			"bytes": {
-				"raw": 140610,
-				"brotli": 34719
-			},
-			"ms": {
-				"starts": 9.9,
-				"evaluates": 1.8,
-				"hydrates": 5.4,
-				"hydratedAt": 17.2,
-				"mounts": 2.3
-			}
-		},
-		{
-			"variant": "prototype, inlined into the template",
-			"locale": "ro",
-			"slowdown": 1,
-			"bytes": {
-				"raw": 68078,
-				"brotli": 19746
-			},
-			"ms": {
-				"starts": 7.8,
-				"evaluates": 0.8,
-				"hydrates": 2.6,
-				"hydratedAt": 11.2,
-				"mounts": 1.1
-			}
-		},
-		{
-			"variant": "i18next",
-			"locale": "ro",
-			"slowdown": 1,
-			"bytes": {
-				"raw": 549176,
-				"brotli": 126630
-			},
-			"ms": {
-				"starts": 18.7,
-				"evaluates": 5,
-				"hydrates": 11.5,
-				"hydratedAt": 35.4,
-				"mounts": 5.4
-			}
-		},
-		{
-			"variant": "use-intl",
-			"locale": "ro",
-			"slowdown": 1,
-			"bytes": {
-				"raw": 551087,
-				"brotli": 125390
-			},
-			"ms": {
-				"starts": 18.7,
-				"evaluates": 4.4,
-				"hydrates": 16.6,
-				"hydratedAt": 39.5,
-				"mounts": 5.5
-			}
-		},
-		{
-			"variant": "Paraglide",
-			"locale": "ro",
-			"slowdown": 4,
-			"bytes": {
-				"raw": 176423,
-				"brotli": 37554
-			},
-			"ms": {
-				"starts": 39.1,
-				"evaluates": 9.9,
-				"hydrates": 34.2,
-				"hydratedAt": 83.4,
-				"mounts": 12.8
-			}
-		},
-		{
-			"variant": "grai, the locale's copies",
-			"locale": "ro",
-			"slowdown": 4,
-			"bytes": {
-				"raw": 85675,
-				"brotli": 22392
-			},
-			"ms": {
-				"starts": 28.4,
-				"evaluates": 6.3,
-				"hydrates": 22.8,
-				"hydratedAt": 58.3,
-				"mounts": 10.1
-			}
-		},
-		{
-			"variant": "grai, every locale's chunks",
-			"locale": "ro",
-			"slowdown": 4,
-			"bytes": {
-				"raw": 140610,
-				"brotli": 34719
-			},
-			"ms": {
-				"starts": 32.7,
-				"evaluates": 8.7,
-				"hydrates": 22.8,
-				"hydratedAt": 63.9,
-				"mounts": 10.1
-			}
-		},
-		{
-			"variant": "prototype, inlined into the template",
-			"locale": "ro",
-			"slowdown": 4,
-			"bytes": {
-				"raw": 68078,
-				"brotli": 19746
-			},
-			"ms": {
-				"starts": 25.6,
-				"evaluates": 3.5,
-				"hydrates": 11.9,
-				"hydratedAt": 41.2,
-				"mounts": 5.2
-			}
-		},
-		{
-			"variant": "i18next",
-			"locale": "ro",
-			"slowdown": 4,
-			"bytes": {
-				"raw": 549176,
-				"brotli": 126630
-			},
-			"ms": {
-				"starts": 58.2,
-				"evaluates": 23.3,
-				"hydrates": 50.3,
-				"hydratedAt": 132.6,
-				"mounts": 24
-			}
-		},
-		{
-			"variant": "use-intl",
-			"locale": "ro",
-			"slowdown": 4,
-			"bytes": {
-				"raw": 551087,
-				"brotli": 125390
-			},
-			"ms": {
-				"starts": 60.1,
-				"evaluates": 19.5,
-				"hydrates": 72.7,
-				"hydratedAt": 152.1,
-				"mounts": 24.4
-			}
-		},
-		{
-			"variant": "Paraglide",
-			"locale": "ru",
-			"slowdown": 1,
-			"bytes": {
-				"raw": 176423,
-				"brotli": 37554
-			},
-			"ms": {
-				"starts": 12.5,
-				"evaluates": 2.3,
-				"hydrates": 8.7,
-				"hydratedAt": 23.4,
-				"mounts": 3.2
-			}
-		},
-		{
-			"variant": "grai, the locale's copies",
-			"locale": "ru",
-			"slowdown": 1,
-			"bytes": {
-				"raw": 97939,
-				"brotli": 23117
-			},
-			"ms": {
-				"starts": 9.7,
-				"evaluates": 1.5,
+				"starts": 10.6,
+				"evaluates": 24.8,
 				"hydrates": 5.9,
-				"hydratedAt": 17,
-				"mounts": 2.5
-			}
+				"hydratedAt": 41.6,
+				"mounts": 1.85
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1,
+					"low": 1,
+					"high": 1,
+					"confidence": 0.979,
+					"rounds": [
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 92.9,
+					"evaluated": 96.4,
+					"hydrated": 103.3,
+					"mounted": 2.3
+				},
+				{
+					"loaded": 10,
+					"evaluated": 34.3,
+					"hydrated": 39.7,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 11.7,
+					"evaluated": 39.5,
+					"hydrated": 45.8,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 11.8,
+					"evaluated": 39,
+					"hydrated": 45.1,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 11.4,
+					"evaluated": 41.3,
+					"hydrated": 47.9,
+					"mounted": 2.2
+				},
+				{
+					"loaded": 9.4,
+					"evaluated": 34.2,
+					"hydrated": 39.7,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 10.1,
+					"evaluated": 34.9,
+					"hydrated": 40.2,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 9.4,
+					"evaluated": 34.3,
+					"hydrated": 39.6,
+					"mounted": 1.7
+				},
+				{
+					"loaded": 11.8,
+					"evaluated": 34.7,
+					"hydrated": 40.4,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 9.7,
+					"evaluated": 33.5,
+					"hydrated": 39,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 11,
+					"evaluated": 34.2,
+					"hydrated": 39.9,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 10.6,
+					"evaluated": 36.6,
+					"hydrated": 42.8,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 9.7,
+					"evaluated": 33.8,
+					"hydrated": 39.2,
+					"mounted": 1.7
+				},
+				{
+					"loaded": 10,
+					"evaluated": 37.9,
+					"hydrated": 44,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 10.5,
+					"evaluated": 38.5,
+					"hydrated": 44.8,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 13.5,
+					"evaluated": 41.1,
+					"hydrated": 47.2,
+					"mounted": 1.9
+				}
+			]
+		},
+		{
+			"variant": "grai, every locale's chunks",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 145770,
+				"brotli": 36282
+			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/grai/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 84053,
+					"brotli": 19225
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 577,
+					"brotli": 291
+				}
+			],
+			"ms": {
+				"starts": 10.2,
+				"evaluates": 26.6,
+				"hydrates": 6.4,
+				"hydratedAt": 44.9,
+				"mounts": 2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.05,
+					"low": 1.02,
+					"high": 1.13,
+					"confidence": 0.979,
+					"rounds": [
+						0.928,
+						1.28,
+						1.03,
+						1.16,
+						1.06,
+						1.27,
+						1.06,
+						0.981,
+						0.947,
+						1.02,
+						1.05,
+						1.02,
+						1.11,
+						1.13,
+						1.02,
+						1.08
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 145.3,
+					"evaluated": 148.9,
+					"hydrated": 155.3,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 38.3,
+					"hydrated": 45.2,
+					"mounted": 2.3
+				},
+				{
+					"loaded": 9.7,
+					"evaluated": 38.1,
+					"hydrated": 44.6,
+					"mounted": 2
+				},
+				{
+					"loaded": 12.9,
+					"evaluated": 40.7,
+					"hydrated": 47.8,
+					"mounted": 2.2
+				},
+				{
+					"loaded": 11.9,
+					"evaluated": 40.1,
+					"hydrated": 47.1,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 18.7,
+					"evaluated": 42.1,
+					"hydrated": 49.1,
+					"mounted": 2.3
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 34.8,
+					"hydrated": 40.4,
+					"mounted": 2
+				},
+				{
+					"loaded": 8.2,
+					"evaluated": 33.5,
+					"hydrated": 38.7,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 9.6,
+					"evaluated": 34.6,
+					"hydrated": 40,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 10.5,
+					"evaluated": 33.2,
+					"hydrated": 38.8,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 8.4,
+					"evaluated": 35.2,
+					"hydrated": 41.2,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 9.6,
+					"evaluated": 36.1,
+					"hydrated": 42.4,
+					"mounted": 2
+				},
+				{
+					"loaded": 10.8,
+					"evaluated": 30,
+					"hydrated": 36,
+					"mounted": 2
+				},
+				{
+					"loaded": 12.3,
+					"evaluated": 39.3,
+					"hydrated": 46.2,
+					"mounted": 2
+				},
+				{
+					"loaded": 10.8,
+					"evaluated": 41.5,
+					"hydrated": 47.9,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 9.6,
+					"evaluated": 40.1,
+					"hydrated": 46.7,
+					"mounted": 2.2
+				}
+			]
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 67168,
+				"brotli": 19842
+			},
+			"resources": [
+				{
+					"path": "/assets/index-C2Y1pfME.js",
+					"raw": 697,
+					"brotli": 344
+				},
+				{
+					"path": "/assets/page-CecUzePw.js",
+					"raw": 66471,
+					"brotli": 19498
+				}
+			],
+			"ms": {
+				"starts": 8.85,
+				"evaluates": 24.8,
+				"hydrates": 3.1,
+				"hydratedAt": 38.8,
+				"mounts": 1.4
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 0.518,
+					"low": 0.5,
+					"high": 0.566,
+					"confidence": 0.979,
+					"rounds": [
+						0.536,
+						0.593,
+						0.508,
+						0.508,
+						0.5,
+						0.527,
+						0.566,
+						0.566,
+						0.491,
+						0.582,
+						0.509,
+						0.435,
+						0.556,
+						0.557,
+						0.492,
+						0.508
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 72,
+					"evaluated": 75.5,
+					"hydrated": 79.2,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.8,
+					"evaluated": 37.8,
+					"hydrated": 41,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.2,
+					"evaluated": 35.8,
+					"hydrated": 39,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 8.2,
+					"evaluated": 36.4,
+					"hydrated": 39.5,
+					"mounted": 1.5
+				},
+				{
+					"loaded": 14,
+					"evaluated": 38.1,
+					"hydrated": 41.4,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.3,
+					"evaluated": 35.2,
+					"hydrated": 38.1,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 8.1,
+					"evaluated": 33.7,
+					"hydrated": 36.7,
+					"mounted": 1.5
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 33.1,
+					"hydrated": 36.1,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 7.6,
+					"evaluated": 32.8,
+					"hydrated": 35.6,
+					"mounted": 1.3
+				},
+				{
+					"loaded": 12.2,
+					"evaluated": 33.8,
+					"hydrated": 37,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 15,
+					"evaluated": 29.5,
+					"hydrated": 32.4,
+					"mounted": 1.3
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 33.2,
+					"hydrated": 35.9,
+					"mounted": 1.3
+				},
+				{
+					"loaded": 11.9,
+					"evaluated": 35.6,
+					"hydrated": 38.6,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 8.1,
+					"evaluated": 37.8,
+					"hydrated": 41.2,
+					"mounted": 1.5
+				},
+				{
+					"loaded": 16.6,
+					"evaluated": 39.6,
+					"hydrated": 42.7,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 9.3,
+					"evaluated": 37.7,
+					"hydrated": 40.8,
+					"mounted": 1.5
+				}
+			]
+		},
+		{
+			"variant": "i18next",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 146585,
+				"brotli": 36334
+			},
+			"resources": [
+				{
+					"path": "/assets/index-C4Tff-_D.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-6GoukKty.js",
+					"raw": 145888,
+					"brotli": 35987
+				}
+			],
+			"ms": {
+				"starts": 9.5,
+				"evaluates": 27.2,
+				"hydrates": 14.4,
+				"hydratedAt": 53.1,
+				"mounts": 7.05
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.43,
+					"low": 2.31,
+					"high": 2.54,
+					"confidence": 0.979,
+					"rounds": [
+						2.2,
+						2.76,
+						2.33,
+						2.31,
+						2.44,
+						2.4,
+						2.74,
+						2.53,
+						2.39,
+						2.42,
+						2.23,
+						2.31,
+						2.61,
+						2.54,
+						2.46,
+						2.51
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 152.7,
+					"evaluated": 158.8,
+					"hydrated": 174,
+					"mounted": 7.6
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 38.4,
+					"hydrated": 53.3,
+					"mounted": 7
+				},
+				{
+					"loaded": 9.3,
+					"evaluated": 38.3,
+					"hydrated": 53,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 8.8,
+					"evaluated": 36.8,
+					"hydrated": 50.9,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 11,
+					"evaluated": 43.3,
+					"hydrated": 59.4,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 8.4,
+					"evaluated": 34.8,
+					"hydrated": 48,
+					"mounted": 6.5
+				},
+				{
+					"loaded": 9.5,
+					"evaluated": 41.3,
+					"hydrated": 55.8,
+					"mounted": 7.4
+				},
+				{
+					"loaded": 24.9,
+					"evaluated": 48.9,
+					"hydrated": 62.3,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 9.5,
+					"evaluated": 35.9,
+					"hydrated": 49.5,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 9.8,
+					"evaluated": 35.1,
+					"hydrated": 48.4,
+					"mounted": 6.5
+				},
+				{
+					"loaded": 8.7,
+					"evaluated": 33.4,
+					"hydrated": 46.1,
+					"mounted": 6.2
+				},
+				{
+					"loaded": 11.8,
+					"evaluated": 35.2,
+					"hydrated": 49.5,
+					"mounted": 6.9
+				},
+				{
+					"loaded": 9.2,
+					"evaluated": 35.2,
+					"hydrated": 49.3,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 8.8,
+					"evaluated": 39.4,
+					"hydrated": 54.9,
+					"mounted": 7.3
+				},
+				{
+					"loaded": 9.5,
+					"evaluated": 39.8,
+					"hydrated": 55.3,
+					"mounted": 7.4
+				},
+				{
+					"loaded": 10.3,
+					"evaluated": 40.9,
+					"hydrated": 56.2,
+					"mounted": 7.5
+				}
+			]
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 141636,
+				"brotli": 34194
+			},
+			"resources": [
+				{
+					"path": "/assets/index-HJejEDor.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-BY5wRi59.js",
+					"raw": 140939,
+					"brotli": 33847
+				}
+			],
+			"ms": {
+				"starts": 9.8,
+				"evaluates": 26.4,
+				"hydrates": 20.3,
+				"hydratedAt": 57.6,
+				"mounts": 6.7
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.43,
+					"low": 3.18,
+					"high": 3.73,
+					"confidence": 0.979,
+					"rounds": [
+						3.09,
+						4.65,
+						3.67,
+						3.51,
+						2.98,
+						3.73,
+						4.09,
+						3.77,
+						3.26,
+						3.31,
+						3.18,
+						3.24,
+						3.48,
+						3.03,
+						3.48,
+						3.39
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 145.4,
+					"evaluated": 150.5,
+					"hydrated": 171.8,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 10.1,
+					"evaluated": 44.9,
+					"hydrated": 70,
+					"mounted": 8.2
+				},
+				{
+					"loaded": 12.1,
+					"evaluated": 42.6,
+					"hydrated": 65.7,
+					"mounted": 7.6
+				},
+				{
+					"loaded": 9.3,
+					"evaluated": 38.6,
+					"hydrated": 60,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 35.4,
+					"hydrated": 55.1,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 9.7,
+					"evaluated": 36.6,
+					"hydrated": 57.1,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 10.3,
+					"evaluated": 38.2,
+					"hydrated": 59.9,
+					"mounted": 6.9
+				},
+				{
+					"loaded": 10.2,
+					"evaluated": 34.7,
+					"hydrated": 54.7,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 34.5,
+					"hydrated": 53.1,
+					"mounted": 6
+				},
+				{
+					"loaded": 8.7,
+					"evaluated": 33.3,
+					"hydrated": 51.5,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 34.3,
+					"hydrated": 52.4,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 12,
+					"evaluated": 38,
+					"hydrated": 58.1,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 11,
+					"evaluated": 34.5,
+					"hydrated": 53.3,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 8.2,
+					"evaluated": 34.5,
+					"hydrated": 53,
+					"mounted": 6.2
+				},
+				{
+					"loaded": 9,
+					"evaluated": 40.1,
+					"hydrated": 62,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 9.5,
+					"evaluated": 39.2,
+					"hydrated": 59.9,
+					"mounted": 7.1
+				}
+			]
+		},
+		{
+			"variant": "i18next, the locale's whole catalog",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 548094,
+				"brotli": 126792
+			},
+			"resources": [
+				{
+					"path": "/assets/index-CiQa75Lg.js",
+					"raw": 697,
+					"brotli": 352
+				},
+				{
+					"path": "/assets/page-BB0HeBVB.js",
+					"raw": 547397,
+					"brotli": 126440
+				}
+			],
+			"ms": {
+				"starts": 13.1,
+				"evaluates": 26.9,
+				"hydrates": 14.3,
+				"hydratedAt": 54.4,
+				"mounts": 6.75
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.46,
+					"low": 2.29,
+					"high": 2.67,
+					"confidence": 0.979,
+					"rounds": [
+						2.58,
+						3.65,
+						2.29,
+						2.87,
+						2.14,
+						2.71,
+						2.55,
+						2.43,
+						2.25,
+						2.49,
+						2.4,
+						2.23,
+						2.67,
+						2.33,
+						2.43,
+						2.59
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 694.2,
+					"evaluated": 711.3,
+					"hydrated": 729.1,
+					"mounted": 8.5
+				},
+				{
+					"loaded": 17.3,
+					"evaluated": 48.7,
+					"hydrated": 68.4,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 13.2,
+					"evaluated": 41.6,
+					"hydrated": 56,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 15.5,
+					"evaluated": 49.3,
+					"hydrated": 66.8,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 12.7,
+					"evaluated": 40.3,
+					"hydrated": 54.4,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 13.8,
+					"evaluated": 42.7,
+					"hydrated": 57.6,
+					"mounted": 6.9
+				},
+				{
+					"loaded": 11.8,
+					"evaluated": 38.4,
+					"hydrated": 51.9,
+					"mounted": 6.2
+				},
+				{
+					"loaded": 12.9,
+					"evaluated": 38.5,
+					"hydrated": 51.4,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 12.2,
+					"evaluated": 37.6,
+					"hydrated": 50.4,
+					"mounted": 6
+				},
+				{
+					"loaded": 11.1,
+					"evaluated": 37.1,
+					"hydrated": 50.8,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 11.4,
+					"evaluated": 36.9,
+					"hydrated": 50.6,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 13.3,
+					"evaluated": 40,
+					"hydrated": 53.8,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 12.4,
+					"evaluated": 39.4,
+					"hydrated": 53.8,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 15.6,
+					"evaluated": 40.1,
+					"hydrated": 54.3,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 13,
+					"evaluated": 43.3,
+					"hydrated": 58.6,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 14.2,
+					"evaluated": 44,
+					"hydrated": 59.8,
+					"mounted": 7.6
+				}
+			]
+		},
+		{
+			"variant": "use-intl, the locale's whole catalog",
+			"locale": "ro",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 549881,
+				"brotli": 125214
+			},
+			"resources": [
+				{
+					"path": "/assets/index-DItu7Skp.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-BYL0nNwU.js",
+					"raw": 549184,
+					"brotli": 124867
+				}
+			],
+			"ms": {
+				"starts": 13.5,
+				"evaluates": 25.8,
+				"hydrates": 21.2,
+				"hydratedAt": 61.1,
+				"mounts": 7.15
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.56,
+					"low": 3.37,
+					"high": 3.89,
+					"confidence": 0.979,
+					"rounds": [
+						3.17,
+						4.56,
+						3.89,
+						3.89,
+						2.85,
+						4.64,
+						3.72,
+						3.51,
+						3.37,
+						3.45,
+						3.61,
+						3.71,
+						3.5,
+						3,
+						3.46,
+						3.69
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 603.3,
+					"evaluated": 617.1,
+					"hydrated": 639,
+					"mounted": 7.4
+				},
+				{
+					"loaded": 17.3,
+					"evaluated": 47.5,
+					"hydrated": 72.1,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 14.5,
+					"evaluated": 47.1,
+					"hydrated": 71.6,
+					"mounted": 8.3
+				},
+				{
+					"loaded": 14.6,
+					"evaluated": 44.1,
+					"hydrated": 67.8,
+					"mounted": 8.9
+				},
+				{
+					"loaded": 12.4,
+					"evaluated": 37.2,
+					"hydrated": 56,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 15.8,
+					"evaluated": 47.9,
+					"hydrated": 73.4,
+					"mounted": 8.6
+				},
+				{
+					"loaded": 13,
+					"evaluated": 37.4,
+					"hydrated": 57.1,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 11.8,
+					"evaluated": 36.6,
+					"hydrated": 55.2,
+					"mounted": 6.2
+				},
+				{
+					"loaded": 11.4,
+					"evaluated": 36,
+					"hydrated": 55.2,
+					"mounted": 6.5
+				},
+				{
+					"loaded": 11.4,
+					"evaluated": 37.4,
+					"hydrated": 56.4,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 11.9,
+					"evaluated": 37.5,
+					"hydrated": 58.1,
+					"mounted": 7
+				},
+				{
+					"loaded": 14.2,
+					"evaluated": 44.9,
+					"hydrated": 67.9,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 11.6,
+					"evaluated": 36.5,
+					"hydrated": 55.4,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 13.9,
+					"evaluated": 36.5,
+					"hydrated": 54.8,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 13.4,
+					"evaluated": 42.3,
+					"hydrated": 64.1,
+					"mounted": 7.3
+				},
+				{
+					"loaded": 13.5,
+					"evaluated": 42,
+					"hydrated": 64.5,
+					"mounted": 7.5
+				}
+			]
+		},
+		{
+			"variant": "Paraglide",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 174539,
+				"brotli": 37653
+			},
+			"resources": [
+				{
+					"path": "/assets/index-DMeYKnn1.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-B4M7EPe1.js",
+					"raw": 173842,
+					"brotli": 37307
+				}
+			],
+			"ms": {
+				"starts": 20.4,
+				"evaluates": 131.2,
+				"hydrates": 41,
+				"hydratedAt": 190.1,
+				"mounts": 16.2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.72,
+					"low": 1.63,
+					"high": 1.81,
+					"confidence": 0.979,
+					"rounds": [
+						1.73,
+						1.81,
+						1.7,
+						1.97,
+						1.62,
+						2.13,
+						1.92,
+						1.79,
+						1.71,
+						1.78,
+						1.63,
+						1.71,
+						1.6,
+						1.4,
+						1.76,
+						1.71
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 24.6,
+					"evaluated": 182.2,
+					"hydrated": 230.4,
+					"mounted": 18.5
+				},
+				{
+					"loaded": 21.2,
+					"evaluated": 153.1,
+					"hydrated": 194.3,
+					"mounted": 17
+				},
+				{
+					"loaded": 21,
+					"evaluated": 151.6,
+					"hydrated": 191.8,
+					"mounted": 16.7
+				},
+				{
+					"loaded": 20.9,
+					"evaluated": 161.3,
+					"hydrated": 207.2,
+					"mounted": 17.7
+				},
+				{
+					"loaded": 19.8,
+					"evaluated": 143.3,
+					"hydrated": 184.1,
+					"mounted": 14.9
+				},
+				{
+					"loaded": 23.6,
+					"evaluated": 166.8,
+					"hydrated": 212,
+					"mounted": 17.7
+				},
+				{
+					"loaded": 20.4,
+					"evaluated": 166.8,
+					"hydrated": 209.8,
+					"mounted": 16.2
+				},
+				{
+					"loaded": 17,
+					"evaluated": 133.7,
+					"hydrated": 172,
+					"mounted": 14.8
+				},
+				{
+					"loaded": 18.7,
+					"evaluated": 138.3,
+					"hydrated": 175.3,
+					"mounted": 14.3
+				},
+				{
+					"loaded": 19.5,
+					"evaluated": 137.9,
+					"hydrated": 177.4,
+					"mounted": 15.4
+				},
+				{
+					"loaded": 19.2,
+					"evaluated": 138.6,
+					"hydrated": 176.7,
+					"mounted": 14
+				},
+				{
+					"loaded": 21.7,
+					"evaluated": 154.8,
+					"hydrated": 197.6,
+					"mounted": 16.5
+				},
+				{
+					"loaded": 17.2,
+					"evaluated": 135.1,
+					"hydrated": 169.8,
+					"mounted": 14.3
+				},
+				{
+					"loaded": 21.3,
+					"evaluated": 137.7,
+					"hydrated": 173.1,
+					"mounted": 14.1
+				},
+				{
+					"loaded": 20.4,
+					"evaluated": 157.6,
+					"hydrated": 201.8,
+					"mounted": 16.3
+				},
+				{
+					"loaded": 12,
+					"evaluated": 145.7,
+					"hydrated": 188.4,
+					"mounted": 17.1
+				}
+			]
+		},
+		{
+			"variant": "grai, the locale's copies",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 91825,
+				"brotli": 24549
+			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "/assets/grai-ro/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 29641,
+					"brotli": 7332
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 1044,
+					"brotli": 451
+				}
+			],
+			"ms": {
+				"starts": 28,
+				"evaluates": 114.8,
+				"hydrates": 23.4,
+				"hydratedAt": 165.7,
+				"mounts": 8.4
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1,
+					"low": 1,
+					"high": 1,
+					"confidence": 0.979,
+					"rounds": [
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 34,
+					"evaluated": 176.6,
+					"hydrated": 204.5,
+					"mounted": 9.8
+				},
+				{
+					"loaded": 27.1,
+					"evaluated": 137.6,
+					"hydrated": 160.3,
+					"mounted": 8
+				},
+				{
+					"loaded": 29.6,
+					"evaluated": 150.9,
+					"hydrated": 174.5,
+					"mounted": 9.2
+				},
+				{
+					"loaded": 30.3,
+					"evaluated": 148.1,
+					"hydrated": 171.4,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 31.1,
+					"evaluated": 155.1,
+					"hydrated": 180.3,
+					"mounted": 8.8
+				},
+				{
+					"loaded": 27.1,
+					"evaluated": 138.8,
+					"hydrated": 160,
+					"mounted": 7.4
+				},
+				{
+					"loaded": 27.5,
+					"evaluated": 136.6,
+					"hydrated": 159,
+					"mounted": 8.9
+				},
+				{
+					"loaded": 27.8,
+					"evaluated": 138.4,
+					"hydrated": 159.8,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 25.8,
+					"evaluated": 133.7,
+					"hydrated": 155.3,
+					"mounted": 7.6
+				},
+				{
+					"loaded": 27.7,
+					"evaluated": 137.7,
+					"hydrated": 159.9,
+					"mounted": 7.4
+				},
+				{
+					"loaded": 26.7,
+					"evaluated": 137,
+					"hydrated": 160.4,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 26.5,
+					"evaluated": 146,
+					"hydrated": 171,
+					"mounted": 8.8
+				},
+				{
+					"loaded": 28.3,
+					"evaluated": 136.9,
+					"hydrated": 158.6,
+					"mounted": 6.9
+				},
+				{
+					"loaded": 29.2,
+					"evaluated": 153.8,
+					"hydrated": 179.1,
+					"mounted": 9.1
+				},
+				{
+					"loaded": 30.4,
+					"evaluated": 157.3,
+					"hydrated": 182.4,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 32.2,
+					"evaluated": 163.3,
+					"hydrated": 188.2,
+					"mounted": 8.3
+				}
+			]
+		},
+		{
+			"variant": "grai, every locale's chunks",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 145770,
+				"brotli": 36282
+			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/grai/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 84053,
+					"brotli": 19225
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 577,
+					"brotli": 291
+				}
+			],
+			"ms": {
+				"starts": 20.8,
+				"evaluates": 127.4,
+				"hydrates": 24.4,
+				"hydratedAt": 172.7,
+				"mounts": 8.6
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.03,
+					"low": 0.991,
+					"high": 1.11,
+					"confidence": 0.979,
+					"rounds": [
+						0.968,
+						1.11,
+						1.01,
+						1.19,
+						1.2,
+						1.5,
+						1.03,
+						1.11,
+						1.06,
+						0.991,
+						1.02,
+						0.876,
+						1.04,
+						0.988,
+						1.02,
+						1.01
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 23.3,
+					"evaluated": 161.1,
+					"hydrated": 188.1,
+					"mounted": 9.3
+				},
+				{
+					"loaded": 20.9,
+					"evaluated": 150.9,
+					"hydrated": 176.2,
+					"mounted": 9.7
+				},
+				{
+					"loaded": 20.6,
+					"evaluated": 145.4,
+					"hydrated": 169.2,
+					"mounted": 8.2
+				},
+				{
+					"loaded": 20.9,
+					"evaluated": 163.3,
+					"hydrated": 191.1,
+					"mounted": 9.6
+				},
+				{
+					"loaded": 23.5,
+					"evaluated": 175,
+					"hydrated": 205.3,
+					"mounted": 9.5
+				},
+				{
+					"loaded": 25.6,
+					"evaluated": 166.2,
+					"hydrated": 197.9,
+					"mounted": 10.9
+				},
+				{
+					"loaded": 20.1,
+					"evaluated": 138.3,
+					"hydrated": 161.4,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 19.4,
+					"evaluated": 136,
+					"hydrated": 159.8,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 19.3,
+					"evaluated": 134.3,
+					"hydrated": 157.1,
+					"mounted": 7.6
+				},
+				{
+					"loaded": 19.9,
+					"evaluated": 137.7,
+					"hydrated": 159.7,
+					"mounted": 8.5
+				},
+				{
+					"loaded": 17.8,
+					"evaluated": 135.6,
+					"hydrated": 159.4,
+					"mounted": 8.5
+				},
+				{
+					"loaded": 20.5,
+					"evaluated": 142.6,
+					"hydrated": 164.5,
+					"mounted": 7.7
+				},
+				{
+					"loaded": 22.1,
+					"evaluated": 137.5,
+					"hydrated": 160,
+					"mounted": 8
+				},
+				{
+					"loaded": 21.5,
+					"evaluated": 158.1,
+					"hydrated": 183.1,
+					"mounted": 8.8
+				},
+				{
+					"loaded": 22,
+					"evaluated": 158.7,
+					"hydrated": 184.4,
+					"mounted": 8.7
+				},
+				{
+					"loaded": 20.8,
+					"evaluated": 154.7,
+					"hydrated": 179.9,
+					"mounted": 9.1
+				}
+			]
+		},
+		{
+			"variant": "prototype, inlined into the template",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 67168,
+				"brotli": 19842
+			},
+			"resources": [
+				{
+					"path": "/assets/index-C2Y1pfME.js",
+					"raw": 697,
+					"brotli": 344
+				},
+				{
+					"path": "/assets/page-CecUzePw.js",
+					"raw": 66471,
+					"brotli": 19498
+				}
+			],
+			"ms": {
+				"starts": 19.6,
+				"evaluates": 119.6,
+				"hydrates": 13.6,
+				"hydratedAt": 152,
+				"mounts": 6.7
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 0.585,
+					"low": 0.567,
+					"high": 0.617,
+					"confidence": 0.979,
+					"rounds": [
+						0.591,
+						0.617,
+						0.572,
+						0.588,
+						0.567,
+						0.651,
+						0.603,
+						0.617,
+						0.597,
+						0.581,
+						0.538,
+						0.512,
+						0.581,
+						0.553,
+						0.582,
+						0.622
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 25.4,
+					"evaluated": 169.4,
+					"hydrated": 185.9,
+					"mounted": 8.2
+				},
+				{
+					"loaded": 19.6,
+					"evaluated": 143.8,
+					"hydrated": 157.8,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 18.3,
+					"evaluated": 138.9,
+					"hydrated": 152.4,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 19.6,
+					"evaluated": 138.2,
+					"hydrated": 151.9,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 18.6,
+					"evaluated": 143.3,
+					"hydrated": 157.6,
+					"mounted": 6.5
+				},
+				{
+					"loaded": 17.6,
+					"evaluated": 138.3,
+					"hydrated": 152.1,
+					"mounted": 7
+				},
+				{
+					"loaded": 19.7,
+					"evaluated": 133.1,
+					"hydrated": 146.6,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 22.1,
+					"evaluated": 133.1,
+					"hydrated": 146.3,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 21.3,
+					"evaluated": 130.5,
+					"hydrated": 143.4,
+					"mounted": 5.8
+				},
+				{
+					"loaded": 21.5,
+					"evaluated": 128.7,
+					"hydrated": 141.6,
+					"mounted": 5.5
+				},
+				{
+					"loaded": 19.7,
+					"evaluated": 131.5,
+					"hydrated": 144.1,
+					"mounted": 5.9
+				},
+				{
+					"loaded": 18.7,
+					"evaluated": 127.4,
+					"hydrated": 140.2,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 17,
+					"evaluated": 127.3,
+					"hydrated": 139.9,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 20,
+					"evaluated": 153,
+					"hydrated": 167,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 19.6,
+					"evaluated": 146.4,
+					"hydrated": 161,
+					"mounted": 7
+				},
+				{
+					"loaded": 19.2,
+					"evaluated": 147,
+					"hydrated": 162.5,
+					"mounted": 7.6
+				}
+			]
+		},
+		{
+			"variant": "i18next",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 146585,
+				"brotli": 36334
+			},
+			"resources": [
+				{
+					"path": "/assets/index-C4Tff-_D.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-6GoukKty.js",
+					"raw": 145888,
+					"brotli": 35987
+				}
+			],
+			"ms": {
+				"starts": 20.6,
+				"evaluates": 127.1,
+				"hydrates": 60.1,
+				"hydratedAt": 207.5,
+				"mounts": 30
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.59,
+					"low": 2.42,
+					"high": 2.65,
+					"confidence": 0.979,
+					"rounds": [
+						2.28,
+						2.85,
+						2.81,
+						2.64,
+						2.64,
+						2.66,
+						2.61,
+						2.56,
+						2.53,
+						2.65,
+						2.32,
+						2.26,
+						2.53,
+						2.42,
+						2.53,
+						2.61
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 20.8,
+					"evaluated": 148.2,
+					"hydrated": 211.7,
+					"mounted": 30.7
+				},
+				{
+					"loaded": 20.4,
+					"evaluated": 153.3,
+					"hydrated": 218.1,
+					"mounted": 33.7
+				},
+				{
+					"loaded": 21,
+					"evaluated": 165.7,
+					"hydrated": 232,
+					"mounted": 31.8
+				},
+				{
+					"loaded": 20.6,
+					"evaluated": 147.4,
+					"hydrated": 208.8,
+					"mounted": 30.3
+				},
+				{
+					"loaded": 20.6,
+					"evaluated": 164.4,
+					"hydrated": 231,
+					"mounted": 31.8
+				},
+				{
+					"loaded": 19.9,
+					"evaluated": 139.5,
+					"hydrated": 195.9,
+					"mounted": 25.9
+				},
+				{
+					"loaded": 19.2,
+					"evaluated": 147.8,
+					"hydrated": 206.3,
+					"mounted": 29.8
+				},
+				{
+					"loaded": 20.9,
+					"evaluated": 137.5,
+					"hydrated": 192.3,
+					"mounted": 26.2
+				},
+				{
+					"loaded": 17.7,
+					"evaluated": 138.4,
+					"hydrated": 193.1,
+					"mounted": 26
+				},
+				{
+					"loaded": 20.5,
+					"evaluated": 136.5,
+					"hydrated": 195.4,
+					"mounted": 26.7
+				},
+				{
+					"loaded": 17.7,
+					"evaluated": 135.4,
+					"hydrated": 189.8,
+					"mounted": 26.1
+				},
+				{
+					"loaded": 22.4,
+					"evaluated": 144.5,
+					"hydrated": 201,
+					"mounted": 26.5
+				},
+				{
+					"loaded": 18.3,
+					"evaluated": 136.7,
+					"hydrated": 191.7,
+					"mounted": 28.9
+				},
+				{
+					"loaded": 19.4,
+					"evaluated": 148.9,
+					"hydrated": 210.1,
+					"mounted": 30.2
+				},
+				{
+					"loaded": 21.3,
+					"evaluated": 161.6,
+					"hydrated": 225.2,
+					"mounted": 32.5
+				},
+				{
+					"loaded": 21.2,
+					"evaluated": 159.3,
+					"hydrated": 224.4,
+					"mounted": 31.5
+				}
+			]
+		},
+		{
+			"variant": "use-intl",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 141636,
+				"brotli": 34194
+			},
+			"resources": [
+				{
+					"path": "/assets/index-HJejEDor.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-BY5wRi59.js",
+					"raw": 140939,
+					"brotli": 33847
+				}
+			],
+			"ms": {
+				"starts": 18.9,
+				"evaluates": 124.4,
+				"hydrates": 84.3,
+				"hydratedAt": 228.4,
+				"mounts": 28.8
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.67,
+					"low": 3.4,
+					"high": 3.85,
+					"confidence": 0.979,
+					"rounds": [
+						2.94,
+						4.79,
+						4.36,
+						3.79,
+						3.4,
+						3.85,
+						3.74,
+						3.77,
+						3.64,
+						3.57,
+						3.34,
+						3.47,
+						3.91,
+						3.11,
+						3.62,
+						3.69
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 20.7,
+					"evaluated": 145.1,
+					"hydrated": 227.2,
+					"mounted": 28.9
+				},
+				{
+					"loaded": 23.1,
+					"evaluated": 177.3,
+					"hydrated": 286,
+					"mounted": 35.8
+				},
+				{
+					"loaded": 23.2,
+					"evaluated": 178.1,
+					"hydrated": 281.1,
+					"mounted": 35.2
+				},
+				{
+					"loaded": 20.2,
+					"evaluated": 152.1,
+					"hydrated": 240.3,
+					"mounted": 31.8
+				},
+				{
+					"loaded": 18.7,
+					"evaluated": 145.1,
+					"hydrated": 230.7,
+					"mounted": 30.1
+				},
+				{
+					"loaded": 19,
+					"evaluated": 143.5,
+					"hydrated": 225.1,
+					"mounted": 31.6
+				},
+				{
+					"loaded": 20.1,
+					"evaluated": 147.1,
+					"hydrated": 230.9,
+					"mounted": 28.5
+				},
+				{
+					"loaded": 18.9,
+					"evaluated": 134.4,
+					"hydrated": 215,
+					"mounted": 27.9
+				},
+				{
+					"loaded": 17.1,
+					"evaluated": 132.7,
+					"hydrated": 211.4,
+					"mounted": 26.5
+				},
+				{
+					"loaded": 18.3,
+					"evaluated": 135.8,
+					"hydrated": 215.1,
+					"mounted": 27.6
+				},
+				{
+					"loaded": 17,
+					"evaluated": 129.2,
+					"hydrated": 207.3,
+					"mounted": 27.5
+				},
+				{
+					"loaded": 18.8,
+					"evaluated": 143,
+					"hydrated": 229.7,
+					"mounted": 28.5
+				},
+				{
+					"loaded": 18.6,
+					"evaluated": 138.3,
+					"hydrated": 223.2,
+					"mounted": 28.8
+				},
+				{
+					"loaded": 17.9,
+					"evaluated": 135.1,
+					"hydrated": 213.9,
+					"mounted": 26.1
+				},
+				{
+					"loaded": 20.3,
+					"evaluated": 153.7,
+					"hydrated": 244.6,
+					"mounted": 33.2
+				},
+				{
+					"loaded": 19.8,
+					"evaluated": 151.4,
+					"hydrated": 243.2,
+					"mounted": 31.6
+				}
+			]
+		},
+		{
+			"variant": "i18next, the locale's whole catalog",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 548094,
+				"brotli": 126792
+			},
+			"resources": [
+				{
+					"path": "/assets/index-CiQa75Lg.js",
+					"raw": 697,
+					"brotli": 352
+				},
+				{
+					"path": "/assets/page-BB0HeBVB.js",
+					"raw": 547397,
+					"brotli": 126440
+				}
+			],
+			"ms": {
+				"starts": 23.8,
+				"evaluates": 138,
+				"hydrates": 60,
+				"hydratedAt": 222.5,
+				"mounts": 27.9
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.54,
+					"low": 2.46,
+					"high": 2.7,
+					"confidence": 0.979,
+					"rounds": [
+						2.46,
+						3.31,
+						2.68,
+						2.78,
+						2.33,
+						2.95,
+						2.55,
+						2.65,
+						2.58,
+						2.52,
+						2.48,
+						2.45,
+						2.47,
+						2.27,
+						2.53,
+						2.7
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 26,
+					"evaluated": 182.7,
+					"hydrated": 251.3,
+					"mounted": 31.1
+				},
+				{
+					"loaded": 43.1,
+					"evaluated": 204.5,
+					"hydrated": 279.6,
+					"mounted": 35.5
+				},
+				{
+					"loaded": 23.7,
+					"evaluated": 170.3,
+					"hydrated": 233.5,
+					"mounted": 27.6
+				},
+				{
+					"loaded": 26.2,
+					"evaluated": 184.4,
+					"hydrated": 249.1,
+					"mounted": 30.3
+				},
+				{
+					"loaded": 23.9,
+					"evaluated": 162,
+					"hydrated": 220.8,
+					"mounted": 28.2
+				},
+				{
+					"loaded": 26.3,
+					"evaluated": 171.1,
+					"hydrated": 233.7,
+					"mounted": 30.7
+				},
+				{
+					"loaded": 22.6,
+					"evaluated": 155.7,
+					"hydrated": 212.9,
+					"mounted": 26.4
+				},
+				{
+					"loaded": 22.8,
+					"evaluated": 151.1,
+					"hydrated": 207.8,
+					"mounted": 27.3
+				},
+				{
+					"loaded": 24,
+					"evaluated": 154.1,
+					"hydrated": 209.9,
+					"mounted": 27.2
+				},
+				{
+					"loaded": 21,
+					"evaluated": 151.7,
+					"hydrated": 207.6,
+					"mounted": 26.9
+				},
+				{
+					"loaded": 21.9,
+					"evaluated": 155.9,
+					"hydrated": 214,
+					"mounted": 27.1
+				},
+				{
+					"loaded": 25,
+					"evaluated": 162.9,
+					"hydrated": 224.2,
+					"mounted": 29.1
+				},
+				{
+					"loaded": 21.9,
+					"evaluated": 151.2,
+					"hydrated": 204.8,
+					"mounted": 26.7
+				},
+				{
+					"loaded": 22.9,
+					"evaluated": 152.4,
+					"hydrated": 209.8,
+					"mounted": 27
+				},
+				{
+					"loaded": 23.3,
+					"evaluated": 174.5,
+					"hydrated": 238.1,
+					"mounted": 30.8
+				},
+				{
+					"loaded": 23.8,
+					"evaluated": 179.5,
+					"hydrated": 246.7,
+					"mounted": 33
+				}
+			]
+		},
+		{
+			"variant": "use-intl, the locale's whole catalog",
+			"locale": "ro",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 549881,
+				"brotli": 125214
+			},
+			"resources": [
+				{
+					"path": "/assets/index-DItu7Skp.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-BYL0nNwU.js",
+					"raw": 549184,
+					"brotli": 124867
+				}
+			],
+			"ms": {
+				"starts": 23.5,
+				"evaluates": 136.3,
+				"hydrates": 87.4,
+				"hydratedAt": 245.2,
+				"mounts": 29.2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.69,
+					"low": 3.51,
+					"high": 4.11,
+					"confidence": 0.979,
+					"rounds": [
+						3.51,
+						4.59,
+						4.11,
+						4.15,
+						3.14,
+						4.61,
+						3.75,
+						3.67,
+						3.81,
+						3.61,
+						3.35,
+						3.88,
+						3.61,
+						3.29,
+						3.62,
+						3.71
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 25.8,
+					"evaluated": 178.8,
+					"hydrated": 276.6,
+					"mounted": 31.2
+				},
+				{
+					"loaded": 27.2,
+					"evaluated": 195.2,
+					"hydrated": 299.4,
+					"mounted": 35.5
+				},
+				{
+					"loaded": 26.6,
+					"evaluated": 192,
+					"hydrated": 288.9,
+					"mounted": 30.9
+				},
+				{
+					"loaded": 27.2,
+					"evaluated": 186.4,
+					"hydrated": 283.1,
+					"mounted": 33
+				},
+				{
+					"loaded": 22.9,
+					"evaluated": 152.1,
+					"hydrated": 231.3,
+					"mounted": 26.6
+				},
+				{
+					"loaded": 24,
+					"evaluated": 177.3,
+					"hydrated": 275,
+					"mounted": 30.4
+				},
+				{
+					"loaded": 20.8,
+					"evaluated": 149.1,
+					"hydrated": 233.1,
+					"mounted": 27.1
+				},
+				{
+					"loaded": 21.1,
+					"evaluated": 147.1,
+					"hydrated": 225.6,
+					"mounted": 27.5
+				},
+				{
+					"loaded": 20.8,
+					"evaluated": 146.8,
+					"hydrated": 229.2,
+					"mounted": 28.2
+				},
+				{
+					"loaded": 23.1,
+					"evaluated": 148.5,
+					"hydrated": 228.6,
+					"mounted": 25.8
+				},
+				{
+					"loaded": 22.3,
+					"evaluated": 147.4,
+					"hydrated": 225.8,
+					"mounted": 27.6
+				},
+				{
+					"loaded": 25.2,
+					"evaluated": 180.4,
+					"hydrated": 277.5,
+					"mounted": 33
+				},
+				{
+					"loaded": 20.2,
+					"evaluated": 148.5,
+					"hydrated": 226.9,
+					"mounted": 25.6
+				},
+				{
+					"loaded": 26.9,
+					"evaluated": 150.4,
+					"hydrated": 233.6,
+					"mounted": 26.3
+				},
+				{
+					"loaded": 22.5,
+					"evaluated": 166,
+					"hydrated": 256.8,
+					"mounted": 32.3
+				},
+				{
+					"loaded": 24,
+					"evaluated": 169.7,
+					"hydrated": 262.1,
+					"mounted": 30.1
+				}
+			]
+		},
+		{
+			"variant": "Paraglide",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 174539,
+				"brotli": 37653
+			},
+			"resources": [
+				{
+					"path": "/assets/index-DMeYKnn1.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-B4M7EPe1.js",
+					"raw": 173842,
+					"brotli": 37307
+				}
+			],
+			"ms": {
+				"starts": 9.55,
+				"evaluates": 27.9,
+				"hydrates": 9.75,
+				"hydratedAt": 47.7,
+				"mounts": 4.2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.69,
+					"low": 1.59,
+					"high": 1.8,
+					"confidence": 0.979,
+					"rounds": [
+						1.61,
+						1.85,
+						1.68,
+						1.92,
+						1.57,
+						1.8,
+						1.72,
+						1.7,
+						1.61,
+						1.75,
+						1.52,
+						1.77,
+						1.59,
+						1.33,
+						2.03,
+						1.67
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 194.9,
+					"evaluated": 203.3,
+					"hydrated": 214.9,
+					"mounted": 4.5
+				},
+				{
+					"loaded": 9.2,
+					"evaluated": 40.1,
+					"hydrated": 50.1,
+					"mounted": 4.3
+				},
+				{
+					"loaded": 9.7,
+					"evaluated": 39,
+					"hydrated": 48.9,
+					"mounted": 4.4
+				},
+				{
+					"loaded": 10.3,
+					"evaluated": 43.4,
+					"hydrated": 54.7,
+					"mounted": 4.6
+				},
+				{
+					"loaded": 9.3,
+					"evaluated": 37,
+					"hydrated": 46.6,
+					"mounted": 4.3
+				},
+				{
+					"loaded": 10.2,
+					"evaluated": 39.9,
+					"hydrated": 50.5,
+					"mounted": 4.1
+				},
+				{
+					"loaded": 9.4,
+					"evaluated": 36.8,
+					"hydrated": 46.1,
+					"mounted": 4.1
+				},
+				{
+					"loaded": 8.1,
+					"evaluated": 35.3,
+					"hydrated": 44.5,
+					"mounted": 3.8
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 35,
+					"hydrated": 43.7,
+					"mounted": 4.1
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 36.6,
+					"hydrated": 45.9,
+					"mounted": 4
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 35.3,
+					"hydrated": 44.4,
+					"mounted": 3.8
+				},
+				{
+					"loaded": 10.7,
+					"evaluated": 39.5,
+					"hydrated": 50.3,
+					"mounted": 4.4
+				},
+				{
+					"loaded": 8.1,
+					"evaluated": 34.7,
+					"hydrated": 43.6,
+					"mounted": 3.7
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 35,
+					"hydrated": 43.8,
+					"mounted": 3.8
+				},
+				{
+					"loaded": 9.8,
+					"evaluated": 39.5,
+					"hydrated": 51.9,
+					"mounted": 4.6
+				},
+				{
+					"loaded": 10.1,
+					"evaluated": 41.9,
+					"hydrated": 52.4,
+					"mounted": 4.4
+				}
+			]
+		},
+		{
+			"variant": "grai, the locale's copies",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 103929,
+				"brotli": 25303
+			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "/assets/grai-ru/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 41745,
+					"brotli": 8086
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 1044,
+					"brotli": 451
+				}
+			],
+			"ms": {
+				"starts": 10.6,
+				"evaluates": 25.1,
+				"hydrates": 5.9,
+				"hydratedAt": 42.1,
+				"mounts": 1.85
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1,
+					"low": 1,
+					"high": 1,
+					"confidence": 0.979,
+					"rounds": [
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 116.2,
+					"evaluated": 119.7,
+					"hydrated": 126.9,
+					"mounted": 2.4
+				},
+				{
+					"loaded": 9.8,
+					"evaluated": 33.4,
+					"hydrated": 38.8,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 10.7,
+					"evaluated": 36.7,
+					"hydrated": 42.6,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 12.1,
+					"evaluated": 37,
+					"hydrated": 42.9,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 12.3,
+					"evaluated": 37.9,
+					"hydrated": 44,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 10.1,
+					"evaluated": 34.8,
+					"hydrated": 40.7,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 9.2,
+					"evaluated": 34.4,
+					"hydrated": 39.8,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 9.1,
+					"evaluated": 33.5,
+					"hydrated": 38.9,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 9.4,
+					"evaluated": 34.5,
+					"hydrated": 39.9,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 9.2,
+					"evaluated": 33.9,
+					"hydrated": 39.2,
+					"mounted": 1.7
+				},
+				{
+					"loaded": 10.6,
+					"evaluated": 35.7,
+					"hydrated": 41.7,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 10.9,
+					"evaluated": 37.9,
+					"hydrated": 44,
+					"mounted": 2
+				},
+				{
+					"loaded": 10.7,
+					"evaluated": 34.3,
+					"hydrated": 39.9,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 11.8,
+					"evaluated": 38.8,
+					"hydrated": 45.4,
+					"mounted": 2
+				},
+				{
+					"loaded": 11.4,
+					"evaluated": 39.9,
+					"hydrated": 46,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 10.5,
+					"evaluated": 38.3,
+					"hydrated": 44.6,
+					"mounted": 1.8
+				}
+			]
 		},
 		{
 			"variant": "grai, every locale's chunks",
 			"locale": "ru",
 			"slowdown": 1,
 			"bytes": {
-				"raw": 140610,
-				"brotli": 34719
+				"raw": 145770,
+				"brotli": 36282
 			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/grai/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 84053,
+					"brotli": 19225
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 577,
+					"brotli": 291
+				}
+			],
 			"ms": {
-				"starts": 10.5,
-				"evaluates": 1.9,
-				"hydrates": 5.9,
-				"hydratedAt": 18.2,
-				"mounts": 2.4
-			}
+				"starts": 9.55,
+				"evaluates": 27.3,
+				"hydrates": 6.1,
+				"hydratedAt": 43.8,
+				"mounts": 2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.04,
+					"low": 0.968,
+					"high": 1.13,
+					"confidence": 0.979,
+					"rounds": [
+						1,
+						1.15,
+						1.03,
+						1.19,
+						1.03,
+						1.29,
+						1.04,
+						0.944,
+						1,
+						1.13,
+						0.9,
+						0.902,
+						1.09,
+						1.05,
+						1.05,
+						0.968
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 154,
+					"evaluated": 157.8,
+					"hydrated": 165,
+					"mounted": 2.4
+				},
+				{
+					"loaded": 9.6,
+					"evaluated": 39.5,
+					"hydrated": 45.7,
+					"mounted": 2
+				},
+				{
+					"loaded": 9.2,
+					"evaluated": 37.8,
+					"hydrated": 43.9,
+					"mounted": 2
+				},
+				{
+					"loaded": 10.5,
+					"evaluated": 40.7,
+					"hydrated": 47.7,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 40.5,
+					"hydrated": 46.8,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 15.8,
+					"evaluated": 44.3,
+					"hydrated": 51.9,
+					"mounted": 2.3
+				},
+				{
+					"loaded": 8.8,
+					"evaluated": 34.8,
+					"hydrated": 40.4,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 32.9,
+					"hydrated": 38,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 33.7,
+					"hydrated": 39.1,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 10.8,
+					"evaluated": 36.2,
+					"hydrated": 42.2,
+					"mounted": 1.9
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 34.6,
+					"hydrated": 40,
+					"mounted": 1.7
+				},
+				{
+					"loaded": 9.5,
+					"evaluated": 34.5,
+					"hydrated": 40,
+					"mounted": 1.8
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 35.8,
+					"hydrated": 41.9,
+					"mounted": 1.7
+				},
+				{
+					"loaded": 10.2,
+					"evaluated": 41.2,
+					"hydrated": 48.1,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 12,
+					"evaluated": 39.4,
+					"hydrated": 45.8,
+					"mounted": 2.1
+				},
+				{
+					"loaded": 8.8,
+					"evaluated": 37.7,
+					"hydrated": 43.8,
+					"mounted": 2
+				}
+			]
 		},
 		{
 			"variant": "prototype, inlined into the template",
 			"locale": "ru",
 			"slowdown": 1,
 			"bytes": {
-				"raw": 79935,
-				"brotli": 20356
+				"raw": 79025,
+				"brotli": 20445
 			},
+			"resources": [
+				{
+					"path": "/assets/index-BviXbiaI.js",
+					"raw": 697,
+					"brotli": 343
+				},
+				{
+					"path": "/assets/page-CzwOz0bg.js",
+					"raw": 78328,
+					"brotli": 20102
+				}
+			],
 			"ms": {
-				"starts": 9.1,
-				"evaluates": 0.8,
-				"hydrates": 2.8,
-				"hydratedAt": 12.6,
-				"mounts": 1.2
-			}
+				"starts": 8.6,
+				"evaluates": 26.7,
+				"hydrates": 3.05,
+				"hydratedAt": 39.2,
+				"mounts": 1.55
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 0.539,
+					"low": 0.5,
+					"high": 0.556,
+					"confidence": 0.979,
+					"rounds": [
+						0.486,
+						0.593,
+						0.542,
+						0.508,
+						0.541,
+						0.492,
+						0.556,
+						0.537,
+						0.556,
+						0.566,
+						0.5,
+						0.459,
+						0.554,
+						0.5,
+						0.525,
+						0.556
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 88.8,
+					"evaluated": 92.2,
+					"hydrated": 95.7,
+					"mounted": 1.7
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 37.6,
+					"hydrated": 40.8,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 36.9,
+					"hydrated": 40.1,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 36.2,
+					"hydrated": 39.2,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 10.9,
+					"evaluated": 40.6,
+					"hydrated": 43.9,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 34.4,
+					"hydrated": 37.3,
+					"mounted": 1.5
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 36.2,
+					"hydrated": 39.2,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 11.2,
+					"evaluated": 33.1,
+					"hydrated": 36,
+					"mounted": 1.3
+				},
+				{
+					"loaded": 7.9,
+					"evaluated": 33.3,
+					"hydrated": 36.3,
+					"mounted": 1.3
+				},
+				{
+					"loaded": 10.4,
+					"evaluated": 34.7,
+					"hydrated": 37.7,
+					"mounted": 1.3
+				},
+				{
+					"loaded": 12.4,
+					"evaluated": 35.6,
+					"hydrated": 38.6,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 8.6,
+					"evaluated": 32.9,
+					"hydrated": 35.7,
+					"mounted": 1.4
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 33.2,
+					"hydrated": 36.3,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 37.4,
+					"hydrated": 40.7,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 37.5,
+					"hydrated": 40.7,
+					"mounted": 1.6
+				},
+				{
+					"loaded": 9,
+					"evaluated": 38.8,
+					"hydrated": 42.3,
+					"mounted": 1.6
+				}
+			]
 		},
 		{
 			"variant": "i18next",
 			"locale": "ru",
 			"slowdown": 1,
 			"bytes": {
-				"raw": 698495,
-				"brotli": 132338
+				"raw": 158892,
+				"brotli": 37029
 			},
+			"resources": [
+				{
+					"path": "/assets/index-B3ckT2M9.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-DxDuF-_l.js",
+					"raw": 158195,
+					"brotli": 36683
+				}
+			],
 			"ms": {
-				"starts": 22.7,
-				"evaluates": 5.4,
-				"hydrates": 12.5,
-				"hydratedAt": 40.9,
-				"mounts": 5.8
-			}
+				"starts": 9.25,
+				"evaluates": 27.3,
+				"hydrates": 14.3,
+				"hydratedAt": 52.2,
+				"mounts": 6.8
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.41,
+					"low": 2.17,
+					"high": 2.63,
+					"confidence": 0.979,
+					"rounds": [
+						1.81,
+						3.02,
+						2.63,
+						2.51,
+						2.41,
+						2.22,
+						2.44,
+						2.41,
+						2.67,
+						2.7,
+						2.17,
+						2.11,
+						2.3,
+						2.15,
+						2.51,
+						2.38
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 152.3,
+					"evaluated": 157.7,
+					"hydrated": 170.7,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 12.7,
+					"evaluated": 43.9,
+					"hydrated": 60.2,
+					"mounted": 8.1
+				},
+				{
+					"loaded": 9.8,
+					"evaluated": 41,
+					"hydrated": 56.5,
+					"mounted": 7.6
+				},
+				{
+					"loaded": 10,
+					"evaluated": 39.2,
+					"hydrated": 54,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 38.1,
+					"hydrated": 52.8,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 8.1,
+					"evaluated": 35.9,
+					"hydrated": 49,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 9.1,
+					"evaluated": 35.8,
+					"hydrated": 49,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 34.7,
+					"hydrated": 47.7,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 8.9,
+					"evaluated": 34.7,
+					"hydrated": 49.1,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 11.4,
+					"evaluated": 37.3,
+					"hydrated": 51.6,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 8.5,
+					"evaluated": 35,
+					"hydrated": 48,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 8.1,
+					"evaluated": 34.6,
+					"hydrated": 47.5,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 9.5,
+					"evaluated": 34.2,
+					"hydrated": 47.1,
+					"mounted": 6.2
+				},
+				{
+					"loaded": 9,
+					"evaluated": 40.3,
+					"hydrated": 54.5,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 9.9,
+					"evaluated": 42.5,
+					"hydrated": 57.8,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 9.4,
+					"evaluated": 42.3,
+					"hydrated": 57.3,
+					"mounted": 7.2
+				}
+			]
 		},
 		{
 			"variant": "use-intl",
 			"locale": "ru",
 			"slowdown": 1,
 			"bytes": {
-				"raw": 698737,
-				"brotli": 130173
+				"raw": 153470,
+				"brotli": 34987
 			},
+			"resources": [
+				{
+					"path": "/assets/index-CZFWQ54T.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-BHYlG7Xx.js",
+					"raw": 152773,
+					"brotli": 34640
+				}
+			],
 			"ms": {
-				"starts": 22.5,
-				"evaluates": 4.6,
-				"hydrates": 18.4,
-				"hydratedAt": 45.9,
-				"mounts": 6
-			}
+				"starts": 10.4,
+				"evaluates": 27.5,
+				"hydrates": 20.9,
+				"hydratedAt": 58.4,
+				"mounts": 7.35
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.59,
+					"low": 3.34,
+					"high": 3.71,
+					"confidence": 0.979,
+					"rounds": [
+						3.22,
+						4.69,
+						4.19,
+						3.86,
+						3.59,
+						3.68,
+						3.41,
+						3.59,
+						3.61,
+						3.58,
+						3.03,
+						3.34,
+						3.71,
+						2.77,
+						3.56,
+						3.35
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 154.1,
+					"evaluated": 159.9,
+					"hydrated": 183.1,
+					"mounted": 8.1
+				},
+				{
+					"loaded": 13.1,
+					"evaluated": 45.8,
+					"hydrated": 71.1,
+					"mounted": 9
+				},
+				{
+					"loaded": 13.3,
+					"evaluated": 46.3,
+					"hydrated": 71,
+					"mounted": 8
+				},
+				{
+					"loaded": 12.5,
+					"evaluated": 42.5,
+					"hydrated": 65.3,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 10.5,
+					"evaluated": 38.3,
+					"hydrated": 60.2,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 11,
+					"evaluated": 39.1,
+					"hydrated": 60.8,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 8.4,
+					"evaluated": 36,
+					"hydrated": 54.4,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 8.7,
+					"evaluated": 35.4,
+					"hydrated": 54.8,
+					"mounted": 6.5
+				},
+				{
+					"loaded": 9,
+					"evaluated": 36.4,
+					"hydrated": 55.9,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 8.3,
+					"evaluated": 34.4,
+					"hydrated": 53.4,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 8.7,
+					"evaluated": 34.9,
+					"hydrated": 53.1,
+					"mounted": 6.5
+				},
+				{
+					"loaded": 11.2,
+					"evaluated": 32,
+					"hydrated": 52.4,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 10.3,
+					"evaluated": 35.7,
+					"hydrated": 56.5,
+					"mounted": 7.3
+				},
+				{
+					"loaded": 7.9,
+					"evaluated": 34.2,
+					"hydrated": 52.5,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 9.2,
+					"evaluated": 41,
+					"hydrated": 62.7,
+					"mounted": 7.7
+				},
+				{
+					"loaded": 10.9,
+					"evaluated": 41.5,
+					"hydrated": 62.6,
+					"mounted": 7.4
+				}
+			]
+		},
+		{
+			"variant": "i18next, the locale's whole catalog",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 697413,
+				"brotli": 132454
+			},
+			"resources": [
+				{
+					"path": "/assets/index-Dk5ntyye.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-Bvq1nfJC.js",
+					"raw": 696716,
+					"brotli": 132108
+				}
+			],
+			"ms": {
+				"starts": 14.1,
+				"evaluates": 25.8,
+				"hydrates": 14.1,
+				"hydratedAt": 54.4,
+				"mounts": 6.75
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.44,
+					"low": 2.27,
+					"high": 2.61,
+					"confidence": 0.979,
+					"rounds": [
+						1.93,
+						3.28,
+						2.49,
+						2.59,
+						2.11,
+						2.92,
+						2.44,
+						2.61,
+						2.54,
+						2.43,
+						2.2,
+						2.39,
+						2.41,
+						2.27,
+						2.33,
+						2.73
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 770,
+					"evaluated": 783.9,
+					"hydrated": 797.8,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 19,
+					"evaluated": 50,
+					"hydrated": 67.7,
+					"mounted": 8.3
+				},
+				{
+					"loaded": 13.5,
+					"evaluated": 42.3,
+					"hydrated": 57,
+					"mounted": 7.4
+				},
+				{
+					"loaded": 15.5,
+					"evaluated": 43,
+					"hydrated": 58.3,
+					"mounted": 7.7
+				},
+				{
+					"loaded": 12.4,
+					"evaluated": 37.4,
+					"hydrated": 50.3,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 21.5,
+					"evaluated": 43.7,
+					"hydrated": 60.9,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 12.9,
+					"evaluated": 38.8,
+					"hydrated": 52,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 14.7,
+					"evaluated": 38.7,
+					"hydrated": 52.8,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 14.5,
+					"evaluated": 39.5,
+					"hydrated": 53.2,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 12.9,
+					"evaluated": 38.5,
+					"hydrated": 51.4,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 13,
+					"evaluated": 39.4,
+					"hydrated": 52.6,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 13.6,
+					"evaluated": 40.5,
+					"hydrated": 55.1,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 13.6,
+					"evaluated": 38.4,
+					"hydrated": 51.9,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 14.8,
+					"evaluated": 38.6,
+					"hydrated": 53.6,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 13.7,
+					"evaluated": 41.7,
+					"hydrated": 55.9,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 15.5,
+					"evaluated": 47.2,
+					"hydrated": 64.4,
+					"mounted": 7.7
+				}
+			]
+		},
+		{
+			"variant": "use-intl, the locale's whole catalog",
+			"locale": "ru",
+			"slowdown": 1,
+			"bytes": {
+				"raw": 697531,
+				"brotli": 130171
+			},
+			"resources": [
+				{
+					"path": "/assets/index-BWoNR_IA.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-uUascuMI.js",
+					"raw": 696834,
+					"brotli": 129824
+				}
+			],
+			"ms": {
+				"starts": 13.9,
+				"evaluates": 24.7,
+				"hydrates": 20.2,
+				"hydratedAt": 59.9,
+				"mounts": 6.85
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.51,
+					"low": 3.32,
+					"high": 3.69,
+					"confidence": 0.979,
+					"rounds": [
+						2.99,
+						4.19,
+						3.71,
+						3.47,
+						3.18,
+						3.64,
+						3.61,
+						3.48,
+						3.48,
+						3.64,
+						3.32,
+						4.03,
+						3.39,
+						2.83,
+						3.69,
+						3.54
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 858.8,
+					"evaluated": 872.2,
+					"hydrated": 893.7,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 16.8,
+					"evaluated": 44.4,
+					"hydrated": 67,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 13.9,
+					"evaluated": 41.2,
+					"hydrated": 63.1,
+					"mounted": 7.7
+				},
+				{
+					"loaded": 14.4,
+					"evaluated": 40.8,
+					"hydrated": 61.3,
+					"mounted": 7
+				},
+				{
+					"loaded": 12.6,
+					"evaluated": 37,
+					"hydrated": 56.4,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 13.6,
+					"evaluated": 41.4,
+					"hydrated": 62.9,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 13.8,
+					"evaluated": 38,
+					"hydrated": 57.5,
+					"mounted": 6.6
+				},
+				{
+					"loaded": 12.3,
+					"evaluated": 36.3,
+					"hydrated": 55.1,
+					"mounted": 6.2
+				},
+				{
+					"loaded": 13.2,
+					"evaluated": 36.4,
+					"hydrated": 55.2,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 12.8,
+					"evaluated": 37.4,
+					"hydrated": 56.7,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 14.3,
+					"evaluated": 38.7,
+					"hydrated": 58.6,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 15.9,
+					"evaluated": 44.3,
+					"hydrated": 68.9,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 13.5,
+					"evaluated": 38.2,
+					"hydrated": 57.2,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 12.1,
+					"evaluated": 36,
+					"hydrated": 54.7,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 14.2,
+					"evaluated": 42.3,
+					"hydrated": 64.8,
+					"mounted": 7.1
+				},
+				{
+					"loaded": 15.1,
+					"evaluated": 44.5,
+					"hydrated": 66.8,
+					"mounted": 7.6
+				}
+			]
 		},
 		{
 			"variant": "Paraglide",
 			"locale": "ru",
 			"slowdown": 4,
 			"bytes": {
-				"raw": 176423,
-				"brotli": 37554
+				"raw": 174539,
+				"brotli": 37653
 			},
+			"resources": [
+				{
+					"path": "/assets/index-DMeYKnn1.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-B4M7EPe1.js",
+					"raw": 173842,
+					"brotli": 37307
+				}
+			],
 			"ms": {
-				"starts": 40,
-				"evaluates": 10.3,
-				"hydrates": 34.7,
-				"hydratedAt": 85.7,
-				"mounts": 13.1
-			}
+				"starts": 20.4,
+				"evaluates": 132.9,
+				"hydrates": 41.1,
+				"hydratedAt": 192.9,
+				"mounts": 16.9
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.77,
+					"low": 1.67,
+					"high": 1.79,
+					"confidence": 0.979,
+					"rounds": [
+						1.63,
+						1.94,
+						1.76,
+						1.67,
+						1.88,
+						1.76,
+						1.79,
+						1.64,
+						1.79,
+						1.78,
+						1.66,
+						1.77,
+						1.77,
+						1.7,
+						1.76,
+						1.77
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 27,
+					"evaluated": 184.9,
+					"hydrated": 232,
+					"mounted": 19.8
+				},
+				{
+					"loaded": 21.6,
+					"evaluated": 157.6,
+					"hydrated": 199.7,
+					"mounted": 16.8
+				},
+				{
+					"loaded": 20.1,
+					"evaluated": 151.9,
+					"hydrated": 192.6,
+					"mounted": 16.9
+				},
+				{
+					"loaded": 21.6,
+					"evaluated": 161.3,
+					"hydrated": 203.5,
+					"mounted": 18.9
+				},
+				{
+					"loaded": 21.7,
+					"evaluated": 158.1,
+					"hydrated": 203.7,
+					"mounted": 21.1
+				},
+				{
+					"loaded": 20,
+					"evaluated": 154.1,
+					"hydrated": 193.1,
+					"mounted": 15.8
+				},
+				{
+					"loaded": 20.5,
+					"evaluated": 145.6,
+					"hydrated": 184.1,
+					"mounted": 15.9
+				},
+				{
+					"loaded": 20.2,
+					"evaluated": 143.1,
+					"hydrated": 180.9,
+					"mounted": 15.1
+				},
+				{
+					"loaded": 19.9,
+					"evaluated": 140.5,
+					"hydrated": 179.6,
+					"mounted": 15.4
+				},
+				{
+					"loaded": 18.6,
+					"evaluated": 139,
+					"hydrated": 177.1,
+					"mounted": 16
+				},
+				{
+					"loaded": 19.9,
+					"evaluated": 141,
+					"hydrated": 179.1,
+					"mounted": 16.6
+				},
+				{
+					"loaded": 22.8,
+					"evaluated": 158.2,
+					"hydrated": 200.6,
+					"mounted": 17
+				},
+				{
+					"loaded": 19,
+					"evaluated": 138.5,
+					"hydrated": 178.3,
+					"mounted": 16.3
+				},
+				{
+					"loaded": 18.2,
+					"evaluated": 140.5,
+					"hydrated": 181.9,
+					"mounted": 17.6
+				},
+				{
+					"loaded": 22.2,
+					"evaluated": 164,
+					"hydrated": 207.4,
+					"mounted": 18.4
+				},
+				{
+					"loaded": 22.2,
+					"evaluated": 165.2,
+					"hydrated": 208.5,
+					"mounted": 18.1
+				}
+			]
 		},
 		{
 			"variant": "grai, the locale's copies",
 			"locale": "ru",
 			"slowdown": 4,
 			"bytes": {
-				"raw": 97939,
-				"brotli": 23117
+				"raw": 103929,
+				"brotli": 25303
 			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "/assets/grai-ru/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 41745,
+					"brotli": 8086
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 1044,
+					"brotli": 451
+				}
+			],
 			"ms": {
-				"starts": 30.1,
-				"evaluates": 6.9,
-				"hydrates": 22.8,
-				"hydratedAt": 59.6,
-				"mounts": 10
-			}
+				"starts": 28,
+				"evaluates": 119,
+				"hydrates": 23.1,
+				"hydratedAt": 170.1,
+				"mounts": 8.15
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1,
+					"low": 1,
+					"high": 1,
+					"confidence": 0.979,
+					"rounds": [
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1,
+						1
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 36.4,
+					"evaluated": 181.4,
+					"hydrated": 210.3,
+					"mounted": 9.6
+				},
+				{
+					"loaded": 28,
+					"evaluated": 145.4,
+					"hydrated": 167.1,
+					"mounted": 8.1
+				},
+				{
+					"loaded": 28,
+					"evaluated": 147.2,
+					"hydrated": 170.3,
+					"mounted": 7.7
+				},
+				{
+					"loaded": 27.3,
+					"evaluated": 152.7,
+					"hydrated": 178,
+					"mounted": 9.3
+				},
+				{
+					"loaded": 29.5,
+					"evaluated": 156.2,
+					"hydrated": 180.4,
+					"mounted": 8.2
+				},
+				{
+					"loaded": 29.1,
+					"evaluated": 147.8,
+					"hydrated": 169.9,
+					"mounted": 8.4
+				},
+				{
+					"loaded": 28,
+					"evaluated": 141.1,
+					"hydrated": 162.6,
+					"mounted": 7.7
+				},
+				{
+					"loaded": 26.7,
+					"evaluated": 136.3,
+					"hydrated": 159.3,
+					"mounted": 7.6
+				},
+				{
+					"loaded": 26.1,
+					"evaluated": 136.6,
+					"hydrated": 158.5,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 27.3,
+					"evaluated": 135,
+					"hydrated": 156.4,
+					"mounted": 8.1
+				},
+				{
+					"loaded": 27.1,
+					"evaluated": 141.2,
+					"hydrated": 164.1,
+					"mounted": 7.2
+				},
+				{
+					"loaded": 34.5,
+					"evaluated": 157.7,
+					"hydrated": 181.6,
+					"mounted": 9.1
+				},
+				{
+					"loaded": 23.6,
+					"evaluated": 133.9,
+					"hydrated": 156.4,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 30.4,
+					"evaluated": 154.8,
+					"hydrated": 179.1,
+					"mounted": 8.7
+				},
+				{
+					"loaded": 31.6,
+					"evaluated": 162.5,
+					"hydrated": 187.1,
+					"mounted": 8.9
+				},
+				{
+					"loaded": 31.4,
+					"evaluated": 154,
+					"hydrated": 178.5,
+					"mounted": 8.8
+				}
+			]
 		},
 		{
 			"variant": "grai, every locale's chunks",
 			"locale": "ru",
 			"slowdown": 4,
 			"bytes": {
-				"raw": 140610,
-				"brotli": 34719
+				"raw": 145770,
+				"brotli": 36282
 			},
+			"resources": [
+				{
+					"path": "/assets/index-CRxmKDOg.js",
+					"raw": 697,
+					"brotli": 353
+				},
+				{
+					"path": "/assets/grai-runtime-BVM2qX-6.js",
+					"raw": 1944,
+					"brotli": 793
+				},
+				{
+					"path": "/assets/grai/grai~key-area0_part4_message5529-BUBRJUvp.js",
+					"raw": 84053,
+					"brotli": 19225
+				},
+				{
+					"path": "/assets/page-DA5cKpN_.js",
+					"raw": 58499,
+					"brotli": 15620
+				},
+				{
+					"path": "index.html, inline",
+					"raw": 577,
+					"brotli": 291
+				}
+			],
 			"ms": {
-				"starts": 34,
-				"evaluates": 8.9,
-				"hydrates": 23,
-				"hydratedAt": 67.6,
-				"mounts": 10.3
-			}
+				"starts": 20.8,
+				"evaluates": 129.8,
+				"hydrates": 24.1,
+				"hydratedAt": 174.8,
+				"mounts": 8.3
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 1.03,
+					"low": 0.997,
+					"high": 1.06,
+					"confidence": 0.979,
+					"rounds": [
+						0.997,
+						1.15,
+						1.06,
+						1.1,
+						1.02,
+						1.16,
+						1.06,
+						1,
+						1.05,
+						1.06,
+						1.03,
+						0.962,
+						0.978,
+						1.02,
+						0.955,
+						1.04
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 26.1,
+					"evaluated": 181.1,
+					"hydrated": 209.9,
+					"mounted": 10.3
+				},
+				{
+					"loaded": 21.2,
+					"evaluated": 154,
+					"hydrated": 178.9,
+					"mounted": 9.5
+				},
+				{
+					"loaded": 20.5,
+					"evaluated": 148,
+					"hydrated": 172.6,
+					"mounted": 8.3
+				},
+				{
+					"loaded": 21.7,
+					"evaluated": 158.4,
+					"hydrated": 186.3,
+					"mounted": 10
+				},
+				{
+					"loaded": 24,
+					"evaluated": 166.4,
+					"hydrated": 191,
+					"mounted": 9.5
+				},
+				{
+					"loaded": 23.6,
+					"evaluated": 167.2,
+					"hydrated": 192.9,
+					"mounted": 8.7
+				},
+				{
+					"loaded": 18.4,
+					"evaluated": 138.9,
+					"hydrated": 161.6,
+					"mounted": 8.2
+				},
+				{
+					"loaded": 20.3,
+					"evaluated": 136.2,
+					"hydrated": 159.2,
+					"mounted": 7.9
+				},
+				{
+					"loaded": 19.6,
+					"evaluated": 133.4,
+					"hydrated": 156.5,
+					"mounted": 8
+				},
+				{
+					"loaded": 20.6,
+					"evaluated": 128,
+					"hydrated": 150.6,
+					"mounted": 7.8
+				},
+				{
+					"loaded": 19.8,
+					"evaluated": 137.9,
+					"hydrated": 161.5,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 18.9,
+					"evaluated": 137.2,
+					"hydrated": 160.2,
+					"mounted": 7.9
+				},
+				{
+					"loaded": 19.6,
+					"evaluated": 132.9,
+					"hydrated": 154.9,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 22.3,
+					"evaluated": 159.5,
+					"hydrated": 184.3,
+					"mounted": 8.6
+				},
+				{
+					"loaded": 21.5,
+					"evaluated": 153.5,
+					"hydrated": 177,
+					"mounted": 8.7
+				},
+				{
+					"loaded": 21.1,
+					"evaluated": 159.3,
+					"hydrated": 184.7,
+					"mounted": 8.3
+				}
+			]
 		},
 		{
 			"variant": "prototype, inlined into the template",
 			"locale": "ru",
 			"slowdown": 4,
 			"bytes": {
-				"raw": 79935,
-				"brotli": 20356
+				"raw": 79025,
+				"brotli": 20445
 			},
+			"resources": [
+				{
+					"path": "/assets/index-BviXbiaI.js",
+					"raw": 697,
+					"brotli": 343
+				},
+				{
+					"path": "/assets/page-CzwOz0bg.js",
+					"raw": 78328,
+					"brotli": 20102
+				}
+			],
 			"ms": {
-				"starts": 26.6,
-				"evaluates": 4.1,
-				"hydrates": 12.1,
-				"hydratedAt": 43,
-				"mounts": 5.5
-			}
+				"starts": 20.5,
+				"evaluates": 122.5,
+				"hydrates": 14.1,
+				"hydratedAt": 157.1,
+				"mounts": 6.55
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 0.59,
+					"low": 0.577,
+					"high": 0.612,
+					"confidence": 0.979,
+					"rounds": [
+						0.578,
+						0.664,
+						0.641,
+						0.53,
+						0.591,
+						0.602,
+						0.684,
+						0.578,
+						0.607,
+						0.589,
+						0.572,
+						0.577,
+						0.564,
+						0.597,
+						0.581,
+						0.612
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 23.6,
+					"evaluated": 170.5,
+					"hydrated": 187.2,
+					"mounted": 8.3
+				},
+				{
+					"loaded": 20.4,
+					"evaluated": 143,
+					"hydrated": 157.4,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 20,
+					"evaluated": 146.3,
+					"hydrated": 161.1,
+					"mounted": 6.9
+				},
+				{
+					"loaded": 21,
+					"evaluated": 143.4,
+					"hydrated": 156.8,
+					"mounted": 5.6
+				},
+				{
+					"loaded": 21.3,
+					"evaluated": 148.9,
+					"hydrated": 163.2,
+					"mounted": 6.8
+				},
+				{
+					"loaded": 18.4,
+					"evaluated": 133.4,
+					"hydrated": 146.7,
+					"mounted": 6.9
+				},
+				{
+					"loaded": 21.6,
+					"evaluated": 150.9,
+					"hydrated": 165.6,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 21.7,
+					"evaluated": 134,
+					"hydrated": 147.3,
+					"mounted": 6.4
+				},
+				{
+					"loaded": 18.5,
+					"evaluated": 129.1,
+					"hydrated": 142.4,
+					"mounted": 5.8
+				},
+				{
+					"loaded": 20.4,
+					"evaluated": 136.1,
+					"hydrated": 148.7,
+					"mounted": 6.1
+				},
+				{
+					"loaded": 19.1,
+					"evaluated": 134.5,
+					"hydrated": 147.6,
+					"mounted": 5.4
+				},
+				{
+					"loaded": 24.1,
+					"evaluated": 138.7,
+					"hydrated": 152.5,
+					"mounted": 6.3
+				},
+				{
+					"loaded": 18.5,
+					"evaluated": 130,
+					"hydrated": 142.7,
+					"mounted": 5.7
+				},
+				{
+					"loaded": 19.8,
+					"evaluated": 154.9,
+					"hydrated": 169.4,
+					"mounted": 6.7
+				},
+				{
+					"loaded": 20.6,
+					"evaluated": 151.2,
+					"hydrated": 165.5,
+					"mounted": 7.5
+				},
+				{
+					"loaded": 21.5,
+					"evaluated": 153.8,
+					"hydrated": 168.8,
+					"mounted": 7
+				}
+			]
 		},
 		{
 			"variant": "i18next",
 			"locale": "ru",
 			"slowdown": 4,
 			"bytes": {
-				"raw": 698495,
-				"brotli": 132338
+				"raw": 158892,
+				"brotli": 37029
 			},
+			"resources": [
+				{
+					"path": "/assets/index-B3ckT2M9.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-DxDuF-_l.js",
+					"raw": 158195,
+					"brotli": 36683
+				}
+			],
 			"ms": {
-				"starts": 64.3,
-				"evaluates": 23.4,
-				"hydrates": 51.8,
-				"hydratedAt": 136.1,
-				"mounts": 24.4
-			}
+				"starts": 19.6,
+				"evaluates": 126.8,
+				"hydrates": 58.6,
+				"hydratedAt": 206.4,
+				"mounts": 28.3
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.5,
+					"low": 2.38,
+					"high": 2.57,
+					"confidence": 0.979,
+					"rounds": [
+						2.07,
+						3.37,
+						2.77,
+						2.27,
+						2.49,
+						2.51,
+						2.84,
+						2.44,
+						2.56,
+						2.47,
+						2.38,
+						2.36,
+						2.41,
+						2.57,
+						2.51,
+						2.57
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 19.8,
+					"evaluated": 145.6,
+					"hydrated": 205.3,
+					"mounted": 28.2
+				},
+				{
+					"loaded": 26,
+					"evaluated": 181.3,
+					"hydrated": 254.4,
+					"mounted": 34.8
+				},
+				{
+					"loaded": 23.8,
+					"evaluated": 167.1,
+					"hydrated": 231,
+					"mounted": 29.6
+				},
+				{
+					"loaded": 21.4,
+					"evaluated": 156.3,
+					"hydrated": 213.8,
+					"mounted": 29.5
+				},
+				{
+					"loaded": 19.5,
+					"evaluated": 147.3,
+					"hydrated": 207.6,
+					"mounted": 28.4
+				},
+				{
+					"loaded": 18,
+					"evaluated": 140.1,
+					"hydrated": 195.5,
+					"mounted": 26
+				},
+				{
+					"loaded": 19.1,
+					"evaluated": 148.2,
+					"hydrated": 209.3,
+					"mounted": 29
+				},
+				{
+					"loaded": 19.1,
+					"evaluated": 138.8,
+					"hydrated": 195,
+					"mounted": 25.7
+				},
+				{
+					"loaded": 19.7,
+					"evaluated": 136.1,
+					"hydrated": 192.1,
+					"mounted": 26.9
+				},
+				{
+					"loaded": 18.9,
+					"evaluated": 139.9,
+					"hydrated": 192.8,
+					"mounted": 28.1
+				},
+				{
+					"loaded": 18.9,
+					"evaluated": 138.7,
+					"hydrated": 193.3,
+					"mounted": 26.5
+				},
+				{
+					"loaded": 19.1,
+					"evaluated": 138,
+					"hydrated": 194.5,
+					"mounted": 26.7
+				},
+				{
+					"loaded": 19.5,
+					"evaluated": 138.8,
+					"hydrated": 193.1,
+					"mounted": 26.2
+				},
+				{
+					"loaded": 22.5,
+					"evaluated": 159.4,
+					"hydrated": 221.8,
+					"mounted": 30.9
+				},
+				{
+					"loaded": 21.1,
+					"evaluated": 160.7,
+					"hydrated": 222.5,
+					"mounted": 31.7
+				},
+				{
+					"loaded": 21.3,
+					"evaluated": 163.9,
+					"hydrated": 226.8,
+					"mounted": 30.1
+				}
+			]
 		},
 		{
 			"variant": "use-intl",
 			"locale": "ru",
 			"slowdown": 4,
 			"bytes": {
-				"raw": 698737,
-				"brotli": 130173
+				"raw": 153470,
+				"brotli": 34987
 			},
+			"resources": [
+				{
+					"path": "/assets/index-CZFWQ54T.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-BHYlG7Xx.js",
+					"raw": 152773,
+					"brotli": 34640
+				}
+			],
 			"ms": {
-				"starts": 63.9,
-				"evaluates": 19.9,
-				"hydrates": 72.5,
-				"hydratedAt": 156.8,
-				"mounts": 23.5
-			}
+				"starts": 20.9,
+				"evaluates": 131.3,
+				"hydrates": 88.3,
+				"hydratedAt": 240.6,
+				"mounts": 30.2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.76,
+					"low": 3.63,
+					"high": 4.21,
+					"confidence": 0.979,
+					"rounds": [
+						3.74,
+						4.91,
+						4.45,
+						4.21,
+						3.64,
+						4.35,
+						3.68,
+						3.63,
+						3.65,
+						3.81,
+						3.55,
+						3.48,
+						3.94,
+						3.23,
+						3.78,
+						3.79
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 27.4,
+					"evaluated": 172.6,
+					"hydrated": 280.8,
+					"mounted": 38.1
+				},
+				{
+					"loaded": 26.4,
+					"evaluated": 189.6,
+					"hydrated": 296.1,
+					"mounted": 35.8
+				},
+				{
+					"loaded": 23.6,
+					"evaluated": 180.4,
+					"hydrated": 283.1,
+					"mounted": 34.8
+				},
+				{
+					"loaded": 25.1,
+					"evaluated": 183.1,
+					"hydrated": 289.7,
+					"mounted": 35
+				},
+				{
+					"loaded": 21.4,
+					"evaluated": 155.2,
+					"hydrated": 243.2,
+					"mounted": 32.3
+				},
+				{
+					"loaded": 22,
+					"evaluated": 165.7,
+					"hydrated": 261.8,
+					"mounted": 32.4
+				},
+				{
+					"loaded": 19,
+					"evaluated": 139.4,
+					"hydrated": 218.6,
+					"mounted": 28
+				},
+				{
+					"loaded": 19.2,
+					"evaluated": 136.8,
+					"hydrated": 220.4,
+					"mounted": 27.4
+				},
+				{
+					"loaded": 19.3,
+					"evaluated": 140.8,
+					"hydrated": 220.8,
+					"mounted": 27.8
+				},
+				{
+					"loaded": 19.5,
+					"evaluated": 138.5,
+					"hydrated": 220.1,
+					"mounted": 27.3
+				},
+				{
+					"loaded": 23.8,
+					"evaluated": 137.3,
+					"hydrated": 218.5,
+					"mounted": 27.9
+				},
+				{
+					"loaded": 19.3,
+					"evaluated": 145.7,
+					"hydrated": 228.8,
+					"mounted": 29.9
+				},
+				{
+					"loaded": 20.7,
+					"evaluated": 149.5,
+					"hydrated": 238.1,
+					"mounted": 28.7
+				},
+				{
+					"loaded": 18.8,
+					"evaluated": 135.7,
+					"hydrated": 214.3,
+					"mounted": 27.3
+				},
+				{
+					"loaded": 20.5,
+					"evaluated": 155.9,
+					"hydrated": 248.9,
+					"mounted": 32
+				},
+				{
+					"loaded": 21.1,
+					"evaluated": 162,
+					"hydrated": 254.9,
+					"mounted": 30.5
+				}
+			]
+		},
+		{
+			"variant": "i18next, the locale's whole catalog",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 697413,
+				"brotli": 132454
+			},
+			"resources": [
+				{
+					"path": "/assets/index-Dk5ntyye.js",
+					"raw": 697,
+					"brotli": 346
+				},
+				{
+					"path": "/assets/page-Bvq1nfJC.js",
+					"raw": 696716,
+					"brotli": 132108
+				}
+			],
+			"ms": {
+				"starts": 24.8,
+				"evaluates": 134.6,
+				"hydrates": 57.1,
+				"hydratedAt": 215.8,
+				"mounts": 28.2
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 2.57,
+					"low": 2.43,
+					"high": 2.67,
+					"confidence": 0.979,
+					"rounds": [
+						1.94,
+						3.5,
+						2.98,
+						2.67,
+						2.33,
+						3.19,
+						2.59,
+						2.51,
+						2.56,
+						2.6,
+						2.43,
+						2.66,
+						2.5,
+						2.3,
+						2.63,
+						2.55
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 25,
+					"evaluated": 160.2,
+					"hydrated": 216.2,
+					"mounted": 26.3
+				},
+				{
+					"loaded": 35.8,
+					"evaluated": 208.2,
+					"hydrated": 284.2,
+					"mounted": 33.9
+				},
+				{
+					"loaded": 29.4,
+					"evaluated": 191.3,
+					"hydrated": 260.1,
+					"mounted": 35.2
+				},
+				{
+					"loaded": 26.1,
+					"evaluated": 181.8,
+					"hydrated": 249.4,
+					"mounted": 31.8
+				},
+				{
+					"loaded": 23.3,
+					"evaluated": 156.8,
+					"hydrated": 213.3,
+					"mounted": 25.4
+				},
+				{
+					"loaded": 29,
+					"evaluated": 189.4,
+					"hydrated": 259.9,
+					"mounted": 31.9
+				},
+				{
+					"loaded": 23.1,
+					"evaluated": 157,
+					"hydrated": 212.7,
+					"mounted": 28
+				},
+				{
+					"loaded": 26.4,
+					"evaluated": 157.7,
+					"hydrated": 215.4,
+					"mounted": 26.3
+				},
+				{
+					"loaded": 22.7,
+					"evaluated": 156,
+					"hydrated": 212,
+					"mounted": 25.6
+				},
+				{
+					"loaded": 21.3,
+					"evaluated": 150.4,
+					"hydrated": 206.1,
+					"mounted": 26.4
+				},
+				{
+					"loaded": 22.7,
+					"evaluated": 153.6,
+					"hydrated": 209.3,
+					"mounted": 28.4
+				},
+				{
+					"loaded": 25.7,
+					"evaluated": 167.5,
+					"hydrated": 231.1,
+					"mounted": 29.2
+				},
+				{
+					"loaded": 22.4,
+					"evaluated": 152.1,
+					"hydrated": 208.3,
+					"mounted": 27
+				},
+				{
+					"loaded": 22.8,
+					"evaluated": 151.9,
+					"hydrated": 207.7,
+					"mounted": 25.3
+				},
+				{
+					"loaded": 24.5,
+					"evaluated": 177.1,
+					"hydrated": 241.9,
+					"mounted": 30.2
+				},
+				{
+					"loaded": 28.7,
+					"evaluated": 183.2,
+					"hydrated": 245.6,
+					"mounted": 30.3
+				}
+			]
+		},
+		{
+			"variant": "use-intl, the locale's whole catalog",
+			"locale": "ru",
+			"slowdown": 4,
+			"bytes": {
+				"raw": 697531,
+				"brotli": 130171
+			},
+			"resources": [
+				{
+					"path": "/assets/index-BWoNR_IA.js",
+					"raw": 697,
+					"brotli": 347
+				},
+				{
+					"path": "/assets/page-uUascuMI.js",
+					"raw": 696834,
+					"brotli": 129824
+				}
+			],
+			"ms": {
+				"starts": 24.8,
+				"evaluates": 133.5,
+				"hydrates": 85.7,
+				"hydratedAt": 247.9,
+				"mounts": 28.4
+			},
+			"against": "grai, the locale's copies",
+			"ratio": {
+				"hydrates": {
+					"median": 3.67,
+					"low": 3.42,
+					"high": 3.88,
+					"confidence": 0.979,
+					"rounds": [
+						3.06,
+						4.17,
+						3.88,
+						3.39,
+						3.42,
+						3.88,
+						4.19,
+						3.53,
+						3.68,
+						3.66,
+						3.53,
+						4.15,
+						3.53,
+						3.32,
+						3.83,
+						3.8
+					]
+				}
+			},
+			"loads": [
+				{
+					"loaded": 26.7,
+					"evaluated": 167.2,
+					"hydrated": 255.5,
+					"mounted": 28.9
+				},
+				{
+					"loaded": 26.3,
+					"evaluated": 172.3,
+					"hydrated": 262.8,
+					"mounted": 29.7
+				},
+				{
+					"loaded": 27.1,
+					"evaluated": 173.2,
+					"hydrated": 262.9,
+					"mounted": 30.6
+				},
+				{
+					"loaded": 25.2,
+					"evaluated": 163.3,
+					"hydrated": 249,
+					"mounted": 28.9
+				},
+				{
+					"loaded": 23.9,
+					"evaluated": 151.6,
+					"hydrated": 234.3,
+					"mounted": 27.6
+				},
+				{
+					"loaded": 24.7,
+					"evaluated": 161.2,
+					"hydrated": 246.9,
+					"mounted": 30
+				},
+				{
+					"loaded": 35.1,
+					"evaluated": 160.2,
+					"hydrated": 250.3,
+					"mounted": 28
+				},
+				{
+					"loaded": 23.6,
+					"evaluated": 150.6,
+					"hydrated": 231.9,
+					"mounted": 27.9
+				},
+				{
+					"loaded": 22,
+					"evaluated": 149.7,
+					"hydrated": 230.4,
+					"mounted": 26.1
+				},
+				{
+					"loaded": 22.3,
+					"evaluated": 146.1,
+					"hydrated": 224.4,
+					"mounted": 26.5
+				},
+				{
+					"loaded": 22.2,
+					"evaluated": 152.7,
+					"hydrated": 233.5,
+					"mounted": 27.2
+				},
+				{
+					"loaded": 34.8,
+					"evaluated": 186.9,
+					"hydrated": 286.1,
+					"mounted": 32.8
+				},
+				{
+					"loaded": 22.4,
+					"evaluated": 147.8,
+					"hydrated": 227.3,
+					"mounted": 26.8
+				},
+				{
+					"loaded": 22.7,
+					"evaluated": 148,
+					"hydrated": 228.6,
+					"mounted": 27.3
+				},
+				{
+					"loaded": 26,
+					"evaluated": 172.6,
+					"hydrated": 266.9,
+					"mounted": 31.6
+				},
+				{
+					"loaded": 24.8,
+					"evaluated": 171,
+					"hydrated": 264,
+					"mounted": 34
+				}
+			]
 		}
 	]
 }

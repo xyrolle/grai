@@ -1,6 +1,6 @@
 {
 	"bench": "refactor-synthetic",
-	"date": "2026-10-28T09:17:06.614Z",
+	"date": "2026-10-28T20:59:40.711Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,11 +8,11 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 13.7,
-		"end": 24
+		"start": 5.82,
+		"end": 6.22
 	},
 	"node": "24.16.0",
-	"grai": "1253e02",
+	"grai": "e1293d8d",
 	"versions": {
 		"@inlang/paraglide-js": "2.29.1",
 		"i18next": "26.4.7",
@@ -30,74 +30,74 @@
 	"rows": {
 		"check": {
 			"ran": "grai check --json",
-			"cold": 3366.5,
+			"cold": 2503.9,
 			"coldSamples": {
-				"median": 3366.5,
-				"low": 2808.1,
-				"high": 4077.5,
+				"median": 2503.9,
+				"low": 2235.7,
+				"high": 2680.3,
 				"confidence": 0.969,
 				"samples": [
-					2830.2,
-					2808.1,
-					3214.1,
-					4077.5,
-					4055.4,
-					3519
+					2415.3,
+					2592.5,
+					2235.7,
+					2656.4,
+					2376.2,
+					2680.3
 				]
 			},
-			"warm": 775.1,
+			"warm": 483.3,
 			"warmSamples": {
-				"median": 775.1,
-				"low": 601.7,
-				"high": 1057.8,
+				"median": 483.3,
+				"low": 429.7,
+				"high": 723.5,
 				"confidence": 0.969,
 				"samples": [
-					799,
-					601.7,
-					731.8,
-					879.3,
-					751.2,
-					1057.8
+					723.5,
+					511.6,
+					485,
+					448.9,
+					481.6,
+					429.7
 				]
 			},
 			"rounds": [
 				{
-					"load": 13.7,
+					"load": 5.82,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 13.7,
+					"load": 6,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 13.6,
+					"load": 6.56,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 14.1,
+					"load": 6.56,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 14.3,
+					"load": 6.67,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 15.2,
+					"load": 6.46,
 					"order": [
 						"warm",
 						"cold"
@@ -107,74 +107,74 @@
 		},
 		"find": {
 			"ran": "grai find area70_label_5793",
-			"cold": 3568.6,
+			"cold": 2479.8,
 			"coldSamples": {
-				"median": 3568.6,
-				"low": 3144.9,
-				"high": 3902.8,
+				"median": 2479.8,
+				"low": 2412.8,
+				"high": 2575.9,
 				"confidence": 0.969,
 				"samples": [
-					3446.9,
-					3846.6,
-					3902.8,
-					3144.9,
-					3247.1,
-					3690.4
+					2412.8,
+					2489.6,
+					2439.4,
+					2500.1,
+					2575.9,
+					2470
 				]
 			},
-			"warm": 700.8,
+			"warm": 378.8,
 			"warmSamples": {
-				"median": 700.8,
-				"low": 619.1,
-				"high": 750.7,
+				"median": 378.8,
+				"low": 367.1,
+				"high": 464.1,
 				"confidence": 0.969,
 				"samples": [
-					750.7,
-					619.1,
-					748.5,
-					701,
-					700.6,
-					656.1
+					367.1,
+					464.1,
+					375.2,
+					367.5,
+					417.6,
+					382.4
 				]
 			},
 			"rounds": [
 				{
-					"load": 15.4,
+					"load": 6.46,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 16.1,
+					"load": 6.66,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 18.4,
+					"load": 6.53,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 19.4,
+					"load": 6.53,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 19.4,
+					"load": 6.17,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 19.7,
+					"load": 6.39,
 					"order": [
 						"warm",
 						"cold"
@@ -184,74 +184,74 @@
 		},
 		"rename": {
 			"ran": "grai rename area70_label_5793 area70_label_5793_x",
-			"cold": 3316.5,
+			"cold": 2554,
 			"coldSamples": {
-				"median": 3316.5,
-				"low": 3093.4,
-				"high": 4598.8,
+				"median": 2554,
+				"low": 2465.1,
+				"high": 2597.2,
 				"confidence": 0.969,
 				"samples": [
-					3093.4,
-					3289.1,
-					3116.3,
-					3558.3,
-					3344,
-					4598.8
+					2540.4,
+					2465.1,
+					2597.2,
+					2549.3,
+					2558.7,
+					2588.5
 				]
 			},
-			"warm": 726.9,
+			"warm": 443.2,
 			"warmSamples": {
-				"median": 726.9,
-				"low": 622.9,
-				"high": 772.3,
+				"median": 443.2,
+				"low": 432.2,
+				"high": 465.5,
 				"confidence": 0.969,
 				"samples": [
-					622.9,
-					730.1,
-					723.7,
-					745.8,
-					711.8,
-					772.3
+					465.5,
+					432.2,
+					449.5,
+					433.9,
+					461.2,
+					437
 				]
 			},
 			"rounds": [
 				{
-					"load": 20,
+					"load": 6.39,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 19.8,
+					"load": 6.6,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 19.9,
+					"load": 6.31,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 19.6,
+					"load": 5.97,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 19,
+					"load": 5.97,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 19.1,
+					"load": 5.65,
 					"order": [
 						"warm",
 						"cold"
@@ -261,74 +261,74 @@
 		},
 		"check --fix": {
 			"ran": "grai check --fix",
-			"cold": 3249.9,
+			"cold": 2692.5,
 			"coldSamples": {
-				"median": 3249.9,
-				"low": 3048,
-				"high": 3443.8,
+				"median": 2692.5,
+				"low": 2616.7,
+				"high": 2749.2,
 				"confidence": 0.969,
 				"samples": [
-					3443.8,
-					3304,
-					3239.8,
-					3048,
-					3259.9,
-					3083.1
+					2625.2,
+					2749.2,
+					2616.7,
+					2707.5,
+					2677.5,
+					2738.4
 				]
 			},
-			"warm": 891.9,
+			"warm": 578,
 			"warmSamples": {
-				"median": 891.9,
-				"low": 747,
-				"high": 918,
+				"median": 578,
+				"low": 543.3,
+				"high": 617.5,
 				"confidence": 0.969,
 				"samples": [
-					907.4,
-					918,
-					903.5,
-					880.2,
-					801,
-					747
+					565.6,
+					590.3,
+					543.3,
+					600.3,
+					553.5,
+					617.5
 				]
 			},
 			"rounds": [
 				{
-					"load": 20.5,
+					"load": 6.32,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 20.3,
+					"load": 6.29,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 21.9,
+					"load": 6.29,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 22.2,
+					"load": 6.11,
 					"order": [
 						"warm",
 						"cold"
 					]
 				},
 				{
-					"load": 23.3,
+					"load": 6.5,
 					"order": [
 						"cold",
 						"warm"
 					]
 				},
 				{
-					"load": 23.1,
+					"load": 6.22,
 					"order": [
 						"warm",
 						"cold"
