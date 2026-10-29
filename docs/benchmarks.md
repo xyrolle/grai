@@ -226,7 +226,7 @@ Each variant makes the same 2,000 calls inside a request in Node, built as an ap
 
 ### Next.js: a cold dev server's first page
 
-Turbopack compiles grai's message functions in each layer that imports them, where next-intl's catalog is data. A built Next.js page is smaller on grai (in the numbers below).
+next-intl in both its setups: with the client component's keys picked, as its docs advise, and with the whole catalog, its default.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/next-first-page-dark.svg">

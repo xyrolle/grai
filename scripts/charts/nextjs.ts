@@ -88,7 +88,7 @@ export function nextColdSection(): Section {
 		id: "next-cold",
 		heading: "Next.js: a cold dev server's first page",
 		readme: true,
-		lead: "Turbopack compiles grai's message functions in each layer that imports them, where next-intl's catalog is data. A built Next.js page is smaller on grai (in the numbers below).",
+		lead: "next-intl in both its setups: with the client component's keys picked, as its docs advise, and with the whole catalog, its default.",
 		figures: [
 			{
 				id: "next-first-page",
