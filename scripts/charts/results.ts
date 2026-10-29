@@ -105,9 +105,12 @@ export const nanoseconds = (ns: number): string =>
 export const kilobytes = (bytes: number): string =>
 	`${tenths(bytes / 1024)} KB`;
 
-/** A ratio as a multiple: "390×", "6.4×", "0.98×". */
+/**
+ * A ratio as a multiple: "390×", "6.4×", "1.02×", "0.98×". Under 2 it keeps two places, so an
+ * interval's end just past 1 does not read as 1.
+ */
 export function times(value: number): string {
-	const digits = value >= 10 ? 0 : value >= 1 ? 1 : 2;
+	const digits = value >= 10 ? 0 : value >= 2 ? 1 : 2;
 	return `${value.toLocaleString("en", { maximumFractionDigits: digits, minimumFractionDigits: digits })}×`;
 }
 
