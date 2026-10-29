@@ -101,6 +101,16 @@ const measured: Record<string, string> = {
 	"types-synthetic-13326": "the editor's completions at 13,326 keys",
 };
 
+/** The days a window spans, in UTC: "28 Oct 2026", or "28–29 Oct 2026" across midnight. */
+function days(first: number, last: number): string {
+	const day = (time: number, parts: Intl.DateTimeFormatOptions) =>
+		new Date(time).toLocaleDateString("en-GB", { timeZone: "UTC", ...parts });
+	const whole = { day: "numeric", month: "short", year: "numeric" } as const;
+	return day(first, whole) === day(last, whole)
+		? day(last, whole)
+		: `${day(first, { day: "numeric" })}–${day(last, whole)}`;
+}
+
 const capitalized = (text: string) =>
 	`${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
 
@@ -146,11 +156,10 @@ export function cited(): Record<string, string> {
 	const at = ({ name, date, load }: Run & { name: string }) =>
 		`${measured[name] ?? name} (${new Date(date).toISOString().slice(11, 16)} UTC, its load from ${whole(load.start)} to ${whole(load.end)})`;
 	return {
-		"bench-date": new Date(date).toLocaleDateString("en-GB", {
-			day: "numeric",
-			month: "short",
-			year: "numeric",
-		}),
+		"bench-date": days(
+			Math.min(...window.map((run) => Date.parse(run.date))),
+			Date.parse(date),
+		),
 		"bench-machine": `${machine.cpu === "unknown" ? "a machine" : `an ${machine.cpu}`} with ${machine.cores} cores`,
 		"bench-load": `${whole(Math.min(...loads))} to ${whole(Math.max(...loads))}`,
 		"bench-after":
