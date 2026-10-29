@@ -88,8 +88,11 @@ function tickStep(max: number, ticks: number): number {
 	return step * power;
 }
 
-const number = (value: number) =>
-	value.toLocaleString("en", { maximumFractionDigits: value < 10 ? 1 : 0 });
+/** A tick's number, with as many decimals as its step has: 2.5, 5, 7.5, 10, 12.5. */
+const number = (value: number, step: number) =>
+	value.toLocaleString("en", {
+		maximumFractionDigits: Number.isInteger(step) ? 0 : step < 1 ? 2 : 1,
+	});
 
 /** A coordinate to a tenth of a pixel, finer than a screen draws. */
 const at = (value: number) => Math.round(value * 10) / 10;
@@ -113,7 +116,7 @@ const xmlText = (text: string) =>
 /** About the width of a character of the subtitle's 13 px type, to wrap it within the chart. */
 const subtitleCharacterWidth = 6.6;
 /** About the width of a character of the title's 16 px bold type, to wrap it within the chart. */
-const titleCharacterWidth = 8.8;
+const titleCharacterWidth = 8.2;
 
 /** Text broken at spaces into lines of at most `characters` characters. A subtitle too long for one line breaks at its clauses first. */
 function wrapped(text: string, characters: number): string[] {
@@ -200,7 +203,7 @@ export function barChart(chart: BarChart, theme: Theme): string {
 		const x = at(x0 + scale(tick));
 		grid.push(
 			`<line x1="${x}" y1="${plotTop}" x2="${x}" y2="${plotBottom}" stroke="${tick === 0 ? theme.baseline : theme.grid}" stroke-width="1"/>`,
-			`<text x="${x}" y="${plotBottom + 17}" font-size="12" text-anchor="middle" fill="${theme.secondary}" style="font-variant-numeric: tabular-nums">${number(tick)}</text>`,
+			`<text x="${x}" y="${plotBottom + 17}" font-size="12" text-anchor="middle" fill="${theme.secondary}" style="font-variant-numeric: tabular-nums">${number(tick, step)}</text>`,
 		);
 	}
 	const height = plotBottom + 46;
