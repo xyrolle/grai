@@ -7,37 +7,39 @@
 <text x="16" y="78" font-size="13" fill="#52514e">lower is better</text>
 <line x1="208" y1="99" x2="208" y2="295" stroke="#c3c2b7" stroke-width="1"/>
 <text x="208" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="253" y1="99" x2="253" y2="295" stroke="#e1e0d9" stroke-width="1"/>
-<text x="253" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">5</text>
-<line x1="298" y1="99" x2="298" y2="295" stroke="#e1e0d9" stroke-width="1"/>
-<text x="298" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">10</text>
-<line x1="343" y1="99" x2="343" y2="295" stroke="#e1e0d9" stroke-width="1"/>
-<text x="343" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">15</text>
+<line x1="244" y1="99" x2="244" y2="295" stroke="#e1e0d9" stroke-width="1"/>
+<text x="244" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">5</text>
+<line x1="280" y1="99" x2="280" y2="295" stroke="#e1e0d9" stroke-width="1"/>
+<text x="280" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">10</text>
+<line x1="316" y1="99" x2="316" y2="295" stroke="#e1e0d9" stroke-width="1"/>
+<text x="316" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">15</text>
+<line x1="352" y1="99" x2="352" y2="295" stroke="#e1e0d9" stroke-width="1"/>
+<text x="352" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">20</text>
 <line x1="388" y1="99" x2="388" y2="295" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">20</text>
+<text x="388" y="312" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">25</text>
 <text x="198" y="120" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M208,108H249.9A4,4 0 0 1 253.9,112V118A4,4 0 0 1 249.9,122H208Z" fill="#2a78d6"/>
-<path d="M253,115H256.6M253,111V119M256.6,111V119" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="262.6" y="120" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">5.1 ms</text>
+<path d="M208,108H246.5A4,4 0 0 1 250.5,112V118A4,4 0 0 1 246.5,122H208Z" fill="#2a78d6"/>
+<path d="M246.9,115H251.9M246.9,111V119M251.9,111V119" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="257.9" y="120" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">5.9 ms</text>
 <text x="198" y="152" font-size="14" text-anchor="end" fill="#0b0b0b">Paraglide</text>
-<path d="M208,140H281A4,4 0 0 1 285,144V150A4,4 0 0 1 281,154H208Z" fill="#898781"/>
-<path d="M282.7,147H293.5M282.7,143V151M293.5,143V151" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="299.5" y="152" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">8.6 ms</text>
+<path d="M208,140H274.2A4,4 0 0 1 278.2,144V150A4,4 0 0 1 274.2,154H208Z" fill="#898781"/>
+<path d="M273.5,147H285.8M273.5,143V151M285.8,143V151" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="291.8" y="152" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">9.8 ms</text>
 <text x="198" y="184" font-size="14" text-anchor="end" fill="#0b0b0b">i18next, whole catalog</text>
-<path d="M208,172H314.3A4,4 0 0 1 318.3,176V182A4,4 0 0 1 314.3,186H208Z" fill="#898781"/>
-<path d="M316,179H324.1M316,175V183M324.1,175V183" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="330.1" y="184" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">12.2 ms</text>
+<path d="M208,172H305.9A4,4 0 0 1 309.9,176V182A4,4 0 0 1 305.9,186H208Z" fill="#898781"/>
+<path d="M303,179H318.2M303,175V183M318.2,175V183" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="324.2" y="184" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">14.1 ms</text>
 <text x="198" y="216" font-size="14" text-anchor="end" fill="#0b0b0b">i18next, page's keys</text>
-<path d="M208,204H314.7A4,4 0 0 1 318.7,208V214A4,4 0 0 1 314.7,218H208Z" fill="#898781"/>
-<path d="M316,211H329.5M316,207V215M329.5,207V215" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="335.5" y="216" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">12.3 ms</text>
-<text x="198" y="248" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl, page's keys</text>
-<path d="M208,236H365.1A4,4 0 0 1 369.1,240V246A4,4 0 0 1 365.1,250H208Z" fill="#898781"/>
-<path d="M364.6,243H377.2M364.6,239V247M377.2,239V247" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="383.2" y="248" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">17.9 ms</text>
-<text x="198" y="280" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl, whole catalog</text>
-<path d="M208,268H368.3A4,4 0 0 1 372.3,272V278A4,4 0 0 1 368.3,282H208Z" fill="#898781"/>
-<path d="M365.5,275H378.1M365.5,271V279M378.1,271V279" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="384.1" y="280" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">18.3 ms</text>
+<path d="M208,204H306.6A4,4 0 0 1 310.6,208V214A4,4 0 0 1 306.6,218H208Z" fill="#898781"/>
+<path d="M301.6,211H316M301.6,207V215M316,207V215" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="322" y="216" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">14.3 ms</text>
+<text x="198" y="248" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl, whole catalog</text>
+<path d="M208,236H349.4A4,4 0 0 1 353.4,240V246A4,4 0 0 1 349.4,250H208Z" fill="#898781"/>
+<path d="M344.8,243H368.6M344.8,239V247M368.6,239V247" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="374.6" y="248" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">20.2 ms</text>
+<text x="198" y="280" font-size="14" text-anchor="end" fill="#0b0b0b">use-intl, page's keys</text>
+<path d="M208,268H354.8A4,4 0 0 1 358.8,272V278A4,4 0 0 1 354.8,282H208Z" fill="#898781"/>
+<path d="M344.8,275H372.2M344.8,271V279M372.2,271V279" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="378.2" y="280" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">21.0 ms</text>
 <text x="388" y="332" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>

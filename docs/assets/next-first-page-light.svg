@@ -8,29 +8,31 @@
 <text x="16" y="98" font-size="13" fill="#52514e">lower is better</text>
 <line x1="216" y1="119" x2="216" y2="251" stroke="#c3c2b7" stroke-width="1"/>
 <text x="216" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="259" y1="119" x2="259" y2="251" stroke="#e1e0d9" stroke-width="1"/>
-<text x="259" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
-<line x1="302" y1="119" x2="302" y2="251" stroke="#e1e0d9" stroke-width="1"/>
-<text x="302" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
-<line x1="345" y1="119" x2="345" y2="251" stroke="#e1e0d9" stroke-width="1"/>
-<text x="345" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">3,000</text>
+<line x1="250.4" y1="119" x2="250.4" y2="251" stroke="#e1e0d9" stroke-width="1"/>
+<text x="250.4" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">500</text>
+<line x1="284.8" y1="119" x2="284.8" y2="251" stroke="#e1e0d9" stroke-width="1"/>
+<text x="284.8" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,000</text>
+<line x1="319.2" y1="119" x2="319.2" y2="251" stroke="#e1e0d9" stroke-width="1"/>
+<text x="319.2" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">1,500</text>
+<line x1="353.6" y1="119" x2="353.6" y2="251" stroke="#e1e0d9" stroke-width="1"/>
+<text x="353.6" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,000</text>
 <line x1="388" y1="119" x2="388" y2="251" stroke="#e1e0d9" stroke-width="1"/>
-<text x="388" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">4,000</text>
-<text x="206" y="140" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl, keys picked</text>
-<path d="M216,128H316.5A4,4 0 0 1 320.5,132V138A4,4 0 0 1 316.5,142H216Z" fill="#898781"/>
-<path d="M278.1,135H330.3M278.1,131V139M330.3,131V139" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="336.3" y="140" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.43 s</text>
+<text x="388" y="268" font-size="12" text-anchor="middle" fill="#52514e" style="font-variant-numeric: tabular-nums">2,500</text>
+<text x="206" y="140" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl, whole catalog</text>
+<path d="M216,128H338A4,4 0 0 1 342,132V138A4,4 0 0 1 338,142H216Z" fill="#898781"/>
+<path d="M331.7,135H361.9M331.7,131V139M361.9,131V139" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="367.9" y="140" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">1.83 s</text>
 <text x="206" y="172" font-size="14" text-anchor="end" font-weight="600" fill="#0b0b0b">grai</text>
-<path d="M216,160H317.9A4,4 0 0 1 321.9,164V170A4,4 0 0 1 317.9,174H216Z" fill="#2a78d6"/>
-<path d="M286.4,167H333.6M286.4,163V171M333.6,163V171" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="339.6" y="172" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.46 s</text>
-<text x="206" y="204" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl, whole catalog</text>
-<path d="M216,192H320.9A4,4 0 0 1 324.9,196V202A4,4 0 0 1 320.9,206H216Z" fill="#898781"/>
-<path d="M281.5,199H333.4M281.5,195V203M333.4,195V203" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="339.4" y="204" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.53 s</text>
+<path d="M216,160H346.9A4,4 0 0 1 350.9,164V170A4,4 0 0 1 346.9,174H216Z" fill="#2a78d6"/>
+<path d="M328.9,167H384.1M328.9,163V171M384.1,163V171" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="390.1" y="172" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">1.96 s</text>
+<text x="206" y="204" font-size="14" text-anchor="end" fill="#0b0b0b">next-intl, keys picked</text>
+<path d="M216,192H347.5A4,4 0 0 1 351.5,196V202A4,4 0 0 1 347.5,206H216Z" fill="#898781"/>
+<path d="M343.6,199H373.3M343.6,195V203M373.3,195V203" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="379.3" y="204" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">1.97 s</text>
 <text x="206" y="236" font-size="14" text-anchor="end" fill="#0b0b0b">grai, fresh clone</text>
-<path d="M216,224H337.7A4,4 0 0 1 341.7,228V234A4,4 0 0 1 337.7,238H216Z" fill="#898781"/>
-<path d="M288.9,231H353.9M288.9,227V235M353.9,227V235" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
-<text x="359.9" y="236" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.92 s</text>
+<path d="M216,224H353.4A4,4 0 0 1 357.4,228V234A4,4 0 0 1 353.4,238H216Z" fill="#898781"/>
+<path d="M349.8,231H369.8M349.8,227V235M369.8,227V235" stroke="#0b0b0b" stroke-width="1.5" fill="none"/>
+<text x="375.8" y="236" font-size="14" fill="#0b0b0b" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" style="font-variant-numeric: tabular-nums">2.06 s</text>
 <text x="388" y="288" font-size="12" text-anchor="end" fill="#52514e">milliseconds</text>
 </svg>
