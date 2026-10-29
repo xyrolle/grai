@@ -1,6 +1,6 @@
 {
 	"bench": "library-bytes-synthetic",
-	"date": "2026-10-27T14:49:22.268Z",
+	"date": "2026-10-29T04:49:17.780Z",
 	"machine": {
 		"cpu": "Apple M5 Pro",
 		"cores": 18,
@@ -8,11 +8,11 @@
 		"os": "darwin 27.2.0"
 	},
 	"load": {
-		"start": 7.4,
-		"end": 7.7
+		"start": 15.1,
+		"end": 14.4
 	},
 	"node": "24.16.0",
-	"grai": "cee60fe2",
+	"grai": "e1293d8d",
 	"versions": {
 		"@inlang/paraglide-js": "2.29.1",
 		"i18next": "26.4.7",
@@ -25,12 +25,73 @@
 	},
 	"app": "synthetic, 6,366 keys",
 	"locale": "ru",
+	"shown": [
+		{
+			"key": "area28_part9_message3714",
+			"kind": "text"
+		},
+		{
+			"key": "area82_part2_message470",
+			"kind": "inputs"
+		},
+		{
+			"key": "area66_part1_message66",
+			"kind": "plural"
+		}
+	],
 	"rows": [
 		{
 			"library": "grai, as its build writes the locale's copies",
 			"runtime": {
-				"brotli": 636,
-				"raw": 1453
+				"brotli": 1467,
+				"raw": 3388
+			},
+			"page": {
+				"brotli": 1947,
+				"raw": 4246,
+				"resources": [
+					{
+						"path": "/assets/index-_NwD4l3k.js",
+						"raw": 697,
+						"brotli": 347
+					},
+					{
+						"path": "/assets/grai-runtime-D-XDI8LU.js",
+						"raw": 1876,
+						"brotli": 760
+					},
+					{
+						"path": "/assets/page-Cm45PIkh.js",
+						"raw": 151,
+						"brotli": 125
+					},
+					{
+						"path": "/assets/grai-ru/grai~key-area28_part9_message3714-BxuKJ8vM.js",
+						"raw": 478,
+						"brotli": 264
+					},
+					{
+						"path": "index.html, inline",
+						"raw": 1044,
+						"brotli": 451
+					}
+				]
+			},
+			"withoutLibrary": {
+				"brotli": 480,
+				"raw": 858,
+				"resources": [
+					{
+						"path": "/assets/index-COEi6U2s.js",
+						"raw": 697,
+						"brotli": 343
+					},
+					{
+						"path": "/assets/page-CepwbvRk.js",
+						"raw": 161,
+						"brotli": 137
+					}
+				]
 			},
 			"messages": {
 				"brotli": 93839,
@@ -47,19 +108,83 @@
 		{
 			"library": "Paraglide, every locale",
 			"runtime": {
-				"brotli": 3702,
-				"raw": 10734
+				"brotli": 1893,
+				"raw": 4842
+			},
+			"page": {
+				"brotli": 2373,
+				"raw": 5700,
+				"resources": [
+					{
+						"path": "/assets/index-BUyT4Bqr.js",
+						"raw": 697,
+						"brotli": 346
+					},
+					{
+						"path": "/assets/page-C3M8bMM4.js",
+						"raw": 5003,
+						"brotli": 2027
+					}
+				]
+			},
+			"withoutLibrary": {
+				"brotli": 480,
+				"raw": 858,
+				"resources": [
+					{
+						"path": "/assets/index-COEi6U2s.js",
+						"raw": 697,
+						"brotli": 343
+					},
+					{
+						"path": "/assets/page-CepwbvRk.js",
+						"raw": 161,
+						"brotli": 137
+					}
+				]
 			},
 			"messages": {
-				"brotli": 272112,
+				"brotli": 272333,
 				"raw": 1791224
 			}
 		},
 		{
 			"library": "i18next",
 			"runtime": {
-				"brotli": 12359,
-				"raw": 43478
+				"brotli": 12456,
+				"raw": 43818
+			},
+			"page": {
+				"brotli": 12936,
+				"raw": 44676,
+				"resources": [
+					{
+						"path": "/assets/index-DykFEmKy.js",
+						"raw": 697,
+						"brotli": 346
+					},
+					{
+						"path": "/assets/page-LHIYJqC8.js",
+						"raw": 43979,
+						"brotli": 12590
+					}
+				]
+			},
+			"withoutLibrary": {
+				"brotli": 480,
+				"raw": 858,
+				"resources": [
+					{
+						"path": "/assets/index-COEi6U2s.js",
+						"raw": 697,
+						"brotli": 343
+					},
+					{
+						"path": "/assets/page-CepwbvRk.js",
+						"raw": 161,
+						"brotli": 137
+					}
+				]
 			},
 			"messages": {
 				"brotli": 104024,
@@ -69,8 +194,40 @@
 		{
 			"library": "use-intl",
 			"runtime": {
-				"brotli": 10481,
-				"raw": 39006
+				"brotli": 10428,
+				"raw": 39110
+			},
+			"page": {
+				"brotli": 10908,
+				"raw": 39968,
+				"resources": [
+					{
+						"path": "/assets/index-CYDy3vDU.js",
+						"raw": 697,
+						"brotli": 348
+					},
+					{
+						"path": "/assets/page-Bi6U8vGI.js",
+						"raw": 39271,
+						"brotli": 10560
+					}
+				]
+			},
+			"withoutLibrary": {
+				"brotli": 480,
+				"raw": 858,
+				"resources": [
+					{
+						"path": "/assets/index-COEi6U2s.js",
+						"raw": 697,
+						"brotli": 343
+					},
+					{
+						"path": "/assets/page-CepwbvRk.js",
+						"raw": 161,
+						"brotli": 137
+					}
+				]
 			},
 			"messages": {
 				"brotli": 102218,
@@ -82,6 +239,34 @@
 			"messages": {
 				"brotli": 106948,
 				"raw": 796814
+			}
+		},
+		{
+			"library": "grai, runtime.js with every export, alone",
+			"runtime": {
+				"brotli": 636,
+				"raw": 1453
+			}
+		},
+		{
+			"library": "Paraglide, runtime.js with every export, alone",
+			"runtime": {
+				"brotli": 3664,
+				"raw": 10632
+			}
+		},
+		{
+			"library": "i18next, init and t, alone",
+			"runtime": {
+				"brotli": 12359,
+				"raw": 43478
+			}
+		},
+		{
+			"library": "use-intl, createTranslator, alone",
+			"runtime": {
+				"brotli": 10481,
+				"raw": 39006
 			}
 		}
 	]
